@@ -1,0 +1,47 @@
+# Hate Watch API on Fly.io. Deploy from this folder: fly deploy --ha=false
+# App names are global on Fly: if "hate-watch-api" is taken, change it here AND in app/eas.json.
+app = "hate-watch-api"
+primary_region = "iad"   # US East: closest to ESPN's API and most US users
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  HW_DB = "/data/hatewatch.db"
+  # HW_DEV must stay unset in production (it enables /dev/simulate).
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The live-game poller and every open WebSocket run inside this one process.
+  # It must never be stopped for idleness, and there must be exactly one machine.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"     # each open app holds one WebSocket
+    soft_limit = 2000
+    hard_limit = 2500
+
+[[http_service.checks]]
+  # First boot downloads ~5,000 players and verifies every image (~30-60s) before listening.
+  grace_period = "120s"
+  interval = "30s"
+  timeout = "5s"
+  method = "GET"
+  path = "/health"
+
+[[mounts]]
+  source = "hatewatch_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[deploy]
+  # One machine + one volume: replace it in place (a few seconds of downtime per deploy).
+  strategy = "immediate"

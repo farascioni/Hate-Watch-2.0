@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hate-watch-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "app", "expo", "start", "--web", "--port", "8081"],
+      "cwd": "app",
+      "port": 8081
+    }
+  ]
+}

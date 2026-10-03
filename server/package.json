@@ -1,0 +1,22 @@
+{
+  "name": "hate-watch-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hate Watch real-time backend: ESPN ingest, live play detection, push + websocket fan-out",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.ts",
+    "ingest": "node --disable-warning=ExperimentalWarning src/ingest-cli.ts",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.0"
+  }
+}
