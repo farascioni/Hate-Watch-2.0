@@ -57,4 +57,18 @@ check('unfollow works', (await call('GET', '/me/follows', token)).follows.length
 const bad = await fetch(`${B}/me/feed`, { headers: { authorization: 'Bearer nope.nope' } });
 check('bad token rejected', bad.status === 401);
 ws.close();
+
+for (const page of ['/privacy', '/support']) {
+  const r = await fetch(B + page);
+  const html = await r.text();
+  check(`${page} serves HTML with a contact email`, r.ok && r.headers.get('content-type')?.startsWith('text/html') && /mailto:[^"]+@/.test(html));
+}
+
+const ws2 = new WebSocket(`${B.replace('http', 'ws')}/ws?token=${token}`);
+await new Promise((r) => ws2.on('open', r));
+const closed = new Promise<number>((r) => ws2.on('close', (code) => r(code)));
+await call('DELETE', '/me', token);
+check('delete-all closes the live socket', (await closed) === 4401);
+const gone = await fetch(`${B}/me/follows`, { headers: { authorization: `Bearer ${token}` } });
+check('deleted device token no longer works', gone.status === 401);
 console.log('health:', JSON.stringify((await call('GET', '/health')).live));

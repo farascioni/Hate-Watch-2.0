@@ -28,6 +28,12 @@ export async function ensureToken(): Promise<string> {
   return token;
 }
 
+/** Drop the stored identity; the next request registers a fresh anonymous device. */
+export async function forgetToken() {
+  token = null;
+  await storage.del(TOKEN_KEY);
+}
+
 async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (auth) headers.authorization = `Bearer ${await ensureToken()}`;
@@ -61,5 +67,6 @@ export const api = {
 
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),
   clearFeed: () => request('DELETE', '/me/feed'),
+  deleteMe: () => request('DELETE', '/me'),
   simulate: () => request('POST', '/dev/simulate', {}),
 };

@@ -79,6 +79,32 @@ npx eas-cli@latest build --platform ios --profile production    # Apple ID login
 npx eas-cli@latest submit --platform ios --latest               # uploads to App Store Connect / TestFlight
 ```
 
+### App Store Connect answers
+
+| Field | Value |
+|---|---|
+| Privacy Policy URL | https://hate-watch-api.fly.dev/privacy |
+| Support URL | https://hate-watch-api.fly.dev/support |
+| Data collection | **Yes** |
+| Identifiers → Device ID | App Functionality · linked to the user · not used for tracking |
+| Usage Data → Product Interaction (tracked teams/players, alert settings) | App Functionality · linked to the user · not used for tracking |
+| Tracking | **No** |
+| Account deletion | In-app: Settings → Delete all my data (`DELETE /me`) |
+
+The contact email on those pages comes from `HW_CONTACT_EMAIL` in `server/fly.toml`. Double-check these answers against the current App Store Connect questionnaire. The answers are your responsibility as the publisher.
+
+### Icons and splash
+
+The artwork is an angry eye. Every icon is generated from vector source in [`app/scripts/build-icons.mjs`](app/scripts/build-icons.mjs):
+
+- the iOS 1024 px icon (opaque, as Apple requires)
+- the Android adaptive foreground, background and monochrome layers
+- the Android notification icon
+- the splash image
+- the web favicon
+
+After editing the script, regenerate with `cd app && npm run icons`.
+
 ## Data: rosters, duplicates, and images
 
 Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, MLB, NFL and NHL**. The NHL is included because several of the requested alerts are hockey alerts.
@@ -161,4 +187,3 @@ HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws deliv
 - Goalie-on-ice for NHL goals is inferred from the last save each goalie made. Empty-net goals are skipped.
 - MLB "gives up runs" credits the pitcher on the mound, not official earned-run or inherited-runner accounting.
 - Standings and injury alerts fire on change. The first snapshot after a fresh install is a silent baseline.
-- App icon and splash are still the Expo defaults.

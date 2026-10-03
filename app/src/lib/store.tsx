@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { api, ensureToken, WS_URL } from './api';
+import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import type { EventType, FeedItem, League, Prefs, Target } from './types';
 
@@ -27,6 +27,7 @@ interface Store {
   leagues: { id: League; name: string }[];
   push: { status: PushStatus | 'unknown'; reason?: string };
   enablePush: () => Promise<void>;
+  deleteAllData: () => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -143,6 +144,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       setPush({ status: r.status, reason: r.reason });
       if (r.token) await api.setPushToken(r.token);
+    },
+    deleteAllData: async () => {
+      // Server deletes the device (follows, prefs, feed, push token) and drops our socket;
+      // we then start over as a brand-new anonymous device.
+      await api.deleteMe();
+      await forgetToken();
+      setFollows(new Map());
+      setFeed([]);
+      setUnseen(0);
+      setPrefs(await api.prefs());
+      const r = await registerForPush();
+      if (r.token) api.setPushToken(r.token).catch(() => {});
     },
   }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed]);
 

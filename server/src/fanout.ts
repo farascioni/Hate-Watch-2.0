@@ -76,6 +76,13 @@ export function addSocket(deviceId: string, ws: WebSocket) {
   ws.on('close', () => sockets.get(deviceId)?.delete(ws));
 }
 
+/** After a device deletes itself: drop cached prefs and close its live sockets. */
+export function forgetDevice(deviceId: string) {
+  prefsCache.delete(deviceId);
+  for (const ws of sockets.get(deviceId) ?? []) ws.close(4401, 'deleted');
+  sockets.delete(deviceId);
+}
+
 // ─── Feed item shape (shared by REST + websocket) ─────────────────────────────────────────────
 export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);

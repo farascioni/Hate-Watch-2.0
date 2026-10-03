@@ -1,6 +1,6 @@
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useStore } from '../../lib/store';
-import { api } from '../../lib/api';
+import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { colors, leagueColors, radius, space } from '../../theme';
 import type { EventType, League } from '../../lib/types';
@@ -49,7 +49,7 @@ function HourStepper({ label, value, onChange }: { label: string; value: string;
 }
 
 export default function SettingsScreen() {
-  const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed } = useStore();
+  const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   if (!prefs) return null;
 
   const on = (t: EventType) => prefs.types[t.id] ?? t.defaultOn;
@@ -111,11 +111,28 @@ export default function SettingsScreen() {
         }}>
           <Text style={[styles.actionText, { color: colors.hate }]}>Clear feed</Text>
         </Pressable>
+        <Pressable style={styles.action} onPress={() => {
+          const go = () => deleteAllData().catch((e) => Alert.alert('Could not delete', String(e)));
+          const msg = 'This permanently deletes everyone you track, your settings and your feed from our server, and gives this device a fresh anonymous identity.';
+          if (Platform.OS === 'web') { if (window.confirm(msg)) go(); }
+          else Alert.alert('Delete all my data?', msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete everything', style: 'destructive', onPress: go }]);
+        }}>
+          <Text style={[styles.actionText, { color: colors.hate }]}>Delete all my data</Text>
+        </Pressable>
         {__DEV__ ? (
           <Pressable style={styles.action} onPress={() => api.simulate().catch((e) => Alert.alert('Simulate failed', String(e)))}>
             <Text style={styles.actionText}>🧪 Send a test event (dev)</Text>
           </Pressable>
         ) : null}
+      </View>
+      <SectionHeader>About</SectionHeader>
+      <View style={styles.card}>
+        <Pressable style={styles.action} onPress={() => Linking.openURL(`${API_URL}/privacy`)} accessibilityRole="link">
+          <Text style={styles.actionText}>Privacy policy</Text>
+        </Pressable>
+        <Pressable style={styles.action} onPress={() => Linking.openURL(`${API_URL}/support`)} accessibilityRole="link">
+          <Text style={styles.actionText}>Help & support</Text>
+        </Pressable>
       </View>
       <Text style={styles.footer}>Data: ESPN public APIs. Live plays polled every ~2s; injury report every 30s; standings every 60s.</Text>
     </ScrollView>

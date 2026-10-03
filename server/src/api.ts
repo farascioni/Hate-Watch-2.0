@@ -5,8 +5,14 @@ import { db, kvGet } from './db.ts';
 import { catalog, search, teamDto, playerDto, targetDto } from './catalog.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
-import { addSocket, feedItem, getPrefs, setPrefs, publish, DEFAULT_PREFS } from './fanout.ts';
+import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT_PREFS } from './fanout.ts';
 import { engine } from './live.ts';
+import { privacyPage, supportPage } from './pages.ts';
+
+class Html {
+  body: string;
+  constructor(body: string) { this.body = body; }
+}
 
 type Handler = (req: IncomingMessage & { deviceId?: string }, url: URL, params: string[], body: any) => unknown | Promise<unknown>;
 class HttpError extends Error {
@@ -99,6 +105,18 @@ route('DELETE', '/me/feed', true, (req) => {
   return { ok: true };
 });
 
+// "Delete all my data": the device row cascades to follows + feed (see db.ts foreign keys).
+route('DELETE', '/me', true, (req) => {
+  db.prepare('DELETE FROM devices WHERE id = ?').run(req.deviceId!);
+  forgetDevice(req.deviceId!);
+  engine.kick();
+  return { ok: true };
+});
+
+// ─── Public pages (App Store privacy policy + support URLs) ───────────────────────────────────
+route('GET', '/privacy', false, () => new Html(privacyPage()));
+route('GET', '/support', false, () => new Html(supportPage()));
+
 // ─── Dev only: inject a fake event to test push + feed end to end ─────────────────────────────
 if (process.env.HW_DEV === '1') {
   route('POST', '/dev/simulate', true, (req, _u, _p, body) => {
@@ -132,6 +150,7 @@ export function startApi(port: number) {
         body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
       }
       const out = await r.fn(req, url, url.pathname.match(r.re)!.slice(1), body);
+      if (out instanceof Html) return void res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300' }).end(out.body);
       res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(out ?? null));
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;
