@@ -2,7 +2,10 @@ import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
 import { LEAGUE_IDS, urls, teamKey, playerKey, type League } from './leagues.ts';
-import { PLAYER_DETECTORS, fromCorePlay, fromSitePlay, teamScoreEvents, nextScore, scoreLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import {
+  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, scoreLine, teamScoreEvents,
+  type Detected, type GameCtx, type NPlay,
+} from './detectors.ts';
 import { publish } from './fanout.ts';
 
 const LIVE_POLL_MS = Number(process.env.HW_LIVE_POLL_MS ?? 2000);      // per live game
@@ -69,13 +72,10 @@ class GameTracker {
     ]);
     if (core.status === 'rejected' && summary.status === 'rejected') throw core.reason;
 
-    const byId = new Map<string, NPlay>();
-    if (core.status === 'fulfilled') for (const p of core.value.items ?? []) { const n = fromCorePlay(p); byId.set(n.id, n); }
-    if (summary.status === 'fulfilled' && league !== 'nfl') {
-      // NFL summary has no flat plays list (drives only, without participants); core covers it.
-      for (const p of summary.value.plays ?? []) { const n = fromSitePlay(p); if (!byId.has(n.id)) byId.set(n.id, n); }
-    }
-    const plays = [...byId.values()].sort((a, b) => a.seq - b.seq);
+    const corePlays: NPlay[] = core.status === 'fulfilled' ? (core.value.items ?? []).map(fromCorePlay) : [];
+    // NFL summary has no flat plays list (drives only, without participants); core covers it.
+    const sitePlays: NPlay[] = summary.status === 'fulfilled' && league !== 'nfl' ? (summary.value.plays ?? []).map(fromSitePlay) : [];
+    const plays = mergePlays(corePlays, sitePlays);
 
     let final: { home: number; away: number } | null = null;
     if (summary.status === 'fulfilled') {
@@ -98,9 +98,12 @@ class GameTracker {
       this.seen.add(p.id);
       const prev = this.score;
       this.score = nextScore(prev, p);
-      if (this.first && p.at < cutoff) continue; // history from before we attached: keep state, don't notify
-      events.push(...PLAYER_DETECTORS[league](this.ctx, p));
-      if (this.score.home !== prev.home || this.score.away !== prev.away) events.push(...teamScoreEvents(this.ctx, prev, p));
+      // History from before we attached updates state but is never notified.
+      if (!(this.first && p.at < cutoff)) {
+        events.push(...PLAYER_DETECTORS[league](this.ctx, p));
+        if (this.score.home !== prev.home || this.score.away !== prev.away) events.push(...teamScoreEvents(this.ctx, prev, p));
+      }
+      observePlay(this.ctx, p);
     }
     this.first = false;
     if (events.length) publish(events, league);
@@ -117,6 +120,8 @@ class GameTracker {
   finish(final: { home: number; away: number }) {
     if (this.finished) return;
     this.finished = true;
+    const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
+    if (lastHalf.length) publish(lastHalf, this.ctx.league);
     if (final.home === final.away) return; // ties are miserable for everyone, but not a loss
     const loserId = final.home < final.away ? this.ctx.homeId : this.ctx.awayId;
     const winnerId = loserId === this.ctx.homeId ? this.ctx.awayId : this.ctx.homeId;
@@ -234,11 +239,6 @@ export function parseStandings(res: any): Map<string, StandingSnap> {
   walk(res);
   return out;
 }
-
-export const ordinal = (n: number) => {
-  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-};
 
 async function scanStandings(lg: League) {
   const now = parseStandings(await getJson(urls.standings(lg), { timeoutMs: 8000 }));

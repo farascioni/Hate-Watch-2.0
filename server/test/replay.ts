@@ -3,7 +3,7 @@
 import { loadCatalog } from '../src/catalog.ts';
 import { getJson } from '../src/espn.ts';
 import { urls, type League } from '../src/leagues.ts';
-import { PLAYER_DETECTORS, fromCorePlay, fromSitePlay, teamScoreEvents, nextScore, type GameCtx, type Detected } from '../src/detectors.ts';
+import { PLAYER_DETECTORS, fromCorePlay, fromSitePlay, mlbFinalHalfInning, nextScore, observePlay, teamScoreEvents, type GameCtx, type Detected } from '../src/detectors.ts';
 
 loadCatalog();
 const games = process.argv.slice(2).length ? process.argv.slice(2) : ['mlb:401907973', 'nfl:401872963', 'nhl:401891781', 'nba:401811026'];
@@ -29,7 +29,10 @@ for (const g of games) {
     score = nextScore(prev, p);
     events.push(...PLAYER_DETECTORS[league](ctx, p));
     if (score.home !== prev.home || score.away !== prev.away) events.push(...teamScoreEvents(ctx, prev, p));
+    observePlay(ctx, p);
   }
+  events.push(...mlbFinalHalfInning(ctx)); // what the live tracker does at the final
+  for (const e of events.filter((x) => x.type === 'mlb.team.stranded_risp')) console.log(`  🏝️  ${e.title} | ${e.body.slice(0, 110)}`);
   const finalHome = Number(comp.competitors.find((c: any) => c.homeAway === 'home').score);
   const finalAway = Number(comp.competitors.find((c: any) => c.homeAway === 'away').score);
   const ok = score.home === finalHome && score.away === finalAway;

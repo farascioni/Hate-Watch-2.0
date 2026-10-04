@@ -59,9 +59,13 @@ export default function SettingsScreen() {
   const setAll = (types: EventType[], v: boolean) => updatePrefs({ types: Object.fromEntries(types.map((t) => [t.id, v])) });
 
   const groups: { title: string; color?: string; league?: League; types: EventType[] }[] = [
-    ...leagues.map((l) => ({ title: `${l.name} player alerts`, color: leagueColors[l.id], league: l.id, types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length === 1 && t.leagues[0] === l.id) })),
+    // League-only alerts (player ones first, then team ones like MLB "strands runners") live under their league.
+    ...leagues.map((l) => ({
+      title: `${l.name} alerts`, color: leagueColors[l.id], league: l.id,
+      types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id).sort((a, b) => Number(a.scope === 'team') - Number(b.scope === 'team')),
+    })),
     { title: 'All player alerts', types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
-    { title: 'Team alerts', types: eventTypes.filter((t) => t.scope === 'team') },
+    { title: 'Team alerts', types: eventTypes.filter((t) => t.scope === 'team' && t.leagues.length > 1) },
   ];
 
   return (

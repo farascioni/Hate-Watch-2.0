@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 // The DB module opens its file on import, so point it at memory before loading app code.
 process.env.HW_DB = ':memory:';
 const { wants, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
-const { parseStandings, ordinal } = await import('../src/live.ts');
-const { nextScore } = await import('../src/detectors.ts');
+const { parseStandings } = await import('../src/live.ts');
+const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, PLAYER_DETECTORS } = await import('../src/detectors.ts');
+
+const play = (o: object) => ({ id: '1', type: '', typeSlug: '', text: '', participants: [], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false, ...o });
 const { normalize } = await import('../src/catalog.ts');
 
 const prefs = (over: object = {}) => ({ ...DEFAULT_PREFS, ...over });
@@ -38,7 +40,6 @@ test('quiet hours handle windows that cross midnight, in the user timezone', () 
 });
 
 test('only scoring plays move the score, and scores never go backwards', () => {
-  const play = (o: object) => ({ id: '1', seq: 1, type: '', typeSlug: '', text: '', participants: [], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false, ...o });
   assert.deepEqual(nextScore({ home: 0, away: 0 }, play({ home: 3 })), { home: 0, away: 0 });
   assert.deepEqual(nextScore({ home: 0, away: 0 }, play({ home: 3, scoring: true })), { home: 3, away: 0 });
   assert.deepEqual(nextScore({ home: 3, away: 1 }, play({ home: 0, away: 2, scoring: true })), { home: 3, away: 2 });
@@ -51,6 +52,46 @@ test('standings parser ranks by playoff seed within each group', () => {
   assert.equal(s.get('1')!.rank, 1);
   assert.equal(s.get('3')!.clincher, 'e');
   assert.equal(s.get('3')!.streak, 'L4');
+});
+
+test('merging the two ESPN sources keeps play order (never sorts) and slots in source-only plays', () => {
+  const ids = (ps: { id: string }[]) => ps.map((p) => p.id).join(',');
+  const P = (id: string) => play({ id });
+  // MLB-style: ids are not chronological, so any sort would scramble them.
+  assert.equal(ids(mergePlays([P('9'), P('2'), P('7')], [P('9'), P('2'), P('7')])), '9,2,7');
+  // Core (primary) is missing play 5 that only the summary has: it lands after its predecessor 2.
+  assert.equal(ids(mergePlays([P('9'), P('2'), P('7')], [P('9'), P('2'), P('5'), P('7')])), '9,2,5,7');
+  // Core failed entirely: summary order is used.
+  assert.equal(ids(mergePlays([], [P('3'), P('1')])), '3,1');
+});
+
+test('MLB: stranding runners in scoring position', () => {
+  const ctx = () => ({ league: 'mlb' as const, gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() });
+  const result = (runners: string[], extra: object = {}) => play({
+    id: `r-${runners.join('')}`, typeSlug: 'play-result', teamId: '22', text: 'Stott struck out looking.', outs: 3,
+    period: { type: 'Top', number: 4 },
+    participants: [{ id: '1', role: 'pitcher' }, { id: '2', role: 'batter' }, ...runners.map((r, i) => ({ id: `${10 + i}`, role: r }))],
+    ...extra,
+  });
+  const endInning = play({ id: 'end', typeSlug: 'end-inning', teamId: '22' });
+  const run = (runners: string[]) => { const g = ctx(); observePlay(g, result(runners)); return PLAYER_DETECTORS.mlb(g, endInning); };
+
+  const second = run(['onSecond']);
+  assert.equal(second.length, 1);
+  assert.equal(second[0].type, 'mlb.team.stranded_risp');
+  assert.equal(second[0].targetKey, 'team:mlb:22'); // the batting team is the one that stranded them
+  assert.match(second[0].title, /stranded a runner on second/);
+  assert.match(second[0].body, /^Top 4th: Stott struck out looking\./);
+  assert.match(run(['onSecond', 'onThird'])[0].title, /stranded 2 runners in scoring position/);
+  assert.match(run(['onFirst', 'onSecond', 'onThird'])[0].title, /left the bases loaded/);
+  assert.equal(run(['onFirst']).length, 0, 'a runner on first is not in scoring position');
+  assert.equal(run([]).length, 0);
+
+  // The game's last half-inning has no End Inning play: checked at the final instead.
+  const g = ctx(); observePlay(g, result(['onThird']));
+  assert.equal(mlbFinalHalfInning(g).length, 1);
+  const walkoff = ctx(); observePlay(walkoff, result(['onSecond'], { outs: 1 }));
+  assert.equal(mlbFinalHalfInning(walkoff).length, 0, 'a walk-off ends with fewer than 3 outs');
 });
 
 test('ordinals and search normalization', () => {

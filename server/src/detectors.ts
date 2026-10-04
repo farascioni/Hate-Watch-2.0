@@ -5,7 +5,6 @@ import { playerKey, teamKey, type League } from './leagues.ts';
 /** League-agnostic view of one play. */
 export interface NPlay {
   id: string;              // identical across the site and core APIs
-  seq: number;             // ESPN sequenceNumber, for ordering merged sources
   type: string;            // ESPN type text, e.g. "Pass Interception Return", "Missed"
   typeSlug: string;        // ESPN type.type / abbreviation when present ("play-result", "shot-missed")
   text: string;
@@ -18,6 +17,8 @@ export interface NPlay {
   at: number;              // epoch ms the play happened (ESPN wallclock), falls back to detection time
   shooting: boolean;
   penaltyMinutes?: number;
+  outs?: number;           // MLB: outs in the half-inning after this play
+  period?: { type: string; number: number }; // MLB: { type: 'Top' | 'Bottom' | 'Mid' | 'End', number }
 }
 
 export interface GameCtx {
@@ -27,6 +28,8 @@ export interface GameCtx {
   awayId: string;
   /** NHL: who is in net for each team right now (teamId -> athleteId). Updated as plays stream in. */
   goalies: Map<string, string>;
+  /** MLB: the latest at-bat result. Its onFirst/onSecond/onThird roles are the bases AFTER that play. */
+  lastResult?: NPlay;
 }
 
 export interface Detected {
@@ -44,7 +47,6 @@ export interface Detected {
 export function fromSitePlay(p: any): NPlay {
   return {
     id: String(p.id),
-    seq: Number(p.sequenceNumber ?? 0),
     type: String(p.type?.text ?? '').replace(/\n/g, ' '),
     typeSlug: String(p.type?.type ?? p.type?.abbreviation ?? ''),
     text: String(p.text ?? '').replace(/\n/g, ' '),
@@ -57,13 +59,20 @@ export function fromSitePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : undefined,
+    ...mlbFields(p),
+  };
+}
+
+function mlbFields(p: any): Pick<NPlay, 'outs' | 'period'> {
+  return {
+    outs: p.outs != null ? Number(p.outs) : undefined,
+    period: p.period?.type ? { type: String(p.period.type), number: Number(p.period.number ?? 0) } : undefined,
   };
 }
 
 export function fromCorePlay(p: any): NPlay {
   return {
     id: String(p.id),
-    seq: Number(p.sequenceNumber ?? 0),
     type: String(p.type?.text ?? ''),
     typeSlug: String(p.type?.type ?? p.type?.abbreviation ?? ''),
     text: String(p.text ?? '').replace(/\n/g, ' '),
@@ -76,7 +85,43 @@ export function fromCorePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : p.penalty?.minutes ? Number(p.penalty.minutes) : undefined,
+    ...mlbFields(p),
   };
+}
+
+/**
+ * Merge two chronologically ordered play lists by id, keeping play order. Plays only in
+ * `secondary` are placed right after the play that preceded them there. (ESPN's sequenceNumber
+ * restarts every MLB at-bat, so sorting by it scrambles a baseball game.)
+ */
+export function mergePlays(primary: NPlay[], secondary: NPlay[]): NPlay[] {
+  const out = [...primary];
+  const ids = new Set(out.map((p) => p.id));
+  let anchor = -1;
+  for (const p of secondary) {
+    if (ids.has(p.id)) {
+      let j = anchor + 1;
+      while (j < out.length && out[j].id !== p.id) j++;
+      anchor = j < out.length ? j : out.findIndex((q) => q.id === p.id);
+      continue;
+    }
+    out.splice(anchor + 1, 0, p);
+    anchor++;
+    ids.add(p.id);
+  }
+  return out;
+}
+
+/**
+ * Passive game state that later plays depend on. Runs for EVERY play, including history
+ * from before we attached to the game (which is never notified), so state is right from the start.
+ */
+export function observePlay(g: GameCtx, p: NPlay) {
+  if (g.league === 'nhl') {
+    const [saver] = p.participants.filter((x) => x.role === 'saver').map((x) => x.id);
+    if (saver && p.teamId) g.goalies.set(p.teamId === g.homeId ? g.awayId : g.homeId, saver);
+  }
+  if (g.league === 'mlb' && p.typeSlug === 'play-result') g.lastResult = p;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
@@ -116,8 +161,46 @@ function mk(g: GameCtx, p: NPlay, type: string, athleteId: string, title: string
   };
 }
 
+export const ordinal = (n: number) => {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+/**
+ * Team alert: the half-inning just ended with runners on second and/or third.
+ * Uses the half-inning's last at-bat result, whose runner roles are the bases after the third out.
+ */
+function strandedRisp(g: GameCtx): Detected[] {
+  const r = g.lastResult;
+  if (!r?.teamId) return [];
+  const on = (base: string) => r.participants.some((x) => x.role === base);
+  const [first, second, third] = [on('onFirst'), on('onSecond'), on('onThird')];
+  const risp = Number(second) + Number(third);
+  if (!risp) return [];
+  const what = first && second && third ? 'left the bases loaded 🤦'
+    : risp === 2 ? 'stranded 2 runners in scoring position'
+    : `stranded a runner on ${third ? 'third' : 'second'}`;
+  const half = r.period ? `${r.period.type === 'Top' ? 'Top' : 'Bottom'} ${ordinal(r.period.number)}` : 'Inning over';
+  return [{
+    id: `${g.gameId}:${r.id}:mlb.team.stranded_risp:${r.teamId}`,
+    type: 'mlb.team.stranded_risp',
+    targetKey: teamKey('mlb', r.teamId), // play-result team = batting team
+    title: `${teamName('mlb', r.teamId)} ${what}`,
+    body: `${half}: ${r.text} — ${scoreLine(g, r)}`,
+    at: r.at,
+    meta: { gameId: g.gameId, playId: r.id, runnersInScoringPosition: risp },
+  }];
+}
+
+/** The game's final half-inning has no "End Inning" play; the tracker calls this at the final. */
+export function mlbFinalHalfInning(g: GameCtx): Detected[] {
+  return g.league === 'mlb' && g.lastResult?.outs === 3 ? strandedRisp(g) : []; // walk-offs end with < 3 outs
+}
+
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
 function mlb(g: GameCtx, p: NPlay): Detected[] {
+  // ESPN marks every half-inning except the game's last with an "End Inning" play.
+  if (p.typeSlug === 'end-inning') return strandedRisp(g);
   const out: Detected[] = [];
   const [batter] = role(p, 'batter');
   const [pitcher] = role(p, 'pitcher');
@@ -198,9 +281,8 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
   const slug = p.typeSlug;
   const [shooter] = role(p, 'shooter');
-  const [saver] = role(p, 'saver');
   const other = (id?: string) => (id === g.homeId ? g.awayId : g.homeId);
-  if (saver && p.teamId) g.goalies.set(other(p.teamId), saver);
+  // g.goalies is kept current by observePlay().
 
   if (slug === 'goal' || p.type === 'Goal') {
     const goalie = g.goalies.get(other(p.teamId));
