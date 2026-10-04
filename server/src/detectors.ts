@@ -495,17 +495,26 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const opp = side === 'home' ? 'away' : 'home';
     const delta = p[opp] - prev[opp];
     const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
-    if (delta === 2 && g.league === 'nfl' && isSafety(p)) {
+    const [team, oppName] = [teamName(g.league, teamId), teamName(g.league, oppId)];
+    const what = g.league === 'nhl' ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
+    const safety = delta === 2 && g.league === 'nfl' && isSafety(p);
+    // Falling behind can only happen because the opponent just scored, so the two alerts always
+    // coincide. The fell-behind alert carries both facts; the scored-on alert for this play is
+    // then `unless` it: each user gets one (the combined one if they want "falls behind").
+    const fellBehind = prev[side] - prev[opp] >= 0 && p[side] - p[opp] < 0;
+    const unlessBehind = fellBehind ? { unless: 'team.fell_behind' } : {};
+    if (safety) {
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
-      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${teamName(g.league, teamId)} gave up a safety`, ...base });
+      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind });
     } else if (delta > 0 && g.league !== 'nba') {
-      const what = g.league === 'nhl' ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: `${teamName(g.league, oppId)} ${what} on the ${teamName(g.league, teamId)}`, ...base });
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind });
     }
-    const was = prev[side] - prev[opp];
-    const now = p[side] - p[opp];
-    if (was >= 0 && now < 0) {
-      out.push({ id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind', title: `${teamName(g.league, teamId)} fell behind ${teamName(g.league, oppId)}`, ...base });
+    if (fellBehind) {
+      out.push({
+        id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
+        title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over the ${team}`,
+        ...base,
+      });
     }
   }
   return out;

@@ -39,6 +39,11 @@ for (const g of games) {
   events.push(...unique);
   const spotlight: Record<string, string> = { 'mlb.team.stranded_risp': '🏝️', 'mlb.runner.caught_stealing': '🚔', 'nfl.safety': '😵', 'nfl.qb.delay_of_game': '⏱️' };
   for (const e of events.filter((x) => spotlight[x.type])) console.log(`  ${spotlight[e.type]}  ${e.title}${e.aliases ? ` [also counts as: ${e.aliases}]` : ''} | ${e.body.slice(0, 100)}`);
+  // Every lead change: the scored-on alert for that play must yield to the combined fell-behind alert.
+  const behind = events.filter((e) => e.type === 'team.fell_behind');
+  const merged = behind.filter((b) => league === 'nba' || events.some((e) => e !== b && e.targetKey === b.targetKey && e.meta?.playId === b.meta?.playId && e.unless === 'team.fell_behind'));
+  console.log(`${merged.length === behind.length ? 'PASS' : 'FAIL'} lead changes merged into one alert: ${merged.length}/${behind.length}${behind[0] ? ` e.g. "${behind[0].title}"` : ''}`);
+  if (merged.length !== behind.length) process.exitCode = 1;
   const finalHome = Number(comp.competitors.find((c: any) => c.homeAway === 'home').score);
   const finalAway = Number(comp.competitors.find((c: any) => c.homeAway === 'away').score);
   const ok = score.home === finalHome && score.away === finalAway;

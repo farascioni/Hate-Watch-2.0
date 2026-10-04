@@ -180,8 +180,9 @@ test('NFL: delay of game goes to the offense QB; safeties replace the generic al
   const types = team23.map((e) => e.type);
   assert.ok(types.includes('nfl.safety') && !types.includes('team.opponent_scored'), `got ${types}`);
   assert.match(team23.find((e) => e.type === 'nfl.safety')!.title, /Steelers gave up a safety/);
-  // (It also put them behind 2-0, so the separate "falls behind" alert fires, as for any go-ahead score.)
-  assert.ok(types.includes('team.fell_behind'));
+  // It also put them behind 2-0: the safety alert yields to one combined "fell behind" alert.
+  assert.equal(team23.find((e) => e.type === 'nfl.safety')!.unless, 'team.fell_behind');
+  assert.match(team23.find((e) => e.type === 'team.fell_behind')!.title, /Steelers gave up a safety and fell behind the Browns/);
   // Overturned: nothing.
   assert.equal(nfl({ type: 'Safety', scoring: false, text: 'N.Cross tackled in End Zone, SAFETY NULLIFIED by Penalty' }).filter((e) => e.type === 'nfl.safety').length, 0);
 });
@@ -227,6 +228,30 @@ test('MLB: NOBLETIGER (bases loaded, nobody out, no runs) and no duplicate with 
   assert.deepEqual(delivered({ 'mlb.team.nobletiger': false }), ['mlb.team.stranded_risp'], 'NOBLETIGER off: falls back to stranded');
   assert.deepEqual(delivered({ 'mlb.team.stranded_risp': false }), ['mlb.team.nobletiger']);
   assert.deepEqual(delivered({ 'mlb.team.nobletiger': false, 'mlb.team.stranded_risp': false }), []);
+});
+
+test('scored on AND fell behind on the same play: one alert per user, not two', () => {
+  const g: any = { league: 'nhl', gameId: 'g', homeId: '1', awayId: '2', goalies: new Map() };
+  const goal = (home: number, away: number) => play({ id: `${home}-${away}`, scoring: true, home, away, text: 'Goal' });
+  const forHome = (prev: { home: number; away: number }, p: ReturnType<typeof play>) =>
+    teamScoreEvents(g, prev, p).filter((e) => e.targetKey === 'team:nhl:1');
+
+  // Tied 1-1, away team scores: home is scored on AND falls behind.
+  const [scored, behind] = forHome({ home: 1, away: 1 }, goal(1, 2));
+  assert.equal(scored.type, 'team.opponent_scored');
+  assert.equal(scored.unless, 'team.fell_behind');
+  assert.equal(behind.type, 'team.fell_behind');
+  assert.match(behind.title, /scored to take the lead over the/, 'the combined alert says both things');
+
+  const delivered = (types: Record<string, boolean>) => [scored, behind].filter((e) => shouldDeliver(prefs({ types }), e, 'nhl')).map((e) => e.type);
+  assert.deepEqual(delivered({}), ['team.fell_behind'], 'both on (default): just the combined alert');
+  assert.deepEqual(delivered({ 'team.fell_behind': false }), ['team.opponent_scored'], '"falls behind" off: the plain scored-on alert');
+  assert.deepEqual(delivered({ 'team.opponent_scored': false }), ['team.fell_behind']);
+  assert.deepEqual(delivered({ 'team.opponent_scored': false, 'team.fell_behind': false }), []);
+
+  // Scored on but still leading (3-1 → 3-2): nothing to merge, the scored-on alert is unconditional.
+  const notLead = forHome({ home: 3, away: 1 }, goal(3, 2));
+  assert.deepEqual(notLead.map((e) => [e.type, e.unless]), [['team.opponent_scored', undefined]]);
 });
 
 test('ordinals and search normalization', () => {
