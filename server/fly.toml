@@ -9,7 +9,7 @@ primary_region = "iad"   # US East: closest to ESPN's API and most US users
 [env]
   PORT = "8080"
   HW_DB = "/data/hatewatch.db"
-  HW_CONTACT_EMAIL = "frasgriffin@gmail.com"   # shown publicly on /privacy and /support
+  HW_CONTACT_EMAIL = "hatewatchfeedback@gmail.com"   # shown publicly on /privacy and /support
   # HW_DEV must stay unset in production (it enables /dev/simulate).
 
 [http_service]
