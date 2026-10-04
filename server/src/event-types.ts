@@ -52,7 +52,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'nhl.penalty', scope: 'player', leagues: ['nhl'], label: 'Takes a penalty', description: 'Tracked player goes to the box.', defaultOn: true, emoji: '⛓️' },
 
   // ── F1 drivers (one finish alert per driver per session: the facts that apply are merged)
-  { id: 'f1.driver.dnf', scope: 'player', leagues: ['f1'], label: "Doesn't finish", description: 'Tracked driver retires, is disqualified, or doesn\'t start a race or sprint. Sent live.', defaultOn: true, emoji: '🏳️' },
+  { id: 'f1.driver.dnf', scope: 'player', leagues: ['f1'], label: "Doesn't finish", description: 'Tracked driver retires, is disqualified, or doesn\'t start a race or sprint. Sent live.', defaultOn: true, emoji: '🛑' },
   { id: 'f1.driver.out_of_points', scope: 'player', leagues: ['f1'], label: 'Finishes outside the points', description: 'Tracked driver finishes outside the top 10 (top 8 in a sprint).', defaultOn: true, emoji: '0️⃣' },
   { id: 'f1.driver.lost_places', scope: 'player', leagues: ['f1'], label: 'Loses places from the grid', description: 'Tracked driver finishes 3 or more places lower than they started.', defaultOn: true, emoji: '🔻' },
   { id: 'f1.driver.beaten_by_teammate', scope: 'player', leagues: ['f1'], label: 'Finishes behind teammate', description: 'Tracked driver is beaten by the other car in the same team.', defaultOn: true, emoji: '🥈' },

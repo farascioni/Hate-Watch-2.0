@@ -129,23 +129,30 @@ After editing the script, regenerate with `cd app && npm run icons`.
 
 ## Data: rosters, duplicates, and images
 
-Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, MLB, NFL and NHL**. The NHL is included because several of the requested alerts are hockey alerts.
+Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, MLB, NFL, NHL and Formula 1**. The NHL is included because several of the requested alerts are hockey alerts.
 
-Last ingest (2026-10-03): **124 teams, 5,033 players**.
+Last ingest (2026-10-04): **135 teams, 5,074 players**.
 
 | | Teams | Players | Verified headshots | Logo fallback |
 |---|---|---|---|---|
-| NBA | 30 | 603 | 546 | 57 |
-| MLB | 30 | 1,067 | 1,024 | 43 |
+| NBA | 30 | 605 | 546 | 59 |
+| MLB | 30 | 1,080 | 1,037 | 43 |
 | NFL | 32 | 2,544 | 2,541 | 3 |
-| NHL | 32 | 819 | 785 | 34 |
+| NHL | 32 | 822 | 789 | 33 |
+| F1 | 11 constructors | 23 drivers | 15 | 8 (team badge) |
 
 - **No duplicates.** Players are deduped on ESPN athlete ID, with a second pass on normalized name + birth date. Teams are deduped on ID and abbreviation. The ingest throws rather than commit a duplicate key, and the database primary keys enforce it again.
 - **Every team and player has an image.** The ingest won't commit a row without one.
 - **Images are accurate.** Each headshot URL must be keyed by that athlete's own ESPN ID, and ESPN's alt text must match the player's name (0 mismatches). Every image is fetched (PNG header via HTTP Range) to confirm it exists and to record its true pixel size.
 - **No wrong faces.** ESPN has no photo for 137 players (practice squad, call-ups; every one re-checked as a real 404). They show their **team logo plus a jersey-number badge**.
 - **Images are scaled properly.** The app asks ESPN's image combiner for exactly the pixels it draws (points × screen density) at the image's native aspect ratio. That matters because sizes vary: 4,894 headshots are 600×436, 2 are square, and one logo is 4096×4096. Headshots use cover + top anchoring so faces aren't cropped. Logos use contain, with ESPN's dark-mode variant when it exists.
-- Rosters refresh every 6 hours. If a refresh fails, the previous catalog stays.
+- Rosters refresh every 6 hours. If a refresh fails, the previous catalog stays. On boot, the server also imports if any league is missing from its catalog (that's how F1 arrived on the existing server).
+
+**Formula 1 is different** (ESPN sport `racing`, league `f1`):
+
+- **Drivers** are the ones who actually raced this season: the championship standings plus this weekend's entry list. The season's athlete list also includes reserves.
+- **Team and car number** come from this weekend's entry list. ESPN's athlete records can be stale after a team move: Lindblad's record says "Red Bull #36", but he races the Racing Bulls #41. The record is only the fallback, for a driver who isn't entered (e.g. Tsunoda, replaced mid-season).
+- **Constructors have no logos on ESPN** (404, `logos: null`). Rather than use trademarked logos from elsewhere, the app draws a badge in the team's official ESPN colour with a code (FER, MCL, RBR…), with black or white text for contrast. Drivers without an ESPN headshot (8, all re-checked as 404) get that badge plus their car number.
 
 Audit it yourself: `cd server && node test/verify-catalog.ts`.
 
@@ -169,7 +176,7 @@ Ways the delay is kept down:
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
-## Notifications (39 types, all user-controllable)
+## Notifications (47 types, all user-controllable)
 
 | | |
 |---|---|
@@ -178,6 +185,9 @@ Ways the delay is kept down:
 | NFL delay of game / safety | **Delay of game** is charged to the team ("PENALTY on PIT, Delay of Game", with no player), so it goes to the offense's quarterback in the game: the latest passer the roster lists as a QB. It's skipped for punt and field-goal formations, declined flags, and flags on the defense. Play text uses NFL team codes (ARZ, BLT, CLV, HST, LA, WAS), which are mapped to ESPN's. **Safety** alerts both the team ("49ers gave up a safety", replacing "opponent scored") and the player responsible: the flagged player on a penalty safety, the sacked QB, or the ball carrier. These replace that player's generic penalty or sack alert. Overturned safeties ("SAFETY NULLIFIED") are ignored. |
 | NBA | missed shot, missed FT, got blocked, turnover, foul (off by default), technical/ejection |
 | NHL | goalie allows a goal, shot missed, shot blocked (off by default), shot saved (off by default), giveaway (off by default), penalty |
+| F1 drivers | doesn't finish (retired / DSQ / DNS, **live**), outside the points, lost 3+ places from the grid, behind teammate, knocked out in Q1/Q2, drops in the drivers' championship |
+| F1 constructors | double DNF (**live**), no points, drops in the constructors' championship (the shared "Drops in standings" toggle) |
+| F1 how | There's no play-by-play: a race weekend is one ESPN event whose sessions (FP1…Qualifying…Race) are competitions. While a race or sprint runs, the server polls the status of **only the followed drivers** every 15s (including both cars of a followed constructor), so DNFs and double DNFs arrive live. When a session completes, it reads the classification once. Each driver gets **one** alert per session with the facts merged ("Pierre Gasly finished P16 from P9 on the grid: no points, behind teammate Franco Colapinto (P13)"), counting for each matching toggle. Qualifying knockouts use classification position: the top 10 reach Q3, and the rest split evenly between Q2 and Q1 (22 cars: P11–16 / P17–22). Results are only announced for sessions that started in the last 8 hours, so a deploy never re-announces an old race. |
 | Any player | injured / injury status downgraded |
 | Teams | lost, opponent scored, fell behind, dropped in standings, losing streak ≥3, eliminated from playoffs, a player injured |
 | Scored on + fell behind | A team can only fall behind because the opponent just scored, so these two always coincide. The fell-behind alert carries both ("Bears scored 7 to take the lead over the Eagles", or "…gave up a safety and fell behind…"), and that play's scored-on alert is `unless: team.fell_behind`. Each user gets one: the combined alert if "Falls behind" is on, otherwise the plain scored-on alert. |
@@ -202,10 +212,11 @@ A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won'
 
 ```bash
 cd server
-npm test                      # prefs, quiet hours, aliases, scoring, standings parsing
+npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, and a simulated F1 race (test/f1-live.test.ts)
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
 node test/core-vs-site.ts     # both ESPN sources produce identical detections
 HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws delivery, prefs, mute, unfollow, auth
+node test/f1-replay.ts        # F1 alert logic on the real, current race weekend vs ESPN's classification
 ```
 
 ## Known limits
@@ -214,3 +225,5 @@ HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws deliv
 - Goalie-on-ice for NHL goals is inferred from the last save each goalie made. Empty-net goals are skipped.
 - MLB "gives up runs" credits the pitcher on the mound, not official earned-run or inherited-runner accounting.
 - Standings and injury alerts fire on change. The first snapshot after a fresh install is a silent baseline.
+- F1's live path (in-race DNFs and double DNFs) is tested with a simulated race through the real engine (`test/f1-live.test.ts`). Its first run against a real live race is the next race weekend after this was added.
+- F1 sprint qualifying sessions don't generate alerts (only Qualifying, Sprint and Race do). F1 has no injury report on ESPN.

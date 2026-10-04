@@ -3,7 +3,7 @@
 //   live:  while a race/sprint runs, poll the status of followed drivers → DNF alerts the moment they retire
 //   flag:  when a session completes → finishing-position / qualifying alerts
 //   table: championship standings → drivers' and constructors' drops
-import { getJson, mapLimit } from './espn.ts';
+import { getJson as espnGetJson, mapLimit } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
 import { urls, playerKey, teamKey } from './leagues.ts';
@@ -15,6 +15,16 @@ const F1_STATUS_MS = Number(process.env.HW_F1_STATUS_MS ?? 15_000); // followed 
 const F1_STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60_000);
 /** Results are only announced for sessions that started recently (never re-announce an old race after a deploy). */
 const RECENT_MS = 8 * 3600_000;
+
+/**
+ * Seams for tests (test/f1-live.test.ts drives a whole simulated race through the real engine with
+ * fake ESPN responses). Production never changes these.
+ */
+export const f1Deps = {
+  getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => Promise<any>,
+  setTimeout: (fn: () => void, ms: number): unknown => setTimeout(fn, ms),
+};
+const getJson = (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => f1Deps.getJson(url, opts);
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), '[f1]', ...a);
 
@@ -168,20 +178,21 @@ const sessionLabel = (ev: any, comp: any) => `${ev.shortName ?? ev.name} · ${co
 class RaceWatch {
   private status = new Map<string, F1Row>();
   private first = true;
-  private timer?: NodeJS.Timeout;
+  private timer?: unknown;
   readonly eventId: string;
   readonly meta: Omit<SessionMeta, 'at'>;
   constructor(eventId: string, meta: Omit<SessionMeta, 'at'>) { this.eventId = eventId; this.meta = meta; }
 
   start() { void this.tick(); }
-  stop() { clearTimeout(this.timer); }
+  private stopped = false;
+  stop() { this.stopped = true; clearTimeout(this.timer as NodeJS.Timeout); }
 
   private async tick() {
     try { await this.poll(); } catch (e) { log(`race ${this.meta.compId} poll error`, String(e)); }
-    this.timer = setTimeout(() => this.tick(), F1_STATUS_MS);
+    if (!this.stopped) this.timer = f1Deps.setTimeout(() => this.tick(), F1_STATUS_MS);
   }
 
-  private async poll() {
+  async poll() {
     const watched = watchedF1Drivers();
     if (!watched.size) return;
     const ids = [...watched];
@@ -208,10 +219,10 @@ class RaceWatch {
 }
 
 // ─── Engine ───────────────────────────────────────────────────────────────────────────────────
-const races = new Map<string, RaceWatch>();
+export const races = new Map<string, RaceWatch>();
 const finalized = new Set<string>();
 
-async function scanF1() {
+export async function scanF1() {
   if (!watchedF1Drivers().size) { for (const w of races.values()) w.stop(); races.clear(); return; }
   const sb = await getJson(urls.scoreboard('f1'), { bust: true, timeoutMs: 8000 });
   for (const ev of sb.events ?? []) {
