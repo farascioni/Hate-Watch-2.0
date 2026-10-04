@@ -4,20 +4,22 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { Empty, PrimaryButton, SectionHeader, TargetRow } from '../../components/ui';
+import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Target } from '../../lib/types';
 
 export default function FollowingScreen() {
   const { follows, toggleFollow, prefs, updatePrefs } = useStore();
   const muted = new Set(prefs?.muted ?? []);
+  const { filter, setFilter, active, reset } = useFilter();
 
   const sections = useMemo((): { title: string; data: Target[] }[] => {
-    const all = [...follows.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const all = [...follows.values()].filter((t) => matchesFilter(filter, t)).sort((a, b) => a.name.localeCompare(b.name));
     return [
       { title: 'Teams', data: all.filter((t) => t.kind === 'team') },
       { title: 'Players', data: all.filter((t) => t.kind === 'player') },
     ].filter((s) => s.data.length);
-  }, [follows]);
+  }, [follows, filter]);
 
   const toggleMute = (t: Target) => {
     const next = muted.has(t.key) ? [...muted].filter((k) => k !== t.key) : [...muted, t.key];
@@ -29,6 +31,8 @@ export default function FollowingScreen() {
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View>
     <SectionList
       sections={sections}
       keyExtractor={(t) => t.key}
@@ -49,12 +53,15 @@ export default function FollowingScreen() {
           }
         />
       )}
-      contentContainerStyle={{ paddingBottom: space(8) }}
+      ListEmptyComponent={active ? <Empty emoji="🔎" title={`You're not tracking any ${describeFilter(filter)}`} body="Change the filter, or find some on the Search tab." action={<PrimaryButton label="Show everything" onPress={reset} />} /> : null}
+      contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
