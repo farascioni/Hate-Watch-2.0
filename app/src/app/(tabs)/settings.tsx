@@ -2,6 +2,7 @@ import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Te
 import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
+import { TipJar } from '../../components/TipJar';
 import { colors, leagueColors, radius, space } from '../../theme';
 import type { EventType, League } from '../../lib/types';
 
@@ -65,6 +66,9 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: space(16) }}>
+      <SectionHeader>Support Hate Watch</SectionHeader>
+      <TipJar />
+
       <SectionHeader>Delivery</SectionHeader>
       <View style={styles.card}>
         <Row title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />

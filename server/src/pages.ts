@@ -76,6 +76,7 @@ email address or phone number.</strong></p>
 <ul>
 <li><strong>Fly.io</strong> hosts our server and database in the United States. Like any web host, it processes your IP address to route requests.</li>
 <li><strong>Expo push service, Apple Push Notification service and Google Firebase Cloud Messaging</strong> receive your push token and the text of each alert in order to deliver it.</li>
+<li><strong>Apple App Store and Google Play</strong> process donations (in-app tips). The payment happens entirely between you and Apple or Google; we never receive your name, card or payment details, and donating unlocks nothing and changes nothing about your data.</li>
 <li><strong>ESPN.</strong> Our server reads public sports data (rosters, scores, play-by-play) from ESPN. The app loads player photos and team logos directly from ESPN's image servers, so ESPN receives your device's IP address and standard request information when those images load. We never send ESPN any of the data listed above.</li>
 </ul>
 

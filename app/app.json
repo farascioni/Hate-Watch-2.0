@@ -56,7 +56,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#0B0B0D"
         }
-      ]
+      ],
+      "expo-iap"
     ],
     "extra": {
       "eas": {

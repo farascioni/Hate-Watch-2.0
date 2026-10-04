@@ -93,6 +93,28 @@ npx eas-cli@latest submit --platform ios --latest               # uploads to App
 
 The contact email on those pages comes from `HW_CONTACT_EMAIL` in `server/fly.toml`. Double-check these answers against the current App Store Connect questionnaire. The answers are your responsibility as the publisher.
 
+### Donations (in-app tips)
+
+Settings → **Support Hate Watch** has a Donate button that offers three tip sizes. Tips are **consumable in-app purchases** via [`expo-iap`](https://openiap.dev/docs/setup/expo). Apple allows "tipping the developer" through in-app purchase in every country (guideline 3.1.1); external payment links would only be allowed on the US App Store. Tips unlock nothing, and our server never sees the payment.
+
+The product IDs are defined in `app/src/lib/tips.ts`:
+
+| Product ID | Suggested price |
+|---|---|
+| `com.hatewatch.app.tip.small` | $1.99 |
+| `com.hatewatch.app.tip.medium` | $4.99 |
+| `com.hatewatch.app.tip.large` | $9.99 |
+
+**Before tips work:**
+
+1. **App Store Connect:** accept the **Paid Apps Agreement** and fill in tax and banking (Business → Agreements). Apple requires this even for free apps that sell in-app purchases.
+2. **App Store Connect → your app → In-App Purchases:** create three products of type **Consumable** with exactly the IDs above. Each needs a display name, a price, and a review screenshot (a screenshot of Settings is fine).
+3. **Your first in-app purchases must be submitted for review together with an app version.** On the version page, under "In-App Purchases and Subscriptions", add all three before submitting.
+4. **Google Play Console:** set up a payments profile, upload a build (the billing permission is added automatically), then create the same three IDs under **Monetize → Products → In-app products** and activate them.
+5. **Test with sandbox accounts.** On iOS, add a Sandbox tester in App Store Connect and buy through TestFlight. On Android, add a license tester.
+
+The Donate button needs a development or store build. In Expo Go and on web there's no store to pay through, so the button explains that instead. Apple and Google keep 15% under their small-business programs. Privacy label: purchases aren't collected by us, because Apple and Google handle them.
+
 ### Icons and splash
 
 The artwork is an angry eye. Every icon is generated from vector source in [`app/scripts/build-icons.mjs`](app/scripts/build-icons.mjs):
