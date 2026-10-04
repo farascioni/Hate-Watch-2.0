@@ -11,6 +11,7 @@ import type { Target } from '../../lib/types';
 export default function FollowingScreen() {
   const { follows, toggleFollow, prefs, updatePrefs } = useStore();
   const muted = new Set(prefs?.muted ?? []);
+  const customized = new Set(Object.keys(prefs?.targetTypes ?? {}));
   const { filter, setFilter, active, reset } = useFilter();
 
   const sections = useMemo((): { title: string; data: Target[] }[] => {
@@ -37,7 +38,7 @@ export default function FollowingScreen() {
       sections={sections}
       keyExtractor={(t) => t.key}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}</SectionHeader>}
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team. Their alerts still show up in your feed. Unfollow stops tracking them entirely.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely.</Text>}
       renderItem={({ item }) => (
         <TargetRow
           target={item}
@@ -45,6 +46,16 @@ export default function FollowingScreen() {
             <View style={styles.actions}>
               <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
                 <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
+              </Pressable>
+              {/* Per-player/team alert choices. Red when this target has any that differ from the global settings. */}
+              <Pressable
+                onPress={() => router.push(`/alerts/${encodeURIComponent(item.key)}`)}
+                hitSlop={8}
+                style={[styles.icon, customized.has(item.key) && styles.iconCustom]}
+                accessibilityRole="button"
+                accessibilityLabel={`Alert settings for ${item.name}${customized.has(item.key) ? ' (customized)' : ''}`}
+              >
+                <Ionicons name="settings-sharp" size={20} color={customized.has(item.key) ? colors.hate : colors.text} />
               </Pressable>
               <Pressable onPress={() => toggleFollow(item)} hitSlop={8} style={styles.unfollow} accessibilityLabel={`Unfollow ${item.name}`}>
                 <Text style={styles.unfollowText}>Unfollow</Text>
@@ -65,6 +76,7 @@ const styles = StyleSheet.create({
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
+  iconCustom: { borderWidth: 1, borderColor: colors.hate },
   unfollow: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
 });

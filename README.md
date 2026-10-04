@@ -203,6 +203,7 @@ Settings let users control:
 - each league on/off
 - every alert type, with "all on/off" per group
 - per-target 🔕 on the Tracking tab: turns off push for that player or team, while their alerts still land in the feed
+- **per-target ⚙️ on the Tracking tab: choose exactly which alerts you get for one player or team.** These choices beat every global alert setting for that target, including the type and league switches. For example, interceptions stay on globally but are off for Daniel Jones alone, or a league is off globally but one player's alert is explicitly on. Each switch shows "Custom for …" with "Use global setting", and there's "Reset all". The gear turns red when a target has custom choices. The screen lists only the alerts that can fire for that kind of target in that league. Stored as `targetTypes` (targetKey → typeId → on/off) in prefs; a `null` in a PUT resets one back to global. The "one alert, not two" rules (NOBLETIGER vs stranded, lead changes) use the same per-target answer.
 - reset to defaults
 - clear feed
 

@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
-import type { EventType, FeedItem, League, Prefs, Target } from './types';
+import type { EventType, FeedItem, League, Prefs, PrefsPatch, Target } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -22,7 +22,7 @@ interface Store {
   toggleFollow: (t: Target) => Promise<void>;
 
   prefs: Prefs | null;
-  updatePrefs: (patch: Partial<Prefs>) => Promise<void>;
+  updatePrefs: (patch: PrefsPatch) => Promise<void>;
   eventTypes: EventType[];
   leagues: { id: League; name: string }[];
   push: { status: PushStatus | 'unknown'; reason?: string };
@@ -36,6 +36,18 @@ export const useStore = () => {
   if (!s) throw new Error('useStore outside StoreProvider');
   return s;
 };
+
+/** true/false sets a per-target choice, null removes it (back to global); a target with none left disappears. */
+function mergeTargetTypes(cur: Prefs['targetTypes'] = {}, patch?: PrefsPatch['targetTypes']): Prefs['targetTypes'] {
+  if (!patch) return cur;
+  const out = { ...cur };
+  for (const [target, types] of Object.entries(patch)) {
+    const merged = { ...out[target] };
+    for (const [typeId, v] of Object.entries(types)) { if (v === null) delete merged[typeId]; else merged[typeId] = v; }
+    if (Object.keys(merged).length) out[target] = merged; else delete out[target];
+  }
+  return out;
+}
 
 const mergeFeed = (a: FeedItem[], b: FeedItem[]) => {
   const byId = new Map<string, FeedItem>();
@@ -141,7 +153,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       catch { setFollows((m) => { const n = new Map(m); was ? n.set(t.key, t) : n.delete(t.key); return n; }); }
     },
     updatePrefs: async (patch) => {
-      setPrefs((p) => (p ? { ...p, ...patch, types: { ...p.types, ...patch.types }, leagues: { ...p.leagues, ...patch.leagues }, quietHours: { ...p.quietHours, ...patch.quietHours } } : p));
+      // Optimistic: apply locally right away (same merge rules as the server), then take the server's copy.
+      setPrefs((p) => (p ? {
+        ...p, ...patch,
+        types: { ...p.types, ...patch.types }, leagues: { ...p.leagues, ...patch.leagues },
+        quietHours: { ...p.quietHours, ...patch.quietHours }, targetTypes: mergeTargetTypes(p.targetTypes, patch.targetTypes),
+      } : p));
       setPrefs(await api.setPrefs(patch));
     },
     enablePush: async () => {

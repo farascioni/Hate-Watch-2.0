@@ -42,15 +42,28 @@ await call('POST', '/dev/simulate', token, { targetKey: harper.key, type: 'mlb.b
 await new Promise((r) => setTimeout(r, 300));
 check('disabled type is not delivered', received.length === 1);
 
+// Per-player choice beats the global setting: strikeouts back ON globally, OFF just for Harper.
+await call('PUT', '/me/prefs', token, { types: { 'mlb.batter.strikeout': true }, targetTypes: { [harper.key]: { 'mlb.batter.strikeout': false } } });
+await call('POST', '/dev/simulate', token, { targetKey: harper.key, type: 'mlb.batter.strikeout' });
+await new Promise((r) => setTimeout(r, 300));
+check('per-player "off" beats global "on"', received.length === 1);
+const saved = await call('GET', '/me/prefs', token);
+check('per-player choice is saved', saved.targetTypes?.[harper.key]?.['mlb.batter.strikeout'] === false);
+await call('PUT', '/me/prefs', token, { targetTypes: { [harper.key]: { 'mlb.batter.strikeout': null } } });
+check('"reset to global" removes it', !(await call('GET', '/me/prefs', token)).targetTypes?.[harper.key]);
+await call('POST', '/dev/simulate', token, { targetKey: harper.key, type: 'mlb.batter.strikeout' });
+await new Promise((r) => setTimeout(r, 300));
+check('after reset, the global "on" applies again', received.length === 2);
+
 // 🔕 mute only turns off push (unit-tested in logic.test.ts): the alert must still reach the live feed.
 await call('PUT', '/me/prefs', token, { muted: [eagles.key] });
 await call('POST', '/dev/simulate', token, { targetKey: eagles.key, type: 'team.lost' });
 await new Promise((r) => setTimeout(r, 300));
-check('muted target still delivered to the live feed', received.length === 2 && received[1].type === 'team.lost');
+check('muted target still delivered to the live feed', received.length === 3 && received[2].type === 'team.lost');
 await call('PUT', '/me/prefs', token, { muted: [] });
 
 const feed = (await call('GET', '/me/feed', token)).items;
-check('muted alert is stored in the feed, newest-first', feed.length === 2 && feed[0].type === 'team.lost' && feed[0].occurredAt >= feed[1].occurredAt);
+check('muted alert is stored in the feed, newest-first', feed.length === 3 && feed[0].type === 'team.lost' && feed[0].occurredAt >= feed[1].occurredAt);
 
 await call('DELETE', `/me/follows/${encodeURIComponent(harper.key)}`, token);
 check('unfollow works', (await call('GET', '/me/follows', token)).follows.length === 1);

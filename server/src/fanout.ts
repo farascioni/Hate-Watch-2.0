@@ -13,7 +13,15 @@ export interface Prefs {
   types: Record<string, boolean>;          // overrides of each type's defaultOn
   muted: string[];                         // followed targets with push off: alerts still go to the feed
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
+  /**
+   * Per-player/per-team alert choices (the ⚙️ on the Tracking tab): targetKey → typeId → on/off.
+   * An entry here beats every global alert setting (type and league switches) for that target.
+   */
+  targetTypes: Record<string, Record<string, boolean>>;
 }
+
+/** A PUT /me/prefs patch: like Prefs, but a per-target value of null means "back to the global setting". */
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes'>> & { targetTypes?: Record<string, Record<string, boolean | null>> };
 
 export const DEFAULT_PREFS: Prefs = {
   pushEnabled: true,
@@ -22,6 +30,7 @@ export const DEFAULT_PREFS: Prefs = {
   types: {},
   muted: [],
   quietHours: { enabled: false, start: '23:00', end: '08:00', tz: 'America/New_York' },
+  targetTypes: {},
 };
 
 const prefsCache = new Map<string, Prefs>();
@@ -37,7 +46,7 @@ export function getPrefs(deviceId: string): Prefs {
   return p;
 }
 
-export function setPrefs(deviceId: string, patch: Partial<Prefs>): Prefs {
+export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
   const cur = getPrefs(deviceId);
   const next: Prefs = {
     ...cur, ...patch,
@@ -45,20 +54,50 @@ export function setPrefs(deviceId: string, patch: Partial<Prefs>): Prefs {
     types: { ...cur.types, ...patch.types },
     quietHours: { ...cur.quietHours, ...patch.quietHours },
     muted: patch.muted ?? cur.muted,
+    targetTypes: mergeTargetTypes(cur.targetTypes, patch.targetTypes),
   };
   db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify(next), deviceId);
   prefsCache.set(deviceId, next);
   return next;
 }
 
+const TARGET_KEY = /^(player|team):[a-z0-9]+:[\w-]+$/;
+
+/** Merge per-target overrides: true/false sets one, null removes it (back to global). Unknown keys/types are ignored. */
+export function mergeTargetTypes(cur: Prefs['targetTypes'] = {}, patch?: PrefsPatch['targetTypes']): Prefs['targetTypes'] {
+  if (!patch) return cur;
+  const out: Prefs['targetTypes'] = { ...cur };
+  for (const [target, types] of Object.entries(patch)) {
+    if (!TARGET_KEY.test(target) || !types || typeof types !== 'object') continue;
+    const merged = { ...out[target] };
+    for (const [typeId, v] of Object.entries(types)) {
+      if (!EVENT_TYPE_BY_ID.has(typeId)) continue;
+      if (v === null) delete merged[typeId];
+      else if (typeof v === 'boolean') merged[typeId] = v;
+    }
+    if (Object.keys(merged).length) out[target] = merged; else delete out[target];
+  }
+  return out;
+}
+
+/** The global (Settings tab) answer for one alert type. */
 export function typeEnabled(p: Prefs, typeId: string) {
   return p.types[typeId] ?? EVENT_TYPE_BY_ID.get(typeId)?.defaultOn ?? false;
 }
 
+/**
+ * Is this alert type on for this specific target? A per-target choice always wins; otherwise the
+ * global settings decide (the league switch, then the type switch).
+ */
+export function typeEnabledFor(p: Prefs, targetKey: string, typeId: string, league: League) {
+  const own = p.targetTypes?.[targetKey]?.[typeId];
+  if (own !== undefined) return own;
+  return p.leagues[league] !== false && typeEnabled(p, typeId);
+}
+
 /** Does this user want this alert at all (feed + live)? Muting a target does NOT affect this. */
 export function wants(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKey'>, league: League) {
-  if (p.leagues[league] === false) return false;
-  return typeEnabled(p, e.type) || (e.aliases ?? []).some((a) => typeEnabled(p, a));
+  return [e.type, ...(e.aliases ?? [])].some((t) => typeEnabledFor(p, e.targetKey, t, league));
 }
 
 /** Should an alert they want also be pushed? Muted targets (🔕 on the Tracking tab) are feed-only. */

@@ -1,34 +1,12 @@
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { TipJar } from '../../components/TipJar';
+import { SettingRow } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, leagueColors, radius, space } from '../../theme';
 import type { EventType, League } from '../../lib/types';
-
-function Row({ title, desc, value, onChange, emoji, disabled }: { title: string; desc?: string; value: boolean; onChange: (v: boolean) => void; emoji?: string; disabled?: boolean }) {
-  return (
-    <View style={[styles.row, disabled && { opacity: 0.45 }]}>
-      {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
-      <View style={{ flex: 1 }}>
-        <Text style={styles.title}>{title}</Text>
-        {desc ? <Text style={styles.desc}>{desc}</Text> : null}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        trackColor={{ true: colors.hate, false: colors.border }}
-        thumbColor="#fff"
-        ios_backgroundColor={colors.border}
-        // react-native-web otherwise paints the "on" thumb Material teal
-        {...({ activeThumbColor: '#fff' } as object)}
-        accessibilityLabel={title}
-      />
-    </View>
-  );
-}
 
 const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
 const fmtHour = (hm: string) => {
@@ -76,9 +54,9 @@ export default function SettingsScreen() {
 
       <SectionHeader>Delivery</SectionHeader>
       <View style={styles.card}>
-        <Row title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
-        <Row title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
-        <Row title="Quiet hours" desc="Silence pushes overnight. Everything still lands in your feed." value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
+        <SettingRow title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
+        <SettingRow title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
+        <SettingRow title="Quiet hours" desc="Silence pushes overnight. Everything still lands in your feed." value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
         {prefs.quietHours.enabled ? (
           <View style={styles.quiet}>
             <HourStepper label="From" value={prefs.quietHours.start} onChange={(start) => updatePrefs({ quietHours: { ...prefs.quietHours, start } })} />
@@ -89,8 +67,11 @@ export default function SettingsScreen() {
 
       <SectionHeader>Leagues</SectionHeader>
       <View style={styles.card}>
-        {leagues.map((l) => <Row key={l.id} title={l.name} desc={leagueOn(l.id) ? undefined : 'All alerts from this league are off'} value={leagueOn(l.id)} onChange={(v) => updatePrefs({ leagues: { [l.id]: v } })} />)}
+        {leagues.map((l) => <SettingRow key={l.id} title={l.name} desc={leagueOn(l.id) ? undefined : 'All alerts from this league are off'} value={leagueOn(l.id)} onChange={(v) => updatePrefs({ leagues: { [l.id]: v } })} />)}
       </View>
+      <Text style={styles.hint}>
+        These are your defaults for everyone. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.
+      </Text>
 
       {groups.filter((g) => g.types.length).map((g) => {
         const off = g.league ? !leagueOn(g.league) : false;
@@ -102,7 +83,7 @@ export default function SettingsScreen() {
               <Pressable onPress={() => setAll(g.types, !allOn)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
             </View>
             <View style={[styles.card, g.color ? { borderLeftColor: g.color, borderLeftWidth: 3 } : null]}>
-              {g.types.map((t) => <Row key={t.id} emoji={t.emoji} title={t.label} desc={t.description} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off} />)}
+              {g.types.map((t) => <SettingRow key={t.id} emoji={t.emoji} title={t.label} desc={t.description} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off} />)}
             </View>
           </View>
         );
@@ -154,9 +135,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  emoji: { fontSize: 20, width: 26, textAlign: 'center' },
-  title: { color: colors.text, fontSize: 15, fontWeight: '700' },
   desc: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 17 },
   groupHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingRight: space(4) },
   toggleAll: { color: colors.hate, fontWeight: '800', fontSize: 13, paddingBottom: space(2) },
@@ -170,4 +148,5 @@ const styles = StyleSheet.create({
   actionText: { color: colors.text, fontWeight: '700', fontSize: 15 },
   actionSub: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 17 },
   footer: { color: colors.textFaint, fontSize: 12, textAlign: 'center', padding: space(6) },
+  hint: { color: colors.textFaint, fontSize: 13, lineHeight: 18, paddingHorizontal: space(4), paddingTop: space(3) },
 });

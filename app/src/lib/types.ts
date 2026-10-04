@@ -21,7 +21,7 @@ export interface FeedItem {
 }
 
 export interface EventType {
-  id: string; scope: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;
+  id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;
 }
 
 export interface Prefs {
@@ -31,4 +31,9 @@ export interface Prefs {
   types: Record<string, boolean>;
   muted: string[];
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
+  /** Per-player/team alert choices (⚙️ on the Tracking tab). They beat the global settings for that target. */
+  targetTypes: Record<string, Record<string, boolean>>;
 }
+
+/** A prefs update. In targetTypes, null means "back to the global setting" for that alert. */
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes'>> & { targetTypes?: Record<string, Record<string, boolean | null>> };

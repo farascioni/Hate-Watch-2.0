@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, FeedItem, League, Prefs, Target, Team, Player } from './types';
+import type { EventType, FeedItem, League, Prefs, PrefsPatch, Target, Team, Player } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -62,7 +62,7 @@ export const api = {
   unfollow: (key: string) => request('DELETE', `/me/follows/${enc(key)}`),
 
   prefs: () => request<Prefs>('GET', '/me/prefs'),
-  setPrefs: (patch: Partial<Prefs>) => request<Prefs>('PUT', '/me/prefs', patch),
+  setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),
   setPushToken: (pushToken: string | null) => request('PUT', '/me/push-token', { pushToken }),
 
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),

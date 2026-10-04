@@ -30,6 +30,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="target/[key]" options={{ title: '', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="alerts/[key]" options={{ title: 'Alerts', headerBackTitle: 'Back' }} />
       </Stack>
     </StoreProvider>
   );

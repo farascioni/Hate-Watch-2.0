@@ -293,6 +293,37 @@ test('F1: session results become one alert per driver, with merged facts and tea
   assert.equal(isOut('STATUS_NOT_CLASSIFIED'), true);
 });
 
+test('per-player/team alert choices override the global settings', async () => {
+  const { mergeTargetTypes } = await import('../src/fanout.ts');
+  const JONES = 'player:nfl:1', OTHER_QB = 'player:nfl:2';
+  const int = (targetKey: string) => ({ type: 'nfl.qb.interception', targetKey });
+
+  // Interceptions on globally, off just for Daniel Jones.
+  const p = prefs({ targetTypes: { [JONES]: { 'nfl.qb.interception': false } } });
+  assert.equal(wants(p, int(JONES), 'nfl'), false, 'off for Jones');
+  assert.equal(wants(p, int(OTHER_QB), 'nfl'), true, 'still on for every other QB');
+
+  // The reverse: off globally (even the whole NFL), but explicitly on for Jones → Jones wins.
+  const q = prefs({ types: { 'nfl.qb.interception': false }, leagues: { nfl: false }, targetTypes: { [JONES]: { 'nfl.qb.interception': true } } });
+  assert.equal(wants(q, int(JONES), 'nfl'), true);
+  assert.equal(wants(q, int(OTHER_QB), 'nfl'), false);
+
+  // "One alert, not two" rules use the same per-target answer: NOBLETIGER off for this team only
+  // means that team's stranded-runners alert comes through instead.
+  const TEAM = 'team:mlb:22';
+  const r = prefs({ targetTypes: { [TEAM]: { 'mlb.team.nobletiger': false } } });
+  assert.equal(shouldDeliver(r, { type: 'mlb.team.stranded_risp', targetKey: TEAM, unless: 'mlb.team.nobletiger' }, 'mlb'), true);
+  assert.equal(shouldDeliver(r, { type: 'mlb.team.stranded_risp', targetKey: 'team:mlb:15', unless: 'mlb.team.nobletiger' }, 'mlb'), false);
+
+  // Merging a patch: true/false set, null resets to global, junk is ignored, empty targets disappear.
+  let t = mergeTargetTypes({}, { [JONES]: { 'nfl.qb.interception': false, 'nfl.qb.sacked': true } });
+  assert.deepEqual(t, { [JONES]: { 'nfl.qb.interception': false, 'nfl.qb.sacked': true } });
+  t = mergeTargetTypes(t, { [JONES]: { 'nfl.qb.sacked': null, 'not.a.type': true } as any, 'bogus key': { 'nfl.qb.sacked': true } });
+  assert.deepEqual(t, { [JONES]: { 'nfl.qb.interception': false } });
+  t = mergeTargetTypes(t, { [JONES]: { 'nfl.qb.interception': null } });
+  assert.deepEqual(t, {}, 'resetting the last override removes the target entirely');
+});
+
 test('ordinals and search normalization', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st']);
   assert.equal(normalize('Ronald Acuña Jr.'), 'ronald acuna jr');
