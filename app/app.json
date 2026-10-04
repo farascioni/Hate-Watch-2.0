@@ -10,7 +10,7 @@
     "backgroundColor": "#0B0B0D",
     "ios": {
       "bundleIdentifier": "com.hatewatch.app",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },
