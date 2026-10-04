@@ -31,6 +31,8 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'nfl.fumble_lost', scope: 'player', leagues: ['nfl'], label: 'Loses a fumble', description: 'Tracked player fumbles and the defense recovers.', defaultOn: true, emoji: '🏈' },
   { id: 'nfl.fumble', scope: 'player', leagues: ['nfl'], label: 'Fumbles (any)', description: 'Tracked player fumbles, even if their team recovers.', defaultOn: false, emoji: '🤲' },
   { id: 'nfl.kicker.miss', scope: 'player', leagues: ['nfl'], label: 'Misses a kick', description: 'Tracked kicker misses or has a field goal / extra point blocked.', defaultOn: true, emoji: '🦵' },
+  { id: 'nfl.qb.delay_of_game', scope: 'player', leagues: ['nfl'], label: 'Delay of game', description: "Tracked quarterback's offense is flagged for delay of game (not on punts or field goals).", defaultOn: true, emoji: '⏱️' },
+  { id: 'nfl.safety', scope: 'team', leagues: ['nfl'], label: 'Gives up a safety', description: 'Tracked team gives up a safety, or a tracked player is tackled, sacked or flagged in their own end zone for one.', defaultOn: true, emoji: '😵' },
   { id: 'nfl.penalty', scope: 'player', leagues: ['nfl'], label: 'Commits a penalty', description: 'Tracked player is flagged.', defaultOn: true, emoji: '🚩' },
 
   // ── NBA players

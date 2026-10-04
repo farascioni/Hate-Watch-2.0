@@ -37,7 +37,8 @@ for (const g of games) {
   const unique = [...new Map(events.map((e) => [e.id, e])).values()];
   events.length = 0;
   events.push(...unique);
-  for (const e of events.filter((x) => /stranded_risp|caught_stealing/.test(x.type))) console.log(`  ${e.type === 'mlb.runner.caught_stealing' ? '🚔' : '🏝️'}  ${e.title} | ${e.body.slice(0, 110)}`);
+  const spotlight: Record<string, string> = { 'mlb.team.stranded_risp': '🏝️', 'mlb.runner.caught_stealing': '🚔', 'nfl.safety': '😵', 'nfl.qb.delay_of_game': '⏱️' };
+  for (const e of events.filter((x) => spotlight[x.type])) console.log(`  ${spotlight[e.type]}  ${e.title}${e.aliases ? ` [also counts as: ${e.aliases}]` : ''} | ${e.body.slice(0, 100)}`);
   const finalHome = Number(comp.competitors.find((c: any) => c.homeAway === 'home').score);
   const finalAway = Number(comp.competitors.find((c: any) => c.homeAway === 'away').score);
   const ok = score.home === finalHome && score.away === finalAway;

@@ -169,12 +169,13 @@ Ways the delay is kept down:
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
-## Notifications (36 types, all user-controllable)
+## Notifications (38 types, all user-controllable)
 
 | | |
 |---|---|
 | MLB | strikeout, grounded into DP, any out (off by default), pitcher gives up runs, gives up a HR, walk/HBP (off by default), fielding error, caught stealing or picked off (one toggle; see note) |
-| NFL | interception (incl. pick-six), sacked, incompletion (off by default), fumble lost, any fumble (off by default), missed FG/XP or blocked kick, penalty |
+| NFL | interception (incl. pick-six), sacked, incompletion (off by default), fumble lost, any fumble (off by default), missed FG/XP or blocked kick, penalty, delay of game (QB), gives up a safety (see note) |
+| NFL delay of game / safety | **Delay of game** is charged to the team ("PENALTY on PIT, Delay of Game", with no player), so it goes to the offense's quarterback in the game: the latest passer the roster lists as a QB. It's skipped for punt and field-goal formations, declined flags, and flags on the defense. Play text uses NFL team codes (ARZ, BLT, CLV, HST, LA, WAS), which are mapped to ESPN's. **Safety** alerts both the team ("49ers gave up a safety", replacing "opponent scored") and the player responsible: the flagged player on a penalty safety, the sacked QB, or the ball carrier. These replace that player's generic penalty or sack alert. Overturned safeties ("SAFETY NULLIFIED") are ignored. |
 | NBA | missed shot, missed FT, got blocked, turnover, foul (off by default), technical/ejection |
 | NHL | goalie allows a goal, shot missed, shot blocked (off by default), shot saved (off by default), giveaway (off by default), penalty |
 | Any player | injured / injury status downgraded |

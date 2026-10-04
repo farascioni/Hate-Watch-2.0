@@ -32,6 +32,8 @@ export interface GameCtx {
   lastResult?: NPlay;
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
+  /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
+  qbs?: Record<string, string>;
 }
 
 export interface Detected {
@@ -122,6 +124,12 @@ export function observePlay(g: GameCtx, p: NPlay) {
   if (g.league === 'nhl') {
     const [saver] = p.participants.filter((x) => x.role === 'saver').map((x) => x.id);
     if (saver && p.teamId) g.goalies.set(p.teamId === g.homeId ? g.awayId : g.homeId, saver);
+  }
+  if (g.league === 'nfl' && p.teamId) {
+    // Core plays' team is the offense. A trick-play pass by a non-QB doesn't change who is under center.
+    const qb = p.participants.find((x) => x.role === 'passer')?.id;
+    const position = qb && catalog.playerByEspn('nfl', qb)?.position;
+    if (qb && (!position || position === 'QB')) (g.qbs ??= {})[p.teamId] = qb;
   }
   if (g.league === 'mlb') {
     if (p.typeSlug === 'play-result') g.lastResult = p;
@@ -311,7 +319,60 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (kickMiss) for (const k of [...role(p, 'kicker'), ...role(p, 'patScorer')].slice(0, 1))
     out.push(mk(g, p, 'nfl.kicker.miss', k, `${nameOf('nfl', k)} ${/blocked/i.test(ty + p.text) ? 'got a kick blocked' : /extra point/i.test(p.text) ? 'missed the extra point' : 'missed a field goal'}`));
   for (const x of role(p, 'penalized')) out.push(mk(g, p, 'nfl.penalty', x, `${nameOf('nfl', x)} was flagged${/declined/i.test(p.text) ? ' (declined)' : ''}`));
+
+  // A more specific alert replaces the generic one for the same player on the same play, and
+  // counts as that generic toggle too (aliases), so nobody gets two notifications for one play.
+  const replace = (e: Detected, generic?: string) => {
+    if (generic) {
+      const i = out.findIndex((x) => x.type === generic && x.targetKey === e.targetKey);
+      if (i >= 0) out.splice(i, 1);
+      e.aliases = [generic];
+    }
+    out.push(e);
+  };
+  const victim = isSafety(p) ? safetyVictim(p) : undefined;
+  if (victim) replace(mk(g, p, 'nfl.safety', victim.id, `${nameOf('nfl', victim.id)} ${victim.how}`), victim.covers);
+  const dog = delayOfGameQb(g, p);
+  if (dog) replace(mk(g, p, 'nfl.qb.delay_of_game', dog.qb, `${nameOf('nfl', dog.qb)} took a delay of game penalty`), dog.named ? 'nfl.penalty' : undefined);
   return out;
+}
+
+/** A safety that actually counted: a scoring play that says so and wasn't wiped out by a penalty. */
+export function isSafety(p: NPlay) {
+  return p.scoring && (/^Safety$/i.test(p.type) || /\bSAFETY\b/.test(p.text)) && !/NULLIFIED/i.test(p.text);
+}
+
+/**
+ * Who on the conceding team is to blame. Real examples:
+ *   "…PENALTY on SF-D.Puni, Offensive Holding, … enforced in End Zone, SAFETY - No Play." → penalized
+ *   "Kaevon Merriweather Safety" (names the defender; the ball carrier is the 'rusher')  → rusher
+ */
+function safetyVictim(p: NPlay): { id: string; how: string; covers?: string } | undefined {
+  const penalized = /PENALTY on/i.test(p.text) ? role(p, 'penalized')[0] : undefined;
+  if (penalized) return { id: penalized, how: 'got flagged in the end zone for a safety', covers: 'nfl.penalty' };
+  const sacked = /sack/i.test(p.type) || /\bsacked\b/i.test(p.text) ? role(p, 'passer')[0] : undefined;
+  if (sacked) return { id: sacked, how: 'got sacked in the end zone for a safety', covers: 'nfl.qb.sacked' };
+  const carrier = [...role(p, 'rusher'), ...role(p, 'receiver'), ...role(p, 'returner'), ...role(p, 'fumbler'), ...role(p, 'passer')][0];
+  // Neutral wording: includes punters running out of the end zone on purpose (intentional safeties).
+  return carrier ? { id: carrier, how: 'gave up a safety' } : undefined;
+}
+
+/** NFL play text uses gamebook team codes; these are the ones that differ from ESPN's. */
+const NFL_CODE: Record<string, string> = { ARZ: 'ARI', BLT: 'BAL', CLV: 'CLE', HST: 'HOU', LA: 'LAR', WAS: 'WSH', JAC: 'JAX' };
+
+/**
+ * Delay of game is charged to the team ("PENALTY on PIT, Delay of Game, 5 yards…" with no player),
+ * so it goes to the offense's quarterback in the game. Skipped for punts/field goals (not the QB's
+ * snap), declined/offsetting flags, and flags on the defense.
+ */
+function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | undefined {
+  const m = p.text.match(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, Delay of Game/);
+  if (!m || /declined|offsetting/i.test(p.text) || /\([^)]*(?:punt|field goal|kick)[^)]*\)/i.test(p.text)) return;
+  const offense = p.teamId ? catalog.teamByEspn('nfl', p.teamId)?.abbrev : undefined;
+  if (!offense || (NFL_CODE[m[1]] ?? m[1]) !== offense) return;
+  const named = role(p, 'penalized').find((id) => catalog.playerByEspn('nfl', id)?.position === 'QB');
+  const qb = named ?? g.qbs?.[p.teamId!];
+  return qb ? { qb, named: !!named } : undefined;
 }
 
 function nba(g: GameCtx, p: NPlay): Detected[] {
@@ -383,7 +444,10 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const opp = side === 'home' ? 'away' : 'home';
     const delta = p[opp] - prev[opp];
     const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
-    if (delta > 0 && g.league !== 'nba') {
+    if (delta === 2 && g.league === 'nfl' && isSafety(p)) {
+      // Replaces "opponent scored 2" for this play, and counts as that toggle too.
+      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${teamName(g.league, teamId)} gave up a safety`, ...base });
+    } else if (delta > 0 && g.league !== 'nba') {
       const what = g.league === 'nhl' ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
       out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: `${teamName(g.league, oppId)} ${what} on the ${teamName(g.league, teamId)}`, ...base });
     }
