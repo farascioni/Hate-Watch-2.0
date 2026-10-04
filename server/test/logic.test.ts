@@ -94,6 +94,30 @@ test('MLB: stranding runners in scoring position', () => {
   assert.equal(mlbFinalHalfInning(walkoff).length, 0, 'a walk-off ends with fewer than 3 outs');
 });
 
+test('MLB: caught stealing is pinned on the runner from the base they left', () => {
+  const g: any = { league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() };
+  // A pitch with the batter + runners is a full snapshot of the bases.
+  observePlay(g, play({ id: 'p1', typeSlug: 'strike-swinging', teamId: '15', participants: [{ id: 'P', role: 'pitcher' }, { id: 'B', role: 'batter' }, { id: 'R1', role: 'onFirst' }, { id: 'R2', role: 'onSecond' }] }));
+  // ESPN's runner-event plays list only the pitcher; they must not wipe the bases.
+  const csPlay = { typeSlug: 'caught-stealing', teamId: '22', text: 'Butler caught stealing third, catcher to third.', period: { type: 'Top', number: 3 }, participants: [{ id: 'P', role: 'pitcher' }] };
+  observePlay(g, play({ id: 'x', ...csPlay }));
+  const [a] = PLAYER_DETECTORS.mlb(g, play({ id: 'cs-1', ...csPlay }));
+  assert.equal(a.type, 'mlb.runner.caught_stealing');
+  assert.equal(a.targetKey, 'player:mlb:R2', 'stealing third means the runner came from second');
+  assert.match(a.title, /caught stealing third$/);
+
+  // ESPN repeats it as a "Play Result" with the same text: same id, so one notification.
+  const [b] = PLAYER_DETECTORS.mlb(g, play({ id: 'cs-2', ...csPlay, typeSlug: 'play-result' }));
+  assert.equal(b.id, a.id);
+
+  // Strike-'em-out-throw-'em-out: the runner's name sits mid-sentence.
+  const [c] = PLAYER_DETECTORS.mlb(g, play({ id: 'dp', typeSlug: 'play-result', teamId: '22', text: 'Smith struck out swinging and Acuña Jr. caught stealing second, catcher to shortstop.', participants: [{ id: 'P', role: 'pitcher' }] }));
+  assert.equal(c.targetKey, 'player:mlb:R1', 'stealing second means the runner came from first');
+
+  // Not a caught stealing: nothing.
+  assert.equal(PLAYER_DETECTORS.mlb(g, play({ id: 'sb', typeSlug: 'stolen-base', teamId: '22', text: 'Butler stole second.' })).filter((e) => e.type === 'mlb.runner.caught_stealing').length, 0);
+});
+
 test('ordinals and search normalization', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st']);
   assert.equal(normalize('Ronald Acuña Jr.'), 'ronald acuna jr');

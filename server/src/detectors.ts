@@ -30,6 +30,8 @@ export interface GameCtx {
   goalies: Map<string, string>;
   /** MLB: the latest at-bat result. Its onFirst/onSecond/onThird roles are the bases AFTER that play. */
   lastResult?: NPlay;
+  /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
+  bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
 }
 
 export interface Detected {
@@ -121,7 +123,15 @@ export function observePlay(g: GameCtx, p: NPlay) {
     const [saver] = p.participants.filter((x) => x.role === 'saver').map((x) => x.id);
     if (saver && p.teamId) g.goalies.set(p.teamId === g.homeId ? g.awayId : g.homeId, saver);
   }
-  if (g.league === 'mlb' && p.typeSlug === 'play-result') g.lastResult = p;
+  if (g.league === 'mlb') {
+    if (p.typeSlug === 'play-result') g.lastResult = p;
+    // Pitches and at-bat results list the batter plus every runner: a full snapshot of the bases.
+    // Runner events (steals, pickoffs) list only the pitcher, so they must not clear the bases.
+    if (p.participants.some((x) => x.role === 'batter')) {
+      const at = (base: 'onFirst' | 'onSecond' | 'onThird') => p.participants.find((x) => x.role === base)?.id;
+      g.bases = { onFirst: at('onFirst'), onSecond: at('onSecond'), onThird: at('onThird') };
+    }
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────────────────────
@@ -197,6 +207,40 @@ export function mlbFinalHalfInning(g: GameCtx): Detected[] {
   return g.league === 'mlb' && g.lastResult?.outs === 3 ? strandedRisp(g) : []; // walk-offs end with < 3 outs
 }
 
+const STOLEN_FROM = { second: 'onFirst', third: 'onSecond', home: 'onThird' } as const;
+
+/**
+ * Player alert: a runner thrown out stealing. ESPN lists only the pitcher on these plays, so the
+ * runner is whoever was on the base they left (from g.bases), cross-checked against the last name
+ * in the text ("Butler caught stealing second, catcher to second.").
+ * ESPN emits each one twice (a "Caught Stealing" play and a "Play Result" with the same text);
+ * the id is built from the text, not the play id, so both collapse into one notification.
+ */
+function caughtStealing(g: GameCtx, p: NPlay): Detected | null {
+  if (p.typeSlug !== 'caught-stealing' && p.typeSlug !== 'play-result') return null;
+  const m = p.text.match(/([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III|IV))?) caught stealing (second|third|home)/u);
+  if (!m) return null;
+  const [, lastName, base] = m;
+  const fullName = (id: string) => catalog.playerByEspn('mlb', id)?.name;
+  const matches = (id: string) => normalize(fullName(id) ?? '').endsWith(normalize(lastName));
+
+  let runner = g.bases?.[STOLEN_FROM[base as keyof typeof STOLEN_FROM]];
+  if (!runner || (fullName(runner) && !matches(runner))) {
+    runner = p.teamId ? byLastName(g, p.teamId, lastName) : undefined; // play team = batting team
+  }
+  if (!runner) return null;
+  const half = p.period ? `${p.period.type}${p.period.number}` : '';
+  return {
+    id: `${g.gameId}:cs:${half}:${normalize(p.text).replace(/ /g, '-')}:${runner}`,
+    type: 'mlb.runner.caught_stealing',
+    targetKey: playerKey('mlb', runner),
+    title: `${nameOf('mlb', runner)} got caught stealing ${base}`,
+    body: `${p.text} — ${scoreLine(g, p)}`,
+    at: p.at,
+    meta: { gameId: g.gameId, playId: p.id, athleteId: runner },
+  };
+}
+
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
 function mlb(g: GameCtx, p: NPlay): Detected[] {
   // ESPN marks every half-inning except the game's last with an "End Inning" play.
@@ -223,6 +267,8 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     }
     if (isResult && /\b(walked|hit by pitch)\b/i.test(t)) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${nameOf('mlb', pitcher)} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
   }
+  const cs = caughtStealing(g, p);
+  if (cs) out.push(cs);
   const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;

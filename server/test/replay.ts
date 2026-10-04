@@ -32,16 +32,20 @@ for (const g of games) {
     observePlay(ctx, p);
   }
   events.push(...mlbFinalHalfInning(ctx)); // what the live tracker does at the final
-  for (const e of events.filter((x) => x.type === 'mlb.team.stranded_risp')) console.log(`  🏝️  ${e.title} | ${e.body.slice(0, 110)}`);
+  // publish() stores each id once, so same-id detections become one notification. Mirror that.
+  const raw = events.length;
+  const unique = [...new Map(events.map((e) => [e.id, e])).values()];
+  events.length = 0;
+  events.push(...unique);
+  for (const e of events.filter((x) => /stranded_risp|caught_stealing/.test(x.type))) console.log(`  ${e.type === 'mlb.runner.caught_stealing' ? '🚔' : '🏝️'}  ${e.title} | ${e.body.slice(0, 110)}`);
   const finalHome = Number(comp.competitors.find((c: any) => c.homeAway === 'home').score);
   const finalAway = Number(comp.competitors.find((c: any) => c.homeAway === 'away').score);
   const ok = score.home === finalHome && score.away === finalAway;
   console.log(`${ok ? 'PASS' : 'FAIL'} tracked score ${score.away}-${score.home} vs final ${finalAway}-${finalHome}`);
   if (!ok) process.exitCode = 1;
-  const ids = new Set(events.map((e) => e.id));
   const byType: Record<string, number> = {};
   for (const e of events) byType[e.type] = (byType[e.type] ?? 0) + 1;
-  console.log(`\n=== ${league.toUpperCase()} ${s.header.competitions[0].competitors.map((c: any) => `${c.team.abbreviation} ${c.score}`).join(' – ')} | ${plays.length} plays → ${events.length} events (${events.length - ids.size} duplicate ids)`);
+  console.log(`\n=== ${league.toUpperCase()} ${s.header.competitions[0].competitors.map((c: any) => `${c.team.abbreviation} ${c.score}`).join(' – ')} | ${plays.length} plays → ${events.length} notifications (${raw - events.length} same-id detections collapsed)`);
   console.log(byType);
   const unknownTargets = events.filter((e) => /Your guy/.test(e.title)).length;
   console.log(`events naming an athlete not in current catalog: ${unknownTargets}`);
