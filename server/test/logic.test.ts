@@ -115,7 +115,21 @@ test('MLB: caught stealing is pinned on the runner from the base they left', () 
   assert.equal(c.targetKey, 'player:mlb:R1', 'stealing second means the runner came from first');
 
   // Not a caught stealing: nothing.
-  assert.equal(PLAYER_DETECTORS.mlb(g, play({ id: 'sb', typeSlug: 'stolen-base', teamId: '22', text: 'Butler stole second.' })).filter((e) => e.type === 'mlb.runner.caught_stealing').length, 0);
+  const runnerOuts = (p: object) => PLAYER_DETECTORS.mlb(g, play(p)).filter((e) => e.type === 'mlb.runner.caught_stealing');
+  assert.equal(runnerOuts({ id: 'sb', typeSlug: 'stolen-base', teamId: '22', text: 'Butler stole second.' }).length, 0);
+
+  // Pickoffs share the same notification type (one toggle).
+  const pickoff = { teamId: '22', text: 'Bolte picked off second.', period: { type: 'Top', number: 3 }, participants: [{ id: 'P', role: 'pitcher' }] };
+  const [po] = runnerOuts({ id: 'po-1', typeSlug: 'pick-off', ...pickoff });
+  assert.equal(po.targetKey, 'player:mlb:R2', 'picked off second means the runner was standing on second');
+  assert.match(po.title, /got picked off second$/);
+  assert.equal(runnerOuts({ id: 'po-2', typeSlug: 'play-result', ...pickoff })[0].id, po.id, 'ESPN twin plays collapse to one');
+  // "picked off and caught stealing": the runner left first heading for second.
+  const [pocs] = runnerOuts({ id: 'pocs', typeSlug: 'play-result', teamId: '22', text: 'Bolte picked off and caught stealing second, pitcher to shortstop.' });
+  assert.equal(pocs.targetKey, 'player:mlb:R1');
+  assert.match(pocs.title, /picked off \(caught stealing second\)/);
+  // A failed pickoff attempt is not an out.
+  assert.equal(runnerOuts({ id: 'poe', typeSlug: 'play-result', teamId: '22', text: 'Bolte to second on pickoff error by pitcher.' }).length, 0);
 });
 
 test('ordinals and search normalization', () => {

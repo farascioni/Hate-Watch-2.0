@@ -207,24 +207,40 @@ export function mlbFinalHalfInning(g: GameCtx): Detected[] {
   return g.league === 'mlb' && g.lastResult?.outs === 3 ? strandedRisp(g) : []; // walk-offs end with < 3 outs
 }
 
-const STOLEN_FROM = { second: 'onFirst', third: 'onSecond', home: 'onThird' } as const;
+type Base = 'onFirst' | 'onSecond' | 'onThird';
+/** Stealing a base means the runner left the one before it. */
+const STOLEN_FROM: Record<string, Base> = { second: 'onFirst', third: 'onSecond', home: 'onThird' };
+/** Picked off a base means the runner was standing on it. */
+const PICKED_AT: Record<string, Base> = { first: 'onFirst', second: 'onSecond', third: 'onThird' };
+const NAME = String.raw`([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III|IV))?)`;
+const PICKED_OFF = new RegExp(`${NAME} picked off (?:and caught stealing (second|third|home)|(first|second|third))`, 'u');
+const CAUGHT_STEALING = new RegExp(`${NAME} caught stealing (second|third|home)`, 'u');
 
 /**
- * Player alert: a runner thrown out stealing. ESPN lists only the pitcher on these plays, so the
- * runner is whoever was on the base they left (from g.bases), cross-checked against the last name
- * in the text ("Butler caught stealing second, catcher to second.").
- * ESPN emits each one twice (a "Caught Stealing" play and a "Play Result" with the same text);
- * the id is built from the text, not the play id, so both collapse into one notification.
+ * Player alert: a runner thrown out stealing OR picked off (one notification type, one toggle).
+ *   "Butler caught stealing second, catcher to second."   → runner came from first
+ *   "Bolte picked off first."                              → runner was on first
+ *   "X picked off and caught stealing second."             → runner came from first
+ * ESPN lists only the pitcher on these plays, so the runner is whoever was on that base (g.bases),
+ * cross-checked against the last name in the text, with a roster name match as fallback.
+ * ESPN emits each one twice (a "Caught Stealing"/"Pick Off" play and a "Play Result" with the same
+ * text); the id is built from the text, not the play id, so both collapse into one notification.
  */
-function caughtStealing(g: GameCtx, p: NPlay): Detected | null {
-  if (p.typeSlug !== 'caught-stealing' && p.typeSlug !== 'play-result') return null;
-  const m = p.text.match(/([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III|IV))?) caught stealing (second|third|home)/u);
-  if (!m) return null;
-  const [, lastName, base] = m;
+function runnerOut(g: GameCtx, p: NPlay): Detected | null {
+  let lastName: string, from: Base, what: string;
+  const po = p.text.match(PICKED_OFF);
+  const cs = po ? null : p.text.match(CAUGHT_STEALING); // check pickoffs first: "picked off and caught stealing"
+  if (po) {
+    const [, name, stealing, at] = po;
+    [lastName, from, what] = stealing ? [name, STOLEN_FROM[stealing], `got picked off (caught stealing ${stealing})`] : [name, PICKED_AT[at], `got picked off ${at}`];
+  } else if (cs) {
+    const [, name, stealing] = cs;
+    [lastName, from, what] = [name, STOLEN_FROM[stealing], `got caught stealing ${stealing}`];
+  } else return null;
+
   const fullName = (id: string) => catalog.playerByEspn('mlb', id)?.name;
   const matches = (id: string) => normalize(fullName(id) ?? '').endsWith(normalize(lastName));
-
-  let runner = g.bases?.[STOLEN_FROM[base as keyof typeof STOLEN_FROM]];
+  let runner = g.bases?.[from];
   if (!runner || (fullName(runner) && !matches(runner))) {
     runner = p.teamId ? byLastName(g, p.teamId, lastName) : undefined; // play team = batting team
   }
@@ -234,7 +250,7 @@ function caughtStealing(g: GameCtx, p: NPlay): Detected | null {
     id: `${g.gameId}:cs:${half}:${normalize(p.text).replace(/ /g, '-')}:${runner}`,
     type: 'mlb.runner.caught_stealing',
     targetKey: playerKey('mlb', runner),
-    title: `${nameOf('mlb', runner)} got caught stealing ${base}`,
+    title: `${nameOf('mlb', runner)} ${what}`,
     body: `${p.text} — ${scoreLine(g, p)}`,
     at: p.at,
     meta: { gameId: g.gameId, playId: p.id, athleteId: runner },
@@ -267,8 +283,8 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     }
     if (isResult && /\b(walked|hit by pitch)\b/i.test(t)) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${nameOf('mlb', pitcher)} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
   }
-  const cs = caughtStealing(g, p);
-  if (cs) out.push(cs);
+  const runner = runnerOut(g, p);
+  if (runner) out.push(runner);
   const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;

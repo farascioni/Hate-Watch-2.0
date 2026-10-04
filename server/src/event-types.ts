@@ -20,7 +20,8 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'mlb.pitcher.runs_allowed', scope: 'player', leagues: ['mlb'], label: 'Gives up runs', description: 'Tracked pitcher allows a run to score.', defaultOn: true, emoji: '🩸' },
   { id: 'mlb.pitcher.home_run_allowed', scope: 'player', leagues: ['mlb'], label: 'Gives up a home run', description: 'Tracked pitcher serves up a homer.', defaultOn: true, emoji: '💣' },
   { id: 'mlb.pitcher.walk', scope: 'player', leagues: ['mlb'], label: 'Issues a walk / HBP', description: 'Tracked pitcher walks or hits a batter.', defaultOn: false, emoji: '🚶' },
-  { id: 'mlb.runner.caught_stealing', scope: 'player', leagues: ['mlb'], label: 'Gets caught stealing', description: 'Tracked player is thrown out trying to steal a base.', defaultOn: true, emoji: '🚔' },
+  // id kept from when this was caught-stealing only, so existing users' on/off choice carries over.
+  { id: 'mlb.runner.caught_stealing', scope: 'player', leagues: ['mlb'], label: 'Gets caught stealing or picked off', description: 'Tracked player is thrown out trying to steal, or picked off a base.', defaultOn: true, emoji: '🚔' },
   { id: 'mlb.fielder.error', scope: 'player', leagues: ['mlb'], label: 'Commits an error', description: 'Tracked player is charged with a fielding error.', defaultOn: true, emoji: '🧤' },
 
   // ── NFL players

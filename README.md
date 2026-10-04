@@ -173,13 +173,13 @@ Ways the delay is kept down:
 
 | | |
 |---|---|
-| MLB | strikeout, grounded into DP, any out (off by default), pitcher gives up runs, gives up a HR, walk/HBP (off by default), fielding error, caught stealing (see note) |
+| MLB | strikeout, grounded into DP, any out (off by default), pitcher gives up runs, gives up a HR, walk/HBP (off by default), fielding error, caught stealing or picked off (one toggle; see note) |
 | NFL | interception (incl. pick-six), sacked, incompletion (off by default), fumble lost, any fumble (off by default), missed FG/XP or blocked kick, penalty |
 | NBA | missed shot, missed FT, got blocked, turnover, foul (off by default), technical/ejection |
 | NHL | goalie allows a goal, shot missed, shot blocked (off by default), shot saved (off by default), giveaway (off by default), penalty |
 | Any player | injured / injury status downgraded |
 | Teams | lost, opponent scored, fell behind, dropped in standings, losing streak ≥3, eliminated from playoffs, a player injured |
-| MLB caught stealing | ESPN lists only the pitcher on these plays. The runner is whoever was on the base they left, from the tracked base state, cross-checked against the last name in the play text. ESPN reports each one twice; both copies share one notification ID. |
+| MLB caught stealing / picked off | "caught stealing second" means the runner came from first; "picked off first" means the runner was on first; "picked off and caught stealing second" means the runner came from first. ESPN lists only the pitcher on these plays. The runner is whoever was on that base, from the tracked base state, cross-checked against the last name in the play text. ESPN reports each one twice; both copies share one notification ID. |
 | MLB teams | strands runners in scoring position: the half-inning ends with a runner on 2nd and/or 3rd ("left the bases loaded" when full). Uses the base state ESPN records after the inning's final out, including the game's last half-inning. |
 
 Settings let users control:
