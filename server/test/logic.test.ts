@@ -254,6 +254,45 @@ test('scored on AND fell behind on the same play: one alert per user, not two', 
   assert.deepEqual(notLead.map((e) => [e.type, e.unless]), [['team.opponent_scored', undefined]]);
 });
 
+test('F1: session results become one alert per driver, with merged facts and team alerts', async () => {
+  const { f1SessionResults, isOut } = await import('../src/f1.ts');
+  const row = (id: string, order: number, grid: number, team: string, out = '') =>
+    ({ id, order, grid, out: !!out, outLabel: out, lap: out ? 12 : null, teamKey: `team:f1:${team}` });
+  const meta = (kind: 'race' | 'sprint' | 'qual') => ({ compId: 'c', kind, label: 'Test GP', at: 0 });
+  const by = <T extends { targetKey: string }>(es: T[], key: string) => es.filter((e) => e.targetKey === key);
+
+  // Double DNF: both cars out → one team alert that also covers "no points".
+  const race = f1SessionResults(meta('race'), [row('A', 1, 1, 'X'), row('B', 2, 3, 'X'), row('C', 21, 5, 'Y', 'Retired'), row('D', 22, 6, 'Y', 'Disqualified')]);
+  const y = by(race, 'team:f1:Y');
+  assert.deepEqual(y.map((e) => e.type), ['f1.team.double_dnf']);
+  assert.deepEqual(y[0].aliases, ['f1.team.no_points']);
+  assert.match(by(race, 'player:f1:C')[0].title, /retired on lap 12/);
+  assert.match(by(race, 'player:f1:D')[0].title, /was disqualified/);
+  assert.equal(by(race, 'player:f1:A').length, 0, 'the winner gets nothing');
+  assert.equal(by(race, 'team:f1:X').length, 0, 'a team with points gets nothing');
+
+  // Sprint: points go to the top 8, so P9 is "no points" (it wouldn't be in a race).
+  const sprint = f1SessionResults(meta('sprint'), [row('A', 9, 9, 'X'), row('B', 1, 1, 'X')]);
+  assert.match(by(sprint, 'player:f1:A')[0].title, /P9: no points, behind teammate/);
+  assert.deepEqual(by(sprint, 'player:f1:A').map((e) => [e.type, e.aliases]), [['f1.driver.out_of_points', ['f1.driver.beaten_by_teammate']]]);
+
+  // Unknown grid (0) never claims "lost places".
+  assert.equal(f1SessionResults(meta('race'), [row('A', 9, 0, 'X')]).length, 0);
+  // Exactly 3 places lost counts; 2 does not.
+  assert.equal(f1SessionResults(meta('race'), [row('A', 8, 5, 'X')])[0].type, 'f1.driver.lost_places');
+  assert.equal(f1SessionResults(meta('race'), [row('A', 7, 5, 'X')]).length, 0);
+
+  // 20-car qualifying: P11-15 out in Q2, P16-20 out in Q1.
+  const q = f1SessionResults(meta('qual'), Array.from({ length: 20 }, (_, i) => row(`Q${i + 1}`, i + 1, 0, 'X')));
+  assert.equal(q.length, 10);
+  assert.match(by(q, 'player:f1:Q15')[0].title, /Q2 \(P15\)/);
+  assert.match(by(q, 'player:f1:Q16')[0].title, /Q1 \(P16\)/);
+
+  assert.equal(isOut('STATUS_CLASSIFIED'), false);
+  assert.equal(isOut('STATUS_RETIRED'), true);
+  assert.equal(isOut('STATUS_NOT_CLASSIFIED'), true);
+});
+
 test('ordinals and search normalization', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st']);
   assert.equal(normalize('Ronald Acuña Jr.'), 'ronald acuna jr');

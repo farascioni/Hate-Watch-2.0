@@ -51,6 +51,17 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'nhl.giveaway', scope: 'player', leagues: ['nhl'], label: 'Gives the puck away', description: 'Tracked player is charged with a giveaway.', defaultOn: false, emoji: '🎁' },
   { id: 'nhl.penalty', scope: 'player', leagues: ['nhl'], label: 'Takes a penalty', description: 'Tracked player goes to the box.', defaultOn: true, emoji: '⛓️' },
 
+  // ── F1 drivers (one finish alert per driver per session: the facts that apply are merged)
+  { id: 'f1.driver.dnf', scope: 'player', leagues: ['f1'], label: "Doesn't finish", description: 'Tracked driver retires, is disqualified, or doesn\'t start a race or sprint. Sent live.', defaultOn: true, emoji: '🏳️' },
+  { id: 'f1.driver.out_of_points', scope: 'player', leagues: ['f1'], label: 'Finishes outside the points', description: 'Tracked driver finishes outside the top 10 (top 8 in a sprint).', defaultOn: true, emoji: '0️⃣' },
+  { id: 'f1.driver.lost_places', scope: 'player', leagues: ['f1'], label: 'Loses places from the grid', description: 'Tracked driver finishes 3 or more places lower than they started.', defaultOn: true, emoji: '🔻' },
+  { id: 'f1.driver.beaten_by_teammate', scope: 'player', leagues: ['f1'], label: 'Finishes behind teammate', description: 'Tracked driver is beaten by the other car in the same team.', defaultOn: true, emoji: '🥈' },
+  { id: 'f1.driver.quali_knockout', scope: 'player', leagues: ['f1'], label: 'Knocked out in qualifying', description: 'Tracked driver fails to reach Q3 (knocked out in Q1 or Q2).', defaultOn: true, emoji: '🚫' },
+  { id: 'f1.driver.standings_drop', scope: 'player', leagues: ['f1'], label: "Drops in the drivers' championship", description: "Tracked driver slides down the drivers' standings.", defaultOn: true, emoji: '📊' },
+  // ── F1 constructors
+  { id: 'f1.team.double_dnf', scope: 'team', leagues: ['f1'], label: 'Double DNF', description: 'Both of the tracked team\'s cars fail to finish. Sent live. Also covers "Scores no points".', defaultOn: true, emoji: '☠️' },
+  { id: 'f1.team.no_points', scope: 'team', leagues: ['f1'], label: 'Scores no points', description: 'Neither of the tracked team\'s cars finishes in the points.', defaultOn: true, emoji: '🕳️' },
+
   // ── Any player
   { id: 'player.injured', scope: 'player', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Gets injured', description: 'Tracked player appears on the injury report or their status worsens.', defaultOn: true, emoji: '🤕' },
 
@@ -60,7 +71,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'mlb.team.stranded_risp', scope: 'team', leagues: ['mlb'], label: 'Strands runners in scoring position', description: 'Tracked team ends an inning with a runner left on second or third (or the bases loaded).', defaultOn: true, emoji: '🏝️' },
   { id: 'team.opponent_scored', scope: 'team', leagues: ['mlb', 'nfl', 'nhl'], label: 'Opponent scores', description: 'The other team puts points on the board.', defaultOn: true, emoji: '📉' },
   { id: 'team.fell_behind', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Falls behind', description: "Tracked team goes from tied/leading to trailing. Replaces that play's \"Opponent scores\" alert, so you get one alert, not two.", defaultOn: true, emoji: '⬇️' },
-  { id: 'team.standings_drop', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Drops in standings', description: 'Tracked team slides down the conference/league standings.', defaultOn: true, emoji: '📊' },
+  { id: 'team.standings_drop', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Drops in standings', description: "Tracked team slides down the conference/league standings (F1: the constructors' championship).", defaultOn: true, emoji: '📊' },
   { id: 'team.losing_streak', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Losing streak', description: 'Tracked team extends a losing streak to 3 or more.', defaultOn: true, emoji: '🧊' },
   { id: 'team.eliminated', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Eliminated from playoffs', description: 'Tracked team is mathematically eliminated from playoff contention.', defaultOn: true, emoji: '⚰️' },
   { id: 'team.player_injured', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'A player gets injured', description: 'Anyone on the tracked team lands on the injury report.', defaultOn: true, emoji: '🚑' },

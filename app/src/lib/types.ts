@@ -1,4 +1,4 @@
-export type League = 'nba' | 'mlb' | 'nfl' | 'nhl';
+export type League = 'nba' | 'mlb' | 'nfl' | 'nhl' | 'f1';
 
 export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;

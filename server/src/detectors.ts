@@ -475,7 +475,8 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
-export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, nhl };
+// F1 has no play-by-play; its alerts come from session results (f1.ts).
+export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, nhl, f1: () => [] };
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───
 /**

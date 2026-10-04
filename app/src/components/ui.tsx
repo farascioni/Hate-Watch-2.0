@@ -39,8 +39,10 @@ export function FollowButton({ target, compact }: { target: Target; compact?: bo
 }
 
 export function subtitle(t: Target) {
-  if (t.kind === 'team') return t.location ?? t.abbrev;
-  return [t.teamAbbrev, t.position, t.jersey ? `#${t.jersey}` : null].filter(Boolean).join(' · ');
+  if (t.kind === 'team') return t.league === 'f1' ? 'Constructor' : t.location ?? t.abbrev;
+  // F1 team codes (RBR, AMR) are our own badge labels, so drivers show the constructor's name instead.
+  const team = t.league === 'f1' ? t.teamName : t.teamAbbrev;
+  return [team, t.position, t.jersey ? `#${t.jersey}` : null].filter(Boolean).join(' · ');
 }
 
 export function TargetRow({ target, right }: { target: Target; right?: ReactNode }) {

@@ -17,6 +17,7 @@ export const leagueColors: Record<string, string> = {
   mlb: '#1D6FD8',
   nfl: '#2E7D32',
   nhl: '#9CA3AF',
+  f1: '#E10600',
 };
 
 export const space = (n: number) => n * 4;

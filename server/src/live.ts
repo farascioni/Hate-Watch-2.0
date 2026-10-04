@@ -1,7 +1,8 @@
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { LEAGUE_IDS, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { GAME_LEAGUES, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, fromCorePlay, fromSitePlay, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, scoreLine, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
@@ -14,7 +15,7 @@ const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
-const BLOWOUT: Record<League, number> = { nba: 20, nfl: 21, mlb: 7, nhl: 4 };
+const BLOWOUT: Record<League, number> = { nba: 20, nfl: 21, mlb: 7, nhl: 4, f1: Infinity };
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -148,11 +149,12 @@ class LiveEngine {
   private standingsKick: Partial<Record<League, () => void>> = {};
 
   start() {
-    for (const lg of LEAGUE_IDS) {
+    for (const lg of GAME_LEAGUES) {
       this.kickers[lg] = every(SCOREBOARD_MS, () => this.scanScoreboard(lg));
       this.standingsKick[lg] = every(STANDINGS_MS, () => scanStandings(lg));
       every(INJURIES_MS, () => scanInjuries(lg));
     }
+    this.kickers.f1 = startF1(every); // races, not games: see f1.ts
   }
 
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */
@@ -161,7 +163,10 @@ class LiveEngine {
   onGameFinal(lg: League) { setTimeout(() => this.standingsKick[lg]?.(), 15_000); }
 
   status() {
-    return [...this.trackers.values()].map((t) => ({ league: t.ctx.league, gameId: t.ctx.gameId, finished: t.finished, lastPollMs: t.lastPollMs }));
+    return [
+      ...[...this.trackers.values()].map((t) => ({ league: t.ctx.league, gameId: t.ctx.gameId, finished: t.finished, lastPollMs: t.lastPollMs })),
+      ...f1Status(),
+    ];
   }
 
   private async scanScoreboard(lg: League) {

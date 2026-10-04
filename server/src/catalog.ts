@@ -74,6 +74,14 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     const stats = { teams: 0, players: 0, duplicateIdsRemoved: 0, duplicateNamesRemoved: 0, headshotsVerified: 0, headshotFallbackToLogo: 0, headshotAltMismatch: 0 };
     report.leagues[lg] = stats;
 
+    if (lg === 'f1') {
+      const f1 = await ingestF1(stats, report);
+      newTeams.push(...f1.teams);
+      newPlayers.push(...f1.players);
+      log(`[ingest] F1: ${stats.teams} constructors, ${stats.players} drivers (${stats.headshotsVerified} headshots, ${stats.headshotFallbackToLogo} badge fallbacks)`);
+      continue;
+    }
+
     const res = await getJson(urls.teams(lg));
     const rawTeams: any[] = res.sports[0].leagues[0].teams.map((x: any) => x.team).filter((t: any) => t.isActive !== false && !t.isAllStar);
 
@@ -178,6 +186,80 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
   kvSet('ingest:report', report);
   loadCatalog();
   return report;
+}
+
+// ─── Formula 1 ────────────────────────────────────────────────────────────────────────────────
+/**
+ * ESPN has no constructor logos (404, `logos: null`), so constructors get a badge the app draws
+ * natively: a circle in the team's official ESPN colour with this code. Clearly not a fake logo.
+ */
+export const F1_BADGE = 'badge://f1';
+const F1_CODES: Record<string, string> = {
+  alpine: 'ALP', 'aston martin': 'AMR', audi: 'AUD', cadillac: 'CAD', ferrari: 'FER', haas: 'HAA',
+  mclaren: 'MCL', mercedes: 'MER', 'racing bulls': 'RB', 'red bull': 'RBR', williams: 'WIL',
+};
+
+async function ingestF1(stats: IngestReport['leagues'][string], report: IngestReport): Promise<{ teams: Team[]; players: Player[] }> {
+  const res = await getJson(urls.teams('f1'));
+  const teams: Team[] = res.sports[0].leagues[0].teams.map((x: any) => x.team).filter((t: any) => t.isActive !== false).map((t: any) => {
+    const n = normalize(t.displayName);
+    return {
+      key: teamKey('f1', t.id), league: 'f1', espnId: t.id, name: t.displayName, shortName: t.shortDisplayName ?? t.displayName,
+      abbrev: F1_CODES[n] ?? t.displayName.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase(),
+      location: null, color: t.color ? `#${t.color}` : '#888888', altColor: t.alternateColor ? `#${t.alternateColor}` : null,
+      logo: F1_BADGE, logoDark: null, logoW: 512, logoH: 512,
+    } satisfies Team;
+  });
+  const byName = new Map(teams.map((t) => [normalize(t.name), t]));
+  stats.teams = teams.length;
+
+  // Drivers who actually raced this season: championship standings + this weekend's entry list.
+  // (The season athlete list also has reserves and test drivers.)
+  const [standings, sb] = await Promise.all([getJson(urls.standings('f1')), getJson(urls.scoreboard('f1'))]);
+  const season = Number(sb.season?.year ?? new Date().getFullYear());
+  const racing = new Set<string>();
+  for (const e of standings.children?.find((c: any) => /driver/i.test(c.name))?.standings?.entries ?? []) racing.add(String(e.athlete.id));
+  for (const ev of sb.events ?? []) for (const c of ev.competitions ?? []) for (const x of c.competitors ?? []) racing.add(String(x.id));
+
+  // A driver's athlete record can be stale after a team move (Lindblad: record says "Red Bull #36",
+  // but he raced the Racing Bulls #41). This weekend's entry list is authoritative for current
+  // team and car number; the athlete record is only the fallback (e.g. a driver replaced mid-season).
+  const entered = new Map<string, { team: string; number: string }>();
+  const ev = sb.events?.[0];
+  const latest = [...(ev?.competitions ?? [])].reverse().find((c: any) => c.competitors?.length);
+  if (ev && latest) {
+    const list = await getJson(urls.f1Competitors(String(ev.id), String(latest.id)));
+    for (const c of await mapLimit<any, any>(list.items ?? [], 8, (it: any) => getJson(it.$ref))) {
+      if (c.vehicle?.manufacturer) entered.set(String(c.id), { team: c.vehicle.manufacturer, number: String(c.vehicle.number ?? '') });
+    }
+  }
+
+  const list = await getJson(urls.f1Athletes(season));
+  const athletes = (await mapLimit(list.items ?? [], 8, (it: any) => getJson(it.$ref))).filter((a: any) => racing.has(String(a.id)));
+  const seen = new Set<string>();
+  const players = (await mapLimit(athletes, 8, async (a: any) => {
+    if (seen.has(a.id)) { stats.duplicateIdsRemoved++; return null; }
+    seen.add(a.id);
+    const record = a.vehicles?.find((v: any) => String(v.season?.$ref ?? '').includes(`/seasons/${season}`)) ?? a.vehicles?.[0];
+    const now = entered.get(String(a.id));
+    const vehicle = now ? { team: now.team, manufacturer: now.team, number: now.number } : record;
+    const team = byName.get(normalize(vehicle?.team ?? '')) ?? byName.get(normalize(vehicle?.manufacturer ?? ''));
+    if (!team) { report.problems.push(`f1: ${a.displayName} (${a.id}) drives for "${vehicle?.team}", which matches no constructor; skipped`); return null; }
+    const p: Player = {
+      key: playerKey('f1', a.id), league: 'f1', espnId: String(a.id), name: a.displayName, shortName: a.shortName ?? null,
+      position: null, jersey: vehicle?.number ?? null, teamKey: team.key,
+      image: '', imageW: 0, imageH: 0, imageKind: 'headshot',
+    };
+    const candidate: string = a.headshot?.href ?? urls.headshot('f1', a.id);
+    if (!candidate.includes(`/${a.id}.png`)) report.problems.push(`f1: headshot URL for ${p.name} not keyed by id (${candidate})`);
+    if (a.headshot?.alt && normalize(a.headshot.alt) !== normalize(p.name)) { stats.headshotAltMismatch++; report.problems.push(`f1: headshot alt "${a.headshot.alt}" ≠ "${p.name}"`); }
+    const dims = await probePng(candidate);
+    if (dims) { Object.assign(p, { image: candidate, imageW: dims.width, imageH: dims.height }); stats.headshotsVerified++; }
+    else { Object.assign(p, { image: team.logo, imageW: team.logoW, imageH: team.logoH, imageKind: 'team_logo' }); stats.headshotFallbackToLogo++; }
+    return p;
+  })).filter((p): p is Player => !!p);
+  stats.players = players.length;
+  return { teams, players };
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────────────────────

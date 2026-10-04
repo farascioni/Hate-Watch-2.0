@@ -4,10 +4,13 @@ import { sendPushes } from './push.ts';
 import { startApi } from './api.ts';
 import { engine } from './live.ts';
 import { db } from './db.ts';
+import { LEAGUE_IDS } from './leagues.ts';
 
 loadCatalog();
-if (!catalog.size().players) {
-  console.log('[boot] empty catalog, ingesting rosters from ESPN…');
+// Ingest on boot if the catalog is empty or a newly added league (e.g. F1) isn't in it yet.
+const missing = LEAGUE_IDS.filter((lg) => !catalog.allTeams().some((t) => t.league === lg));
+if (missing.length) {
+  console.log(`[boot] catalog missing ${missing.join(', ')}; ingesting rosters from ESPN…`);
   await ingest();
 }
 console.log('[boot] catalog', catalog.size());

@@ -23,6 +23,23 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
   const inner = isHeadshot ? size - 4 : Math.round(size * 0.68);
   const src = sizedImage(uri, w, h, inner, isHeadshot ? 'cover' : 'contain');
 
+  // F1 constructors have no logo on ESPN: the server marks them "badge://" and we draw a badge in the
+  // team's official colour with its code (FER, MCL…). Crisp at any size, and clearly not a fake logo.
+  if (uri.startsWith('badge://')) {
+    const code = (target.kind === 'team' ? target.abbrev : target.teamAbbrev) ?? '?';
+    const fill = ring;
+    return (
+      <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: fill, backgroundColor: fill }]} accessibilityLabel={target.name}>
+        <Text style={{ color: readableOn(fill), fontSize: Math.round(size * (code.length > 2 ? 0.28 : 0.34)), fontWeight: '900', letterSpacing: 0.5 }} numberOfLines={1}>{code}</Text>
+        {target.kind === 'player' && target.jersey ? (
+          <View style={[styles.badge, { backgroundColor: colors.surfaceHi }]}>
+            <Text style={styles.badgeText}>{target.jersey}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: ring }]}>
       <Image
@@ -42,6 +59,15 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
       ) : null}
     </View>
   );
+}
+
+/** Black or white text, whichever reads better on a hex background (Alpine yellow, Williams white…). */
+function readableOn(hex: string) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum > 0.6 ? '#111' : '#fff';
 }
 
 const styles = StyleSheet.create({
