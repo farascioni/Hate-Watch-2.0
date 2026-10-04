@@ -11,7 +11,7 @@ export interface Prefs {
   sound: boolean;
   leagues: Partial<Record<League, boolean>>;
   types: Record<string, boolean>;          // overrides of each type's defaultOn
-  muted: string[];                         // followed targets silenced without unfollowing
+  muted: string[];                         // followed targets with push off: alerts still go to the feed
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
 }
 
@@ -55,10 +55,15 @@ export function typeEnabled(p: Prefs, typeId: string) {
   return p.types[typeId] ?? EVENT_TYPE_BY_ID.get(typeId)?.defaultOn ?? false;
 }
 
+/** Does this user want this alert at all (feed + live)? Muting a target does NOT affect this. */
 export function wants(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKey'>, league: League) {
   if (p.leagues[league] === false) return false;
-  if (p.muted.includes(e.targetKey)) return false;
   return typeEnabled(p, e.type) || (e.aliases ?? []).some((a) => typeEnabled(p, a));
+}
+
+/** Should an alert they want also be pushed? Muted targets (🔕 on the Tracking tab) are feed-only. */
+export function pushAllowed(p: Prefs, targetKey: string, now = new Date()) {
+  return p.pushEnabled && !p.muted.includes(targetKey) && !inQuietHours(p, now);
 }
 
 /**
@@ -125,7 +130,7 @@ export function publish(events: Detected[], league: League) {
     for (const f of fols) {
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
-      const willPush = !!(prefs.pushEnabled && f.push_token && !inQuietHours(prefs));
+      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey);
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
       if (willPush) pushes.push({

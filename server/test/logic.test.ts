@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // The DB module opens its file on import, so point it at memory before loading app code.
 process.env.HW_DB = ':memory:';
-const { wants, shouldDeliver, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
+const { wants, shouldDeliver, pushAllowed, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { parseStandings } = await import('../src/live.ts');
 const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, PLAYER_DETECTORS, teamScoreEvents } = await import('../src/detectors.ts');
 
@@ -18,11 +18,19 @@ test('type defaults come from the catalog', () => {
   assert.equal(wants(prefs(), { ...ev, type: 'mlb.batter.popout' }, 'mlb'), false); // defaultOn: false
 });
 
-test('user can turn a type off, a league off, or mute one target', () => {
+test('user can turn a type off or a league off', () => {
   assert.equal(wants(prefs({ types: { 'mlb.batter.strikeout': false } }), ev, 'mlb'), false);
   assert.equal(wants(prefs({ leagues: { mlb: false } }), ev, 'mlb'), false);
-  assert.equal(wants(prefs({ muted: ['player:mlb:1'] }), ev, 'mlb'), false);
-  assert.equal(wants(prefs({ muted: ['player:mlb:2'] }), ev, 'mlb'), true);
+});
+
+test('muting a target (🔕) only stops push: its alerts still go to the feed', () => {
+  const noon = new Date('2026-10-03T12:00:00Z');
+  const muted = prefs({ muted: ['player:mlb:1'] });
+  assert.equal(wants(muted, ev, 'mlb'), true, 'still delivered to the feed');
+  assert.equal(pushAllowed(muted, 'player:mlb:1', noon), false, 'but no push');
+  assert.equal(pushAllowed(muted, 'player:mlb:2', noon), true, 'other targets still push');
+  assert.equal(pushAllowed(prefs({ pushEnabled: false }), 'player:mlb:2', noon), false);
+  assert.equal(pushAllowed(prefs({ quietHours: { enabled: true, start: '11:00', end: '13:00', tz: 'UTC' } }), 'player:mlb:2', noon), false);
 });
 
 test('aliases: a homer still arrives for users who only want "gives up runs"', () => {

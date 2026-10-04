@@ -121,7 +121,8 @@ export function supportPage() {
 <h2>I'm not getting alerts</h2>
 <ul>
 <li>Make sure notifications are allowed for Hate Watch in your phone's settings, and that <strong>Push notifications</strong> is on in the app's Settings tab.</li>
-<li>Check that the alert type and the league are switched on in Settings, that the player or team isn't muted on the Tracking tab, and that you're not inside your quiet hours.</li>
+<li>Check that the alert type and the league are switched on in Settings, and that you're not inside your quiet hours.</li>
+<li>A bell with a line through it (🔕) next to a player or team on the Tracking tab means their alerts go to your feed without a push notification. Tap it to turn pushes back on.</li>
 <li>Alerts only fire during live games (or when standings and injury reports change). The Feed tab shows everything that was sent to you.</li>
 </ul>
 

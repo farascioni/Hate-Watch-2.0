@@ -33,13 +33,13 @@ export default function FollowingScreen() {
       sections={sections}
       keyExtractor={(t) => t.key}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}</SectionHeader>}
-      ListHeaderComponent={<Text style={styles.hint}>Mute (🔕) pauses alerts for one target without unfollowing. Unfollow removes it entirely.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team. Their alerts still show up in your feed. Unfollow stops tracking them entirely.</Text>}
       renderItem={({ item }) => (
         <TargetRow
           target={item}
           right={
             <View style={styles.actions}>
-              <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Unmute ${item.name}` : `Mute ${item.name}`}>
+              <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
                 <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
               </Pressable>
               <Pressable onPress={() => toggleFollow(item)} hitSlop={8} style={styles.unfollow} accessibilityLabel={`Unfollow ${item.name}`}>

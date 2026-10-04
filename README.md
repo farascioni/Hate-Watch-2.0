@@ -10,7 +10,7 @@ ESPN (core plays + site summary, polled in parallel every 2s per live game)
    │
    ▼
 GameTracker ─► league detectors ─► publish() ─┬─► events table (deduped by deterministic id)
-scoreboard (10s) / standings (60s) /           ├─► per-follower prefs filter (type, league, mute, quiet hours)
+scoreboard (10s) / standings (60s) /           ├─► per-follower prefs filter (type, league); push also skips muted + quiet hours
 injuries (30s)                                 ├─► feed rows ─► WebSocket frame to open apps (≈ms)
                                                └─► Expo Push ─► APNs / FCM (app closed)
 ```
@@ -191,7 +191,7 @@ Settings let users control:
 - quiet hours in their own timezone (alerts still reach the feed)
 - each league on/off
 - every alert type, with "all on/off" per group
-- per-target mute (from the Tracking tab) without unfollowing
+- per-target 🔕 on the Tracking tab: turns off push for that player or team, while their alerts still land in the feed
 - reset to defaults
 - clear feed
 

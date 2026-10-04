@@ -42,15 +42,15 @@ await call('POST', '/dev/simulate', token, { targetKey: harper.key, type: 'mlb.b
 await new Promise((r) => setTimeout(r, 300));
 check('disabled type is not delivered', received.length === 1);
 
+// 🔕 mute only turns off push (unit-tested in logic.test.ts): the alert must still reach the live feed.
 await call('PUT', '/me/prefs', token, { muted: [eagles.key] });
 await call('POST', '/dev/simulate', token, { targetKey: eagles.key, type: 'team.lost' });
-await call('PUT', '/me/prefs', token, { muted: [] });
-await call('POST', '/dev/simulate', token, { targetKey: eagles.key, type: 'team.lost' });
 await new Promise((r) => setTimeout(r, 300));
-check('muted target suppressed, unmuted delivered', received.length === 2 && received[1].type === 'team.lost');
+check('muted target still delivered to the live feed', received.length === 2 && received[1].type === 'team.lost');
+await call('PUT', '/me/prefs', token, { muted: [] });
 
 const feed = (await call('GET', '/me/feed', token)).items;
-check('feed is newest-first by when it happened', feed.length === 2 && feed[0].occurredAt >= feed[1].occurredAt);
+check('muted alert is stored in the feed, newest-first', feed.length === 2 && feed[0].type === 'team.lost' && feed[0].occurredAt >= feed[1].occurredAt);
 
 await call('DELETE', `/me/follows/${encodeURIComponent(harper.key)}`, token);
 check('unfollow works', (await call('GET', '/me/follows', token)).follows.length === 1);

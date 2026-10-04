@@ -55,6 +55,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [leagues, setLeagues] = useState<{ id: League; name: string }[]>([]);
   const [push, setPush] = useState<Store['push']>({ status: 'unknown' });
   const ws = useRef<WebSocket | null>(null);
+  // Read inside the socket handler (which outlives renders), so it must be a ref, not state.
+  const mutedRef = useRef<Set<string>>(new Set());
+  useEffect(() => { mutedRef.current = new Set(prefs?.muted ?? []); }, [prefs]);
 
   const refreshFeed = useCallback(async () => {
     const { items } = await api.feed();
@@ -79,7 +82,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (frame.kind !== 'event') return;
         setFeed((cur) => mergeFeed(cur, [frame.item]));
         setUnseen((n) => n + 1);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        // Muted (🔕) targets still land in the feed, just silently.
+        if (!mutedRef.current.has(frame.item.target.key)) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       };
       sock.onclose = () => {
         if (ws.current === sock) ws.current = null;
