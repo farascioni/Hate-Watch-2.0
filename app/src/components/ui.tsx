@@ -1,15 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { Avatar } from './Avatar';
 import { useStore } from '../lib/store';
 import { colors, leagueColors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
 
-export function Chip({ label, active, onPress, color }: { label: string; active?: boolean; onPress?: () => void; color?: string }) {
+export function Chip({ label, active, onPress, color, style }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle> }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }}>
-      <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
+    <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }}>
+      <Text style={[styles.chipText, active && { color: '#fff' }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
@@ -99,7 +99,7 @@ export function ago(ts: number, now: number) {
 }
 
 const styles = StyleSheet.create({
-  chip: { paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  chip: { paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   tag: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
   tagText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
