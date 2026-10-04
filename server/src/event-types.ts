@@ -56,6 +56,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
 
   // ── Teams
   { id: 'team.lost', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Loses a game', description: 'Final whistle and your tracked team lost.', defaultOn: true, emoji: '🪦' },
+  { id: 'mlb.team.nobletiger', scope: 'team', leagues: ['mlb'], label: 'NOBLETIGER', description: 'No Outs, Bases Loaded, Ending with Team Incapable of Getting Easy Run: tracked team loads the bases with nobody out and fails to score. Replaces that inning\'s stranded-runners alert.', defaultOn: true, emoji: '🐯' },
   { id: 'mlb.team.stranded_risp', scope: 'team', leagues: ['mlb'], label: 'Strands runners in scoring position', description: 'Tracked team ends an inning with a runner left on second or third (or the bases loaded).', defaultOn: true, emoji: '🏝️' },
   { id: 'team.opponent_scored', scope: 'team', leagues: ['mlb', 'nfl', 'nhl'], label: 'Opponent scores', description: 'The other team puts points on the board.', defaultOn: true, emoji: '📉' },
   { id: 'team.fell_behind', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Falls behind', description: 'Tracked team goes from tied/leading to trailing.', defaultOn: true, emoji: '⬇️' },

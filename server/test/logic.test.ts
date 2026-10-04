@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // The DB module opens its file on import, so point it at memory before loading app code.
 process.env.HW_DB = ':memory:';
-const { wants, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
+const { wants, shouldDeliver, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { parseStandings } = await import('../src/live.ts');
 const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, PLAYER_DETECTORS, teamScoreEvents } = await import('../src/detectors.ts');
 
@@ -176,6 +176,49 @@ test('NFL: delay of game goes to the offense QB; safeties replace the generic al
   assert.ok(types.includes('team.fell_behind'));
   // Overturned: nothing.
   assert.equal(nfl({ type: 'Safety', scoring: false, text: 'N.Cross tackled in End Zone, SAFETY NULLIFIED by Penalty' }).filter((e) => e.type === 'nfl.safety').length, 0);
+});
+
+test('MLB: NOBLETIGER (bases loaded, nobody out, no runs) and no duplicate with stranded runners', () => {
+  const LOADED = ['onFirst', 'onSecond', 'onThird'];
+  let n = 0;
+  // An at-bat result: the bases and outs AFTER the play, like ESPN's play-result plays.
+  const ab = (outs: number, runners: string[], extra: object = {}) => play({
+    id: `ab${n++}`, typeSlug: 'play-result', teamId: '22', outs, text: `result ${n}`, period: { type: 'Top', number: 4 },
+    participants: [{ id: 'P', role: 'pitcher' }, { id: `B${n}`, role: 'batter' }, ...runners.map((r, i) => ({ id: `R${i}`, role: r }))],
+    ...extra,
+  });
+  const endInning = play({ id: 'end', typeSlug: 'end-inning', period: { type: 'Mid', number: 4 } });
+  const inning = (...plays: ReturnType<typeof play>[]) => {
+    const g: any = { league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() };
+    for (const p of plays) observePlay(g, p);
+    return PLAYER_DETECTORS.mlb(g, endInning);
+  };
+  const types = (es: { type: string; unless?: string }[]) => es.map((e) => (e.unless ? `${e.type} unless ${e.unless}` : e.type));
+
+  // Walk loads them with 0 outs, then K, popup, K: classic NOBLETIGER, bases still loaded.
+  const classic = inning(ab(0, ['onFirst', 'onSecond']), ab(0, LOADED), ab(1, LOADED), ab(2, LOADED), ab(3, LOADED));
+  assert.deepEqual(types(classic), ['mlb.team.nobletiger', 'mlb.team.stranded_risp unless mlb.team.nobletiger']);
+  assert.match(classic[0].title, /pulled a NOBLETIGER/);
+  assert.equal(classic[0].targetKey, 'team:mlb:22');
+
+  assert.deepEqual(types(inning(ab(1, LOADED), ab(2, LOADED), ab(3, LOADED))), ['mlb.team.stranded_risp'], 'loaded with 1 out is not a NOBLETIGER');
+  assert.deepEqual(types(inning(ab(0, LOADED), ab(1, LOADED, { scoring: true }), ab(2, LOADED), ab(3, LOADED))), ['mlb.team.stranded_risp'], 'scoring after loading them cancels it');
+  assert.deepEqual(types(inning(ab(0, LOADED, { scoring: true }), ab(1, LOADED), ab(2, LOADED), ab(3, LOADED))).includes('mlb.team.nobletiger'), true, 'a run on the play that loaded them happened before, so it still counts');
+  assert.deepEqual(types(inning(ab(0, LOADED), ab(3, []))), ['mlb.team.nobletiger'], 'triple play: NOBLETIGER, nobody left to strand');
+
+  // The game's last half-inning (no "End Inning" play) is checked at the final.
+  const g: any = { league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() };
+  for (const p of [ab(0, LOADED), ab(1, LOADED), ab(2, LOADED), ab(3, LOADED)]) observePlay(g, p);
+  assert.deepEqual(types(mlbFinalHalfInning(g)), ['mlb.team.nobletiger', 'mlb.team.stranded_risp unless mlb.team.nobletiger']);
+
+  // Delivery: every user gets exactly ONE alert for that inning, depending on their toggles.
+  const [noble, stranded] = classic;
+  const delivered = (types: Record<string, boolean>) =>
+    [noble, stranded].filter((e) => shouldDeliver(prefs({ types }), e, 'mlb')).map((e) => e.type);
+  assert.deepEqual(delivered({}), ['mlb.team.nobletiger'], 'both on (default): just the NOBLETIGER');
+  assert.deepEqual(delivered({ 'mlb.team.nobletiger': false }), ['mlb.team.stranded_risp'], 'NOBLETIGER off: falls back to stranded');
+  assert.deepEqual(delivered({ 'mlb.team.stranded_risp': false }), ['mlb.team.nobletiger']);
+  assert.deepEqual(delivered({ 'mlb.team.nobletiger': false, 'mlb.team.stranded_risp': false }), []);
 });
 
 test('ordinals and search normalization', () => {

@@ -169,7 +169,7 @@ Ways the delay is kept down:
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
-## Notifications (38 types, all user-controllable)
+## Notifications (39 types, all user-controllable)
 
 | | |
 |---|---|
@@ -181,6 +181,7 @@ Ways the delay is kept down:
 | Any player | injured / injury status downgraded |
 | Teams | lost, opponent scored, fell behind, dropped in standings, losing streak ≥3, eliminated from playoffs, a player injured |
 | MLB caught stealing / picked off | "caught stealing second" means the runner came from first; "picked off first" means the runner was on first; "picked off and caught stealing second" means the runner came from first. ESPN lists only the pitcher on these plays. The runner is whoever was on that base, from the tracked base state, cross-checked against the last name in the play text. ESPN reports each one twice; both copies share one notification ID. |
+| MLB NOBLETIGER | **N**o **O**uts, **B**ases **L**oaded, **E**nding with **T**eam **I**ncapable of **G**etting **E**asy **R**un: the bases get loaded with nobody out, and no run scores from that point to the end of the half-inning. A run scored on the play that loaded the bases doesn't count. Uses the outs and bases ESPN records after each at-bat result. **No duplicates:** that inning's stranded-runners alert is marked `unless: mlb.team.nobletiger`, so each user gets the NOBLETIGER if it's on, otherwise the stranded alert if that's on, never both (`shouldDeliver` in `fanout.ts`). Find real ones with `node test/find-nobletiger.ts [maxGames]`. |
 | MLB teams | strands runners in scoring position: the half-inning ends with a runner on 2nd and/or 3rd ("left the bases loaded" when full). Uses the base state ESPN records after the inning's final out, including the game's last half-inning. |
 
 Settings let users control:

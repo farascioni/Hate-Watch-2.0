@@ -32,6 +32,8 @@ export interface GameCtx {
   lastResult?: NPlay;
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
+  /** MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs). */
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
 }
@@ -40,6 +42,11 @@ export interface Detected {
   id: string;              // deterministic dedupe key
   type: string;
   aliases?: string[];      // other pref toggles that also cover this event (HR allowed ⊂ runs allowed)
+  /**
+   * Skip this event for users who want this OTHER type: it describes the same moment more
+   * specifically (a stranded-runners alert is `unless` the NOBLETIGER that covers that inning).
+   */
+  unless?: string;
   targetKey: string;
   title: string;
   body: string;
@@ -132,6 +139,7 @@ export function observePlay(g: GameCtx, p: NPlay) {
     if (qb && (!position || position === 'QB')) (g.qbs ??= {})[p.teamId] = qb;
   }
   if (g.league === 'mlb') {
+    trackHalfInning(g, p);
     if (p.typeSlug === 'play-result') g.lastResult = p;
     // Pitches and at-bat results list the batter plus every runner: a full snapshot of the bases.
     // Runner events (steals, pickoffs) list only the pitcher, so they must not clear the bases.
@@ -198,21 +206,64 @@ function strandedRisp(g: GameCtx): Detected[] {
   const what = first && second && third ? 'left the bases loaded 🤦'
     : risp === 2 ? 'stranded 2 runners in scoring position'
     : `stranded a runner on ${third ? 'third' : 'second'}`;
-  const half = r.period ? `${r.period.type === 'Top' ? 'Top' : 'Bottom'} ${ordinal(r.period.number)}` : 'Inning over';
   return [{
     id: `${g.gameId}:${r.id}:mlb.team.stranded_risp:${r.teamId}`,
     type: 'mlb.team.stranded_risp',
     targetKey: teamKey('mlb', r.teamId), // play-result team = batting team
     title: `${teamName('mlb', r.teamId)} ${what}`,
-    body: `${half}: ${r.text} — ${scoreLine(g, r)}`,
+    body: `${halfLabel(r)}: ${r.text} — ${scoreLine(g, r)}`,
     at: r.at,
     meta: { gameId: g.gameId, playId: r.id, runnersInScoringPosition: risp },
   }];
 }
 
+const halfKey = (p: NPlay) => (p.period?.type === 'Top' || p.period?.type === 'Bottom' ? `${p.period.type}${p.period.number}` : undefined);
+const halfLabel = (p: NPlay) => (p.period ? `${p.period.type === 'Top' ? 'Top' : 'Bottom'} ${ordinal(p.period.number)}` : 'Inning over');
+
+/**
+ * NOBLETIGER bookkeeping (No Outs, Bases Loaded, Ending with Team Incapable of Getting Easy Run).
+ * Only at-bat results that list the batter carry reliable outs + bases after the play; ESPN stamps
+ * pitches and runner events with the at-bat's final outs instead.
+ */
+function trackHalfInning(g: GameCtx, p: NPlay) {
+  const key = halfKey(p);
+  if (!key) return; // "End Inning" / "Mid" / "End" markers
+  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false };
+  // Checked before this play can load the bases: a run that scores on the loading play doesn't count.
+  if (g.half.loadedNoOuts && p.scoring) g.half.scoredSince = true;
+  if (p.typeSlug === 'play-result' && p.outs === 0 && p.participants.some((x) => x.role === 'batter')) {
+    const on = (base: string) => p.participants.some((x) => x.role === base);
+    if (on('onFirst') && on('onSecond') && on('onThird')) g.half.loadedNoOuts = true;
+  }
+}
+
+/**
+ * Everything that fires when a half-inning ends. If it was a NOBLETIGER, that alert is sent and the
+ * stranded-runners alert for the same inning becomes `unless` it: each user gets exactly one of them
+ * (the NOBLETIGER if they want it, otherwise the stranded alert if they want that).
+ */
+function halfInningEnded(g: GameCtx): Detected[] {
+  const r = g.lastResult;
+  if (!r?.teamId) return [];
+  const key = halfKey(r);
+  const noble = !!key && g.half?.key === key && g.half.loadedNoOuts && !g.half.scoredSince;
+  const out: Detected[] = [];
+  if (noble) out.push({
+    id: `${g.gameId}:${key}:mlb.team.nobletiger:${r.teamId}`,
+    type: 'mlb.team.nobletiger',
+    targetKey: teamKey('mlb', r.teamId),
+    title: `${teamName('mlb', r.teamId)} pulled a NOBLETIGER`,
+    body: `Bases loaded with nobody out… and not one run. ${halfLabel(r)}: ${r.text} — ${scoreLine(g, r)}`,
+    at: r.at,
+    meta: { gameId: g.gameId, playId: r.id },
+  });
+  for (const s of strandedRisp(g)) out.push(noble ? { ...s, unless: 'mlb.team.nobletiger' } : s);
+  return out;
+}
+
 /** The game's final half-inning has no "End Inning" play; the tracker calls this at the final. */
 export function mlbFinalHalfInning(g: GameCtx): Detected[] {
-  return g.league === 'mlb' && g.lastResult?.outs === 3 ? strandedRisp(g) : []; // walk-offs end with < 3 outs
+  return g.league === 'mlb' && g.lastResult?.outs === 3 ? halfInningEnded(g) : []; // walk-offs end with < 3 outs
 }
 
 type Base = 'onFirst' | 'onSecond' | 'onThird';
@@ -268,7 +319,7 @@ function runnerOut(g: GameCtx, p: NPlay): Detected | null {
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
 function mlb(g: GameCtx, p: NPlay): Detected[] {
   // ESPN marks every half-inning except the game's last with an "End Inning" play.
-  if (p.typeSlug === 'end-inning') return strandedRisp(g);
+  if (p.typeSlug === 'end-inning') return halfInningEnded(g);
   const out: Detected[] = [];
   const [batter] = role(p, 'batter');
   const [pitcher] = role(p, 'pitcher');

@@ -61,6 +61,15 @@ export function wants(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKe
   return typeEnabled(p, e.type) || (e.aliases ?? []).some((a) => typeEnabled(p, a));
 }
 
+/**
+ * Final per-user decision. On top of `wants`, an event marked `unless: X` is dropped for users who
+ * want X, because the X event already covers that moment (e.g. stranded runners vs. NOBLETIGER).
+ */
+export function shouldDeliver(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKey' | 'unless'>, league: League) {
+  if (!wants(p, e, league)) return false;
+  return !(e.unless && wants(p, { type: e.unless, targetKey: e.targetKey }, league));
+}
+
 export function inQuietHours(p: Prefs, now = new Date()) {
   if (!p.quietHours.enabled) return false;
   const hm = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: p.quietHours.tz }).format(now);
@@ -109,13 +118,13 @@ export function publish(events: Detected[], league: League) {
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
-    const res = insEvent().run(e.id, e.type, league, (e.meta?.gameId as string) ?? null, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases }));
+    const res = insEvent().run(e.id, e.type, league, (e.meta?.gameId as string) ?? null, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }));
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null });
     const frame = JSON.stringify({ kind: 'event', item });
     for (const f of fols) {
       const prefs = getPrefs(f.device_id);
-      if (!wants(prefs, e, league)) continue;
+      if (!shouldDeliver(prefs, e, league)) continue;
       const willPush = !!(prefs.pushEnabled && f.push_token && !inQuietHours(prefs));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
