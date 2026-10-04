@@ -62,11 +62,12 @@ email address or phone number.</strong></p>
 <tr><td><strong>Push notification token</strong>, only if you allow notifications</td><td>To deliver alerts to your device.</td></tr>
 <tr><td><strong>The teams and players you track</strong>, and your <strong>notification settings</strong> (alert types, leagues, muted items, quiet hours and the time zone they apply in)</td><td>To decide which alerts to send you and when.</td></tr>
 <tr><td><strong>Your alert feed</strong>: the alerts that were delivered to you</td><td>To show your feed history in the app.</td></tr>
+<tr><td><strong>Feedback emails</strong>, only if you choose to send one (Settings → Give feedback opens your own mail app)</td><td>We receive your email address and message, and use them only to read and reply to your feedback. The email includes the app version, platform and device model to help with bug reports.</td></tr>
 </table></div>
 
 <h2>What we don't collect</h2>
 <ul>
-<li>No name, email, phone number, contacts, photos or precise location.</li>
+<li>No name, phone number, contacts, photos or precise location, and no email address unless you email us yourself.</li>
 <li>No advertising identifiers, no ads, and no analytics or tracking SDKs.</li>
 <li>We do not track you across other companies' apps or websites, and we do not sell or share your data for advertising.</li>
 </ul>

@@ -3,6 +3,7 @@ import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { TipJar } from '../../components/TipJar';
+import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, leagueColors, radius, space } from '../../theme';
 import type { EventType, League } from '../../lib/types';
 
@@ -135,6 +136,10 @@ export default function SettingsScreen() {
       </View>
       <SectionHeader>About</SectionHeader>
       <View style={styles.card}>
+        <Pressable style={styles.action} onPress={sendFeedback} accessibilityRole="button" accessibilityHint={`Opens an email to ${FEEDBACK_EMAIL}`}>
+          <Text style={styles.actionText}>Give feedback</Text>
+          <Text style={styles.actionSub}>Bugs, ideas, alerts you want: {FEEDBACK_EMAIL}</Text>
+        </Pressable>
         <Pressable style={styles.action} onPress={() => Linking.openURL(`${API_URL}/privacy`)} accessibilityRole="link">
           <Text style={styles.actionText}>Privacy policy</Text>
         </Pressable>
@@ -163,5 +168,6 @@ const styles = StyleSheet.create({
   stepVal: { color: colors.text, fontWeight: '800' },
   action: { paddingHorizontal: space(4), paddingVertical: space(4), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   actionText: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  actionSub: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 17 },
   footer: { color: colors.textFaint, fontSize: 12, textAlign: 'center', padding: space(6) },
 });
