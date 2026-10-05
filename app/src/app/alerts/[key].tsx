@@ -31,12 +31,20 @@ export default function TargetAlertsScreen() {
   }
 
   const own = prefs.targetTypes?.[targetKey] ?? {};
+  const ownPush = prefs.targetPushTypes?.[targetKey] ?? {};
   const globalOn = (t: EventType) => prefs.leagues[target.league] !== false && (prefs.types[t.id] ?? t.defaultOn);
+  const globalPush = (t: EventType) => prefs.pushTypes?.[t.id] ?? true;
   const setOne = (typeId: string, value: boolean | null) => updatePrefs({ targetTypes: { [targetKey]: { [typeId]: value } } });
-  const resetAll = () => updatePrefs({ targetTypes: { [targetKey]: Object.fromEntries(Object.keys(own).map((id) => [id, null])) } });
+  const setPush = (typeId: string, value: boolean | null) => updatePrefs({ targetPushTypes: { [targetKey]: { [typeId]: value } } });
+  // "Use global setting" and "Reset all" clear both the switch and the 🔔 overrides.
+  const resetTypes = (ids: string[]) => {
+    const nulls = (map: Record<string, boolean>) => Object.fromEntries(ids.filter((id) => id in map).map((id) => [id, null]));
+    updatePrefs({ targetTypes: { [targetKey]: nulls(own) }, targetPushTypes: { [targetKey]: nulls(ownPush) } });
+  };
+  const customIds = [...new Set([...Object.keys(own), ...Object.keys(ownPush)])];
   const muted = prefs.muted.includes(targetKey);
   const name = target.kind === 'player' ? target.shortName ?? target.name : target.name;
-  const customCount = Object.keys(own).length;
+  const customCount = customIds.length;
 
   return (
     <>
@@ -69,31 +77,32 @@ export default function TargetAlertsScreen() {
         <SectionHeader>Alerts for {name}</SectionHeader>
         <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: leagueColors[target.league] ?? colors.border }]}>
           {types.map((t) => {
-            const custom = own[t.id] !== undefined;
+            const custom = own[t.id] !== undefined || ownPush[t.id] !== undefined;
             return (
               <SettingRow
                 key={t.id}
                 emoji={t.emoji}
                 title={t.label}
                 desc={t.description}
-                value={custom ? own[t.id] : globalOn(t)}
+                value={own[t.id] ?? globalOn(t)}
                 onChange={(v) => setOne(t.id, v)}
+                push={{ on: ownPush[t.id] ?? globalPush(t), onChange: (v) => setPush(t.id, v) }}
                 footer={custom ? (
                   <View style={styles.footer}>
                     <Text style={styles.custom}>Custom for {name}</Text>
-                    <Pressable onPress={() => setOne(t.id, null)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Use the global setting for ${t.label}`}>
+                    <Pressable onPress={() => resetTypes([t.id])} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Use the global setting for ${t.label}`}>
                       <Text style={styles.reset}>Use global setting</Text>
                     </Pressable>
                   </View>
                 ) : (
-                  <Text style={styles.global}>Global setting ({globalOn(t) ? 'on' : 'off'})</Text>
+                  <Text style={styles.global}>Global setting ({!globalOn(t) ? 'off' : globalPush(t) ? 'on' : 'on, feed only'})</Text>
                 )}
               />
             );
           })}
         </View>
 
-        <Pressable onPress={resetAll} disabled={!customCount} style={({ pressed }) => [styles.resetAll, !customCount && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}>
+        <Pressable onPress={() => resetTypes(customIds)} disabled={!customCount} style={({ pressed }) => [styles.resetAll, !customCount && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}>
           <Text style={styles.resetAllText}>{customCount ? `Reset all ${customCount} to global settings` : 'Everything follows your global settings'}</Text>
         </Pressable>
       </ScrollView>

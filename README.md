@@ -207,12 +207,23 @@ Settings let users control:
 - quiet hours in their own timezone (alerts still reach the feed)
 - each league on/off
 - every alert type, with "all on/off" per group
+- **a 🔔 on every alert type: notify me, or feed only.** Off keeps that alert in the feed without a push ("Feed only: no notification" under it). The switch still decides whether the alert arrives at all; the bell is greyed out while the switch is off. Stored as `pushTypes` (typeId → false) in prefs; missing means push, so existing users and older app builds behave exactly as before. The same bell is on every row of a player or team's ⚙️ screen, stored as `targetPushTypes` (targetKey → typeId → push), and it beats the Settings bell for that target. "Custom for …", "Use global setting" and "Reset all" cover it too, and the Tracking tab's gear turns red for it.
+- **How a push is decided** (`publish()` in `fanout.ts`): the alert must be delivered (`shouldDeliver`), then `pushAllowed` (master push switch, the target's 🔕, quiet hours) and `pushWanted` (the alert type's bell) must both say yes. An alert that counts for several types follows the most specific one the user has switched on: with "Gives up a home run" feed-only and "Gives up runs" pushed, a homer arrives quietly; with home runs switched off entirely, it arrives as a run and pushes.
 - per-target 🔕 on the Tracking tab: turns off push for that player or team, while their alerts still land in the feed
 - **per-target ⚙️ on the Tracking tab: choose exactly which alerts you get for one player or team.** These choices beat every global alert setting for that target, including the type and league switches. For example, interceptions stay on globally but are off for Daniel Jones alone, or a league is off globally but one player's alert is explicitly on. Each switch shows "Custom for …" with "Use global setting", and there's "Reset all". The gear turns red when a target has custom choices. The screen lists only the alerts that can fire for that kind of target in that league. Stored as `targetTypes` (targetKey → typeId → on/off) in prefs; a `null` in a PUT resets one back to global. The "one alert, not two" rules (NOBLETIGER vs stranded, lead changes) use the same per-target answer.
 - reset to defaults
 - clear feed
 
 A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won't hide the runs.
+
+## Startup guide
+
+On a device's first launch the app opens a six-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): welcome, tracking from Search, the Feed and sharing, global alert settings, and the per-target 🔔 and ⚙️ on the Tracking tab, then "You're all set". Swipe or tap Next. Skip (top right) ends it from any page. The last page's "Find someone to hate" goes to Search. The pictures are drawings of the real controls, so nothing in the guide changes settings.
+
+- **Once per install:** `hatewatch.guideSeen` in AsyncStorage, set as soon as the guide opens (`app/src/lib/guide.ts`). Deleting the app shows it again.
+- **Rewatch:** Settings → About → Show the guide opens it without the first-run extras. The last button says Done and returns to Settings.
+- **Notification permission waits for it:** the store awaits `guideSettled` before `registerForPush()`, so on first launch the system prompt comes right after the guide instead of covering it. The last page warns that the prompt is coming.
+- Each page scrolls vertically if it doesn't fit (small phones, large text sizes). It's checked on iPhone SE (375×667) and 390×844.
 
 ## Sharing an alert
 

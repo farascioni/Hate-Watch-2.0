@@ -11,7 +11,7 @@ import type { Target } from '../../lib/types';
 export default function FollowingScreen() {
   const { follows, toggleFollow, prefs, updatePrefs } = useStore();
   const muted = new Set(prefs?.muted ?? []);
-  const customized = new Set(Object.keys(prefs?.targetTypes ?? {}));
+  const customized = new Set([...Object.keys(prefs?.targetTypes ?? {}), ...Object.keys(prefs?.targetPushTypes ?? {})]);
   const { filter, setFilter, active, reset } = useFilter();
 
   const sections = useMemo((): { title: string; data: Target[] }[] => {

@@ -1,4 +1,5 @@
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
@@ -34,6 +35,9 @@ export default function SettingsScreen() {
 
   const on = (t: EventType) => prefs.types[t.id] ?? t.defaultOn;
   const setType = (id: string, v: boolean) => updatePrefs({ types: { [id]: v } });
+  // An alert's 🔔: off keeps it in the feed without a notification.
+  const pushOn = (t: EventType) => prefs.pushTypes?.[t.id] ?? true;
+  const setPush = (id: string, v: boolean) => updatePrefs({ pushTypes: { [id]: v } });
   const leagueOn = (l: League) => prefs.leagues[l] !== false;
   const setAll = (types: EventType[], v: boolean) => updatePrefs({ types: Object.fromEntries(types.map((t) => [t.id, v])) });
 
@@ -70,7 +74,7 @@ export default function SettingsScreen() {
         {leagues.map((l) => <SettingRow key={l.id} title={l.name} desc={leagueOn(l.id) ? undefined : 'All alerts from this league are off'} value={leagueOn(l.id)} onChange={(v) => updatePrefs({ leagues: { [l.id]: v } })} />)}
       </View>
       <Text style={styles.hint}>
-        These are your defaults for everyone. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.
+        These are your defaults for everyone. The switch turns an alert on or off; its 🔔 decides whether it also sends a notification or just lands in your feed. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.
       </Text>
 
       {groups.filter((g) => g.types.length).map((g) => {
@@ -83,7 +87,10 @@ export default function SettingsScreen() {
               <Pressable onPress={() => setAll(g.types, !allOn)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
             </View>
             <View style={[styles.card, g.color ? { borderLeftColor: g.color, borderLeftWidth: 3 } : null]}>
-              {g.types.map((t) => <SettingRow key={t.id} emoji={t.emoji} title={t.label} desc={t.description} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off} />)}
+              {g.types.map((t) => (
+                <SettingRow key={t.id} emoji={t.emoji} title={t.label} desc={t.description} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off}
+                  push={{ on: pushOn(t), onChange: (v) => setPush(t.id, v) }} />
+              ))}
             </View>
           </View>
         );
@@ -117,6 +124,10 @@ export default function SettingsScreen() {
       </View>
       <SectionHeader>About</SectionHeader>
       <View style={styles.card}>
+        <Pressable style={styles.action} onPress={() => router.push('/guide')} accessibilityRole="button">
+          <Text style={styles.actionText}>Show the guide</Text>
+          <Text style={styles.actionSub}>How tracking and alerts work</Text>
+        </Pressable>
         <Pressable style={styles.action} onPress={sendFeedback} accessibilityRole="button" accessibilityHint={`Opens an email to ${FEEDBACK_EMAIL}`}>
           <Text style={styles.actionText}>Give feedback</Text>
           <Text style={styles.actionSub}>Bugs, ideas, alerts you want: {FEEDBACK_EMAIL}</Text>

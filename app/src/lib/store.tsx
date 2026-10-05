@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
+import { guideSettled } from './guide';
 import type { EventType, FeedItem, League, Prefs, PrefsPatch, Target } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -126,6 +127,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } finally {
         setReady(true);
       }
+      await guideSettled; // on first launch, ask for notification permission after the startup guide, not over it
       const r = await registerForPush();
       setPush({ status: r.status, reason: r.reason });
       if (r.token) api.setPushToken(r.token).catch(() => {});
@@ -158,6 +160,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...p, ...patch,
         types: { ...p.types, ...patch.types }, leagues: { ...p.leagues, ...patch.leagues },
         quietHours: { ...p.quietHours, ...patch.quietHours }, targetTypes: mergeTargetTypes(p.targetTypes, patch.targetTypes),
+        pushTypes: { ...p.pushTypes, ...patch.pushTypes }, targetPushTypes: mergeTargetTypes(p.targetPushTypes, patch.targetPushTypes),
       } : p));
       setPrefs(await api.setPrefs(patch));
     },

@@ -18,10 +18,17 @@ export interface Prefs {
    * An entry here beats every global alert setting (type and league switches) for that target.
    */
   targetTypes: Record<string, Record<string, boolean>>;
+  /** An alert type's 🔔 in Settings: typeId → false sends it to the feed without a push. Missing = push. */
+  pushTypes: Record<string, boolean>;
+  /** The 🔔 on one alert type for one player or team (their ⚙️ screen): targetKey → typeId → push. Beats pushTypes. */
+  targetPushTypes: Record<string, Record<string, boolean>>;
 }
 
 /** A PUT /me/prefs patch: like Prefs, but a per-target value of null means "back to the global setting". */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes'>> & { targetTypes?: Record<string, Record<string, boolean | null>> };
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes'>> & {
+  targetTypes?: Record<string, Record<string, boolean | null>>;
+  targetPushTypes?: Record<string, Record<string, boolean | null>>;
+};
 
 export const DEFAULT_PREFS: Prefs = {
   pushEnabled: true,
@@ -31,6 +38,8 @@ export const DEFAULT_PREFS: Prefs = {
   muted: [],
   quietHours: { enabled: false, start: '23:00', end: '08:00', tz: 'America/New_York' },
   targetTypes: {},
+  pushTypes: {},
+  targetPushTypes: {},
 };
 
 const prefsCache = new Map<string, Prefs>();
@@ -55,6 +64,8 @@ export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
     quietHours: { ...cur.quietHours, ...patch.quietHours },
     muted: patch.muted ?? cur.muted,
     targetTypes: mergeTargetTypes(cur.targetTypes, patch.targetTypes),
+    pushTypes: { ...cur.pushTypes, ...patch.pushTypes },
+    targetPushTypes: mergeTargetTypes(cur.targetPushTypes, patch.targetPushTypes),
   };
   db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify(next), deviceId);
   prefsCache.set(deviceId, next);
@@ -103,6 +114,21 @@ export function wants(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKe
 /** Should an alert they want also be pushed? Muted targets (🔕 on the Tracking tab) are feed-only. */
 export function pushAllowed(p: Prefs, targetKey: string, now = new Date()) {
   return p.pushEnabled && !p.muted.includes(targetKey) && !inQuietHours(p, now);
+}
+
+/** Push or feed-only for one alert type and target: that target's own 🔔 wins, then the Settings 🔔, then push. */
+export function pushTypeFor(p: Prefs, targetKey: string, typeId: string) {
+  return p.targetPushTypes?.[targetKey]?.[typeId] ?? p.pushTypes?.[typeId] ?? true;
+}
+
+/**
+ * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
+ * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
+ * with home runs switched off, it arrives as a run and pushes.
+ */
+export function pushWanted(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKey'>, league: League) {
+  const decider = [e.type, ...(e.aliases ?? [])].find((t) => typeEnabledFor(p, e.targetKey, t, league));
+  return decider !== undefined && pushTypeFor(p, e.targetKey, decider);
 }
 
 /**
@@ -174,7 +200,7 @@ export function publish(events: Detected[], league: League) {
     for (const f of fols) {
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
-      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey);
+      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
       if (willPush) pushes.push({

@@ -388,6 +388,47 @@ test('per-player/team alert choices override the global settings', async () => {
   assert.deepEqual(t, {}, 'resetting the last override removes the target entirely');
 });
 
+test('per-alert 🔔: an alert can go to the feed without a push, globally or for one player or team', async () => {
+  const { pushWanted, setPrefs, publish, setPushSender } = await import('../src/fanout.ts');
+  const { db } = await import('../src/db.ts');
+  const JONES = 'player:nfl:1', OTHER_QB = 'player:nfl:2';
+  const int = (targetKey: string) => ({ type: 'nfl.qb.interception', targetKey });
+
+  assert.equal(pushWanted(prefs(), int(JONES), 'nfl'), true, 'default: everything that is on also pushes, as before');
+  const feedOnly = prefs({ pushTypes: { 'nfl.qb.interception': false } });
+  assert.equal(shouldDeliver(feedOnly, int(JONES), 'nfl'), true, 'feed-only still lands in the feed');
+  assert.equal(pushWanted(feedOnly, int(JONES), 'nfl'), false);
+
+  // One player's own bell beats the Settings bell, both ways.
+  const jonesLoud = prefs({ pushTypes: { 'nfl.qb.interception': false }, targetPushTypes: { [JONES]: { 'nfl.qb.interception': true } } });
+  assert.equal(pushWanted(jonesLoud, int(JONES), 'nfl'), true);
+  assert.equal(pushWanted(jonesLoud, int(OTHER_QB), 'nfl'), false);
+  const jonesQuiet = prefs({ targetPushTypes: { [JONES]: { 'nfl.qb.interception': false } } });
+  assert.equal(pushWanted(jonesQuiet, int(JONES), 'nfl'), false);
+  assert.equal(pushWanted(jonesQuiet, int(OTHER_QB), 'nfl'), true);
+
+  // An alert that counts for several types follows the most specific one that's switched on.
+  const homer = { type: 'mlb.pitcher.home_run_allowed', aliases: ['mlb.pitcher.runs_allowed'], targetKey: 'player:mlb:9' };
+  assert.equal(pushWanted(prefs({ pushTypes: { 'mlb.pitcher.home_run_allowed': false } }), homer, 'mlb'), false, 'homers feed-only, runs pushed: the homer is quiet');
+  assert.equal(pushWanted(prefs({ types: { 'mlb.pitcher.home_run_allowed': false }, pushTypes: { 'mlb.pitcher.home_run_allowed': false } }), homer, 'mlb'), true, 'homers switched off: it arrives as a run, and runs push');
+  assert.equal(pushWanted(prefs({ types: { 'nfl.qb.interception': false } }), int(JONES), 'nfl'), false, 'an alert that is not wanted never pushes');
+
+  // End to end: the feed-only alert is stored and delivered, but no notification is sent for it.
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('bell', 's', 'ios', 'ExponentPushToken[test]', JSON.stringify(DEFAULT_PREFS));
+  db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('bell', JONES);
+  setPrefs('bell', { pushTypes: { 'nfl.qb.interception': false }, targetPushTypes: { [JONES]: { 'nfl.qb.sacked': true }, 'bogus key': { 'nfl.qb.sacked': false } } });
+  const sent: { data: Record<string, unknown> }[] = [];
+  setPushSender((msgs) => sent.push(...msgs));
+  publish([
+    { id: 'bell:pick', type: 'nfl.qb.interception', targetKey: JONES, title: 'Jones threw a pick', body: '', at: 1 },
+    { id: 'bell:sack', type: 'nfl.qb.sacked', targetKey: JONES, title: 'Jones got sacked', body: '', at: 2 },
+  ], 'nfl');
+  const rows = db.prepare("SELECT event_id, pushed FROM feed WHERE device_id = 'bell' ORDER BY event_id").all() as { event_id: string; pushed: number }[];
+  assert.deepEqual(rows.map((r) => [r.event_id, r.pushed]), [['bell:pick', 0], ['bell:sack', 1]]);
+  assert.deepEqual(sent.map((m) => m.data.eventId), ['bell:sack']);
+  setPushSender(() => {});
+});
+
 test('ordinals and search normalization', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st']);
   assert.equal(normalize('Ronald Acuña Jr.'), 'ronald acuna jr');

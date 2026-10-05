@@ -35,7 +35,14 @@ export interface Prefs {
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
   /** Per-player/team alert choices (⚙️ on the Tracking tab). They beat the global settings for that target. */
   targetTypes: Record<string, Record<string, boolean>>;
+  /** An alert's 🔔 in Settings: typeId → false keeps it in the feed without a notification. Missing = notify. */
+  pushTypes?: Record<string, boolean>;
+  /** The 🔔 on an alert for one player or team (⚙️ screen). Beats pushTypes for that target. */
+  targetPushTypes?: Record<string, Record<string, boolean>>;
 }
 
-/** A prefs update. In targetTypes, null means "back to the global setting" for that alert. */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes'>> & { targetTypes?: Record<string, Record<string, boolean | null>> };
+/** A prefs update. In targetTypes and targetPushTypes, null means "back to the global setting" for that alert. */
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes'>> & {
+  targetTypes?: Record<string, Record<string, boolean | null>>;
+  targetPushTypes?: Record<string, Record<string, boolean | null>>;
+};
