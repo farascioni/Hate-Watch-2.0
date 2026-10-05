@@ -18,6 +18,8 @@ export const scoresDeps = {
 type TeamDto = ReturnType<typeof teamDto>;
 export interface Side { team: TeamDto; score: number | null; winner?: boolean }
 export interface Driver { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }
+/** MLB: who's pitching and who's up. `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K"; batter "0-2" today). */
+export interface AtBatPlayer { id: string; key: string; name: string; line?: string; pitches?: number }
 export interface GameCard {
   key: string;            // `${league}:${ESPN event id}` (F1: `f1:${session id}`)
   league: League;
@@ -32,6 +34,9 @@ export interface GameCard {
   redZone?: boolean;      // NFL
   bases?: { first: boolean; second: boolean; third: boolean; outs: number }; // MLB
   batting?: string;       // MLB: team key at bat
+  count?: { balls: number; strikes: number }; // MLB: the at-bat's count
+  pitcher?: AtBatPlayer;  // MLB: pitches = thrown today (from the box score)
+  batter?: AtBatPlayer;
   winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (NFL, MLB)
   session?: string;       // F1: "Singapore GP · Race"
   order?: Driver[];       // F1: running order / classification
@@ -77,11 +82,37 @@ export function gameCard(lg: League, ev: any): GameCard | null {
       card.bases = { first: !!sit.onFirst, second: !!sit.onSecond, third: !!sit.onThird, outs: Number(sit.outs ?? 0) };
       const half = card.detail.match(/^(Top|Bot)/)?.[1]; // "Mid 5th" / "End 4th": between halves, nobody's up
       if (half) card.batting = half === 'Top' ? card.away!.team.key : card.home!.team.key;
+      const who = (x: any): AtBatPlayer | undefined => {
+        const id = x?.playerId ?? x?.athlete?.id;
+        if (id == null) return undefined;
+        const name = x.athlete?.shortName ?? x.athlete?.displayName ?? catalog.playerByEspn('mlb', String(id))?.name ?? '?';
+        return { id: String(id), key: playerKey('mlb', String(id)), name, ...(x.summary ? { line: String(x.summary) } : {}) };
+      };
+      card.pitcher = who(sit.pitcher);
+      card.batter = who(sit.batter);
+      if (card.batter) card.count = { balls: Number(sit.balls ?? 0), strikes: Number(sit.strikes ?? 0) };
     }
     const pr = sit.lastPlay?.probability;
     if (pr?.homeWinPercentage != null) card.winProb = winProb(pr);
   }
   return card;
+}
+
+/** MLB: pitches thrown by each pitcher today, from a summary's box score ("PC", or the first half of "PC-ST"). */
+export function boxPitchCounts(summary: any): Record<string, number> | undefined {
+  const out: Record<string, number> = {};
+  for (const t of summary?.boxscore?.players ?? []) {
+    for (const st of t.statistics ?? []) {
+      if (st.type !== 'pitching' && st.name !== 'pitching') continue;
+      const labels: string[] = st.labels ?? st.keys ?? [];
+      const pc = labels.indexOf('PC'), pcst = labels.indexOf('PC-ST');
+      for (const a of st.athletes ?? []) {
+        const v = pc >= 0 ? Number(a.stats?.[pc]) : pcst >= 0 ? Number(String(a.stats?.[pcst] ?? '').split('-')[0]) : NaN;
+        if (a.athlete?.id != null && Number.isFinite(v)) out[String(a.athlete.id)] = v;
+      }
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** ESPN's { homeWinPercentage, tiePercentage } (0..1) as each side's chance to win. */
@@ -111,6 +142,12 @@ export function raceCard(ev: any, comp: any): GameCard {
 // ─── The live set ─────────────────────────────────────────────────────────────────────────────
 const cards = new Map<string, GameCard>();
 const lastSent = new Map<string, string>();
+/** MLB: pitches thrown per pitcher (athleteId → count), from the tracker's box score reads. */
+const pitchCounts = new Map<string, Record<string, number>>();
+const withPitches = (g: GameCard): GameCard => {
+  const pc = g.pitcher && pitchCounts.get(g.key)?.[g.pitcher.id];
+  return pc != null && g.pitcher ? { ...g, pitcher: { ...g.pitcher, pitches: pc } } : g;
+};
 export const getGame = (key: string) => cards.get(key);
 
 /**
@@ -119,6 +156,7 @@ export const getGame = (key: string) => cards.get(key);
  * reads by several seconds, and a stale read must not undo a run the feed already announced.
  */
 export function upsertGame(next: GameCard) {
+  next = withPitches(next); // the scoreboard has the pitcher; the box score has his pitch count
   const prev = cards.get(next.key);
   if (prev && next.state === 'in' && prev.state === 'in') {
     for (const s of ['home', 'away'] as const) {
@@ -135,10 +173,11 @@ export function upsertGame(next: GameCard) {
 }
 
 /** What the game tracker (2s polls of a live game) knows sooner than the scoreboard. */
-export function patchGame(key: string, patch: { home?: number; away?: number; winProb?: GameCard['winProb'] }) {
+export function patchGame(key: string, patch: { home?: number; away?: number; winProb?: GameCard['winProb']; pitchCounts?: Record<string, number> }) {
+  if (patch.pitchCounts) pitchCounts.set(key, patch.pitchCounts);
   const cur = cards.get(key);
   if (!cur || cur.state !== 'in') return;
-  const next: GameCard = { ...cur };
+  const next: GameCard = withPitches({ ...cur });
   if (patch.home != null && cur.home) next.home = { ...cur.home, score: Math.max(cur.home.score ?? 0, patch.home) };
   if (patch.away != null && cur.away) next.away = { ...cur.away, score: Math.max(cur.away.score ?? 0, patch.away) };
   if (patch.winProb) next.winProb = patch.winProb;
@@ -148,7 +187,7 @@ export function patchGame(key: string, patch: { home?: number; away?: number; wi
 /** After a league's scoreboard read: forget games that left it more than a day and a half ago. */
 export function pruneGames(league: League, seen: Set<string>, now = Date.now()) {
   for (const [k, g] of cards) {
-    if (g.league === league && !seen.has(k) && now - g.startsAt > 36 * 3600_000) { cards.delete(k); lastSent.delete(k); }
+    if (g.league === league && !seen.has(k) && now - g.startsAt > 36 * 3600_000) { cards.delete(k); lastSent.delete(k); pitchCounts.delete(k); }
   }
 }
 

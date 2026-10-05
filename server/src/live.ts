@@ -9,7 +9,7 @@ import {
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { gameCard, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { boxPitchCounts, gameCard, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -136,7 +136,10 @@ export class GameTracker {
     if (events.length) publish(events, league);
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
-    patchGame(`${league}:${gameId}`, { home: this.score.home, away: this.score.away, winProb: wp?.homeWinPercentage != null ? winProb(wp) : undefined });
+    patchGame(`${league}:${gameId}`, {
+      home: this.score.home, away: this.score.away, winProb: wp?.homeWinPercentage != null ? winProb(wp) : undefined,
+      pitchCounts: league === 'mlb' && summary.status === 'fulfilled' ? boxPitchCounts(summary.value) : undefined,
+    });
     if (final) this.finish(final);
   }
 

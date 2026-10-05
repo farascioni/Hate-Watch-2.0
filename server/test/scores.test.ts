@@ -108,6 +108,39 @@ test("each device's games: their teams and players' teams, live first, within a 
   assert.deepEqual(S.gamesFor('nobody').map((g) => g.key), ['mlb:401907991']);
 });
 
+test('MLB at-bat: pitcher, batter and count from the scoreboard, pitches thrown from the box score', () => {
+  // As ESPN sent them for CHW @ CLE, Bot 7th, 2026-10-05.
+  const atBat = (pitcherId: string, pitcherName: string, balls: number, strikes: number) => ({
+    ...mlbEvent('Bot 7th', {}), id: '401907992',
+    competitions: [{ competitors: [competitor('5', 'home', '3', 'CLE'), competitor('4', 'away', '3', 'CHW')], situation: {
+      outs: 2, balls, strikes,
+      pitcher: { playerId: Number(pitcherId), athlete: { id: pitcherId, shortName: pitcherName }, summary: '4.1 IP, 0 ER, 0 H, 5 K, BB' },
+      batter: { playerId: 41217, athlete: { id: '41217', shortName: 'B. Rocchio' }, summary: '0-2' },
+    } }],
+  });
+  const g = S.gameCard('mlb', atBat('4867679', 'S. Burke', 1, 1))!;
+  assert.deepEqual(g.pitcher, { id: '4867679', key: 'player:mlb:4867679', name: 'S. Burke', line: '4.1 IP, 0 ER, 0 H, 5 K, BB' });
+  assert.deepEqual([g.batter!.name, g.batter!.line], ['B. Rocchio', '0-2']);
+  assert.deepEqual(g.count, { balls: 1, strikes: 1 });
+  assert.equal(S.gameCard('mlb', mlbEvent('End 7th', {}))!.count, undefined, 'between innings: no count, nobody up');
+
+  const box = { boxscore: { players: [{ statistics: [{ type: 'pitching', labels: ['IP', 'H', 'R', 'ER', 'BB', 'K', 'HR', 'PC-ST', 'ERA', 'PC'], athletes: [
+    { athlete: { id: '4867679' }, stats: ['4.1', '0', '0', '0', '1', '5', '0', '67-43', '3.24', '67'] },
+    { athlete: { id: '999' }, stats: ['0.0', '0', '0', '0', '0', '0', '0', '3-2', '0.00', '3'] },
+  ] }] }] } };
+  assert.deepEqual(S.boxPitchCounts(box), { 4867679: 67, 999: 3 });
+  assert.deepEqual(S.boxPitchCounts({ boxscore: { players: [{ statistics: [{ type: 'pitching', labels: ['IP', 'PC-ST'], athletes: [{ athlete: { id: '7' }, stats: ['1.0', '14-9'] }] }] }] } }), { 7: 14 }, 'PC-ST works when there is no PC column');
+
+  S.upsertGame(g);
+  S.patchGame(g.key, { pitchCounts: S.boxPitchCounts(box) });
+  assert.equal(S.getGame(g.key)!.pitcher!.pitches, 67, "the tracker's box score adds his pitch count");
+  S.upsertGame(S.gameCard('mlb', atBat('4867679', 'S. Burke', 2, 1))!);
+  assert.equal(S.getGame(g.key)!.pitcher!.pitches, 67, 'the next scoreboard read keeps it');
+  assert.deepEqual(S.getGame(g.key)!.count, { balls: 2, strikes: 1 });
+  S.upsertGame(S.gameCard('mlb', atBat('999', 'New Guy', 0, 0))!); // pitching change
+  assert.deepEqual([S.getGame(g.key)!.pitcher!.name, S.getGame(g.key)!.pitcher!.pitches], ['New Guy', 3], "the new pitcher's own count");
+});
+
 test('F1: a session card carries the running order, for anyone tracking F1', () => {
   const ev = { shortName: 'Singapore GP' };
   const comp = { id: 'R1', date: new Date().toISOString(), type: { text: 'Race' }, status: { period: 34, type: { state: 'in' } },

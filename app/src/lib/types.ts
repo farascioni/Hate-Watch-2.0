@@ -26,6 +26,7 @@ export interface FeedItem {
 
 /** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
 export interface GameSide { team: Team; score: number | null; winner?: boolean }
+export interface AtBatPlayer { id: string; key: string; name: string; line?: string; pitches?: number }
 export interface GameCard {
   key: string; league: League; id: string;
   state: 'pre' | 'in' | 'post'; startsAt: number; detail: string;
@@ -33,6 +34,10 @@ export interface GameCard {
   possession?: string; downDistance?: string; redZone?: boolean;
   bases?: { first: boolean; second: boolean; third: boolean; outs: number };
   batting?: string;
+  /** MLB at-bat. Pitcher `pitches` = thrown today; `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K", batter "0-2"). */
+  count?: { balls: number; strikes: number };
+  pitcher?: AtBatPlayer;
+  batter?: AtBatPlayer;
   winProb?: { home: number; away: number };
   session?: string;
   order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];

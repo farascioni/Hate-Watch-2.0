@@ -29,9 +29,10 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
       {(['away', 'home'] as const).map((k) => <TeamRow key={k} game={game} side={k} tracked={sides.includes(k)} big={big} />)}
       <View style={styles.meta}>
         <Text style={styles.metaText} numberOfLines={2}>{statusLine(game)}</Text>
-        {game.bases ? <Bases bases={game.bases} /> : null}
+        {game.bases ? <Bases bases={game.bases} count={game.count} /> : null}
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
       </View>
+      {game.pitcher || game.batter ? <AtBat game={game} big={big} /> : null}
       {lose != null && side ? (
         <View style={{ gap: 4 }}>
           <View style={styles.meta}>
@@ -99,8 +100,27 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
   );
 }
 
-/** MLB: who's on base (filled) and how many out. */
-export function Bases({ bases }: { bases: NonNullable<GameCard['bases']> }) {
+/** MLB: who's pitching (and how many he's thrown), who's up and how their day is going. Tracked players in red. */
+function AtBat({ game, big }: { game: GameCard; big?: boolean }) {
+  const { follows } = useStore();
+  const p = game.pitcher, b = game.batter;
+  // ESPN's batter line is hits-at bats today ("0-2"), sometimes with extras ("1-3, HR").
+  const today = (line?: string) => line?.replace(/^(\d+)-(\d+)/, '$1 for $2');
+  const name = (x: { key: string; name: string }) => <Text style={follows.has(x.key) ? styles.mine : styles.who}>{x.name}</Text>;
+  return (
+    <View style={{ gap: 2 }}>
+      {p ? (
+        <Text style={styles.atBat} numberOfLines={big ? 2 : 1}>
+          Pitching: {name(p)}{p.pitches != null ? `, ${p.pitches} pitches` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}
+        </Text>
+      ) : null}
+      {b ? <Text style={styles.atBat} numberOfLines={1}>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</Text> : null}
+    </View>
+  );
+}
+
+/** MLB: who's on base (filled), how many out, and the count. */
+export function Bases({ bases, count }: { bases: NonNullable<GameCard['bases']>; count?: GameCard['count'] }) {
   const base = (on: boolean, pos: object) => <View style={[styles.base, pos, on && styles.baseOn]} />;
   return (
     <View style={styles.inline} accessibilityLabel={`${['first', 'second', 'third'].filter((b) => bases[b as 'first']).join(' and ') || 'Bases empty'}, ${bases.outs} out`}>
@@ -110,6 +130,7 @@ export function Bases({ bases }: { bases: NonNullable<GameCard['bases']> }) {
         {base(bases.first, { left: 20, top: 10 })}
       </View>
       <View style={{ flexDirection: 'row', gap: 3 }}>{[0, 1].map((i) => <View key={i} style={[styles.out, i < bases.outs && styles.outOn]} />)}</View>
+      {count ? <Text style={styles.count} accessibilityLabel={`${count.balls} balls, ${count.strikes} strikes`}>{count.balls}-{count.strikes}</Text> : null}
     </View>
   );
 }
@@ -135,4 +156,8 @@ const styles = StyleSheet.create({
   baseOn: { backgroundColor: colors.warn, borderColor: colors.warn },
   out: { width: 6, height: 6, borderRadius: 3, borderWidth: 1, borderColor: colors.textDim },
   outOn: { backgroundColor: colors.textDim },
+  count: { color: colors.text, fontSize: 12, fontWeight: '800' },
+  atBat: { color: colors.textFaint, fontSize: 12 },
+  who: { color: colors.textDim, fontWeight: '700' },
+  mine: { color: colors.hate, fontWeight: '800' },
 });
