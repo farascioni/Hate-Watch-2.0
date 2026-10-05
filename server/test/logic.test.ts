@@ -434,3 +434,30 @@ test('ordinals and search normalization', () => {
   assert.equal(normalize('Ronald Acuña Jr.'), 'ronald acuna jr');
   assert.equal(normalize("De'Aaron Fox"), 'de aaron fox');
 });
+
+test('NFL: the opponent recovering an onside kick (real kickoff text, TEN @ BAL)', async () => {
+  const { db } = await import('../src/db.ts');
+  const { loadCatalog } = await import('../src/catalog.ts');
+  // Team codes for the "RECOVERED by TEN-…" fallback. Last test in the file, so nothing else sees this catalog.
+  const team = db.prepare(`INSERT OR IGNORE INTO teams (key, league, espn_id, name, short_name, abbrev, color, logo, logo_w, logo_h, updated_at) VALUES (?, 'nfl', ?, ?, ?, ?, '#000', 'x', 1, 1, 0)`);
+  team.run('team:nfl:10', '10', 'Tennessee Titans', 'Titans', 'TEN');
+  team.run('team:nfl:33', '33', 'Baltimore Ravens', 'Ravens', 'BAL');
+  loadCatalog();
+  const g: any = { league: 'nfl', gameId: 'g', homeId: '33', awayId: '10', goalies: new Map() };
+  // Core plays: teamId is start.team (the kicking team), endTeamId is end.team (who has the ball after).
+  const kick = (text: string, endTeamId?: string) =>
+    play({ id: 'k', type: 'Kickoff', typeSlug: 'K', text, teamId: '10', endTeamId, participants: [{ id: '1', role: 'kicker' }] });
+  const onside = (p: ReturnType<typeof play>) => PLAYER_DETECTORS.nfl(g, p).filter((e) => e.type === 'nfl.team.onside_recovered');
+
+  assert.deepEqual(onside(kick("J.Slye kicks onside 9 yards from TEN 35 to TEN 44. M.Starks (didn't try to advance) to TEN 44 for no gain.", '33')), [],
+    'the real one failed: Baltimore had the ball at the end');
+  const [kept] = onside(kick('J.Slye kicks onside 11 yards from TEN 35 to TEN 46. RECOVERED by TEN-J.Smith.', '10'));
+  assert.equal(kept.targetKey, 'team:nfl:33', 'the receiving team gets the alert');
+  assert.equal(kept.title, 'Titans recovered an onside kick against the Ravens');
+  assert.equal(onside(kick('J.Slye kicks onside 11 yards from TEN 35 to TEN 46. RECOVERED by TEN-J.Smith.')).length, 1, 'no end team: the RECOVERED by text decides');
+  assert.equal(onside(kick('J.Slye kicks onside 11 yards from TEN 35 to TEN 46. MUFFS, RECOVERED by TEN-J.Smith, RECOVERED by BLT-R.Smith.')).length, 0,
+    'the last recovery counts, and NFL codes (BLT) map to ESPN abbreviations (BAL)');
+  assert.equal(onside(kick('J.Slye kicks onside 11 yards from TEN 35 to TEN 46. RECOVERED by TEN-J.Smith. PENALTY on TEN-X.Young, Offside on Free Kick, 5 yards, enforced at TEN 35 - No Play.', '10')).length, 0,
+    'wiped out by a penalty');
+  assert.equal(onside(kick('J.Slye kicks 65 yards from TEN 35 to BAL 0. Touchback.', '10')).length, 0, 'an ordinary kickoff is never an onside kick');
+});

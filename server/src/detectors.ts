@@ -9,6 +9,7 @@ export interface NPlay {
   typeSlug: string;        // ESPN type.type / abbreviation when present ("play-result", "shot-missed")
   text: string;
   teamId?: string;         // team credited with the play (batting team, shooting team, offense...)
+  endTeamId?: string;      // team with the ball when the play ended (NFL: who recovered a kickoff)
   participants: { id: string; role?: string }[];
   scoring: boolean;
   scoreValue: number;
@@ -65,6 +66,7 @@ export function fromSitePlay(p: any): NPlay {
     typeSlug: String(p.type?.type ?? p.type?.abbreviation ?? ''),
     text: String(p.text ?? '').replace(/\n/g, ' '),
     teamId: p.team?.id,
+    endTeamId: p.end?.team?.id != null ? String(p.end.team.id) : undefined,
     participants: (p.participants ?? []).map((x: any) => ({ id: String(x.athlete?.id), role: x.type })).filter((x: any) => x.id !== 'undefined'),
     scoring: !!p.scoringPlay,
     scoreValue: Number(p.scoreValue ?? 0),
@@ -91,6 +93,7 @@ export function fromCorePlay(p: any): NPlay {
     typeSlug: String(p.type?.type ?? p.type?.abbreviation ?? ''),
     text: String(p.text ?? '').replace(/\n/g, ' '),
     teamId: teamIdFromRef(p.start?.team?.$ref ?? p.team?.$ref),
+    endTeamId: teamIdFromRef(p.end?.team?.$ref),
     participants: (p.participants ?? []).map((x: any) => ({ id: athleteIdFromRef(x.athlete?.$ref) ?? '', role: x.type })).filter((x: any) => x.id),
     scoring: !!p.scoringPlay,
     scoreValue: Number(p.scoreValue ?? 0),
@@ -434,7 +437,35 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (victim) replace(mk(g, p, 'nfl.safety', victim.id, `${nameOf('nfl', victim.id)} ${victim.how}`), victim.covers);
   const dog = delayOfGameQb(g, p);
   if (dog) replace(mk(g, p, 'nfl.qb.delay_of_game', dog.qb, `${nameOf('nfl', dog.qb)} took a delay of game penalty`), dog.named ? 'nfl.penalty' : undefined);
+  const onside = onsideRecovered(g, p);
+  if (onside) out.push(onside);
   return out;
+}
+
+/**
+ * Team alert for the RECEIVING team: the other side kicked onside and kept the ball. Real kickoffs read
+ * "J.Slye kicks onside 9 yards from TEN 35 to TEN 44. M.Starks (didn't try to advance) to TEN 44 for no
+ * gain." That one failed: the play starts with the kicking team (TEN) and ends with the receivers (BAL).
+ * A success ends with the kicking team still holding it ("… RECOVERED by TEN-…" names them too, used if
+ * ESPN leaves the end team out). A kick wiped out by a penalty ("… - No Play.") doesn't count.
+ */
+function onsideRecovered(g: GameCtx, p: NPlay): Detected | null {
+  if (!/\bkicks onside\b/i.test(p.text) || /\bNo Play\b|NULLIFIED/i.test(p.text)) return null;
+  const kicking = p.teamId;
+  const receiving = kicking === g.homeId ? g.awayId : kicking === g.awayId ? g.homeId : undefined;
+  if (!kicking || !receiving) return null;
+  const recoveredBy = [...p.text.matchAll(/RECOVERED by ([A-Z]{2,3})-/gi)].at(-1)?.[1].toUpperCase();
+  const kept = p.endTeamId ? p.endTeamId === kicking : !!recoveredBy && (NFL_CODE[recoveredBy] ?? recoveredBy) === teamAbbrev('nfl', kicking);
+  if (!kept) return null;
+  return {
+    id: `${g.gameId}:${p.id}:nfl.team.onside_recovered:${receiving}`,
+    type: 'nfl.team.onside_recovered',
+    targetKey: teamKey('nfl', receiving),
+    title: `${teamName('nfl', kicking)} recovered an onside kick against the ${teamName('nfl', receiving)}`,
+    body: `${p.text} — ${scoreLine(g, p)}`,
+    at: p.at,
+    meta: { gameId: g.gameId, playId: p.id },
+  };
 }
 
 /** A safety that actually counted: a scoring play that says so and wasn't wiped out by a penalty. */

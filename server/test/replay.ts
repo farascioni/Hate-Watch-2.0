@@ -37,7 +37,7 @@ for (const g of games) {
   const unique = [...new Map(events.map((e) => [e.id, e])).values()];
   events.length = 0;
   events.push(...unique);
-  const spotlight: Record<string, string> = { 'mlb.team.opponent_risp': '😰', 'mlb.team.stranded_risp': '🏝️', 'mlb.runner.caught_stealing': '🚔', 'nfl.safety': '😵', 'nfl.qb.delay_of_game': '⏱️' };
+  const spotlight: Record<string, string> = { 'nfl.team.onside_recovered': '😱', 'mlb.team.opponent_risp': '😰', 'mlb.team.stranded_risp': '🏝️', 'mlb.runner.caught_stealing': '🚔', 'nfl.safety': '😵', 'nfl.qb.delay_of_game': '⏱️' };
   for (const e of events.filter((x) => spotlight[x.type])) console.log(`  ${spotlight[e.type]}  ${e.title}${e.aliases ? ` [also counts as: ${e.aliases}]` : ''} | ${e.body.slice(0, 100)}`);
   // Every lead change: the scored-on alert for that play must yield to the combined fell-behind alert.
   const behind = events.filter((e) => e.type === 'team.fell_behind');

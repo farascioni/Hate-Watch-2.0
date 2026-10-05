@@ -178,13 +178,14 @@ Ways the delay is kept down:
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
-## Notifications (49 types, all user-controllable)
+## Notifications (50 types, all user-controllable)
 
 | | |
 |---|---|
 | MLB | strikeout, grounded into DP, any out (off by default), pitcher gives up runs, gives up a HR, walk/HBP (off by default), fielding error, caught stealing or picked off (one toggle; see note) |
-| NFL | interception (incl. pick-six), sacked, incompletion (off by default), fumble lost, any fumble (off by default), missed FG/XP or blocked kick, penalty, delay of game (QB), gives up a safety (see note) |
+| NFL | interception (incl. pick-six), sacked, incompletion (off by default), fumble lost, any fumble (off by default), missed FG/XP or blocked kick, penalty, delay of game (QB), gives up a safety (see note), opponent recovers an onside kick (team; see note) |
 | NFL delay of game / safety | **Delay of game** is charged to the team ("PENALTY on PIT, Delay of Game", with no player), so it goes to the offense's quarterback in the game: the latest passer the roster lists as a QB. It's skipped for punt and field-goal formations, declined flags, and flags on the defense. Play text uses NFL team codes (ARZ, BLT, CLV, HST, LA, WAS), which are mapped to ESPN's. **Safety** alerts both the team ("49ers gave up a safety", replacing "opponent scored") and the player responsible: the flagged player on a penalty safety, the sacked QB, or the ball carrier. These replace that player's generic penalty or sack alert. Overturned safeties ("SAFETY NULLIFIED") are ignored. |
+| NFL onside kick | Sent to the **receiving** team when the other side kicks onside and keeps the ball: "Titans recovered an onside kick against the Ravens", with the play. ESPN writes these kickoffs as "J.Slye kicks onside 9 yards from TEN 35 to TEN 44. …"; the kick starts with the kicking team (`start.team`), and it's a success when the kicking team still has the ball at the end (`end.team`, on every kickoff in the core feed). If ESPN ever leaves the end team out, the last "RECOVERED by TEN-…" in the text decides (NFL codes like BLT map to ESPN's BAL). Kicks wiped out by a penalty ("- No Play", "NULLIFIED") don't count. Checked against the four real onside attempts in 2026 weeks 3–4 (all recovered by the receivers, so no alerts). |
 | NBA | missed shot, missed FT, got blocked, turnover, foul (off by default), technical/ejection |
 | NHL | goalie allows a goal, shot missed, shot blocked (off by default), shot saved (off by default), giveaway (off by default), penalty |
 | F1 drivers | doesn't finish (retired / DSQ / DNS, **live**), outside the points, lost 3+ places from the grid, behind teammate, knocked out in Q1/Q2, drops in the drivers' championship |
