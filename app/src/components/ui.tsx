@@ -127,7 +127,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
-  section: { color: colors.textFaint, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(6), paddingBottom: space(2) },
+  // Opaque, like the Feed's day headers: iOS pins SectionList headers while scrolling, and rows must not show through.
+  section: { color: colors.textFaint, backgroundColor: colors.bg, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(6), paddingBottom: space(2) },
   empty: { alignItems: 'center', justifyContent: 'center', padding: space(10), gap: space(3), flexGrow: 1 },
   emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   emptyBody: { color: colors.textDim, fontSize: 15, textAlign: 'center', lineHeight: 21 },

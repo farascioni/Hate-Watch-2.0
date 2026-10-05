@@ -38,6 +38,7 @@ export default function FollowingScreen() {
       sections={sections}
       keyExtractor={(t) => t.key}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}</SectionHeader>}
+      stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
       ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely.</Text>}
       renderItem={({ item }) => (
         <TargetRow
