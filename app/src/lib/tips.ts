@@ -7,10 +7,12 @@ import { requireOptionalNativeModule } from 'expo';
  * Tips unlock nothing (App Review guideline 3.1.1 allows "tipping" the developer via IAP).
  */
 // Suggested prices: $1.99 / $4.99 / $9.99. The app always shows the store's localized price.
+// (The tip.small/medium/large IDs were first created as Non-Consumable by mistake; App Store
+// Connect can't change a product's type or reuse an ID, so these are new.)
 export const TIPS = [
-  { sku: 'com.hatewatch.app.tip.small', emoji: '☕' },
-  { sku: 'com.hatewatch.app.tip.medium', emoji: '🍕' },
-  { sku: 'com.hatewatch.app.tip.large', emoji: '🏆' },
+  { sku: 'com.hatewatch.app.tip.coffee', emoji: '☕' },
+  { sku: 'com.hatewatch.app.tip.pizza', emoji: '🍕' },
+  { sku: 'com.hatewatch.app.tip.trophy', emoji: '🏆' },
 ] as const;
 
 export const TIP_SKUS: string[] = TIPS.map((t) => t.sku);

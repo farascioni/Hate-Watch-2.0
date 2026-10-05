@@ -101,9 +101,11 @@ The product IDs are defined in `app/src/lib/tips.ts`:
 
 | Product ID | Suggested price |
 |---|---|
-| `com.hatewatch.app.tip.small` | $1.99 |
-| `com.hatewatch.app.tip.medium` | $4.99 |
-| `com.hatewatch.app.tip.large` | $9.99 |
+| `com.hatewatch.app.tip.coffee` | $1.99 |
+| `com.hatewatch.app.tip.pizza` | $4.99 |
+| `com.hatewatch.app.tip.trophy` | $9.99 |
+
+(`tip.small`, `tip.medium` and `tip.large` are burned: they were created as Non-Consumable, and App Store Connect can't change a product's type or reuse a product ID.)
 
 **Before tips work:**
 
