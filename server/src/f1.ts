@@ -7,7 +7,7 @@ import { getJson as espnGetJson, mapLimit } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
 import { urls, playerKey, teamKey } from './leagues.ts';
-import { ordinal, type Detected } from './detectors.ts';
+import { START_WORD, ordinal, type Detected } from './detectors.ts';
 import { publish } from './fanout.ts';
 
 const F1_SCAN_MS = Number(process.env.HW_F1_SCAN_MS ?? 30_000);     // scoreboard: sessions going live / finishing
@@ -85,6 +85,19 @@ export function doubleDnfEvent(meta: SessionMeta, team: string, rows: F1Row[]): 
     at: meta.at,
     meta: { compId: meta.compId },
   };
+}
+
+/** "Hate Watch Starting" for every constructor (only followed ones are stored). No single opponent in F1. */
+export function raceStartEvents(meta: SessionMeta): Detected[] {
+  return catalog.allTeams().filter((t) => t.league === 'f1').map((t) => ({
+    id: `${meta.compId}:team.game_start:${t.key}`,
+    type: 'team.game_start',
+    targetKey: t.key,
+    title: `Hate Watch Starting: ${t.name}`,
+    body: `${START_WORD.f1}: ${meta.label}`,
+    at: meta.at,
+    meta: { compId: meta.compId },
+  }));
 }
 
 /**
@@ -221,6 +234,8 @@ class RaceWatch {
 // ─── Engine ───────────────────────────────────────────────────────────────────────────────────
 export const races = new Map<string, RaceWatch>();
 const finalized = new Set<string>();
+/** Races/sprints seen before lights out: only their start is news (not one found already running after a restart). */
+const preSeen = new Set<string>();
 
 export async function scanF1() {
   if (!watchedF1Drivers().size) { for (const w of races.values()) w.stop(); races.clear(); return; }
@@ -231,13 +246,15 @@ export async function scanF1() {
       if (!kind) continue;
       const state = comp.status?.type?.state;
       const meta = { compId: String(comp.id), kind, label: sessionLabel(ev, comp) };
+      if (kind !== 'qual' && state === 'pre') preSeen.add(meta.compId);
       if (kind !== 'qual' && state === 'in' && !races.has(meta.compId)) {
+        if (preSeen.delete(meta.compId)) publish(raceStartEvents({ ...meta, at: Date.now() }), 'f1');
         const w = new RaceWatch(String(ev.id), meta);
         races.set(meta.compId, w);
         log(`watching ${meta.label}`);
         w.start();
       }
-      if (state === 'post') { races.get(meta.compId)?.stop(); races.delete(meta.compId); }
+      if (state === 'post') { races.get(meta.compId)?.stop(); races.delete(meta.compId); preSeen.delete(meta.compId); }
       const recent = Date.now() - Date.parse(comp.date) < RECENT_MS;
       if (comp.status?.type?.completed && recent && !finalized.has(meta.compId)) {
         finalized.add(meta.compId);

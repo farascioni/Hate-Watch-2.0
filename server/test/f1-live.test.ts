@@ -39,10 +39,11 @@ for (const id of Object.keys(cars)) status[id] = { name: 'STATUS_IN_PROGRESS', d
 const race = { id: RACE, type: { abbreviation: 'Race', text: 'Race' }, date: new Date(Date.now() - 3600_000).toISOString(), status: { type: { state: 'in', completed: false } } };
 // An old, already-finished race from days ago must never be announced (e.g. right after a deploy).
 const oldRace = { id: 'OLD', type: { abbreviation: 'Race', text: 'Race' }, date: new Date(Date.now() - 3 * 86400_000).toISOString(), status: { type: { state: 'post', completed: true } } };
+const sessions: any[] = [oldRace, race];
 const fetched: string[] = [];
 f1Deps.getJson = async (url: string) => {
   fetched.push(url);
-  if (url === urls.scoreboard('f1')) return { events: [{ id: EV, shortName: 'Test GP', competitions: [oldRace, race] }] };
+  if (url === urls.scoreboard('f1')) return { events: [{ id: EV, shortName: 'Test GP', competitions: sessions }] };
   if (url === urls.f1Competitors(EV, RACE)) return { items: Object.keys(cars).map((id) => ({ $ref: `fake://car/${id}` })) };
   let m = url.match(/^fake:\/\/car\/(\w+)$/);
   if (m) { const c = cars[m[1]]; return { id: m[1], order: c.order, startOrder: c.grid, vehicle: { manufacturer: c.team }, status: { $ref: `fake://status/${m[1]}` } }; }
@@ -88,4 +89,22 @@ test('a simulated race goes through the real F1 engine end to end', async () => 
   // 6. Later scans don't re-announce the race.
   await scanF1();
   assert.equal(feed().length, 3);
+  // (Step 1 also proved a race found already running gets no late "Hate Watch Starting".)
+});
+
+test('lights out on a race seen beforehand: "Hate Watch Starting" for followed teams only, once', async () => {
+  const sprint = { id: 'S1', type: { abbreviation: 'Sprint', text: 'Sprint' }, date: new Date(Date.now() + 60_000).toISOString(), status: { type: { state: 'pre', completed: false } } };
+  sessions.push(sprint);
+  const before = feed().length;
+  await scanF1(); // before the start
+  assert.equal(feed().length, before);
+
+  sprint.status.type.state = 'in';
+  await scanF1();
+  await settle();
+  assert.deepEqual(feed().slice(before), ['team.game_start | team:f1:CAD | Hate Watch Starting: Cadillac'],
+    'the user follows Cadillac (not Ferrari, and drivers are not teams)');
+
+  await scanF1();
+  assert.equal(feed().length, before + 1, 'announced once');
 });

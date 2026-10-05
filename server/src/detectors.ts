@@ -488,6 +488,22 @@ export function nextScore(prev: { home: number; away: number }, p: NPlay) {
   return { home: Math.max(prev.home, p.home), away: Math.max(prev.away, p.away) };
 }
 
+export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out' };
+
+/** "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). */
+export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
+  const body = [`${START_WORD[g.league]}${info.venue ? ` at ${info.venue}` : ''}`, info.tv].filter(Boolean).join(' · ');
+  return [[g.homeId, g.awayId], [g.awayId, g.homeId]].map(([teamId, oppId]) => ({
+    id: `${g.gameId}:team.game_start:${teamId}`,
+    type: 'team.game_start',
+    targetKey: teamKey(g.league, teamId),
+    title: `Hate Watch Starting: ${teamName(g.league, teamId)} vs ${teamName(g.league, oppId)}`,
+    body,
+    at,
+    meta: { gameId: g.gameId },
+  }));
+}
+
 export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay): Detected[] {
   const out: Detected[] = [];
   for (const side of ['home', 'away'] as const) {

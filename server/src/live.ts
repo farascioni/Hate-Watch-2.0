@@ -4,10 +4,15 @@ import { catalog } from './catalog.ts';
 import { GAME_LEAGUES, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, scoreLine, teamScoreEvents,
+  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, scoreLine, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
+
+/** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
+export const liveDeps = {
+  getJson: getJson as (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => Promise<any>,
+};
 
 const LIVE_POLL_MS = Number(process.env.HW_LIVE_POLL_MS ?? 2000);      // per live game
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
@@ -34,17 +39,29 @@ export function watchedTeamKeys(): Set<string> {
 export function invalidateWatched() { watchedCache.at = 0; }
 
 // ─── One live game ────────────────────────────────────────────────────────────────────────────
-class GameTracker {
+export interface GameInfo {
+  /** We saw this game before it began, so its start is news (attaching mid-game it isn't). */
+  sawPre?: boolean;
+  venue?: string;
+  tv?: string;
+}
+
+export class GameTracker {
   readonly ctx: GameCtx;
   private seen = new Set<string>();
   private score = { home: 0, away: 0 };
   private first = true;
   private stopped = false;
+  private sawPre: boolean;
+  private started = false;
+  private readonly info: GameInfo;
   finished = false;
   lastPollMs = 0;
 
-  constructor(league: League, gameId: string, homeId: string, awayId: string) {
+  constructor(league: League, gameId: string, homeId: string, awayId: string, info: GameInfo = {}) {
     this.ctx = { league, gameId, homeId, awayId, goalies: new Map() };
+    this.info = info;
+    this.sawPre = !!info.sawPre;
   }
 
   start() { void this.loop(); }
@@ -65,11 +82,11 @@ class GameTracker {
    * Measured live: the core API publishes plays ~15-20s before the site summary does, while the
    * summary carries game status, boxscore goalies, and is a fallback if core hiccups.
    */
-  private async poll() {
+  async poll() {
     const { league, gameId } = this.ctx;
     const [core, summary] = await Promise.allSettled([
-      getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
-      getJson(urls.summary(league, gameId), { bust: true, timeoutMs: 4000 }),
+      liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
+      liveDeps.getJson(urls.summary(league, gameId), { bust: true, timeoutMs: 4000 }),
     ]);
     if (core.status === 'rejected' && summary.status === 'rejected') throw core.reason;
 
@@ -78,11 +95,20 @@ class GameTracker {
     const sitePlays: NPlay[] = summary.status === 'fulfilled' && league !== 'nfl' ? (summary.value.plays ?? []).map(fromSitePlay) : [];
     const plays = mergePlays(corePlays, sitePlays);
 
+    const events: Detected[] = [];
     let final: { home: number; away: number } | null = null;
     if (summary.status === 'fulfilled') {
       const s = summary.value;
       if (this.first && league === 'nhl') this.seedGoalies(s);
       const comp = s.header?.competitions?.[0];
+      // "Hate Watch Starting" goes out once, on the pre → in flip. A game first seen already under
+      // way (a follow in the 3rd quarter, a server restart) never gets a late "starting" alert.
+      const state = comp?.status?.type?.state;
+      if (state === 'pre') this.sawPre = true;
+      else if (state === 'in' && this.sawPre && !this.started) {
+        this.started = true;
+        events.push(...gameStartEvents(this.ctx, this.info, Date.now()));
+      }
       if (comp?.status?.type?.completed) {
         const c = (side: string) => Number(comp.competitors.find((x: any) => x.homeAway === side)?.score ?? 0);
         final = { home: c('home'), away: c('away') };
@@ -93,7 +119,6 @@ class GameTracker {
     }
 
     const cutoff = Date.now() - BACKFILL_WINDOW_MS;
-    const events: Detected[] = [];
     for (const p of plays) {
       if (this.seen.has(p.id)) continue;
       this.seen.add(p.id);
@@ -145,6 +170,8 @@ class GameTracker {
 // ─── Engine: scoreboards → trackers, plus standings + injuries ─────────────────────────────────
 class LiveEngine {
   private trackers = new Map<string, GameTracker>();
+  /** Watched games seen before their start but not tracked yet (a tracker attaches 3 min out; a doubleheader nightcap can start early). */
+  private preSeen = new Set<string>();
   private kickers: Partial<Record<League, () => void>> = {};
   private standingsKick: Partial<Record<League, () => void>> = {};
 
@@ -182,13 +209,17 @@ class LiveEngine {
       const relevant = watched.has(teamKey(lg, home.id)) || watched.has(teamKey(lg, away.id));
       const key = `${lg}:${ev.id}`;
       let tr = this.trackers.get(key);
+      if (relevant && state === 'pre') this.preSeen.add(key);
+      else if (!relevant) this.preSeen.delete(key);
 
       if (relevant && !tr && (state === 'in' || (state === 'pre' && startsIn < 3 * 60_000))) {
-        tr = new GameTracker(lg, ev.id, home.id, away.id);
+        const tv = comp.broadcasts?.find((b: any) => b.market === 'national')?.names?.[0] ?? comp.broadcasts?.[0]?.names?.[0];
+        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv });
         this.trackers.set(key, tr);
         log(`[${lg}] tracking ${ev.shortName ?? ev.name} (${ev.id})`);
         tr.start();
       }
+      if (state === 'post') this.preSeen.delete(key); // e.g. postponed before it ever started
       if (state === 'post' && ev.status?.type?.completed) {
         // Scoreboard is the backstop for finals (NFL, or a restart right after the buzzer).
         if (!tr && relevant && Date.now() - Date.parse(ev.date) < 6 * 3600_000) {

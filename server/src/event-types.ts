@@ -68,6 +68,7 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'player.injured', scope: 'player', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Gets injured', description: 'Tracked player appears on the injury report or their status worsens.', defaultOn: true, emoji: '🤕' },
 
   // ── Teams
+  { id: 'team.game_start', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Game starts', description: 'Hate Watch Starting: the tracked team\'s game gets underway (F1: a race or sprint).', defaultOn: true, emoji: '🍿' },
   { id: 'team.lost', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Loses a game', description: 'Final whistle and your tracked team lost.', defaultOn: true, emoji: '🪦' },
   { id: 'mlb.team.nobletiger', scope: 'team', leagues: ['mlb'], label: 'NOBLETIGER', description: 'No Outs, Bases Loaded, Ending with Team Incapable of Getting Easy Run: tracked team loads the bases with nobody out and fails to score. Replaces that inning\'s stranded-runners alert.', defaultOn: true, emoji: '🐯' },
   { id: 'mlb.team.stranded_risp', scope: 'team', leagues: ['mlb'], label: 'Strands runners in scoring position', description: 'Tracked team ends an inning with a runner left on second or third (or the bases loaded).', defaultOn: true, emoji: '🏝️' },
