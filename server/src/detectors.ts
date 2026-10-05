@@ -32,8 +32,11 @@ export interface GameCtx {
   lastResult?: NPlay;
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
-  /** MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs). */
-  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean };
+  /**
+   * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs) and for
+   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half).
+   */
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
 }
@@ -228,13 +231,58 @@ const halfLabel = (p: NPlay) => (p.period ? `${p.period.type === 'Top' ? 'Top' :
 function trackHalfInning(g: GameCtx, p: NPlay) {
   const key = halfKey(p);
   if (!key) return; // "End Inning" / "Mid" / "End" markers
-  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false };
+  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false, risp: false };
   // Checked before this play can load the bases: a run that scores on the loading play doesn't count.
   if (g.half.loadedNoOuts && p.scoring) g.half.scoredSince = true;
   if (p.typeSlug === 'play-result' && p.outs === 0 && p.participants.some((x) => x.role === 'batter')) {
     const on = (base: string) => p.participants.some((x) => x.role === base);
     if (on('onFirst') && on('onSecond') && on('onThird')) g.half.loadedNoOuts = true;
   }
+  if (inScoringPosition(basesAfter(p))) g.half.risp = true;
+}
+
+/**
+ * Bases occupied after this play, when the play says: pitches and at-bat results list the batter plus
+ * every runner (a full snapshot). Runner plays between pitches name the base taken: "Acuña Jr. stole
+ * second.", "Machado to second on wild pitch by Henderson." (also passed balls, balks, errors). Runner
+ * outs are skipped ("caught stealing second, catcher to second" is not a runner on second); anything
+ * unreadable is caught up by the next pitch's snapshot.
+ */
+function basesAfter(p: NPlay): string[] | null {
+  if (p.participants.some((x) => x.role === 'batter')) {
+    return ([['onFirst', 'first'], ['onSecond', 'second'], ['onThird', 'third']] as const)
+      .filter(([r]) => p.participants.some((x) => x.role === r)).map(([, base]) => base);
+  }
+  if (/caught stealing|picked off/i.test(p.text)) return null;
+  const taken = [...p.text.matchAll(/\b(?:stole (second|third)|to (second|third) on)\b/gi)].map((m) => (m[1] ?? m[2]).toLowerCase());
+  return taken.length ? ['second', 'third'].filter((b) => taken.includes(b)) : null;
+}
+const inScoringPosition = (bases: string[] | null) => !!bases && (bases.includes('second') || bases.includes('third'));
+
+/**
+ * Team alert for the FIELDING team: the opponent just got a runner to second or third. Once per
+ * half-inning, the first time it happens; a threat already on base when we attached never fires late
+ * (observePlay marks it for history plays too). If a run scores on the same play, the opponent-scored
+ * alert says more, so this one is `unless` it.
+ */
+function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
+  const key = halfKey(p);
+  const bases = basesAfter(p);
+  if (!key || !inScoringPosition(bases) || (g.half?.key === key && g.half.risp)) return [];
+  const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
+  const where = bases!.length === 3 ? 'the bases loaded' : bases!.length === 1 ? `a runner on ${bases![0]}` : `runners on ${bases![0]} and ${bases![1]}`;
+  // An at-bat result or a steal explains how they got there; a pitch's text ("Ball 2") doesn't.
+  const says = p.typeSlug === 'play-result' || !p.participants.some((x) => x.role === 'batter');
+  return [{
+    id: `${g.gameId}:${key}:mlb.team.opponent_risp:${fieldingId}`,
+    type: 'mlb.team.opponent_risp',
+    ...(p.scoring ? { unless: 'team.opponent_scored' } : {}),
+    targetKey: teamKey('mlb', fieldingId),
+    title: `${teamName('mlb', battingId)} have ${where} against the ${teamName('mlb', fieldingId)}`,
+    body: `${halfLabel(p)}${says ? `: ${p.text}` : ''} — ${scoreLine(g, p)}`,
+    at: p.at,
+    meta: { gameId: g.gameId, playId: p.id },
+  }];
 }
 
 /**
@@ -344,6 +392,7 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   }
   const runner = runnerOut(g, p);
   if (runner) out.push(runner);
+  out.push(...opponentRisp(g, p));
   const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;

@@ -230,6 +230,65 @@ test('MLB: NOBLETIGER (bases loaded, nobody out, no runs) and no duplicate with 
   assert.deepEqual(delivered({ 'mlb.team.nobletiger': false, 'mlb.team.stranded_risp': false }), []);
 });
 
+test('MLB: opponent gets a runner in scoring position: the fielding team hears it once per half-inning', () => {
+  let n = 0;
+  const runners = (rs: string[]) => rs.map((r, i) => ({ id: `R${i}`, role: r }));
+  const at = (half: string) => ({ type: half.split(' ')[0], number: Number(half.split(' ')[1]) });
+  // Shapes from a real game (ATL @ LAD): at-bat results and pitches list the batter and every runner;
+  // a steal lists the pitcher and the runner's new base, and ESPN sends it twice with the same text.
+  const ab = (half: string, text: string, rs: string[], extra: object = {}) =>
+    play({ id: `p${n++}`, typeSlug: 'play-result', text, period: at(half), participants: [{ id: 'P', role: 'pitcher' }, { id: 'B', role: 'batter' }, ...runners(rs)], ...extra });
+  const pitch = (half: string, rs: string[]) =>
+    play({ id: `p${n++}`, typeSlug: 'ball', text: 'Pitch 2 : Ball 1', period: at(half), participants: [{ id: 'P', role: 'pitcher' }, { id: 'B', role: 'batter' }, ...runners(rs)] });
+  const runnerPlay = (half: string, typeSlug: string, text: string, rs: string[] = []) =>
+    play({ id: `p${n++}`, typeSlug, text, period: at(half), participants: [{ id: 'P', role: 'pitcher' }, ...runners(rs)] });
+  const newGame = (): any => ({ league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() });
+  // What the live tracker does for each new play: detect, then update game state.
+  const live = (g: any, p: ReturnType<typeof play>) => { const es = PLAYER_DETECTORS.mlb(g, p).filter((e) => e.type === 'mlb.team.opponent_risp'); observePlay(g, p); return es; };
+
+  const g = newGame();
+  assert.deepEqual(live(g, ab('Top 1', 'Acuña Jr. singled to left.', ['onFirst'])), [], 'a runner on first is not in scoring position');
+  const [stole] = live(g, runnerPlay('Top 1', 'stolen-base', 'Acuña Jr. stole second.', ['onSecond']));
+  assert.equal(stole.targetKey, 'team:mlb:15', 'top of the inning: the home team is fielding');
+  assert.match(stole.title, /have a runner on second against the /);
+  assert.match(stole.body, /^Top 1st: Acuña Jr\. stole second\. — /);
+  assert.equal(stole.unless, undefined);
+  assert.deepEqual(live(g, runnerPlay('Top 1', 'play-result', 'Acuña Jr. stole second.', ['onSecond'])), [], "ESPN's duplicate of the steal");
+  assert.deepEqual(live(g, ab('Top 1', 'Albies walked, Olson to second, Acuña Jr. to third.', ['onFirst', 'onSecond', 'onThird'])), [], 'once per half-inning');
+
+  const [double] = live(g, ab('Bottom 1', 'Rojas doubled to left.', ['onSecond']));
+  assert.equal(double.targetKey, 'team:mlb:22', 'bottom of the inning: the away team is fielding');
+
+  // Wording follows the bases: loaded, two runners, one.
+  assert.match(live(g, ab('Top 2', 'Baldwin walked.', ['onFirst', 'onSecond', 'onThird']))[0].title, /have the bases loaded against/);
+  assert.match(live(g, ab('Bottom 2', 'Pages singled.', ['onFirst', 'onThird']))[0].title, /have runners on first and third against/);
+
+  // A wild pitch (real SD @ MIL wording) moves the runner between pitches: caught right away.
+  assert.deepEqual(live(g, ab('Top 3', 'Machado walked.', ['onFirst'])), []);
+  const [wildPitch] = live(g, runnerPlay('Top 3', 'wild-pitch', 'Machado to second on wild pitch by Henderson.', ['onSecond']));
+  assert.match(wildPitch.body, /^Top 3rd: Machado to second on wild pitch by Henderson\./);
+
+  // A runner thrown out is not a runner in scoring position, even though the text says "to second".
+  assert.deepEqual(live(g, ab('Bottom 3', 'Edman singled.', ['onFirst'])), []);
+  assert.deepEqual(live(g, runnerPlay('Bottom 3', 'caught-stealing', 'Edman caught stealing second, catcher to second.')), []);
+  // A move we can't read is caught up by the next pitch, without "Ball 1" as the story.
+  assert.deepEqual(live(g, runnerPlay('Bottom 3', 'defensive-indifference', 'Defensive indifference.')), []);
+  const [caughtUp] = live(g, pitch('Bottom 3', ['onSecond']));
+  assert.match(caughtUp.body, /^Bottom 3rd — /);
+
+  // A run scoring on the same play: "Opponent scores" says more, so this one is `unless` it.
+  const [scored] = live(g, ab('Top 5', 'Ohtani doubled, Betts scored.', ['onSecond'], { scoring: true, scoreValue: 1 }));
+  assert.equal(scored.unless, 'team.opponent_scored');
+  assert.equal(shouldDeliver(prefs(), scored, 'mlb'), false, 'default: the scored-on alert covers it');
+  assert.equal(shouldDeliver(prefs({ types: { 'team.opponent_scored': false } }), scored, 'mlb'), true, '"Opponent scores" off: this one arrives');
+
+  // Attaching mid-threat (history is observed, never alerted) must not send a late alert.
+  const late = newGame();
+  observePlay(late, ab('Top 4', 'Murphy doubled.', ['onSecond']));
+  assert.deepEqual(live(late, pitch('Top 4', ['onSecond'])), []);
+  assert.deepEqual(live(late, ab('Top 4', 'Baldwin walked.', ['onFirst', 'onSecond'])), []);
+});
+
 test('scored on AND fell behind on the same play: one alert per user, not two', () => {
   const g: any = { league: 'nhl', gameId: 'g', homeId: '1', awayId: '2', goalies: new Map() };
   const goal = (home: number, away: number) => play({ id: `${home}-${away}`, scoring: true, home, away, text: 'Goal' });
