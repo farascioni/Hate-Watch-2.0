@@ -8,7 +8,7 @@ import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
 import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
-import { shareCard, shareLink, type Reply } from './share.ts';
+import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 
 class Html {
   body: string;
@@ -132,6 +132,14 @@ route('GET', '/a/:code/card.png', false, async (_r, _u, [code]) => {
   return new Raw({ status: 200, headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' }, body: png });
 });
 route('GET', '/a/:code', false, (req, _u, [code]) => new Raw(shareLink(code, String(req.headers['user-agent'] ?? ''), origin(req))));
+// Universal links: lets iOS open /a/* links in the app when it's installed.
+route('GET', '/.well-known/apple-app-site-association', false, () => appSiteAssociation());
+// The alert behind a share link, for the screen the app opens it on.
+route('GET', '/shared/:code', false, (_r, _u, [code]) => {
+  const item = sharedAlert(code);
+  if (!item) throw new HttpError(404, 'no such alert');
+  return { item };
+});
 
 // ─── Dev only: inject a fake event to test push + feed end to end ─────────────────────────────
 if (process.env.HW_DEV === '1') {

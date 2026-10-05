@@ -11,6 +11,9 @@
     "ios": {
       "bundleIdentifier": "com.hatewatch.app",
       "supportsTablet": false,
+      "associatedDomains": [
+        "applinks:hate-watch-api.fly.dev"
+      ],
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },

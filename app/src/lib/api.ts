@@ -56,6 +56,8 @@ export const api = {
     request<{ results: Target[] }>('GET', `/search?q=${enc(q)}${league ? `&league=${league}` : ''}${kind ? `&kind=${kind}` : ''}&limit=50`, undefined, false),
   teams: (league?: League) => request<{ teams: Team[] }>('GET', `/teams${league ? `?league=${league}` : ''}`, undefined, false),
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
+  /** The alert behind a share link (/a/<code>), for the screen that link opens in the app. */
+  shared: (code: string) => request<{ item: FeedItem }>('GET', `/shared/${enc(code)}`, undefined, false),
 
   follows: () => request<{ follows: { key: string; followedAt: number; target: Target | null }[] }>('GET', '/me/follows'),
   follow: (key: string) => request('PUT', `/me/follows/${enc(key)}`),

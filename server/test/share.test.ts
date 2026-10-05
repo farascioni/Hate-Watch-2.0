@@ -12,7 +12,7 @@ process.env.HW_DB = ':memory:';
 const { db, shareCode } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { feedItem } = await import('../src/fanout.ts');
-const { shareLink, shareCard, APP_STORE_URL } = await import('../src/share.ts');
+const { shareLink, shareCard, sharedAlert, appSiteAssociation, APP_STORE_URL } = await import('../src/share.ts');
 
 // Offline: emoji images come from a stub instead of the Twemoji CDN.
 globalThis.fetch = async () => new Response('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#FFCC4D"/></svg>');
@@ -71,6 +71,17 @@ test('the card is a 1200×630 PNG, for teams and players (emoji and accents incl
     assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
   }
   assert.equal(await shareCard('nope'), null);
+});
+
+test('universal links: iOS is told Hate Watch opens /a/* links, and the app can fetch the alert', () => {
+  assert.deepEqual(appSiteAssociation(), {
+    applinks: { details: [{ appIDs: ['G9V9266QK5.com.hatewatch.app'], components: [{ '/': '/a/*', comment: 'Shared alerts' }] }] },
+  });
+  const item = sharedAlert(code)!;
+  assert.equal(item.title, 'Successful Hate Watch! Braves lost to the Dodgers');
+  assert.equal(item.target.key, 'team:mlb:15');
+  assert.equal(item.shareUrl, `${ORIGIN}/a/${code}`);
+  assert.equal(sharedAlert('nope'), null);
 });
 
 test('alerts from before share links get codes when the server starts', () => {

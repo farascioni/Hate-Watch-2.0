@@ -1,7 +1,8 @@
 // Share links. The app shares /a/<code> instead of text. That page's link preview (Open Graph) is a
 // picture of the alert, so in Messages, WhatsApp, Discord, X or Slack a shared alert looks like a
-// screenshot. Tapping it on an iPhone goes straight to the App Store; anywhere else the page shows the
-// card and a download button. The picture is drawn here from our own alert data (nothing is uploaded).
+// screenshot. Tapping it on an iPhone with Hate Watch installed opens the app on that alert (a universal
+// link: see appSiteAssociation); without the app it goes to the App Store; anywhere else the page shows
+// the card and a download button. The picture is drawn here from our own alert data (nothing is uploaded).
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import satori from 'satori';
@@ -9,11 +10,29 @@ import { Resvg } from '@resvg/resvg-js';
 import { db } from './db.ts';
 import { targetDto } from './catalog.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
+import { feedItem } from './fanout.ts';
 import { LEAGUES, type League } from './leagues.ts';
 import { sharePage } from './pages.ts';
 
 export const APP_STORE_URL = process.env.HW_APP_STORE_URL ?? 'https://apps.apple.com/app/id6819054268';
 const APP_STORE_ID = APP_STORE_URL.match(/\/id(\d+)/)?.[1];
+/** Apple Team ID + bundle id: the app allowed to open this server's share links. */
+const IOS_APP_ID = process.env.HW_IOS_APP_ID ?? 'G9V9266QK5.com.hatewatch.app';
+
+/**
+ * /.well-known/apple-app-site-association: tells iOS that Hate Watch opens /a/* links on this domain,
+ * so a tap goes straight into the app when it's installed (the app lists the domain in
+ * ios.associatedDomains). iOS fetches this through Apple's CDN when the app is installed or updated.
+ */
+export const appSiteAssociation = () => ({
+  applinks: { details: [{ appIDs: [IOS_APP_ID], components: [{ '/': '/a/*', comment: 'Shared alerts' }] }] },
+});
+
+/** The shared alert as a feed item, for the app screen a share link opens. */
+export function sharedAlert(code: string) {
+  const row = db.prepare('SELECT * FROM events WHERE share_code = ?').get(code) as Parameters<typeof feedItem>[0] | undefined;
+  return row ? feedItem(row) : null;
+}
 
 /** Link-preview fetchers (Messages sends "facebookexternalhit … Twitterbot") must get the page, never the redirect. */
 const PREVIEW_BOT = /bot|crawl|spider|facebookexternalhit|preview|slack|discord|whatsapp|telegram|embed/i;
