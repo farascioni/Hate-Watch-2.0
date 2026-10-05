@@ -28,6 +28,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="scores"
+        options={{ title: 'Scores', tabBarIcon: ({ color, size }) => <Ionicons name="trophy" color={color} size={size} /> }}
+      />
+      <Tabs.Screen
         name="search"
         options={{ title: 'Search', tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} /> }}
       />

@@ -9,6 +9,7 @@ import { catalog } from './catalog.ts';
 import { urls, playerKey, teamKey } from './leagues.ts';
 import { START_WORD, ordinal, type Detected } from './detectors.ts';
 import { publish } from './fanout.ts';
+import { raceCard, upsertGame } from './scores.ts';
 
 const F1_SCAN_MS = Number(process.env.HW_F1_SCAN_MS ?? 30_000);     // scoreboard: sessions going live / finishing
 const F1_STATUS_MS = Number(process.env.HW_F1_STATUS_MS ?? 15_000); // followed drivers' race status
@@ -246,6 +247,7 @@ export async function scanF1() {
       if (!kind) continue;
       const state = comp.status?.type?.state;
       const meta = { compId: String(comp.id), kind, label: sessionLabel(ev, comp) };
+      upsertGame(raceCard(ev, comp)); // the Scores tab (the running order is on the scoreboard)
       if (kind !== 'qual' && state === 'pre') preSeen.add(meta.compId);
       if (kind !== 'qual' && state === 'in' && !races.has(meta.compId)) {
         if (preSeen.delete(meta.compId)) publish(raceStartEvents({ ...meta, at: Date.now() }), 'f1');

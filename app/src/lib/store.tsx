@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
-import type { EventType, FeedItem, League, Prefs, PrefsPatch, Target } from './types';
+import type { EventType, FeedItem, GameCard, League, Prefs, PrefsPatch, Target } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -17,6 +17,10 @@ interface Store {
   refreshFeed: () => Promise<void>;
   loadMore: () => Promise<void>;
   clearFeed: () => Promise<void>;
+
+  /** Scores tab: today's games for the teams (and players' teams) you track, kept live over the socket. */
+  games: Map<string, GameCard>;
+  refreshScores: () => Promise<void>;
 
   follows: Map<string, Target>;
   isFollowing: (key: string) => boolean;
@@ -61,6 +65,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [live, setLive] = useState<LiveState>('connecting');
   const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [games, setGames] = useState<Map<string, GameCard>>(new Map());
   const [unseen, setUnseen] = useState(0);
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
   const [prefs, setPrefs] = useState<Prefs | null>(null);
@@ -77,6 +82,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setFeed((cur) => mergeFeed(cur, items));
   }, []);
 
+  // The server decides which games are yours today; live frames then update them in place.
+  const refreshScores = useCallback(async () => {
+    const { games: list } = await api.scores();
+    setGames(new Map(list.map((g) => [g.key, g])));
+  }, []);
+
   // ── Realtime socket with backoff; on every (re)connect we re-sync the feed to close any gap.
   useEffect(() => {
     let closed = false;
@@ -89,9 +100,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!token) { timer = setTimeout(connect, 3000); return; }
       const sock = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
       ws.current = sock;
-      sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); };
+      sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); refreshScores().catch(() => {}); };
       sock.onmessage = (m) => {
         const frame = JSON.parse(String(m.data));
+        if (frame.kind === 'score') { setGames((cur) => new Map(cur).set(frame.game.key, frame.game)); return; }
         if (frame.kind !== 'event') return;
         setFeed((cur) => mergeFeed(cur, [frame.item]));
         setUnseen((n) => n + 1);
@@ -110,7 +122,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (s === 'active' && !ws.current) { clearTimeout(timer); attempt = 0; connect(); }
     });
     return () => { closed = true; clearTimeout(timer); ws.current?.close(); sub.remove(); };
-  }, [refreshFeed]);
+  }, [refreshFeed, refreshScores]);
 
   // ── Initial load
   useEffect(() => {
@@ -135,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push,
+    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, refreshScores,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -151,7 +163,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Optimistic: flip immediately, roll back if the server says no.
       setFollows((m) => { const n = new Map(m); was ? n.delete(t.key) : n.set(t.key, t); return n; });
       Haptics.selectionAsync().catch(() => {});
-      try { await (was ? api.unfollow(t.key) : api.follow(t.key)); }
+      try { await (was ? api.unfollow(t.key) : api.follow(t.key)); refreshScores().catch(() => {}); }
       catch { setFollows((m) => { const n = new Map(m); was ? n.set(t.key, t) : n.delete(t.key); return n; }); }
     },
     updatePrefs: async (patch) => {
@@ -181,7 +193,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, refreshScores]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

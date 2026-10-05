@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View 
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { FeedCard } from '../../components/FeedCard';
-import { Empty, PrimaryButton, useNow } from '../../components/ui';
+import { Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
 import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
 import { colors, space } from '../../theme';
 import type { FeedItem } from '../../lib/types';
@@ -14,17 +14,6 @@ function dayLabel(ts: number) {
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === y.toDateString()) return 'Yesterday';
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-}
-
-function LiveBadge() {
-  const { live } = useStore();
-  const color = live === 'live' ? colors.live : live === 'connecting' ? colors.warn : colors.textFaint;
-  return (
-    <View style={styles.liveWrap} accessibilityLabel={`Realtime ${live}`}>
-      <View style={[styles.liveDot, { backgroundColor: color }]} />
-      <Text style={[styles.liveText, { color }]}>{live === 'live' ? 'LIVE' : live === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</Text>
-    </View>
-  );
 }
 
 export default function FeedScreen() {
@@ -87,7 +76,4 @@ const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   day: { color: colors.textFaint, backgroundColor: colors.bg, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(4), paddingBottom: space(2) },
-  liveWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: space(4) },
-  liveDot: { width: 8, height: 8, borderRadius: 4 },
-  liveText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 });

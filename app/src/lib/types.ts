@@ -20,7 +20,25 @@ export interface FeedItem {
   title: string; body: string; occurredAt: number; detectedAt: number; target: Target;
   /** A link whose preview is a picture of this alert; tapping it opens the App Store. */
   shareUrl?: string;
+  /** The game (F1: session) it happened in, if any: links the alert to the Scores tab's game screen. */
+  gameId?: string | null;
 }
+
+/** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
+export interface GameSide { team: Team; score: number | null; winner?: boolean }
+export interface GameCard {
+  key: string; league: League; id: string;
+  state: 'pre' | 'in' | 'post'; startsAt: number; detail: string;
+  home?: GameSide; away?: GameSide;
+  possession?: string; downDistance?: string; redZone?: boolean;
+  bases?: { first: boolean; second: boolean; third: boolean; outs: number };
+  batting?: string;
+  winProb?: { home: number; away: number };
+  session?: string;
+  order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
+}
+export interface PlayLine { id: string; text: string; when: string; scoring: boolean }
+export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[] }
 
 export interface EventType {
   id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;

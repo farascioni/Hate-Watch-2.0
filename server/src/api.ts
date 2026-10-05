@@ -9,6 +9,7 @@ import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
+import { forgetDeviceTeams, gamePlays, gamesFor, getGame } from './scores.ts';
 
 class Html {
   body: string;
@@ -83,13 +84,26 @@ route('PUT', '/me/follows/:key', true, (req, _u, [key]) => {
   const k = decodeURIComponent(key);
   if (!targetDto(k)) throw new HttpError(404, 'unknown team/player');
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').run(req.deviceId!, k, Date.now());
+  forgetDeviceTeams(req.deviceId!); // their Scores tab changes now
   engine.kick(); // a game in progress for this target starts tracking right now
   return { ok: true };
 });
 route('DELETE', '/me/follows/:key', true, (req, _u, [key]) => {
   db.prepare('DELETE FROM follows WHERE device_id = ? AND target_key = ?').run(req.deviceId!, decodeURIComponent(key));
+  forgetDeviceTeams(req.deviceId!);
   engine.kick();
   return { ok: true };
+});
+
+// ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
+route('GET', '/me/scores', true, (req) => ({ games: gamesFor(req.deviceId!) }));
+route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
+  const game = getGame(decodeURIComponent(key));
+  if (!game) throw new HttpError(404, 'game not found');
+  const alerts = (db.prepare(`SELECT e.* FROM feed f JOIN events e ON e.id = f.event_id
+    WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[]).map(feedItem);
+  const plays = await gamePlays(game).catch(() => []); // the score card still works if ESPN hiccups
+  return { game, alerts, plays };
 });
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────

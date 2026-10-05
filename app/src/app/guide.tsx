@@ -50,6 +50,28 @@ const PAGES: Page[] = [
     ),
   },
   {
+    key: 'scores', icon: 'trophy', where: 'Scores tab', title: 'Every game, live',
+    body: "Today's games for everyone you track: the score, how badly it's going for them, and the chance they lose. Tap one for the play-by-play.",
+    demo: () => (
+      <View style={styles.demoCard}>
+        <View style={styles.row}>
+          <Badge text="ATL" color="#A71930" />
+          <Text style={[styles.demoTitle, { flex: 1 }]}>Falcons</Text>
+          <Text style={styles.demoScore}>17</Text>
+        </View>
+        <View style={[styles.row, { marginTop: space(2) }]}>
+          <Badge text="NO" color="#9F8958" />
+          <Text style={[styles.demoTitle, { flex: 1, color: colors.textDim }]}>Saints</Text>
+          <Text style={[styles.demoScore, { color: colors.textDim }]}>24</Text>
+        </View>
+        <View style={[styles.row, { marginTop: space(3), justifyContent: 'space-between' }]}>
+          <Text style={styles.demoSub}>Q4 · 2:14</Text>
+          <View style={styles.downPill}><Text style={styles.downText}>Down 7</Text></View>
+        </View>
+      </View>
+    ),
+  },
+  {
     key: 'global', icon: 'options', where: 'Settings tab', title: 'Choose your alerts',
     body: "Turn each kind of alert on or off for every league. An alert's bell decides whether it sends a notification or just lands in your feed.",
     demo: () => (
@@ -216,6 +238,9 @@ const styles = StyleSheet.create({
   demoSub: { color: colors.textDim, fontSize: 13 },
   badge: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.16)' },
   badgeText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  demoScore: { color: colors.text, fontSize: 20, fontWeight: '900' },
+  downPill: { backgroundColor: colors.hateDim, borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },
+  downText: { color: '#FF8A8F', fontSize: 12, fontWeight: '800' },
   trackPill: { backgroundColor: colors.hate, borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2) },
   trackText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   round: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi, alignItems: 'center', justifyContent: 'center' },

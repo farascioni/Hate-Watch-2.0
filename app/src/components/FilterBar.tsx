@@ -35,11 +35,11 @@ export function describeFilter(f: Filter, noun = 'players and teams') {
  * Everything / Players / Teams, plus All / NBA / MLB / NFL / NHL. Two fixed rows rather than a
  * horizontal scroller, so every option is always visible (same on iOS, Android and web).
  */
-export function FilterBar({ filter, onChange }: { filter: Filter; onChange: (f: Filter) => void }) {
+export function FilterBar({ filter, onChange, kinds = true }: { filter: Filter; onChange: (f: Filter) => void; /** false: league chips only (Scores tab) */ kinds?: boolean }) {
   const { leagues } = useStore();
   return (
     <View>
-      <View style={styles.segment} accessibilityRole="tablist">
+      {kinds ? <View style={styles.segment} accessibilityRole="tablist">
         {KINDS.map(({ id, label }) => {
           const on = filter.kind === id;
           return (
@@ -48,7 +48,7 @@ export function FilterBar({ filter, onChange }: { filter: Filter; onChange: (f: 
             </Pressable>
           );
         })}
-      </View>
+      </View> : null}
       <View style={styles.leagues}>
         <Chip label="All" active={!filter.league} onPress={() => onChange({ ...filter, league: undefined })} style={styles.leagueChip} />
         {leagues.map((l) => (

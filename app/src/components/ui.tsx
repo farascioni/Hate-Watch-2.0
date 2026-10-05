@@ -100,7 +100,22 @@ export function ago(ts: number, now: number) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/** The realtime connection state, for a tab's header (Feed, Scores). */
+export function LiveBadge() {
+  const { live } = useStore();
+  const color = live === 'live' ? colors.live : live === 'connecting' ? colors.warn : colors.textFaint;
+  return (
+    <View style={styles.liveWrap} accessibilityLabel={`Realtime ${live}`}>
+      <View style={[styles.liveDot, { backgroundColor: color }]} />
+      <Text style={[styles.liveText, { color }]}>{live === 'live' ? 'LIVE' : live === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  liveWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: space(4) },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
+  liveText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   chip: { paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   tag: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },

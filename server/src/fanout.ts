@@ -155,6 +155,11 @@ export function addSocket(deviceId: string, ws: WebSocket) {
   ws.on('close', () => sockets.get(deviceId)?.delete(ws));
 }
 
+/** Send a frame to every connected device that passes `to` (live scores: see scores.ts). */
+export function sendToConnected(frame: string, to: (deviceId: string) => boolean) {
+  for (const [deviceId, set] of sockets) if (set.size && to(deviceId)) for (const ws of set) ws.send(frame);
+}
+
 /** After a device deletes itself: drop cached prefs and close its live sockets. */
 export function forgetDevice(deviceId: string) {
   prefsCache.delete(deviceId);
@@ -166,10 +171,11 @@ export function forgetDevice(deviceId: string) {
 /** Where links that leave the app point (an alert's share link). */
 export const PUBLIC_URL = process.env.HW_PUBLIC_URL ?? 'https://hate-watch-api.fly.dev';
 
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null }) {
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);
   return {
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
+    gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: row.body, occurredAt: row.occurred_at, detectedAt: row.detected_at,
     target: targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
     // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
@@ -193,9 +199,10 @@ export function publish(events: Detected[], league: League) {
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
-    const res = insEvent().run(e.id, e.type, league, (e.meta?.gameId as string) ?? null, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
+    const gameId = ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null; // F1: the session
+    const res = insEvent().run(e.id, e.type, league, gameId, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
-    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null });
+    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId });
     const frame = JSON.stringify({ kind: 'event', item });
     for (const f of fols) {
       const prefs = getPrefs(f.device_id);

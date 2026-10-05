@@ -217,9 +217,25 @@ Settings let users control:
 
 A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won't hide the runs.
 
+## Scores tab
+
+The second tab lists today's games for the teams you track and the teams of players you track. Live games come first, then later today, then finals from the last 16 hours. Each card shows the score, clock or inning, the NFL down and distance, MLB bases and outs, and a status pill from the hater's side:
+
+- **"Down 7" (red):** good news.
+- **"Threatening" (amber):** the team you hate is in a spot to score (NFL red zone, or a runner in scoring position while they bat).
+- **"Up 3" / "Tied" (grey).**
+- **"Successful Hate Watch!" (finals).**
+
+Where ESPN publishes win probability (NFL, MLB), a bar shows the chance they lose. The newest alert from the game sits underneath. F1 race, sprint and qualifying sessions show your drivers' (or your constructor's cars') running order. Tapping a card opens `app/src/app/game/[key].tsx`: the live card, your alerts from that game, and the latest 25 plays (MLB at-bat results only; F1, the full running order).
+
+- **Where the data comes from** (`server/src/scores.ts`): the live engine already reads every league's ESPN scoreboard every 10s, and F1's every 30s. Each read upserts a card per game (`gameCard` / `raceCard`). The 2s game tracker patches in scores from the play-by-play, which runs ahead of the scoreboard, and win probability from the summary (`patchGame`). While a game is live, each side's score only goes up, so a stale scoreboard read can't undo a run the feed already announced. The final read is exact.
+- **Live:** any change is pushed as `{ kind: 'score', game }` over the existing WebSocket, only to connected devices that track a side (`deviceTeams`: teams plus followed players' teams, cached 5s and reset on follow/unfollow). The first sighting of a game (e.g. after a restart) is a baseline, not a push.
+- **API:** `GET /me/scores` lists the device's games. `GET /me/games/<league:id>` adds the device's alerts from that game (`events.game_id`; F1 alerts now store their session id there) and the play-by-play from ESPN's summary, cached 8s while live and 5 min after. Feed items carry `gameId`, so the app links alerts to their game.
+- Checked live against CHW @ CLE on 2026-10-05: the card, the losing chance (Guardians 25% to lose), a pushed update at the top of the 6th, and the game screen's play-by-play.
+
 ## Startup guide
 
-On a device's first launch the app opens a six-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): welcome, tracking from Search, the Feed and sharing, global alert settings, and the per-target 🔔 and ⚙️ on the Tracking tab, then "You're all set". Swipe or tap Next. Skip (top right) ends it from any page. The last page's "Find someone to hate" goes to Search. The pictures are drawings of the real controls, so nothing in the guide changes settings.
+On a device's first launch the app opens a seven-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): welcome, tracking from Search, the Feed and sharing, the Scores tab, global alert settings, and the per-target 🔔 and ⚙️ on the Tracking tab, then "You're all set". Swipe or tap Next. Skip (top right) ends it from any page. The last page's "Find someone to hate" goes to Search. The pictures are drawings of the real controls, so nothing in the guide changes settings.
 
 - **Once per install:** `hatewatch.guideSeen` in AsyncStorage, set as soon as the guide opens (`app/src/lib/guide.ts`). Deleting the app shows it again.
 - **Rewatch:** Settings → About → Show the guide opens it without the first-run extras. The last button says Done and returns to Settings.
