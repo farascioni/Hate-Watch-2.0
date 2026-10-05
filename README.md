@@ -214,11 +214,21 @@ Settings let users control:
 
 A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won't hide the runs.
 
+## Sharing an alert
+
+The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a picture of the alert, so it looks like a screenshot, and tapping it on an iPhone goes straight to the App Store.
+
+- **The code** is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `db.ts`), stored in `events.share_code` and indexed. Alerts from before share links got theirs when the server started. Every feed item carries `shareUrl`.
+- **`GET /a/<code>`** (`share.ts`): an iPhone, iPad or iPod gets a 302 to the App Store. Everyone else, including link-preview fetchers (Messages sends `facebookexternalhit … Twitterbot`, which never gets the redirect), gets a page with Open Graph and Twitter card tags, Apple's Smart App Banner, the card and a download button. Unknown codes get a 404 page, or the App Store on an iPhone.
+- **`GET /a/<code>/card.png`**: the 1200×630 card, drawn on the server from our own alert data with `satori` (layout to SVG) and `@resvg/resvg-js` (SVG to PNG), in Inter from `@fontsource/inter`, with emoji as Twemoji images from jsDelivr. No user uploads, so no user-generated content to moderate. The card shows team colours and initials, not ESPN logos or headshots. Cached in memory and for a day by HTTP, since alerts never change.
+- **The app** (`app/src/lib/share.ts`) shares just the URL on iOS, so Messages shows one bubble, the card. On Android the link goes at the end of the text.
+- `HW_APP_STORE_URL` overrides the store link (default `https://apps.apple.com/app/id6819054268`) and `HW_PUBLIC_URL` the link's host. The App Store link only works once the app is released.
+
 ## Tests
 
 ```bash
 cd server
-npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, and a simulated F1 race (test/f1-live.test.ts)
+npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, a simulated F1 race, game starts, share links
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
 node test/core-vs-site.ts     # both ESPN sources produce identical detections
 HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws delivery, prefs, mute, unfollow, auth

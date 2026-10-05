@@ -5,13 +5,19 @@ import { db, kvGet } from './db.ts';
 import { catalog, search, teamDto, playerDto, targetDto } from './catalog.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
-import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT_PREFS } from './fanout.ts';
+import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
+import { shareCard, shareLink, type Reply } from './share.ts';
 
 class Html {
   body: string;
   constructor(body: string) { this.body = body; }
+}
+/** Any other response: an image, a redirect, a page with its own status. */
+class Raw {
+  reply: Reply;
+  constructor(reply: Reply) { this.reply = reply; }
 }
 
 type Handler = (req: IncomingMessage & { deviceId?: string }, url: URL, params: string[], body: any) => unknown | Promise<unknown>;
@@ -117,6 +123,16 @@ route('DELETE', '/me', true, (req) => {
 route('GET', '/privacy', false, () => new Html(privacyPage()));
 route('GET', '/support', false, () => new Html(supportPage()));
 
+// ─── Share links: a page whose preview is a picture of the alert (see share.ts) ───────────────
+const origin = (req: IncomingMessage) =>
+  req.headers.host ? `${String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]}://${req.headers.host}` : PUBLIC_URL;
+route('GET', '/a/:code/card.png', false, async (_r, _u, [code]) => {
+  const png = await shareCard(code);
+  if (!png) throw new HttpError(404, 'no such alert');
+  return new Raw({ status: 200, headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' }, body: png });
+});
+route('GET', '/a/:code', false, (req, _u, [code]) => new Raw(shareLink(code, String(req.headers['user-agent'] ?? ''), origin(req))));
+
 // ─── Dev only: inject a fake event to test push + feed end to end ─────────────────────────────
 if (process.env.HW_DEV === '1') {
   route('POST', '/dev/simulate', true, (req, _u, _p, body) => {
@@ -140,7 +156,9 @@ export function startApi(port: number) {
     if (req.method === 'OPTIONS') return void res.writeHead(204).end();
     const url = new URL(req.url ?? '/', 'http://x');
     try {
-      const r = routes.find((x) => x.method === req.method && x.re.test(url.pathname));
+      // HEAD is answered like GET (Node drops the body), for link-preview fetchers that check first.
+      const method = req.method === 'HEAD' ? 'GET' : req.method;
+      const r = routes.find((x) => x.method === method && x.re.test(url.pathname));
       if (!r) throw new HttpError(404, 'no route');
       if (r.auth && !(req.deviceId = authDevice(req.headers.authorization))) throw new HttpError(401, 'bad token');
       let body: any;
@@ -151,6 +169,7 @@ export function startApi(port: number) {
       }
       const out = await r.fn(req, url, url.pathname.match(r.re)!.slice(1), body);
       if (out instanceof Html) return void res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300' }).end(out.body);
+      if (out instanceof Raw) return void res.writeHead(out.reply.status, out.reply.headers).end(out.reply.body);
       res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(out ?? null));
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;

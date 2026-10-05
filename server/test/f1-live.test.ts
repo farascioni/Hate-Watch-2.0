@@ -25,7 +25,8 @@ loadCatalog();
 // ── A user who tracks the Cadillac team, Bottas, and Leclerc (not Pérez, not Hamilton)
 db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev', 's', 'test', JSON.stringify(DEFAULT_PREFS));
 for (const k of ['team:f1:CAD', 'player:f1:BOT', 'player:f1:LEC']) db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('dev', k);
-const feed = () => (db.prepare(`SELECT e.type, e.target_key, e.title FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = 'dev' ORDER BY e.detected_at, e.id`).all() as any[])
+// In delivery order (rowid): the simulated race runs fast enough for several alerts to share a millisecond.
+const feed = () => (db.prepare(`SELECT e.type, e.target_key, e.title FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = 'dev' ORDER BY f.rowid`).all() as any[])
   .map((r) => `${r.type} | ${r.target_key} | ${r.title}`);
 
 // ── Fake ESPN

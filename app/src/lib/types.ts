@@ -18,6 +18,8 @@ export type Target = Team | Player;
 export interface FeedItem {
   id: string; type: string; emoji: string; typeLabel: string; league: League;
   title: string; body: string; occurredAt: number; detectedAt: number; target: Target;
+  /** A link whose preview is a picture of this alert; tapping it opens the App Store. */
+  shareUrl?: string;
 }
 
 export interface EventType {

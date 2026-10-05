@@ -1,16 +1,16 @@
 // Public HTML pages linked from the App Store listing and the app's Settings screen.
 const CONTACT = process.env.HW_CONTACT_EMAIL ?? 'support@example.com';
-const UPDATED = 'October 3, 2026';
+const UPDATED = 'October 5, 2026';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-function layout(title: string, body: string) {
+function layout(title: string, body: string, head = '') {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · Hate Watch</title>
+<title>${esc(title)} · Hate Watch</title>${head}
 <style>
   :root { --bg:#0B0B0D; --surface:#16161A; --border:#2A2A31; --text:#F4F4F5; --dim:#A1A1AA; --red:#E5232B; }
   * { box-sizing: border-box; }
@@ -31,6 +31,8 @@ function layout(title: string, body: string) {
   th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--border); color: var(--dim); }
   th { color: var(--text); font-weight: 600; }
   footer { margin-top: 48px; font-size: 13px; color: var(--dim); }
+  .shot { display: block; width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--border); margin-top: 16px; }
+  .cta { display: inline-block; margin-top: 8px; padding: 12px 22px; border-radius: 999px; background: var(--red); color: #fff; font-weight: 700; text-decoration: none; }
 </style>
 </head>
 <body><main>
@@ -70,6 +72,7 @@ email address or phone number.</strong></p>
 <li>No name, phone number, contacts, photos or precise location, and no email address unless you email us yourself.</li>
 <li>No advertising identifiers, no ads, and no analytics or tracking SDKs.</li>
 <li>We do not track you across other companies' apps or websites, and we do not sell or share your data for advertising.</li>
+<li><strong>Shared alerts:</strong> when you share an alert, the link opens a public page showing that alert, the same for everyone who got it. The link contains nothing about you or your device, and opening it isn't tracked.</li>
 </ul>
 
 <h2>Who else processes data</h2>
@@ -110,6 +113,31 @@ app; you can also email ${mail}.</p>
 <h2>Contact</h2>
 <p>${mail}</p>
 `);
+}
+
+/** The page behind an alert's share link. Its Open Graph tags make the link's preview a picture of the alert. */
+export function sharePage(o: { title: string; description: string; pageUrl: string; imageUrl: string | null; storeUrl: string; appId?: string }) {
+  const image = o.imageUrl ? `
+<meta property="og:image" content="${esc(o.imageUrl)}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(o.title)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${esc(o.imageUrl)}">` : '';
+  const head = `
+<meta name="description" content="${esc(o.description)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hate Watch">
+<meta property="og:title" content="${esc(o.title)}">
+<meta property="og:description" content="${esc(o.description)}">
+<meta property="og:url" content="${esc(o.pageUrl)}">${image}
+<meta name="twitter:title" content="${esc(o.title)}">${o.appId ? `
+<meta name="apple-itunes-app" content="app-id=${esc(o.appId)}">` : ''}`;
+  return layout(o.title, `
+${o.imageUrl ? `<img class="shot" src="${esc(o.imageUrl)}" width="1200" height="630" alt="${esc(o.title)}">` : `<h1>${esc(o.title)}</h1>`}
+<p><a class="cta" href="${esc(o.storeUrl)}">Download Hate Watch on the App Store</a></p>
+<p>Hate Watch tracks the players and teams you can't stand and tells you the second something goes wrong for them.</p>`, head);
 }
 
 export function supportPage() {

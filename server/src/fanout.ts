@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import { db } from './db.ts';
+import { db, shareCode } from './db.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
 import { targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
@@ -137,18 +137,23 @@ export function forgetDevice(deviceId: string) {
 }
 
 // ─── Feed item shape (shared by REST + websocket) ─────────────────────────────────────────────
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null }) {
+/** Where links that leave the app point (an alert's share link). */
+export const PUBLIC_URL = process.env.HW_PUBLIC_URL ?? 'https://hate-watch-api.fly.dev';
+
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);
   return {
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     title: row.title, body: row.body, occurredAt: row.occurred_at, detectedAt: row.detected_at,
     target: targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
+    // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
+    shareUrl: `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`,
   };
 }
 
 // ─── Publish: persist once, then fan out to every follower who wants it ───────────────────────
-const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta)
-  VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
+const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
 const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
 const followers = () => db.prepare('SELECT f.device_id, d.push_token FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
 
@@ -162,7 +167,7 @@ export function publish(events: Detected[], league: League) {
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
-    const res = insEvent().run(e.id, e.type, league, (e.meta?.gameId as string) ?? null, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }));
+    const res = insEvent().run(e.id, e.type, league, (e.meta?.gameId as string) ?? null, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null });
     const frame = JSON.stringify({ kind: 'event', item });
