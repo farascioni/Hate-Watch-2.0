@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
 import { db, shareCode } from './db.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
-import { targetDto } from './catalog.ts';
+import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
 import type { League } from './leagues.ts';
 
@@ -189,7 +189,10 @@ const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id
 const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
 const followers = () => db.prepare('SELECT f.device_id, d.push_token FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
 
-export type PushMessage = { to: string; title: string; body: string; sound: 'default' | null; priority: 'high'; channelId: string; interruptionLevel: string; data: Record<string, unknown> };
+export type PushMessage = { to: string; title: string; body: string; sound: 'default' | null; priority: 'high'; channelId: string; interruptionLevel: string; threadId: string; data: Record<string, unknown> };
+
+/** iOS stacks notifications that share a thread: one stack per team, with its players' alerts in it. */
+export const pushThread = (targetKey: string) => (targetKey.startsWith('team:') ? targetKey : catalog.player(targetKey)?.teamKey ?? targetKey);
 let pushSender: (msgs: PushMessage[]) => void = () => {};
 export function setPushSender(fn: typeof pushSender) { pushSender = fn; }
 
@@ -212,7 +215,7 @@ export function publish(events: Detected[], league: League) {
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
       if (willPush) pushes.push({
         to: f.push_token!, title: `${item.emoji} ${e.title}`, body: e.body, sound: prefs.sound ? 'default' : null,
-        priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive',
+        priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive', threadId: pushThread(e.targetKey),
         data: { eventId: e.id, targetKey: e.targetKey, type: e.type },
       });
     }

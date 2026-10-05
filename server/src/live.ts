@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
@@ -305,31 +306,72 @@ async function scanStandings(lg: League) {
 const SEVERITY: [RegExp, number][] = [[/injured reserve|^ir|60-day|season/i, 4], [/out|suspension/i, 3], [/doubtful/i, 2], [/questionable|day-to-day|probable/i, 1]];
 const severity = (s: string) => SEVERITY.find(([re]) => re.test(s))?.[1] ?? 1;
 
-async function scanInjuries(lg: League) {
-  const res = await getJson(urls.injuries(lg), { conditional: true, timeoutMs: 8000 });
-  const now: Record<string, { status: string; teamId: string; detail: string }> = {};
+/** On ESPN's injury reports but not hurt: NFL game-day "Active" (cleared to play), MLB paternity/bereavement leave. */
+const NOT_INJURED = /^(active|paternity|bereavement)\b/i;
+
+export type InjuryReport = Record<string, { status: string; teamId: string; detail: string }>;
+
+/** athleteId → status, team and note from ESPN's injuries endpoint, leaving out players who aren't injured. */
+export function parseInjuryReport(res: any): InjuryReport {
+  const now: InjuryReport = {};
   for (const team of res.injuries ?? []) {
     for (const inj of team.injuries ?? []) {
       const a = inj.athlete ?? {};
       const id = a.id ?? athleteIdFromRef(a.$ref) ?? a.links?.map((l: any) => l.href?.match(/\/id\/(\d+)/)?.[1]).find(Boolean);
-      if (id) now[id] = { status: String(inj.status ?? inj.type?.description ?? 'Injured'), teamId: String(team.id), detail: String(inj.shortComment ?? inj.details?.type ?? '') };
+      const status = String(inj.status ?? inj.type?.description ?? 'Injured');
+      if (id && !NOT_INJURED.test(status)) now[id] = { status, teamId: String(team.id), detail: String(inj.shortComment ?? inj.details?.type ?? '') };
     }
   }
-  const prev = kvGet<typeof now>(`injuries:${lg}`);
-  kvSet(`injuries:${lg}`, now);
-  if (!prev) return;
+  return now;
+}
+
+/**
+ * Alerts for what got worse between two injury reports. Every player gets their own alert; every team
+ * gets ONE per report update, listing everyone (a game-day inactive list can rule six Falcons out in
+ * the same second: "Falcons: 6 players downgraded to Out", not six alerts).
+ */
+export function injuryEvents(lg: League, prev: InjuryReport, now: InjuryReport, day: string, at = Date.now()): Detected[] {
   const events: Detected[] = [];
+  const byTeam = new Map<string, { athleteId: string; name: string; status: string; downgrade: boolean; title: string; body: string; id: string }[]>();
   for (const [athleteId, cur] of Object.entries(now)) {
     const was = prev[athleteId];
     if (was && severity(cur.status) <= severity(was.status)) continue;
-    const player = catalog.playerByEspn(lg, athleteId);
+    const name = catalog.playerByEspn(lg, athleteId)?.name ?? 'A player';
     const team = catalog.teamByEspn(lg, cur.teamId);
-    const name = player?.name ?? 'A player';
     const title = was ? `${name} downgraded to ${cur.status}` : `${name} is injured (${cur.status})`;
-    const id = `inj:${lg}:${athleteId}:${cur.status}:${new Date().toISOString().slice(0, 10)}`;
+    const id = `inj:${lg}:${athleteId}:${cur.status}:${day}`;
     const body = cur.detail || `${team?.shortName ?? ''} injury report`;
-    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at: Date.now(), meta: { athleteId } });
-    if (team) events.push({ id: `${id}:team`, type: 'team.player_injured', targetKey: team.key, title: `${team.shortName}: ${title}`, body, at: Date.now(), meta: { athleteId } });
+    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at, meta: { athleteId } });
+    if (team) byTeam.set(team.key, [...(byTeam.get(team.key) ?? []), { athleteId, name, status: cur.status, downgrade: !!was, title, body, id }]);
   }
+  for (const [key, changes] of byTeam) {
+    const team = catalog.team(key)!;
+    if (changes.length === 1) { // one player: the same alert (and id) as always
+      const c = changes[0];
+      events.push({ id: `${c.id}:team`, type: 'team.player_injured', targetKey: key, title: `${team.shortName}: ${c.title}`, body: c.body, at, meta: { athleteId: c.athleteId } });
+      continue;
+    }
+    changes.sort((a, b) => severity(b.status) - severity(a.status) || a.name.localeCompare(b.name));
+    const counts = new Map<string, number>();
+    for (const c of changes) counts.set(c.status, (counts.get(c.status) ?? 0) + 1);
+    const one = counts.size === 1 ? changes[0].status : null;
+    const title = one && changes.every((c) => c.downgrade)
+      ? `${team.shortName}: ${changes.length} players downgraded to ${one}`
+      : `${team.shortName}: ${changes.length} players on the injury report (${[...counts].map(([st, n]) => `${n} ${st}`).join(', ')})`;
+    const names = changes.slice(0, 3).map((c) => (one ? c.name : `${c.name} (${c.status})`));
+    const body = `${names.join(', ')}${changes.length > 3 ? ` and ${changes.length - 3} more` : ''}`;
+    // The id is the exact set of changes, so a re-scan or restart never sends the same batch twice.
+    const set = createHash('sha256').update(changes.map((c) => `${c.athleteId}:${c.status}`).sort().join(',')).digest('base64url').slice(0, 12);
+    events.push({ id: `inj:${lg}:team:${team.espnId}:${day}:${set}`, type: 'team.player_injured', targetKey: key, title, body, at, meta: { athleteIds: changes.map((c) => c.athleteId) } });
+  }
+  return events;
+}
+
+async function scanInjuries(lg: League) {
+  const now = parseInjuryReport(await getJson(urls.injuries(lg), { conditional: true, timeoutMs: 8000 }));
+  const prev = kvGet<InjuryReport>(`injuries:${lg}`);
+  kvSet(`injuries:${lg}`, now);
+  if (!prev) return;
+  const events = injuryEvents(lg, prev, now, new Date().toISOString().slice(0, 10));
   if (events.length) publish(events, lg);
 }
