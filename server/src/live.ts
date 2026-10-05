@@ -4,7 +4,7 @@ import { catalog } from './catalog.ts';
 import { GAME_LEAGUES, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, scoreLine, teamScoreEvents,
+  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, gameLostEvent, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -20,7 +20,6 @@ const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
-const BLOWOUT: Record<League, number> = { nba: 20, nfl: 21, mlb: 7, nhl: 4, f1: Infinity };
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -148,21 +147,9 @@ export class GameTracker {
     this.finished = true;
     const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
     if (lastHalf.length) publish(lastHalf, this.ctx.league);
-    if (final.home === final.away) return; // ties are miserable for everyone, but not a loss
-    const loserId = final.home < final.away ? this.ctx.homeId : this.ctx.awayId;
-    const winnerId = loserId === this.ctx.homeId ? this.ctx.awayId : this.ctx.homeId;
-    const loser = catalog.teamByEspn(this.ctx.league, loserId);
-    const winner = catalog.teamByEspn(this.ctx.league, winnerId);
-    const margin = Math.abs(final.home - final.away);
-    publish([{
-      id: `${this.ctx.gameId}:final:team.lost:${loserId}`,
-      type: 'team.lost',
-      targetKey: teamKey(this.ctx.league, loserId),
-      title: `${loser?.shortName ?? 'Your team'} LOST to the ${winner?.shortName ?? 'opponent'}${margin >= BLOWOUT[this.ctx.league] ? ' — blowout 🔥' : ''}`,
-      body: `Final: ${scoreLine(this.ctx, final)}`,
-      at: Date.now(),
-      meta: { gameId: this.ctx.gameId },
-    }], this.ctx.league);
+    const lost = gameLostEvent(this.ctx, final, Date.now());
+    if (!lost) return; // a tie
+    publish([lost], this.ctx.league);
     engine.onGameFinal(this.ctx.league);
   }
 }

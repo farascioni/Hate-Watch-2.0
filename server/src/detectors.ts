@@ -504,6 +504,21 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
   }));
 }
 
+/** The loser's final-whistle alert. Ties (NFL, NHL preseason) are miserable for everyone, but not a loss. */
+export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number): Detected | null {
+  if (final.home === final.away) return null;
+  const [loserId, winnerId] = final.home < final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
+  return {
+    id: `${g.gameId}:final:team.lost:${loserId}`,
+    type: 'team.lost',
+    targetKey: teamKey(g.league, loserId),
+    title: `Successful Hate Watch! ${teamName(g.league, loserId)} lost to the ${teamName(g.league, winnerId)}`,
+    body: `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`,
+    at,
+    meta: { gameId: g.gameId },
+  };
+}
+
 export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay): Detected[] {
   const out: Detected[] = [];
   for (const side of ['home', 'away'] as const) {

@@ -271,6 +271,11 @@ test('F1: session results become one alert per driver, with merged facts and tea
   assert.equal(by(race, 'player:f1:A').length, 0, 'the winner gets nothing');
   assert.equal(by(race, 'team:f1:X').length, 0, 'a team with points gets nothing');
 
+  // Neither car in the points (one DNF): a Successful Hate Watch for the constructor.
+  const pointless = by(f1SessionResults(meta('race'), [row('A', 12, 9, 'Z'), row('B', 20, 8, 'Z', 'Retired')]), 'team:f1:Z');
+  assert.deepEqual(pointless.map((e) => [e.type, e.title, e.body]),
+    [['f1.team.no_points', 'Successful Hate Watch! Your tracked team finished outside the points', 'Test GP: P12, DNF']]);
+
   // Sprint: points go to the top 8, so P9 is "no points" (it wouldn't be in a race).
   const sprint = f1SessionResults(meta('sprint'), [row('A', 9, 9, 'X'), row('B', 1, 1, 'X')]);
   assert.match(by(sprint, 'player:f1:A')[0].title, /P9: no points, behind teammate/);

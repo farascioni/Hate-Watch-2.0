@@ -149,7 +149,7 @@ export function f1SessionResults(meta: SessionMeta, rows: F1Row[]): Detected[] {
       const how = cars.slice().sort((a, b) => a.order - b.order).map((c) => (c.out ? 'DNF' : `P${c.order}`)).join(', ');
       out.push({
         id: `${meta.compId}:f1.team.no_points:${team}`, type: 'f1.team.no_points', targetKey: team,
-        title: `${constructorName(team)} scored no points (${how})`, body: meta.label, at: meta.at, meta: { compId: meta.compId },
+        title: `Successful Hate Watch! ${constructorName(team)} finished outside the points`, body: `${meta.label}: ${how}`, at: meta.at, meta: { compId: meta.compId },
       });
     }
   }

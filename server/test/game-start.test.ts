@@ -1,5 +1,5 @@
 // "Hate Watch Starting": drives a real GameTracker with fake ESPN responses through the moment a game
-// goes from pre-game to live, and checks what lands in each follower's feed.
+// goes from pre-game to live, and checks what lands in each follower's feed. Also the loss wording.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -51,6 +51,18 @@ test('a game going live sends "Hate Watch Starting" once, to each side, from its
 
   await game.poll(); // still live: no repeat
   assert.equal(feed('eagles-fan').length, 1);
+});
+
+test('a loss is a "Successful Hate Watch!", with the final score winner first; a tie is not a loss', async () => {
+  const { gameLostEvent } = await import('../src/detectors.ts');
+  const g = { league: 'nfl' as const, gameId: 'G9', homeId: '21', awayId: '3' };
+  const lost = gameLostEvent(g, { home: 17, away: 24 }, 0)!;
+  assert.equal(lost.targetKey, 'team:nfl:21');
+  assert.equal(lost.title, 'Successful Hate Watch! Eagles lost to the Bears');
+  assert.equal(lost.body, 'Final Score: 24 to 17');
+  assert.equal(lost.id, 'G9:final:team.lost:21', 'same id as before the wording change: no repeat for a game final across the deploy');
+  assert.equal(gameLostEvent(g, { home: 31, away: 10 }, 0)!.title, 'Successful Hate Watch! Bears lost to the Eagles');
+  assert.equal(gameLostEvent(g, { home: 20, away: 20 }, 0), null);
 });
 
 test('a game first seen already under way never gets a late "starting" alert', async () => {
