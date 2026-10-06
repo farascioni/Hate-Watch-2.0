@@ -4,6 +4,7 @@ import { Stack, router, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { StoreProvider } from '../lib/store';
+import { EasterEggOverlay } from '../components/EasterEggOverlay';
 import { needsGuide, settleGuide } from '../lib/guide';
 import { colors } from '../theme';
 
@@ -51,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="a/[code]" options={{ title: 'Shared alert', headerBackTitle: 'Back' }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
+      <EasterEggOverlay />
     </StoreProvider>
   );
 }

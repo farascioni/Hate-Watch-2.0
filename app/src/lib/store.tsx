@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
+import { trackedEasterEgg } from './easterEggs';
 import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -195,6 +196,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const r = await (was ? api.unfollow(t.key) : api.follow(t.key));
         if (r.trackers != null) setTrackers((m) => new Map(m).set(t.key, r.trackers!));
+        if (!was) void trackedEasterEgg(t.key);
         refreshScores().catch(() => {});
       }
       catch { setFollows((m) => { const n = new Map(m); was ? n.set(t.key, t) : n.delete(t.key); return n; }); }
