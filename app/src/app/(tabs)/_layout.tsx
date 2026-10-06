@@ -1,7 +1,18 @@
-import { Tabs } from 'expo-router';
+import { Pressable } from 'react-native';
+import { Tabs, router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
-import { colors } from '../../theme';
+import { colors, space } from '../../theme';
+
+/** Top left of every tab: the leaderboard (the most hated players and teams), instead of a sixth tab. */
+function LeaderboardButton() {
+  return (
+    <Pressable onPress={() => router.push('/leaderboard')} hitSlop={10} style={({ pressed }) => [{ marginLeft: space(4), marginRight: space(2), padding: 2 }, pressed && { opacity: 0.6 }]}
+      accessibilityRole="button" accessibilityLabel="Leaderboard: the most hated players and teams">
+      <Ionicons name="podium" size={22} color={colors.text} />
+    </Pressable>
+  );
+}
 
 export default function TabLayout() {
   const { unseen, follows } = useStore();
@@ -15,6 +26,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.hate,
         tabBarInactiveTintColor: colors.textFaint,
         sceneStyle: { backgroundColor: colors.bg },
+        headerLeft: () => <LeaderboardButton />,
       }}
     >
       <Tabs.Screen

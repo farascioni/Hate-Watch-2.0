@@ -26,7 +26,11 @@ export interface GameCard {
   id: string;             // ESPN event id (F1: the session's competition id), also events.game_id
   state: 'pre' | 'in' | 'post';
   startsAt: number;
+  /** Finals: when it ended (when we saw it go final; estimated for one already over when first seen). */
+  endedAt?: number;
   detail: string;         // ESPN's short status: "Q4 - 2:14", "Bot 8th", "Final/OT" ('' before the start)
+  /** Doubleheaders: "Game 1" / "Game 2", from ESPN's note ("Doubleheader - Game 1 - Makeup from May 23"). */
+  note?: string;
   home?: Side;
   away?: Side;
   possession?: string;    // NFL: team key with the ball
@@ -76,6 +80,9 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     detail: state === 'pre' ? '' : String(ev.status?.type?.shortDetail ?? ''),
     home: side(home), away: side(away),
   };
+  const doubleheader = (c.notes ?? []).map((n: any) => String(n.headline ?? '')).find((h: string) => /doubleheader/i.test(h));
+  const gameNo = doubleheader?.match(/\bgame (\d)\b/i)?.[1];
+  if (gameNo) card.note = `Game ${gameNo}`;
   const sit = c.situation;
   if (state === 'in' && sit) {
     if (lg === 'nfl') {
@@ -242,6 +249,11 @@ export function upsertGame(next: GameCard) {
     }
     if (!next.winProb && prev.winProb) next.winProb = prev.winProb; // from the tracker's summary
   }
+  // Finals stay on the tab for a day after they end: the moment we saw it go final, or, for one
+  // already over when first seen (a restart, yesterday's scoreboard), a typical game's length after the start.
+  if (next.state === 'post') {
+    next.endedAt = prev?.endedAt ?? (prev && prev.state !== 'post' ? Date.now() : Math.min(Date.now(), next.startsAt + GAME_LENGTH_MS[next.league]));
+  }
   // NHL goalies and NFL passers come from the tracker's box score (not the scoreboard): keep them, through the final too.
   if (prev?.goalies && !next.goalies && next.state !== 'pre') next.goalies = prev.goalies;
   if (prev?.leaders && !next.leaders && next.state !== 'pre') next.leaders = prev.leaders;
@@ -271,10 +283,11 @@ export function patchGame(key: string, patch: { home?: number; away?: number; wi
   upsertGame(next);
 }
 
-/** After a league's scoreboard read: forget games that left it more than a day and a half ago. */
+/** After a league's scoreboard read: forget games that left it more than a day and a half ago, once their final is off the tab. */
 export function pruneGames(league: League, seen: Set<string>, now = Date.now()) {
   for (const [k, g] of cards) {
-    if (g.league === league && !seen.has(k) && now - g.startsAt > 36 * 3600_000) { cards.delete(k); lastSent.delete(k); pitchCounts.delete(k); }
+    if (g.league !== league || seen.has(k) || now - g.startsAt < 36 * 3600_000 || (g.state === 'post' && inWindow(g, now))) continue;
+    cards.delete(k); lastSent.delete(k); pitchCounts.delete(k);
   }
 }
 
@@ -313,9 +326,14 @@ export const forgetDeviceTeams = (deviceId: string) => mineCache.delete(deviceId
 const involves = (g: GameCard, mine: Mine) =>
   g.league === 'f1' ? mine.f1 : !!(g.home && mine.teams.has(g.home.team.key)) || !!(g.away && mine.teams.has(g.away.team.key));
 
-/** Live now, starting within a day, or finished in the last 16 hours. */
+/** How long a final stays on the Scores tab after it ends: the last game a team played, for a day. */
+export const KEEP_FINALS_MS = 24 * 3600_000;
+/** A typical game, start to final: when a game was already over the first time we saw it. */
+export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
+/** Live now, starting within a day, or finished in the last 24 hours (every game, so both halves of a doubleheader). */
 export const inWindow = (g: GameCard, now = Date.now()) =>
-  g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000) || (g.state === 'post' && now - g.startsAt < 16 * 3600_000);
+  g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)
+  || (g.state === 'post' && now - (g.endedAt ?? g.startsAt + GAME_LENGTH_MS[g.league]) < KEEP_FINALS_MS);
 
 const RANK = { in: 0, pre: 1, post: 2 } as const;
 /** A device's games for the Scores tab: live first, then upcoming, then finals (newest first). */

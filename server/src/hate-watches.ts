@@ -15,6 +15,23 @@ const ins = () => db.prepare('INSERT INTO hate_watches (device_id, event_id, tar
 /** true if it's new for this device (publish() then tells the app its new tally). */
 export const recordHateWatch = (deviceId: string, e: Pick<Detected, 'id' | 'targetKey' | 'at'>) => ins().run(deviceId, e.id, e.targetKey, e.at).changes > 0;
 
+/** SQL column for a feed query over `events e`: how many devices got that alert (feedItem's `recipients`). */
+export const RECIPIENTS = '(SELECT COUNT(*) FROM feed x WHERE x.event_id = e.id) AS recipients';
+
+/**
+ * Scores tab: finals that gave this device a Successful Hate Watch carry how many others got it too
+ * (`hateWatch.alsoGot`). Per device, so it's added to the device's copy of the card, not the shared one.
+ */
+export function withHateWatch<G extends { id: string; state: string }>(deviceId: string, games: G[]): (G & { hateWatch?: { alsoGot: number } })[] {
+  const ids = games.filter((g) => g.state === 'post').map((g) => g.id);
+  if (!ids.length) return games;
+  const rows = db.prepare(`SELECT e.game_id, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
+    WHERE f.device_id = ? AND e.type IN (${[...HATE_WATCH_TYPES].map(() => '?').join(',')}) AND e.game_id IN (${ids.map(() => '?').join(',')})`)
+    .all(deviceId, ...HATE_WATCH_TYPES, ...ids) as { game_id: string; recipients: number }[];
+  const others = new Map(rows.map((r) => [r.game_id, Math.max(0, r.recipients - 1)]));
+  return games.map((g) => (others.has(g.id) ? { ...g, hateWatch: { alsoGot: others.get(g.id)! } } : g));
+}
+
 /** The Settings counter: the total, and each team's count (most first). */
 export function hateWatchTally(deviceId: string) {
   const rows = db.prepare(`SELECT target_key, COUNT(*) AS n FROM hate_watches WHERE device_id = ?

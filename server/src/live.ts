@@ -9,7 +9,7 @@ import {
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { boxGoalies, boxPassers, boxPitchCounts, gameCard, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -20,6 +20,7 @@ const LIVE_POLL_MS = Number(process.env.HW_LIVE_POLL_MS ?? 2000);      // per li
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
+const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yesterday's finals, for the Scores tab
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
@@ -54,6 +55,8 @@ export class GameTracker {
   readonly ctx: GameCtx;
   private seen = new Set<string>();
   private score = { home: 0, away: 0 };
+  /** The score each side's team alerts have gone out for (see poll). */
+  private announced = { home: 0, away: 0 };
   private first = true;
   private stopped = false;
   private sawPre: boolean;
@@ -125,18 +128,41 @@ export class GameTracker {
     }
 
     const cutoff = Date.now() - BACKFILL_WINDOW_MS;
+    // The score is re-derived from every play on every poll, not kept as a running total, because
+    // ESPN edits plays after publishing them: a goal can be marked as scoring only later, and a
+    // disallowed goal is taken back. A running total would miss the first and, after the second,
+    // the team's next goal. `announced` is the score each side's alerts have gone out for.
+    let score = { home: 0, away: 0 };
     for (const p of plays) {
-      if (this.seen.has(p.id)) continue;
-      this.seen.add(p.id);
-      const prev = this.score;
-      this.score = nextScore(prev, p);
+      const prev = score;
+      score = nextScore(prev, p);
       // History from before we attached updates state but is never notified.
-      if (!(this.first && p.at < cutoff)) {
-        events.push(...PLAYER_DETECTORS[league](this.ctx, p));
-        if (this.score.home !== prev.home || this.score.away !== prev.away) events.push(...teamScoreEvents(this.ctx, prev, p));
+      const history = this.first && p.at < cutoff;
+      const fresh = !this.seen.has(p.id);
+      if (fresh) {
+        this.seen.add(p.id);
+        if (!history) events.push(...PLAYER_DETECTORS[league](this.ctx, p));
+        observePlay(this.ctx, p);
       }
-      observePlay(this.ctx, p);
+      const up = (s: 'home' | 'away') => score[s] > this.announced[s];
+      if (up('home') || up('away')) {
+        // A side already announced at this score (its goal was counted from a later play first)
+        // doesn't move on this play, so it gets no second alert.
+        const from = { home: up('home') ? prev.home : score.home, away: up('away') ? prev.away : score.away };
+        this.announced = { home: Math.max(this.announced.home, score.home), away: Math.max(this.announced.away, score.away) };
+        if (history) continue;
+        events.push(...teamScoreEvents(this.ctx, from, p));
+        if (!fresh) {
+          log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
+          if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
+        }
+      }
     }
+    if (score.home < this.announced.home || score.away < this.announced.away) {
+      log(`[${league} ${gameId}] score went down to ${score.away}-${score.home} (a goal taken back?); the next one is news again`);
+      this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
+    }
+    this.score = score;
     // MLB pitchers' lines: a blown save, no quality start. The loss waits for the final (finalPitching).
     if (league === 'mlb' && summary.status === 'fulfilled') {
       const es = pitcherEvents(this.ctx, boxPitchers(summary.value), { final: false, score: this.score, at: Date.now() }, this.pitching);
@@ -203,6 +229,7 @@ class LiveEngine {
       this.kickers[lg] = every(SCOREBOARD_MS, () => this.scanScoreboard(lg));
       this.standingsKick[lg] = every(STANDINGS_MS, () => scanStandings(lg));
       every(INJURIES_MS, () => scanInjuries(lg));
+      every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
   }
@@ -259,13 +286,31 @@ class LiveEngine {
         tr?.finish({ home: Number(home.score), away: Number(away.score) });
         tr?.stop();
       }
-      if (tr && !relevant && !tr.finished) { tr.stop(); this.trackers.delete(key); }
+      if (tr && !relevant && !tr.finished) {
+        tr.stop(); this.trackers.delete(key);
+        log(`[${lg}] stopped tracking ${ev.shortName ?? ev.name} (${ev.id}): nobody tracks either team now`);
+      }
     }
     for (const [k, t] of this.trackers) if (t.finished && !(sb.events ?? []).some((e: any) => `${lg}:${e.id}` === k) && k.startsWith(lg)) this.trackers.delete(k);
   }
 }
 
 export const engine = new LiveEngine();
+
+/**
+ * The Scores tab keeps a final for a day after it ends, but ESPN's scoreboard rolls over to the new day,
+ * and a restart forgets the games we'd seen. Yesterday's finals (ESPN's date, US Eastern) come from
+ * yesterday's scoreboard. Games we already have are left to today's scoreboard and their trackers.
+ */
+export async function scanYesterday(lg: League, now = Date.now()) {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now - 86400_000).replaceAll('-', '');
+  const sb = await liveDeps.getJson(urls.scoreboard(lg, day), { timeoutMs: 8000 });
+  for (const ev of sb.events ?? []) {
+    if (ev.status?.type?.state !== 'post') continue;
+    const card = gameCard(lg, ev);
+    if (card && !getGame(card.key)) upsertGame(card);
+  }
+}
 
 function every(ms: number, fn: () => Promise<void>): () => void {
   let running = false;

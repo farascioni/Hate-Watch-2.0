@@ -22,6 +22,8 @@ export interface FeedItem {
   shareUrl?: string;
   /** The game (F1: session) it happened in, if any: links the alert to the Scores tab's game screen. */
   gameId?: string | null;
+  /** A Successful Hate Watch: how many other people got this alert too. */
+  alsoGot?: number;
 }
 
 /** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
@@ -30,6 +32,12 @@ export interface LivePlayer { id: string; key: string; name: string; line?: stri
 export interface GameCard {
   key: string; league: League; id: string;
   state: 'pre' | 'in' | 'post'; startsAt: number; detail: string;
+  /** Finals: when it ended (the tab keeps it for a day after). */
+  endedAt?: number;
+  /** Doubleheaders: "Game 1" / "Game 2". */
+  note?: string;
+  /** Finals that gave you a Successful Hate Watch: how many other people got it too (your copy of the card only). */
+  hateWatch?: { alsoGot: number };
   home?: GameSide; away?: GameSide;
   possession?: string; downDistance?: string; redZone?: boolean;
   bases?: { first: boolean; second: boolean; third: boolean; outs: number };
@@ -56,6 +64,9 @@ export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLin
 
 /** Settings counter: each time a team you track lost (F1: your constructor scored no points), and per team (most first). */
 export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }
+
+/** The leaderboard: a player or team and how many people track them (ties share a rank). */
+export interface LeaderboardEntry { rank: number; haters: number; target: Target }
 
 export interface EventType {
   id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;

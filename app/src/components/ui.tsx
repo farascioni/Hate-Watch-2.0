@@ -45,7 +45,8 @@ export function subtitle(t: Target) {
   return [team, t.position, t.jersey ? `#${t.jersey}` : null].filter(Boolean).join(' · ');
 }
 
-export function TargetRow({ target, right }: { target: Target; right?: ReactNode }) {
+/** A player or team in a list. `extra` is an optional line under the league and position (the Tracking tab's tracker count). */
+export function TargetRow({ target, right, extra }: { target: Target; right?: ReactNode; extra?: ReactNode }) {
   return (
     <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Avatar target={target} size={48} />
@@ -55,9 +56,20 @@ export function TargetRow({ target, right }: { target: Target; right?: ReactNode
           <LeagueTag league={target.league} />
           <Text style={styles.rowSub} numberOfLines={1}>{subtitle(target)}</Text>
         </View>
+        {extra}
       </View>
       {right ?? <FollowButton target={target} />}
     </Pressable>
+  );
+}
+
+/** A Successful Hate Watch's company: "23 other hate watchers" got the same alert. */
+export function AlsoGot({ n }: { n: number }) {
+  const label = `${n.toLocaleString()} other hate watcher${n === 1 ? '' : 's'}`;
+  return (
+    <View style={styles.alsoGot} accessible accessibilityLabel={`${label} got this alert too`}>
+      <Text style={styles.alsoGotText}>{label}</Text>
+    </View>
   );
 }
 
@@ -113,6 +125,8 @@ export function LiveBadge() {
 }
 
 const styles = StyleSheet.create({
+  alsoGot: { alignSelf: 'flex-start', backgroundColor: '#0F2E1A', borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },
+  alsoGotText: { color: colors.live, fontSize: 12, fontWeight: '800' },
   liveWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: space(4) },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
   liveText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },

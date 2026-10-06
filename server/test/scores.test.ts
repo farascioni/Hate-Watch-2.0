@@ -250,3 +250,42 @@ test("F1 between weekends: the next race weekend from ESPN's calendar, the curre
   S.setF1Calendar(undefined); // a scoreboard read without a calendar keeps the last one
   assert.equal(S.nextF1Weekend(Date.parse('2026-10-06T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix');
 });
+
+test('finals stay a day after they end, and both games of a doubleheader show, labelled', async () => {
+  // As ESPN's scoreboard listed TB @ NYY on 2026-09-22 (here as CHW @ CLE, which this catalog has).
+  const dh = (id: string, startsAgoH: number, state: string, headline: string) => ({
+    id, date: new Date(Date.now() - startsAgoH * 3600_000).toISOString(),
+    status: { type: { state, shortDetail: state === 'post' ? 'Final' : state === 'in' ? 'Top 2nd' : '' } },
+    competitions: [{ competitors: [competitor('5', 'home', '3', 'CLE'), competitor('4', 'away', '1', 'CHW')], notes: [{ type: 'event', headline }] }],
+  });
+  S.upsertGame(S.gameCard('mlb', dh('dh1', 4, 'in', 'Doubleheader - Game 1 - Makeup from May 23'))!);
+  S.upsertGame(S.gameCard('mlb', dh('dh1', 4, 'post', 'Doubleheader - Game 1 - Makeup from May 23'))!); // we saw it go final
+  S.upsertGame(S.gameCard('mlb', dh('dh2', 0.5, 'in', 'Doubleheader - Game 2'))!);
+  const mine = S.gamesFor('guardians-fan').filter((g) => g.id.startsWith('dh'));
+  assert.deepEqual(mine.map((g) => [g.id, g.state, g.note]), [['dh2', 'in', 'Game 2'], ['dh1', 'post', 'Game 1']], 'both games, live one first');
+  const g1 = S.getGame('mlb:dh1')!;
+  assert.ok(Math.abs(g1.endedAt! - Date.now()) < 1000, 'ended when we saw it go final');
+  assert.equal(S.inWindow(g1, Date.now() + 23 * 3600_000), true, 'still there 23 hours later');
+  assert.equal(S.inWindow(g1, Date.now() + 25 * 3600_000), false, 'gone after a day');
+
+  // Already over the first time we see it (a restart): a typical game's length after the start.
+  S.upsertGame(S.gameCard('mlb', dh('old', 30, 'post', 'Doubleheader - Game 2'))!);
+  assert.equal(S.getGame('mlb:old')!.endedAt, Date.parse(dh('old', 30, 'post', '').date) + 3 * 3600_000);
+  assert.equal(S.gamesFor('guardians-fan').some((g) => g.id === 'old'), false, 'ended ~27 hours ago: off the tab');
+
+  // Yesterday's scoreboard (ESPN's US Eastern date) brings back finals a restart forgot, and leaves known games alone.
+  const { scanYesterday, liveDeps } = await import('../src/live.ts');
+  const asked: string[] = [];
+  liveDeps.getJson = async (url: string) => { asked.push(url); return { events: [dh('yday', 20, 'post', 'x'), { ...dh('dh1', 4, 'post', 'x'), status: { type: { state: 'post', shortDetail: 'Final/10' } } }, dh('dh2', 0.5, 'in', 'x')] }; };
+  await scanYesterday('mlb', Date.parse('2026-10-06T03:00:00Z')); // 11 PM Oct 5 in New York
+  assert.match(asked[0], /scoreboard\?dates=20261004$/);
+  assert.equal(S.getGame('mlb:yday')?.state, 'post');
+  assert.equal(S.getGame('mlb:dh1')!.detail, 'Final', 'a game we already have is not replaced');
+  assert.equal(S.getGame('mlb:dh2')!.state, 'in', "yesterday's board doesn't touch live games");
+
+  // Off the scoreboard and long started, but still inside its day: kept. Past it: forgotten.
+  S.pruneGames('mlb', new Set(), Date.now() + 23 * 3600_000);
+  assert.ok(S.getGame('mlb:dh1'), 'kept while it is on the tab');
+  S.pruneGames('mlb', new Set(), Date.now() + 40 * 3600_000);
+  assert.equal(S.getGame('mlb:dh1'), undefined);
+});

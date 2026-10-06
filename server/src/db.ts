@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS feed (
   PRIMARY KEY (device_id, event_id)
 );
 CREATE INDEX IF NOT EXISTS feed_order ON feed(device_id, occurred_at DESC);
+-- How many devices got an alert (a Successful Hate Watch says how many others got it too).
+CREATE INDEX IF NOT EXISTS feed_event ON feed(event_id);
 
 -- Successful Hate Watches (hate-watches.ts): kept apart from the feed so clearing it doesn't reset the count.
 CREATE TABLE IF NOT EXISTS hate_watches (

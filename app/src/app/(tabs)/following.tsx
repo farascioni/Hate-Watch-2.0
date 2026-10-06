@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { Empty, PrimaryButton, SectionHeader, TargetRow } from '../../components/ui';
@@ -9,7 +9,9 @@ import { colors, radius, space } from '../../theme';
 import type { Target } from '../../lib/types';
 
 export default function FollowingScreen() {
-  const { follows, toggleFollow, prefs, updatePrefs } = useStore();
+  const { follows, toggleFollow, prefs, updatePrefs, trackers, refreshTrackers } = useStore();
+  // Other people follow and unfollow too: fresh counts each time the tab opens.
+  useFocusEffect(useCallback(() => { refreshTrackers().catch(() => {}); }, [refreshTrackers]));
   const muted = new Set(prefs?.muted ?? []);
   const customized = new Set([...Object.keys(prefs?.targetTypes ?? {}), ...Object.keys(prefs?.targetPushTypes ?? {})]);
   const { filter, setFilter, active, reset } = useFilter();
@@ -43,6 +45,7 @@ export default function FollowingScreen() {
       renderItem={({ item }) => (
         <TargetRow
           target={item}
+          extra={<Haters n={trackers.get(item.key)} />}
           right={
             <View style={styles.actions}>
               <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
@@ -72,7 +75,21 @@ export default function FollowingScreen() {
   );
 }
 
+/** "👁 12 haters": how many people track this player or team, you included. */
+function Haters({ n }: { n?: number }) {
+  if (n == null) return null;
+  const label = n === 1 ? '1 hater (just you)' : `${n.toLocaleString()} haters`;
+  return (
+    <View style={styles.haters} accessible accessibilityLabel={n === 1 ? 'Only you track them' : `${n} people track them, you included`}>
+      <Ionicons name="eye" size={12} color={colors.textFaint} />
+      <Text style={styles.hatersText}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  haters: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hatersText: { color: colors.textFaint, fontSize: 12, fontWeight: '600' },
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },

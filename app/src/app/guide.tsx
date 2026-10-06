@@ -3,7 +3,7 @@ import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, Vi
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { LeagueTag } from '../components/ui';
+import { AlsoGot, LeagueTag } from '../components/ui';
 import { markGuideSeen, settleGuide } from '../lib/guide';
 import { colors, radius, space } from '../theme';
 
@@ -37,13 +37,14 @@ const PAGES: Page[] = [
   },
   {
     key: 'feed', icon: 'flame', where: 'Feed tab', title: 'Every bad moment, live',
-    body: 'Alerts land in your feed the moment they happen, newest first, and arrive as notifications. Tap the share icon to send one to a friend.',
+    body: 'Alerts land in your feed the moment they happen, newest first, and arrive as notifications. A Successful Hate Watch (a team you track losing) shows how many other hate watchers got it too. Tap the share icon to send one to a friend.',
     demo: () => (
       <DemoCard>
         <Badge text="PHI" color="#06424d" />
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={styles.demoTitle}>Successful Hate Watch! Eagles lost to the Bears</Text>
           <Text style={styles.demoSub}>Final Score: 24 to 17</Text>
+          <AlsoGot n={23} />
         </View>
         <Ionicons name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={colors.textDim} style={{ alignSelf: 'flex-start' }} />
       </DemoCard>
@@ -51,7 +52,7 @@ const PAGES: Page[] = [
   },
   {
     key: 'scores', icon: 'trophy', where: 'Scores tab', title: 'Every game, live',
-    body: "Today's games for everyone you track: the score, how badly it's going for them, and the chance they lose. Tap one for the play-by-play.",
+    body: "Today's games for everyone you track: the score, how badly it's going for them, who has the ball or who's pitching, and the chance they lose. Finals stay for a day. Tap one for the play-by-play.",
     demo: () => (
       <View style={styles.demoCard}>
         <View style={styles.row}>
@@ -65,9 +66,39 @@ const PAGES: Page[] = [
           <Text style={[styles.demoScore, { color: colors.textDim }]}>24</Text>
         </View>
         <View style={[styles.row, { marginTop: space(3), justifyContent: 'space-between' }]}>
-          <Text style={styles.demoSub}>Q4 · 2:14</Text>
+          <Text style={styles.demoSub}>Q4 · 2:14 · ATL ball, 3rd & 8</Text>
           <View style={styles.downPill}><Text style={styles.downText}>Down 7</Text></View>
         </View>
+        <Text style={[styles.demoFaint, { marginTop: space(2) }]}>Timeouts left: ATL 1 · NO 3</Text>
+        <Text style={styles.demoFaint}>Passing: <Text style={styles.demoStrong}>M. Penix Jr.</Text>, 18/27, 211 YDS</Text>
+        <View style={[styles.row, { marginTop: space(2), justifyContent: 'space-between' }]}>
+          <Text style={styles.demoSub}>Chance the Falcons lose</Text>
+          <Text style={[styles.demoSub, { color: '#FF8A8F', fontWeight: '800' }]}>78%</Text>
+        </View>
+        <View style={styles.bar}><View style={[styles.barFill, { width: '78%' }]} /></View>
+      </View>
+    ),
+  },
+  {
+    key: 'leaderboard', icon: 'podium', where: 'Top left of every tab', title: 'See who\'s most hated',
+    body: 'The leaderboard ranks players and teams by how many people hate them. Filter it like your feed: players or teams, one sport or all of them.',
+    demo: () => (
+      <View style={styles.demoCard}>
+        {([['🥇', 'DAL', '#041E42', 'Dallas Cowboys', 'nfl', '1,204'], ['🥈', 'LAL', '#552583', 'Los Angeles Lakers', 'nba', '987'], ['🥉', 'NYY', '#0C2340', 'New York Yankees', 'mlb', '842']] as const)
+          .map(([medal, abbr, color, name, league, n], i) => (
+            <View key={abbr} style={[styles.row, i > 0 && { marginTop: space(3) }]}>
+              <Text style={styles.medal}>{medal}</Text>
+              <Badge text={abbr} color={color} />
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={styles.demoTitle} numberOfLines={1}>{name}</Text>
+                <View style={{ alignSelf: 'flex-start' }}><LeagueTag league={league} /></View>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.haterCount}>{n}</Text>
+                <Text style={styles.demoFaint}>haters</Text>
+              </View>
+            </View>
+          ))}
       </View>
     ),
   },
@@ -83,6 +114,31 @@ const PAGES: Page[] = [
     ),
   },
   {
+    key: 'record', icon: 'medal', where: 'Settings tab', title: 'Keep score',
+    body: 'The top of Settings counts your Successful Hate Watches: every time a team you track loses. Tap "+3 more" to see every team.',
+    demo: () => (
+      <View style={[styles.demoCard, { borderColor: colors.hateDim, gap: space(3) }]}>
+        <View style={[styles.row, { gap: space(4) }]}>
+          <Text style={styles.recordCount}>12</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.demoTitle, { fontSize: 17 }]}>Successful Hate Watches</Text>
+            <Text style={styles.demoSub}>Each time a team you track lost.</Text>
+          </View>
+        </View>
+        <View style={[styles.inline, { flexWrap: 'wrap' }]}>
+          {([['DAL', '#041E42', 'Cowboys', 5], ['LAL', '#552583', 'Lakers', 4]] as const).map(([abbr, color, name, n]) => (
+            <View key={abbr} style={styles.chip}>
+              <View style={[styles.chipBadge, { backgroundColor: color }]}><Text style={styles.chipBadgeText}>{abbr}</Text></View>
+              <Text style={styles.chipName}>{name}</Text>
+              <Text style={styles.chipCount}>{n}</Text>
+            </View>
+          ))}
+          <View style={[styles.chip, { paddingLeft: space(2.5) }]}><Text style={styles.chipMore}>+3 more</Text><Ionicons name="chevron-down" size={14} color={colors.textDim} /></View>
+        </View>
+      </View>
+    ),
+  },
+  {
     key: 'one', icon: 'eye', where: 'Tracking tab', title: 'Fine-tune one player or team',
     body: 'Next to everyone you track:',
     demo: () => (
@@ -92,10 +148,12 @@ const PAGES: Page[] = [
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.demoTitle} numberOfLines={1}>Daniel Jones</Text>
             <View style={styles.inline}><LeagueTag league="nfl" /><Text style={styles.demoSub} numberOfLines={1}>QB</Text></View>
+            <View style={[styles.inline, { gap: 4 }]}><Ionicons name="eye" size={12} color={colors.textFaint} /><Text style={styles.demoFaint}>214 haters</Text></View>
           </View>
           <RoundIcon name="notifications" />
           <RoundIcon name="settings-sharp" highlight />
         </DemoCard>
+        <Explain icon="eye" text="How many people hate them, you included." />
         <Explain icon="notifications" text="Bell: no notifications about just them. Their alerts still reach your feed." />
         <Explain icon="settings-sharp" text="Gear: pick exactly which alerts you get about them. It beats your global settings." />
       </View>
@@ -239,6 +297,19 @@ const styles = StyleSheet.create({
   badge: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.16)' },
   badgeText: { color: '#fff', fontSize: 13, fontWeight: '900' },
   demoScore: { color: colors.text, fontSize: 20, fontWeight: '900' },
+  demoFaint: { color: colors.textFaint, fontSize: 12 },
+  demoStrong: { color: colors.textDim, fontWeight: '700' },
+  bar: { height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden', marginTop: space(1) },
+  barFill: { height: '100%', backgroundColor: colors.hate },
+  medal: { fontSize: 20, width: 26, textAlign: 'center' },
+  haterCount: { color: colors.hate, fontSize: 17, fontWeight: '900' },
+  recordCount: { color: colors.hate, fontSize: 40, fontWeight: '900' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), backgroundColor: colors.surfaceHi, borderRadius: radius.pill, paddingLeft: 3, paddingRight: space(2.5), paddingVertical: 3 },
+  chipBadge: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  chipBadgeText: { color: '#fff', fontSize: 8, fontWeight: '900' },
+  chipName: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  chipCount: { color: colors.hate, fontSize: 13, fontWeight: '900' },
+  chipMore: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   downPill: { backgroundColor: colors.hateDim, borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },
   downText: { color: '#FF8A8F', fontSize: 12, fontWeight: '800' },
   trackPill: { backgroundColor: colors.hate, borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2) },

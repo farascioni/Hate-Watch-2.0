@@ -10,7 +10,8 @@ import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 import { forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
-import { hateWatchTally } from './hate-watches.ts';
+import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
+import { leaderboard } from './leaderboard.ts';
 
 class Html {
   body: string;
@@ -77,9 +78,12 @@ route('PUT', '/me/push-token', true, (req, _u, _p, body) => {
 });
 
 // ─── Follows ──────────────────────────────────────────────────────────────────────────────────
+/** How many devices track a player or team (the Tracking tab shows it; follows_target indexes it). */
+const trackers = (key: string) => (db.prepare('SELECT COUNT(*) AS n FROM follows WHERE target_key = ?').get(key) as { n: number }).n;
 route('GET', '/me/follows', true, (req) => ({
-  follows: (db.prepare('SELECT target_key, created_at FROM follows WHERE device_id = ? ORDER BY created_at DESC').all(req.deviceId!) as any[])
-    .map((r) => ({ key: r.target_key, followedAt: r.created_at, target: targetDto(r.target_key) })),
+  follows: (db.prepare(`SELECT target_key, created_at, (SELECT COUNT(*) FROM follows x WHERE x.target_key = f.target_key) AS trackers
+    FROM follows f WHERE device_id = ? ORDER BY created_at DESC`).all(req.deviceId!) as any[])
+    .map((r) => ({ key: r.target_key, followedAt: r.created_at, trackers: r.trackers, target: targetDto(r.target_key) })),
 }));
 route('PUT', '/me/follows/:key', true, (req, _u, [key]) => {
   const k = decodeURIComponent(key);
@@ -87,24 +91,33 @@ route('PUT', '/me/follows/:key', true, (req, _u, [key]) => {
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').run(req.deviceId!, k, Date.now());
   forgetDeviceTeams(req.deviceId!); // their Scores tab changes now
   engine.kick(); // a game in progress for this target starts tracking right now
-  return { ok: true };
+  return { ok: true, trackers: trackers(k) };
 });
 route('DELETE', '/me/follows/:key', true, (req, _u, [key]) => {
   db.prepare('DELETE FROM follows WHERE device_id = ? AND target_key = ?').run(req.deviceId!, decodeURIComponent(key));
   forgetDeviceTeams(req.deviceId!);
   engine.kick();
-  return { ok: true };
+  return { ok: true, trackers: trackers(decodeURIComponent(key)) };
 });
 
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
-route('GET', '/me/scores', true, (req) => ({ games: gamesFor(req.deviceId!), nextF1: nextF1Weekend() }));
+route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend() }));
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');
-  const alerts = (db.prepare(`SELECT e.* FROM feed f JOIN events e ON e.id = f.event_id
+  const alerts = (db.prepare(`SELECT e.*, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[]).map(feedItem);
   const plays = await gamePlays(game).catch(() => []); // the score card still works if ESPN hiccups
-  return { game, alerts, plays };
+  return { game: withHateWatch(req.deviceId!, [game])[0], alerts, plays };
+});
+
+// ─── Leaderboard: the most hated players and teams (public: it's counts, never who) ────────────
+route('GET', '/leaderboard', false, (_r, url) => {
+  const kind = url.searchParams.get('kind'), league = url.searchParams.get('league');
+  if (kind && kind !== 'team' && kind !== 'player') throw new HttpError(400, 'kind is team or player');
+  if (league && !LEAGUE_IDS.includes(league as League)) throw new HttpError(400, 'unknown league');
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 100) || 100, 1), 200);
+  return { entries: leaderboard({ kind: (kind ?? undefined) as 'team' | 'player' | undefined, league: (league ?? undefined) as League | undefined, limit }) };
 });
 
 // ─── Settings counter: Successful Hate Watches (a team you track lost) ─────────────────────────
@@ -119,7 +132,7 @@ route('GET', '/me/feed', true, (req, url) => {
   const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200);
   const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
   const after = Number(url.searchParams.get('after') ?? 0);
-  const rows = db.prepare(`SELECT e.* FROM feed f JOIN events e ON e.id = f.event_id
+  const rows = db.prepare(`SELECT e.*, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND f.occurred_at < ? AND f.occurred_at > ? ORDER BY f.occurred_at DESC, e.detected_at DESC LIMIT ?`)
     .all(req.deviceId!, before, after, limit) as any[];
   return { items: rows.map(feedItem) };

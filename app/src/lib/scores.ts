@@ -54,19 +54,30 @@ export function weekendDates(from: number, to: number) {
   return month(a) === month(b) ? `${month(a)} ${a.getDate()}–${b.getDate()}` : `${month(a)} ${a.getDate()} – ${month(b)} ${b.getDate()}`;
 }
 
-/** The status line under the teams: clock or inning, who has the ball, or the start time. */
-export function statusLine(g: GameCard) {
-  if (g.state === 'pre') return startLabel(g.startsAt);
-  if (g.league === 'nfl' && g.state === 'in' && g.downDistance) {
-    const ball = g.possession === g.home?.team.key ? g.home?.team.abbrev : g.possession === g.away?.team.key ? g.away?.team.abbrev : null;
-    return `${g.detail} · ${ball ? `${ball} ball, ` : ''}${g.downDistance}`;
-  }
-  return g.detail;
+/** "Yesterday" or "Sun" for a game from before today ('' for today's). */
+function dayLabel(ts: number, now = Date.now()) {
+  const d = new Date(ts), today = new Date(now);
+  if (d.toDateString() === today.toDateString()) return '';
+  return d.toDateString() === new Date(now - 86400_000).toDateString() ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short' });
 }
 
-/** Same window as the server: live, starting within a day, or finished in the last 16 hours. */
+/** The status line under the teams: clock or inning, who has the ball, or the start time. Doubleheaders say which game. */
+export function statusLine(g: GameCard, now = Date.now()) {
+  let line: string;
+  if (g.state === 'pre') line = startLabel(g.startsAt);
+  else if (g.league === 'nfl' && g.state === 'in' && g.downDistance) {
+    const ball = g.possession === g.home?.team.key ? g.home?.team.abbrev : g.possession === g.away?.team.key ? g.away?.team.abbrev : null;
+    line = `${g.detail} · ${ball ? `${ball} ball, ` : ''}${g.downDistance}`;
+  } else line = g.state === 'post' ? [g.detail, dayLabel(g.startsAt, now)].filter(Boolean).join(' · ') : g.detail;
+  return g.note ? `${g.note} · ${line}` : line;
+}
+
+/** A typical game, start to final (the server's GAME_LENGTH_MS), for a final without an end time. */
+const GAME_LENGTH_MS: Record<GameCard['league'], number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
+/** Same window as the server: live, starting within a day, or finished in the last 24 hours. */
 export const inWindow = (g: GameCard, now = Date.now()) =>
-  g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000) || (g.state === 'post' && now - g.startsAt < 16 * 3600_000);
+  g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)
+  || (g.state === 'post' && now - (g.endedAt ?? g.startsAt + GAME_LENGTH_MS[g.league]) < 24 * 3600_000);
 
 export const SECTION: Record<GameCard['state'], string> = { in: 'Live now', pre: 'Later today', post: 'Final' };
 const RANK = { in: 0, pre: 1, post: 2 } as const;

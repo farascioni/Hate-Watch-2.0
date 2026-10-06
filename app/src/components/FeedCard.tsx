@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
-import { LeagueTag, ago } from './ui';
+import { AlsoGot, LeagueTag, ago } from './ui';
 import { shareAlert } from '../lib/share';
 import { colors, radius, space } from '../theme';
 import type { FeedItem } from '../lib/types';
@@ -29,6 +29,7 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.body} numberOfLines={3}>{item.body}</Text>
+        {item.alsoGot != null ? <AlsoGot n={item.alsoGot} /> : null}
         <View style={styles.meta}>
           <LeagueTag league={item.league} />
           <Text style={styles.metaText}>{item.typeLabel}</Text>

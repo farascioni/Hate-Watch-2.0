@@ -2,7 +2,7 @@ import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Avatar } from './Avatar';
-import { LeagueTag, ago } from './ui';
+import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
 import { hateTag, loseChance, statusLine, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
 import { colors, radius, space } from '../theme';
@@ -28,10 +28,11 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
     <>
       {(['away', 'home'] as const).map((k) => <TeamRow key={k} game={game} side={k} tracked={sides.includes(k)} big={big} />)}
       <View style={styles.meta}>
-        <Text style={styles.metaText} numberOfLines={2}>{statusLine(game)}</Text>
+        <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>
         {game.bases ? <Bases bases={game.bases} count={game.count} /> : null}
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
       </View>
+      {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
       <LiveDetails game={game} big={big} />
       {lose != null && side ? (
         <View style={{ gap: 4 }}>
@@ -90,6 +91,7 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
         <Text style={[styles.teamName, big && { fontSize: 18 }]} numberOfLines={1}>{game.session}</Text>
       </View>
       <Text style={styles.metaText}>{statusLine(game)}</Text>
+      {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
       {mine.map((d) => (
         <View key={d.key} style={styles.meta}>
           <Text style={styles.teamName} numberOfLines={1}>{d.name}</Text>

@@ -3,7 +3,7 @@ import { db, shareCode } from './db.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
-import { hateWatchTally, isHateWatch, recordHateWatch } from './hate-watches.ts';
+import { HATE_WATCH_TYPES, hateWatchTally, isHateWatch, recordHateWatch } from './hate-watches.ts';
 import type { League } from './leagues.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
@@ -172,9 +172,14 @@ export function forgetDevice(deviceId: string) {
 /** Where links that leave the app point (an alert's share link). */
 export const PUBLIC_URL = process.env.HW_PUBLIC_URL ?? 'https://hate-watch-api.fly.dev';
 
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null }) {
+/**
+ * `recipients`: how many devices got this alert in their feed (see RECIPIENTS). A Successful Hate Watch
+ * then says how many others got it too (`alsoGot`, the reader not counted).
+ */
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);
   return {
+    ...(row.recipients != null && HATE_WATCH_TYPES.has(row.type) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: row.body, occurredAt: row.occurred_at, detectedAt: row.detected_at,
@@ -207,9 +212,9 @@ export function publish(events: Detected[], league: League) {
     const gameId = ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null; // F1: the session
     const res = insEvent().run(e.id, e.type, league, gameId, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
-    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId });
-    const frame = JSON.stringify({ kind: 'event', item });
     const hateWatch = isHateWatch(e);
+    // Who gets it, first: a Successful Hate Watch says how many others got it too, from the first frame.
+    const deliver: { f: (typeof fols)[number]; prefs: Prefs }[] = [];
     for (const f of fols) {
       // A Successful Hate Watch counts for everyone tracking the team, whatever their alert settings.
       if (hateWatch && recordHateWatch(f.device_id, e)) {
@@ -223,6 +228,11 @@ export function publish(events: Detected[], league: League) {
         if (have.has(f.device_id)) continue; // they track the player and the player's team: one alert, not two
         have.add(f.device_id);
       }
+      deliver.push({ f, prefs });
+    }
+    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId, recipients: deliver.length });
+    const frame = JSON.stringify({ kind: 'event', item });
+    for (const { f, prefs } of deliver) {
       const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);

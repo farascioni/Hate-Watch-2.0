@@ -28,6 +28,9 @@ interface Store {
   hateWatches: HateWatchTally | null;
 
   follows: Map<string, Target>;
+  /** How many people track each of your players and teams, you included (the Tracking tab). */
+  trackers: Map<string, number>;
+  refreshTrackers: () => Promise<void>;
   isFollowing: (key: string) => boolean;
   toggleFollow: (t: Target) => Promise<void>;
 
@@ -75,6 +78,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [nextF1, setNextF1] = useState<F1Weekend | null>(null);
   const [unseen, setUnseen] = useState(0);
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
+  const [trackers, setTrackers] = useState<Map<string, number>>(new Map());
+  const countsFrom = (list: { key: string; trackers?: number }[]) => new Map(list.filter((x) => x.trackers != null).map((x) => [x.key, x.trackers!]));
+  const refreshTrackers = useCallback(async () => { setTrackers(countsFrom((await api.follows()).follows)); }, []);
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [leagues, setLeagues] = useState<{ id: League; name: string }[]>([]);
@@ -111,9 +117,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); refreshScores().catch(() => {}); api.hateWatches().then(setHateWatches, () => {}); };
       sock.onmessage = (m) => {
         const frame = JSON.parse(String(m.data));
-        if (frame.kind === 'score') { setGames((cur) => new Map(cur).set(frame.game.key, frame.game)); return; }
+        // Score frames are everyone's copy of the card: keep this device's own Successful Hate Watch count on it.
+        if (frame.kind === 'score') { setGames((cur) => { const had = cur.get(frame.game.key)?.hateWatch; return new Map(cur).set(frame.game.key, had ? { ...frame.game, hateWatch: had } : frame.game); }); return; }
         if (frame.kind === 'hateWatches') { setHateWatches(frame.tally); return; }
         if (frame.kind !== 'event') return;
+        // A Successful Hate Watch just landed: its final on the Scores tab says how many others got it too.
+        if (frame.item.alsoGot != null && frame.item.gameId) {
+          const key = `${frame.item.league}:${frame.item.gameId}`;
+          setGames((cur) => { const g = cur.get(key); return g ? new Map(cur).set(key, { ...g, hateWatch: { alsoGot: frame.item.alsoGot } }) : cur; });
+        }
         setFeed((cur) => mergeFeed(cur, [frame.item]));
         setUnseen((n) => n + 1);
         // Muted (🔕) targets still land in the feed, just silently.
@@ -141,6 +153,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setEventTypes(cat.types);
         setLeagues(cat.leagues);
         setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
+        setTrackers(countsFrom(f.follows));
         setPrefs(p);
         await refreshFeed();
       } catch (e) {
@@ -156,7 +169,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches,
+    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -172,7 +185,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Optimistic: flip immediately, roll back if the server says no.
       setFollows((m) => { const n = new Map(m); was ? n.delete(t.key) : n.set(t.key, t); return n; });
       Haptics.selectionAsync().catch(() => {});
-      try { await (was ? api.unfollow(t.key) : api.follow(t.key)); refreshScores().catch(() => {}); }
+      try {
+        const r = await (was ? api.unfollow(t.key) : api.follow(t.key));
+        if (r.trackers != null) setTrackers((m) => new Map(m).set(t.key, r.trackers!));
+        refreshScores().catch(() => {});
+      }
       catch { setFollows((m) => { const n = new Map(m); was ? n.set(t.key, t) : n.delete(t.key); return n; }); }
     },
     updatePrefs: async (patch) => {
@@ -196,6 +213,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await api.deleteMe();
       await forgetToken();
       setFollows(new Map());
+      setTrackers(new Map());
       setFeed([]);
       setUnseen(0);
       setHateWatches({ total: 0, teams: [] });
@@ -203,7 +221,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

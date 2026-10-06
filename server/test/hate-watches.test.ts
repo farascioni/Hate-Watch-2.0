@@ -55,6 +55,16 @@ test('a loss counts for every tracker, alert on or off, once, and the app hears 
   assert.deepEqual(await summary('saints-fan'), [0, []], 'the winners are not a hate watch');
   assert.deepEqual(frames.filter((f) => f.kind === 'hateWatches').map((f) => f.tally.total), [1], 'one frame, with the new total');
 
+  // How many others got it: old-fan and late-fan did (alert-off has the alert off), so one other each.
+  assert.equal(frames.find((f) => f.kind === 'event').item.alsoGot, 1, 'live, in the alert itself');
+  const { RECIPIENTS, withHateWatch } = await import('../src/hate-watches.ts');
+  const { feedItem } = await import('../src/fanout.ts');
+  const read = (dev: string) => (db.prepare(`SELECT e.*, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND e.game_id = 'G1'`).all(dev) as any[]).map(feedItem);
+  assert.deepEqual(read('old-fan').map((i) => [i.type, i.alsoGot]), [['team.lost', 1]], 'and from the feed later');
+  const final = { id: 'G1', state: 'post' }, live = { id: 'G9', state: 'in' };
+  assert.deepEqual(withHateWatch('late-fan', [final, live]), [{ ...final, hateWatch: { alsoGot: 1 } }, live], 'the Scores tab: on the final it came from');
+  assert.deepEqual(withHateWatch('alert-off', [final]), [final], "the alert was off: it wasn't received, so no count");
+
   db.prepare("DELETE FROM feed WHERE device_id = 'old-fan'").run(); // Settings → Clear feed
   assert.equal((await tally('old-fan')).total, 2, 'clearing the feed keeps the count');
 });
