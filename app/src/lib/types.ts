@@ -4,6 +4,8 @@ export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;
   location: string | null; color: string | null; altColor: string | null;
   logo: string; logoDark: string | null; logoW: number; logoH: number;
+  /** How many people track them, where the server includes it (Search, team lists, rosters, their page). */
+  haters?: number;
 }
 
 export interface Player {
@@ -11,6 +13,8 @@ export interface Player {
   position: string | null; jersey: string | null; teamKey: string;
   image: string; imageW: number; imageH: number; imageKind: 'headshot' | 'team_logo';
   teamName: string | null; teamAbbrev: string | null; teamColor: string | null; teamLogo: string | null;
+  /** How many people track them, where the server includes it (Search, rosters, their page). */
+  haters?: number;
 }
 
 export type Target = Team | Player;

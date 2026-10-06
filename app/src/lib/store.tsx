@@ -31,6 +31,8 @@ interface Store {
   /** How many people track each of your players and teams, you included (the Tracking tab). */
   trackers: Map<string, number>;
   refreshTrackers: () => Promise<void>;
+  /** Newer hater counts from a list the server just sent (Search, a roster): the freshest number wins. */
+  noteTrackers: (items: { key: string; haters?: number }[]) => void;
   isFollowing: (key: string) => boolean;
   toggleFollow: (t: Target) => Promise<void>;
 
@@ -80,7 +82,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
   const [trackers, setTrackers] = useState<Map<string, number>>(new Map());
   const countsFrom = (list: { key: string; trackers?: number }[]) => new Map(list.filter((x) => x.trackers != null).map((x) => [x.key, x.trackers!]));
-  const refreshTrackers = useCallback(async () => { setTrackers(countsFrom((await api.follows()).follows)); }, []);
+  // Merged, not replaced: the map also holds counts for players and teams you looked at but don't track.
+  const noteTrackers = useCallback((items: { key: string; haters?: number; trackers?: number }[]) => {
+    const counts = items.filter((x) => (x.haters ?? x.trackers) != null);
+    if (counts.length) setTrackers((m) => { const n = new Map(m); for (const x of counts) n.set(x.key, (x.haters ?? x.trackers)!); return n; });
+  }, []);
+  const refreshTrackers = useCallback(async () => { noteTrackers((await api.follows()).follows); }, [noteTrackers]);
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [leagues, setLeagues] = useState<{ id: League; name: string }[]>([]);
@@ -169,7 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers,
+    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -221,7 +228,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -5,18 +5,18 @@ import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { FeedCard } from '../../components/FeedCard';
-import { FollowButton, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
+import { FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
 import type { Player, Target } from '../../lib/types';
 
 export default function TargetScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
-  const { feed } = useStore();
+  const { feed, noteTrackers } = useStore();
   const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);
   const now = useNow();
 
-  useEffect(() => { api.target(targetKey).then(setTarget).catch(() => {}); }, [targetKey]);
+  useEffect(() => { api.target(targetKey).then((t) => { setTarget(t); noteTrackers([t, ...(t.roster ?? [])]); }).catch(() => {}); }, [targetKey, noteTrackers]);
   const history = useMemo(() => feed.filter((f) => f.target.key === targetKey).slice(0, 20), [feed, targetKey]);
 
   if (!target) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
@@ -31,6 +31,7 @@ export default function TargetScreen() {
           <LeagueTag league={target.league} />
           <Text style={styles.sub}>{target.kind === 'player' ? `${target.teamName ?? ''} · ${subtitle(target)}` : subtitle(target)}</Text>
         </View>
+        <HaterCount target={target} size={14} />
         <View style={{ marginTop: space(3) }}><FollowButton target={target} /></View>
       </View>
       {history.length ? <SectionHeader>Recent misery</SectionHeader> : null}

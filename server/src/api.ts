@@ -11,7 +11,7 @@ import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 import { forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
-import { leaderboard } from './leaderboard.ts';
+import { leaderboard, withHaters } from './leaderboard.ts';
 
 class Html {
   body: string;
@@ -47,21 +47,22 @@ route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live:
 route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name })), types: EVENT_TYPES }));
 route('GET', '/catalog/report', false, () => kvGet('ingest:report'));
 route('GET', '/search', false, (_r, url) => ({
-  results: search(url.searchParams.get('q') ?? '', {
+  results: withHaters(search(url.searchParams.get('q') ?? '', {
     league: (url.searchParams.get('league') as League) || undefined,
     kind: (url.searchParams.get('kind') as 'team' | 'player') || undefined,
     limit: Math.min(Number(url.searchParams.get('limit') ?? 40), 100),
-  }),
+  })),
 }));
 route('GET', '/teams', false, (_r, url) => ({
-  teams: catalog.allTeams().filter((t) => !url.searchParams.get('league') || t.league === url.searchParams.get('league'))
-    .sort((a, b) => a.name.localeCompare(b.name)).map(teamDto),
+  teams: withHaters(catalog.allTeams().filter((t) => !url.searchParams.get('league') || t.league === url.searchParams.get('league'))
+    .sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)),
 }));
 route('GET', '/targets/:key', false, (_r, _u, [key]) => {
   const k = decodeURIComponent(key);
   const t = targetDto(k);
   if (!t) throw new HttpError(404, 'not found');
-  return t.kind === 'team' ? { ...t, roster: catalog.roster(k).map(playerDto) } : t;
+  const [me] = withHaters([t]);
+  return t.kind === 'team' ? { ...me, roster: withHaters(catalog.roster(k).map(playerDto)) } : me;
 });
 
 // ─── Devices (anonymous accounts) ─────────────────────────────────────────────────────────────

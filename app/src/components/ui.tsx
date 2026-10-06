@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { useStore } from '../lib/store';
 import { colors, leagueColors, radius, space } from '../theme';
@@ -45,7 +46,25 @@ export function subtitle(t: Target) {
   return [team, t.position, t.jersey ? `#${t.jersey}` : null].filter(Boolean).join(' · ');
 }
 
-/** A player or team in a list. `extra` is an optional line under the league and position (the Tracking tab's tracker count). */
+/**
+ * "👁 12 haters": how many people track this player or team. The freshest count the app has (from a
+ * list the server just sent, or your own follow or unfollow), else the one on the target.
+ */
+export function HaterCount({ target, size = 12 }: { target: Target; size?: number }) {
+  const { trackers, follows } = useStore();
+  const n = trackers.get(target.key) ?? target.haters;
+  if (n == null) return null;
+  const mine = follows.has(target.key);
+  const label = n === 0 ? 'No haters yet' : n === 1 && mine ? '1 hater (just you)' : `${n.toLocaleString()} hater${n === 1 ? '' : 's'}`;
+  return (
+    <View style={styles.haters} accessible accessibilityLabel={n === 0 ? 'Nobody tracks them yet' : `${n} ${n === 1 ? 'person tracks' : 'people track'} them${mine ? ', you included' : ''}`}>
+      <Ionicons name="eye" size={size} color={colors.textFaint} />
+      <Text style={[styles.hatersText, { fontSize: size }]}>{label}</Text>
+    </View>
+  );
+}
+
+/** A player or team in a list, with how many people hate them. `extra` replaces that line. */
 export function TargetRow({ target, right, extra }: { target: Target; right?: ReactNode; extra?: ReactNode }) {
   return (
     <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
@@ -56,7 +75,7 @@ export function TargetRow({ target, right, extra }: { target: Target; right?: Re
           <LeagueTag league={target.league} />
           <Text style={styles.rowSub} numberOfLines={1}>{subtitle(target)}</Text>
         </View>
-        {extra}
+        {extra ?? <HaterCount target={target} />}
       </View>
       {right ?? <FollowButton target={target} />}
     </Pressable>
@@ -125,6 +144,8 @@ export function LiveBadge() {
 }
 
 const styles = StyleSheet.create({
+  haters: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hatersText: { color: colors.textFaint, fontWeight: '600' },
   alsoGot: { alignSelf: 'flex-start', backgroundColor: '#0F2E1A', borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },
   alsoGotText: { color: colors.live, fontSize: 12, fontWeight: '800' },
   liveWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: space(4) },

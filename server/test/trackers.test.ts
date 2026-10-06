@@ -13,6 +13,7 @@ db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, l
 db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, image, image_w, image_h, image_kind, updated_at) VALUES ('player:nfl:9', 'nfl', '9', 'Michael Penix Jr.', 'team:nfl:1', 'x', 1, 1, 'headshot', 0)`).run();
 db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES ('team:nfl:18', 'nfl', '18', 'New Orleans Saints', 'Saints', 'NO', 'x', 1, 1, 0)`).run();
 db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES ('team:nba:1', 'nba', '1', 'Atlanta Hawks', 'Hawks', 'ATL', 'x', 1, 1, 0)`).run();
+db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES ('team:nfl:3', 'nfl', '3', 'Chicago Bears', 'Bears', 'CHI', 'x', 1, 1, 0)`).run(); // nobody tracks them
 loadCatalog();
 
 test('each tracked player and team says how many people track it', async () => {
@@ -58,5 +59,19 @@ test('the leaderboard: most hated first, ties share a rank, filtered like the Fe
   assert.deepEqual(await get('?limit=1'), ['1. New Orleans Saints 3']);
   assert.equal(await get('?kind=coach'), 400);
   assert.equal(await get('?league=mls'), 400);
+  server.close();
+});
+
+test('search, the team list, and a team page with its roster say how many people hate each one', async () => {
+  const server = startApi(0);
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const get = async (path: string) => (await fetch(base + path)).json();
+  // From the tests above: Saints 3, Falcons 2, Hawks 2, Penix 1.
+  assert.deepEqual((await get('/search?q=atlanta')).results.map((t: any) => `${t.name} ${t.haters}`).sort(), ['Atlanta Falcons 2', 'Atlanta Hawks 2']);
+  assert.deepEqual((await get('/teams?league=nfl')).teams.map((t: any) => `${t.shortName} ${t.haters}`), ['Falcons 2', 'Bears 0', 'Saints 3'], 'nobody yet is 0');
+  const falcons = await get(`/targets/${encodeURIComponent('team:nfl:1')}`);
+  assert.equal(falcons.haters, 2);
+  assert.deepEqual(falcons.roster.map((p: any) => `${p.name} ${p.haters}`), ['Michael Penix Jr. 1']);
   server.close();
 });

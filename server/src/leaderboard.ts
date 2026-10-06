@@ -2,6 +2,23 @@ import { db } from './db.ts';
 import { targetDto } from './catalog.ts';
 import type { League } from './leagues.ts';
 
+/** How many people (devices) track each of these players or teams (0 for nobody). For lists: Search, the team list, a roster. */
+export function haterCounts(keys: string[]): Map<string, number> {
+  const out = new Map(keys.map((k) => [k, 0]));
+  for (let i = 0; i < keys.length; i += 500) {
+    const chunk = keys.slice(i, i + 500);
+    if (!chunk.length) continue;
+    const rows = db.prepare(`SELECT target_key, COUNT(*) AS n FROM follows WHERE target_key IN (${chunk.map(() => '?').join(',')}) GROUP BY target_key`).all(...chunk) as { target_key: string; n: number }[];
+    for (const r of rows) out.set(r.target_key, r.n);
+  }
+  return out;
+}
+/** Each item with its `haters` count. */
+export const withHaters = <T extends { key: string }>(items: T[]): (T & { haters: number })[] => {
+  const n = haterCounts(items.map((t) => t.key));
+  return items.map((t) => ({ ...t, haters: n.get(t.key) ?? 0 }));
+};
+
 export interface LeaderboardEntry { rank: number; haters: number; target: NonNullable<ReturnType<typeof targetDto>> }
 
 /**

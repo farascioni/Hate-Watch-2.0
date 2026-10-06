@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, StyleSheet, TextInput, View, Text } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { api } from '../../lib/api';
+import { useStore } from '../../lib/store';
 import { TargetRow, SectionHeader } from '../../components/ui';
 import { FilterBar, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Target, Team } from '../../lib/types';
 
 export default function SearchScreen() {
+  const { noteTrackers } = useStore();
   const [q, setQ] = useState('');
   const { filter, setFilter } = useFilter();
   const { kind, league } = filter;
@@ -25,14 +27,14 @@ export default function SearchScreen() {
     const t = setTimeout(async () => {
       try {
         const { results } = await api.search(q, league, kind === 'all' ? undefined : kind);
-        if (mine === seq.current) setResults(results);
+        if (mine === seq.current) { setResults(results); noteTrackers(results); }
       } finally { if (mine === seq.current) setLoading(false); }
     }, 150);
     return () => clearTimeout(t);
   }, [q, league, kind]);
 
   // Empty query: browse every team in the selected league.
-  useEffect(() => { api.teams(league).then((r) => setTeams(r.teams)).catch(() => {}); }, [league]);
+  useEffect(() => { api.teams(league).then((r) => { setTeams(r.teams); noteTrackers(r.teams); }).catch(() => {}); }, [league, noteTrackers]);
 
   const browsing = !q.trim();
   const data: Target[] = browsing ? (kind === 'player' ? [] : teams) : results;
