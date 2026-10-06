@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** Hidden reactions to tracking certain players (by catalog key), each shown once per device. */
-const EGGS: Record<string, { emoji: string; say: string }> = {
-  'player:wnba:4433403': { emoji: '🤨', say: 'Hmm. Suspicious.' }, // Caitlin Clark
+const EGGS: Record<string, { emoji: string }> = {
+  'player:wnba:4433403': { emoji: '🤨' }, // Caitlin Clark
 };
 
 type Egg = (typeof EGGS)[string];

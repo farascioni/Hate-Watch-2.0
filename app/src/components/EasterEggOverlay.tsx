@@ -14,10 +14,9 @@ export function EasterEggOverlay() {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => onEasterEgg(async ({ emoji: e, say }) => {
+  useEffect(() => onEasterEgg(async ({ emoji: e }) => {
     const still = await AccessibilityInfo.isReduceMotionEnabled().catch(() => false);
     setEmoji(e);
-    AccessibilityInfo.announceForAccessibility(say);
     opacity.setValue(0);
     scale.setValue(still ? 1 : 0.5);
     Animated.sequence([

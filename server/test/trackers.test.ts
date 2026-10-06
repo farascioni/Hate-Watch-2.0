@@ -43,20 +43,21 @@ test('the leaderboard: most hated first, ties share a rank, filtered like the Fe
   const server = startApi(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const get = async (q = '') => { const r = await fetch(`${base}/leaderboard${q}`); return r.ok ? (await r.json()).entries.map((e: any) => `${e.rank}. ${e.target.name} ${e.haters}`) : r.status; };
+  const get = async (q = '') => { const r = await fetch(`${base}/leaderboard${q}`); return r.ok ? (await r.json()).entries.map((e: any) => `${e.tied ? 'T-' : ''}${e.rank}. ${e.target.name} ${e.haters}`) : r.status; };
   const device = async () => (await (await fetch(`${base}/devices`, { method: 'POST', body: '{}' })).json()).token as string;
   const follow = async (key: string, n: number) => { for (let i = 0; i < n; i++) await fetch(`${base}/me/follows/${encodeURIComponent(key)}`, { method: 'PUT', headers: { authorization: `Bearer ${await device()}` } }); };
   // From the first test: the Falcons and Penix have 1 each.
   await follow('team:nfl:18', 3);
   await follow('team:nba:1', 2);
   await follow('team:nfl:1', 1);
-  assert.deepEqual(await get(), ['1. New Orleans Saints 3', '2. Atlanta Falcons 2', '2. Atlanta Hawks 2', '4. Michael Penix Jr. 1'], 'everything, every sport');
-  assert.deepEqual(await get('?kind=team'), ['1. New Orleans Saints 3', '2. Atlanta Falcons 2', '2. Atlanta Hawks 2'], 'all sports teams');
+  assert.deepEqual(await get(), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2', 'T-2. Atlanta Hawks 2', '4. Michael Penix Jr. 1'], 'everything, every sport');
+  assert.deepEqual(await get('?kind=team'), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2', 'T-2. Atlanta Hawks 2'], 'all sports teams');
   assert.deepEqual(await get('?kind=player'), ['1. Michael Penix Jr. 1'], 'all athletes');
-  assert.deepEqual(await get('?league=nba'), ['1. Atlanta Hawks 2']);
-  assert.deepEqual(await get('?kind=team&league=nfl'), ['1. New Orleans Saints 3', '2. Atlanta Falcons 2']);
+  assert.deepEqual(await get('?league=nba'), ['1. Atlanta Hawks 2'], 'ranked within the filter: the Hawks are 1st in the NBA, not tied for 2nd');
+  assert.deepEqual(await get('?kind=team&league=nfl'), ['1. New Orleans Saints 3', '2. Atlanta Falcons 2'], 'no tie once the Hawks are filtered out');
   assert.deepEqual(await get('?kind=player&league=nba'), []);
   assert.deepEqual(await get('?limit=1'), ['1. New Orleans Saints 3']);
+  assert.deepEqual(await get('?limit=2'), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2'], 'still a tie when the one it is tied with is past the limit');
   assert.equal(await get('?kind=coach'), 400);
   assert.equal(await get('?league=mls'), 400);
   server.close();

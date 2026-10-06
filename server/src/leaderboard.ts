@@ -19,7 +19,8 @@ export const withHaters = <T extends { key: string }>(items: T[]): (T & { haters
   return items.map((t) => ({ ...t, haters: n.get(t.key) ?? 0 }));
 };
 
-export interface LeaderboardEntry { rank: number; haters: number; target: NonNullable<ReturnType<typeof targetDto>> }
+/** `rank` is within the filtered list; `tied` when others share it (the app shows "T-2"), even past the limit. */
+export interface LeaderboardEntry { rank: number; tied: boolean; haters: number; target: NonNullable<ReturnType<typeof targetDto>> }
 
 /**
  * The leaderboard: players and teams by how many people (devices) track them, most hated first. It
@@ -34,9 +35,11 @@ export function leaderboard(o: { kind?: 'team' | 'player'; league?: League; limi
   const ranked = rows
     .flatMap((r) => { const target = targetDto(r.target_key); return target ? [{ target, haters: r.n }] : []; })
     .sort((a, b) => b.haters - a.haters || a.target.name.localeCompare(b.target.name));
+  const sharing = new Map<number, number>(); // haters → how many have that many, in the whole filtered list
+  for (const e of ranked) sharing.set(e.haters, (sharing.get(e.haters) ?? 0) + 1);
   const out: LeaderboardEntry[] = [];
   for (const [i, e] of ranked.slice(0, o.limit ?? 100).entries()) {
-    out.push({ rank: i > 0 && e.haters === ranked[i - 1].haters ? out[i - 1].rank : i + 1, ...e });
+    out.push({ rank: i > 0 && e.haters === ranked[i - 1].haters ? out[i - 1].rank : i + 1, tied: sharing.get(e.haters)! > 1, ...e });
   }
   return out;
 }

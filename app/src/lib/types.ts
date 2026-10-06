@@ -69,8 +69,8 @@ export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLin
 /** Settings counter: each time a team you track lost (F1: your constructor scored no points), and per team (most first). */
 export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }
 
-/** The leaderboard: a player or team and how many people track them (ties share a rank). */
-export interface LeaderboardEntry { rank: number; haters: number; target: Target }
+/** The leaderboard: a player or team and how many people track them. `rank` is within the filter; ties share it (`tied`: shown "T-2"). */
+export interface LeaderboardEntry { rank: number; tied?: boolean; haters: number; target: Target }
 
 export interface EventType {
   id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;

@@ -41,7 +41,7 @@ export default function LeaderboardScreen() {
         <FlatList
           data={entries ?? []}
           keyExtractor={(e) => e.target.key}
-          renderItem={({ item }) => <Row entry={item} mine={follows.has(item.target.key)} />}
+          renderItem={({ item }) => <Row entry={item} tied={item.tied ?? (entries ?? []).some((e) => e !== item && e.rank === item.rank)} mine={follows.has(item.target.key)} />}
           ListHeaderComponent={entries?.length ? <Text style={styles.hint}>Ranked by how many people track them on Hate Watch.</Text> : null}
           ListEmptyComponent={failed
             ? <Empty emoji="📡" title="Couldn't load the leaderboard" body="Check your connection and try again." action={<PrimaryButton label="Try again" onPress={() => { setFailed(false); setEntries(null); void load(); }} />} />
@@ -57,11 +57,16 @@ export default function LeaderboardScreen() {
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-function Row({ entry: { rank, haters, target }, mine }: { entry: LeaderboardEntry; mine: boolean }) {
+/** The rank within the current filter: 🥇🥈🥉 for the top three, a number after that; a tie reads "T-2" (under the medal in the top three). */
+function Row({ entry: { rank, haters, target }, tied, mine }: { entry: LeaderboardEntry; tied: boolean; mine: boolean }) {
+  const place = tied ? `T-${rank}` : String(rank);
   return (
     <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityLabel={`Number ${rank}, ${target.name}, ${haters} ${haters === 1 ? 'hater' : 'haters'}${mine ? ', you track them' : ''}`}>
-      <View style={styles.rank}>{MEDALS[rank - 1] ? <Text style={styles.medal}>{MEDALS[rank - 1]}</Text> : <Text style={styles.rankText}>{rank}</Text>}</View>
+      accessibilityRole="button" accessibilityLabel={`${tied ? `Tied for ${rank}` : `Number ${rank}`}, ${target.name}, ${haters} ${haters === 1 ? 'hater' : 'haters'}${mine ? ', you track them' : ''}`}>
+      <View style={styles.rank}>
+        {MEDALS[rank - 1] ? <Text style={styles.medal}>{MEDALS[rank - 1]}</Text> : <Text style={styles.rankText} numberOfLines={1}>{place}</Text>}
+        {MEDALS[rank - 1] && tied ? <Text style={styles.tie}>{place}</Text> : null}
+      </View>
       <Avatar target={target} size={44} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <View style={styles.inline}>
@@ -85,8 +90,9 @@ const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(1) },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
-  rank: { width: 28, alignItems: 'center' },
-  rankText: { color: colors.textDim, fontSize: 16, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  rank: { width: 40, alignItems: 'center' },
+  rankText: { color: colors.textDim, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  tie: { color: colors.textFaint, fontSize: 10, fontWeight: '800', marginTop: -2 },
   medal: { fontSize: 22 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   name: { color: colors.text, fontSize: 16, fontWeight: '800', flexShrink: 1 },

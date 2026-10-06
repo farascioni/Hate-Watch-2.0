@@ -269,8 +269,9 @@ test('finals stay a day after they end, and both games of a doubleheader show, l
   assert.equal(S.inWindow(g1, Date.now() + 25 * 3600_000), false, 'gone after a day');
 
   // Already over the first time we see it (a restart): a typical game's length after the start.
-  S.upsertGame(S.gameCard('mlb', dh('old', 30, 'post', 'Doubleheader - Game 2'))!);
-  assert.equal(S.getGame('mlb:old')!.endedAt, Date.parse(dh('old', 30, 'post', '').date) + 3 * 3600_000);
+  const old = dh('old', 30, 'post', 'Doubleheader - Game 2'); // one clock reading: the check below compares to the millisecond
+  S.upsertGame(S.gameCard('mlb', old)!);
+  assert.equal(S.getGame('mlb:old')!.endedAt, Date.parse(old.date) + 3 * 3600_000);
   assert.equal(S.gamesFor('guardians-fan').some((g) => g.id === 'old'), false, 'ended ~27 hours ago: off the tab');
 
   // Yesterday's scoreboard (ESPN's US Eastern date) brings back finals a restart forgot, and leaves known games alone.
