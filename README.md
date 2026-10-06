@@ -144,6 +144,7 @@ Last ingest (2026-10-06): **135 teams, 5,284 players**, 214 of them from injured
 | F1 | 11 constructors | 23 drivers | 15 | 8 (team badge) |
 
 - **Injured lists too.** A player on MLB's 60-day IL comes off the 40-man roster ESPN serves, and NHL long-term injured reserve players are left off too, so Carlos Correa wasn't on the Astros. The ingest also reads each league's injury report and adds anyone on it who isn't on a roster to the team it lists them under (`injuredOffRoster` in `catalog.ts`), with the same duplicate checks and headshot verification. NBA and NFL rosters already include their injured players.
+- **Refreshes every 6 hours, counted from the last one.** Deploys restart the server, and a timer that started over each time kept putting refreshes off. A change to what the ingest collects bumps `INGEST_VERSION`, so the next boot rebuilds in the background right away (`nextIngestIn`).
 - **No duplicates.** Players are deduped on ESPN athlete ID, with a second pass on normalized name + birth date. Teams are deduped on ID and abbreviation. The ingest throws rather than commit a duplicate key, and the database primary keys enforce it again.
 - **Every team and player has an image.** The ingest won't commit a row without one.
 - **Images are accurate.** Each headshot URL must be keyed by that athlete's own ESPN ID, and ESPN's alt text must match the player's name (0 mismatches). Every image is fetched (PNG header via HTTP Range) to confirm it exists and to record its true pixel size.

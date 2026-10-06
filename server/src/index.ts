@@ -1,9 +1,9 @@
-import { catalog, ingest, loadCatalog } from './catalog.ts';
+import { catalog, ingest, loadCatalog, nextIngestIn, INGEST_EVERY_MS, type IngestReport } from './catalog.ts';
 import { setPushSender } from './fanout.ts';
 import { sendPushes } from './push.ts';
 import { startApi } from './api.ts';
 import { engine } from './live.ts';
-import { db } from './db.ts';
+import { db, kvGet } from './db.ts';
 import { LEAGUE_IDS } from './leagues.ts';
 
 loadCatalog();
@@ -15,8 +15,12 @@ if (missing.length) {
 }
 console.log('[boot] catalog', catalog.size());
 
-// Rosters change daily (trades, call-ups, cuts). Refresh every 6h; a failed refresh keeps the old catalog.
-setInterval(() => ingest().catch((e) => console.error('[ingest] refresh failed, keeping previous catalog', e)), 6 * 3600_000);
+// Rosters change daily (trades, call-ups, cuts). Refresh every 6h, counted from the last refresh rather than
+// from boot, and in the background right away if the ingest changed (nextIngestIn). A failed refresh keeps the old catalog.
+const refresh = () => ingest().catch((e) => console.error('[ingest] refresh failed, keeping previous catalog', e));
+const due = nextIngestIn(kvGet<IngestReport>('ingest:report'));
+console.log(`[boot] next roster refresh in ${Math.round(due / 60_000)} min`);
+setTimeout(() => { void refresh(); setInterval(refresh, INGEST_EVERY_MS); }, due);
 
 setPushSender(sendPushes);
 const server = startApi(Number(process.env.PORT ?? 8787));

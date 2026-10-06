@@ -11,8 +11,25 @@ export interface Player {
   teamKey: string; image: string; imageW: number; imageH: number; imageKind: 'headshot' | 'team_logo';
 }
 
+/** Bump when what ingest() collects changes (2: injured lists), so the next boot rebuilds the catalog instead of waiting. */
+export const INGEST_VERSION = 2;
+export const INGEST_EVERY_MS = 6 * 3600_000;
+
+/**
+ * When the next catalog refresh is due: 6 hours after the last one, not after boot (deploys restart
+ * the server, and a timer that starts over each time keeps putting it off), and right away when there
+ * has been none or the ingest itself changed.
+ */
+export function nextIngestIn(last: Pick<IngestReport, 'at' | 'version'> | undefined, now = Date.now()) {
+  const at = Date.parse(last?.at ?? '');
+  if (!last || !Number.isFinite(at) || last.version !== INGEST_VERSION) return 0;
+  return Math.max(0, at + INGEST_EVERY_MS - now);
+}
+
 export interface IngestReport {
   at: string;
+  /** INGEST_VERSION when it ran. */
+  version?: number;
   leagues: Record<string, {
     teams: number; players: number;
     /** Players on an injured list but off their team's roster (MLB's 60-day IL), added from the injury report. */
@@ -89,7 +106,7 @@ export function injuredOffRoster(report: any, teams: Team[], onRoster: Set<strin
 }
 
 export async function ingest(log: (m: string) => void = console.log): Promise<IngestReport> {
-  const report: IngestReport = { at: new Date().toISOString(), leagues: {}, problems: [] };
+  const report: IngestReport = { at: new Date().toISOString(), version: INGEST_VERSION, leagues: {}, problems: [] };
   const newTeams: Team[] = [];
   const newPlayers: Player[] = [];
 

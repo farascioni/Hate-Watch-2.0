@@ -26,3 +26,13 @@ test('injured players off the roster join their team; ones already on it are not
   assert.equal(out[0].a.headshot.href, 'https://a.espncdn.com/i/headshots/mlb/players/full/32653.png', 'his own headshot, for the same check as everyone else');
   assert.deepEqual(injuredOffRoster(null, [astros], new Set()), [], 'no report: just the rosters');
 });
+
+test('roster refreshes: 6 hours after the last one, not after a restart; at once when the ingest changed', async () => {
+  const { nextIngestIn, INGEST_VERSION } = await import('../src/catalog.ts');
+  const now = Date.parse('2026-10-06T16:00:00Z');
+  assert.equal(nextIngestIn({ at: '2026-10-06T12:50:00Z', version: INGEST_VERSION }, now), (2 * 60 + 50) * 60_000, 'a deploy at 4 PM keeps the 6:50 PM refresh');
+  assert.equal(nextIngestIn({ at: '2026-10-06T08:00:00Z', version: INGEST_VERSION }, now), 0, 'overdue: now');
+  assert.equal(nextIngestIn({ at: '2026-10-06T15:59:00Z', version: INGEST_VERSION - 1 }, now), 0, 'built by an older ingest: now');
+  assert.equal(nextIngestIn({ at: '2026-10-06T15:59:00Z' }, now), 0, 'before versions existed: now');
+  assert.equal(nextIngestIn(undefined, now), 0);
+});
