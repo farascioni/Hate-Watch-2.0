@@ -37,6 +37,8 @@ Dev mode (`HW_DEV=1 npm start`) adds `POST /dev/simulate` and a "Send a test eve
 
 ## Deploy
 
+**Google Play (Android):** step-by-step guide in [docs/android-release.md](docs/android-release.md), written for releasing without owning an Android phone.
+
 ### Server → Fly.io
 
 You need a [Fly.io](https://fly.io) account with a card on file, and `flyctl` installed (`pwsh -Command "iwr https://fly.io/install.ps1 -useb | iex"` on Windows). From `server/`:
