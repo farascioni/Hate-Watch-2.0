@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
-import type { EventType, FeedItem, GameCard, League, Prefs, PrefsPatch, Target } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -20,7 +20,12 @@ interface Store {
 
   /** Scores tab: today's games for the teams (and players' teams) you track, kept live over the socket. */
   games: Map<string, GameCard>;
+  /** F1's race weekend under way, or the next one: what the Scores tab says when no session is on. */
+  nextF1: F1Weekend | null;
   refreshScores: () => Promise<void>;
+
+  /** Successful Hate Watches, for the counter at the top of Settings. The server sends the new tally after each one. */
+  hateWatches: HateWatchTally | null;
 
   follows: Map<string, Target>;
   isFollowing: (key: string) => boolean;
@@ -66,6 +71,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [live, setLive] = useState<LiveState>('connecting');
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [games, setGames] = useState<Map<string, GameCard>>(new Map());
+  const [hateWatches, setHateWatches] = useState<HateWatchTally | null>(null);
+  const [nextF1, setNextF1] = useState<F1Weekend | null>(null);
   const [unseen, setUnseen] = useState(0);
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
   const [prefs, setPrefs] = useState<Prefs | null>(null);
@@ -84,8 +91,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // The server decides which games are yours today; live frames then update them in place.
   const refreshScores = useCallback(async () => {
-    const { games: list } = await api.scores();
+    const { games: list, nextF1: next } = await api.scores();
     setGames(new Map(list.map((g) => [g.key, g])));
+    setNextF1(next ?? null);
   }, []);
 
   // ── Realtime socket with backoff; on every (re)connect we re-sync the feed to close any gap.
@@ -100,10 +108,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!token) { timer = setTimeout(connect, 3000); return; }
       const sock = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
       ws.current = sock;
-      sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); refreshScores().catch(() => {}); };
+      sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); refreshScores().catch(() => {}); api.hateWatches().then(setHateWatches, () => {}); };
       sock.onmessage = (m) => {
         const frame = JSON.parse(String(m.data));
         if (frame.kind === 'score') { setGames((cur) => new Map(cur).set(frame.game.key, frame.game)); return; }
+        if (frame.kind === 'hateWatches') { setHateWatches(frame.tally); return; }
         if (frame.kind !== 'event') return;
         setFeed((cur) => mergeFeed(cur, [frame.item]));
         setUnseen((n) => n + 1);
@@ -147,7 +156,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, refreshScores,
+    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -189,11 +198,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setFollows(new Map());
       setFeed([]);
       setUnseen(0);
+      setHateWatches({ total: 0, teams: [] });
       setPrefs(await api.prefs());
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, refreshScores]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

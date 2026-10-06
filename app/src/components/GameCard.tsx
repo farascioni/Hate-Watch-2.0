@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Avatar } from './Avatar';
@@ -6,7 +6,7 @@ import { LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
 import { hateTag, loseChance, statusLine, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
 import { colors, radius, space } from '../theme';
-import type { FeedItem, GameCard } from '../lib/types';
+import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
   good: { bg: colors.hateDim, fg: '#FF8A8F' },  // they're losing: good news
@@ -32,7 +32,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
         {game.bases ? <Bases bases={game.bases} count={game.count} /> : null}
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
       </View>
-      {game.pitcher || game.batter ? <AtBat game={game} big={big} /> : null}
+      <LiveDetails game={game} big={big} />
       {lose != null && side ? (
         <View style={{ gap: 4 }}>
           <View style={styles.meta}>
@@ -100,23 +100,41 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
   );
 }
 
-/** MLB: who's pitching (and how many he's thrown), who's up and how their day is going. Tracked players in red. */
-function AtBat({ game, big }: { game: GameCard; big?: boolean }) {
+/**
+ * The live detail lines under the score, per sport. MLB: who's pitching (and how many he's thrown) and
+ * who's up. NBA: each side's top scorer. NFL: timeouts left and the passer (both on the game screen).
+ * NHL: shots on goal and who's in net. NBA/NFL/NHL: the last play. Tracked players in red.
+ */
+function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
   const { follows } = useStore();
-  const p = game.pitcher, b = game.batter;
-  // ESPN's batter line is hits-at bats today ("0-2"), sometimes with extras ("1-3, HR").
-  const today = (line?: string) => line?.replace(/^(\d+)-(\d+)/, '$1 for $2');
   const name = (x: { key: string; name: string }) => <Text style={follows.has(x.key) ? styles.mine : styles.who}>{x.name}</Text>;
-  return (
-    <View style={{ gap: 2 }}>
-      {p ? (
-        <Text style={styles.atBat} numberOfLines={big ? 2 : 1}>
-          Pitching: {name(p)}{p.pitches != null ? `, ${p.pitches} pitches` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}
-        </Text>
-      ) : null}
-      {b ? <Text style={styles.atBat} numberOfLines={1}>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</Text> : null}
-    </View>
-  );
+  const abbr = (side: Side) => game[side]?.team.abbrev ?? '';
+  const lines: ReactNode[] = [];
+  const line = (key: string, node: ReactNode, rows = 1) => lines.push(<Text key={key} style={styles.atBat} numberOfLines={big ? rows + 1 : rows}>{node}</Text>);
+  // Away first, like the team rows.
+  const both = (pair: { home?: LivePlayer; away?: LivePlayer } | undefined, fmt: (p: LivePlayer, side: Side) => ReactNode) =>
+    (['away', 'home'] as const).filter((s) => pair?.[s]).map((s, i) => <Text key={s}>{i ? ' · ' : ''}{fmt(pair![s]!, s)}</Text>);
+
+  if (game.league === 'mlb') {
+    const p = game.pitcher, b = game.batter;
+    // ESPN's batter line is hits-at bats today ("0-2"), sometimes with extras ("1-3, HR").
+    const today = (l?: string) => l?.replace(/^(\d+)-(\d+)/, '$1 for $2');
+    if (p) line('p', <>Pitching: {name(p)}{p.pitches != null ? `, ${p.pitches} pitches` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}</>);
+    if (b) line('b', <>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</>);
+  }
+  if (game.league === 'nba' && game.leaders) line('lead', <>Top scorers: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
+  if (game.league === 'nfl') {
+    if (game.timeouts && game.state === 'in') line('to', `Timeouts left: ${abbr('away')} ${game.timeouts.away} · ${abbr('home')} ${game.timeouts.home}`);
+    const withBall: Side | undefined = game.possession === game.home?.team.key ? 'home' : game.possession === game.away?.team.key ? 'away' : undefined;
+    if (big && game.leaders) line('pass', <>Passing: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>, 2);
+    else if (withBall && game.leaders?.[withBall]) { const p = game.leaders[withBall]!; line('pass', <>Passing: {name(p)}, {p.line}</>); }
+  }
+  if (game.league === 'nhl') {
+    if (game.shots) line('sog', `Shots on goal: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
+    if (game.goalies) line('g', <>In net: {both(game.goalies, (p) => <>{name(p)}{p.line ? ` (${p.line})` : ''}</>)}</>);
+  }
+  if (game.lastPlay && game.state === 'in') line('last', <>Last play: <Text style={styles.who}>{game.lastPlay}</Text></>);
+  return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;
 }
 
 /** MLB: who's on base (filled), how many out, and the count. */

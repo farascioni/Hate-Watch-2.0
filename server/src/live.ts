@@ -9,7 +9,7 @@ import {
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { boxPitchCounts, gameCard, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { boxGoalies, boxPassers, boxPitchCounts, gameCard, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -139,6 +139,8 @@ export class GameTracker {
     patchGame(`${league}:${gameId}`, {
       home: this.score.home, away: this.score.away, winProb: wp?.homeWinPercentage != null ? winProb(wp) : undefined,
       pitchCounts: league === 'mlb' && summary.status === 'fulfilled' ? boxPitchCounts(summary.value) : undefined,
+      goalies: league === 'nhl' && summary.status === 'fulfilled' ? boxGoalies(summary.value, this.ctx.goalies) : undefined,
+      passers: league === 'nfl' && summary.status === 'fulfilled' ? boxPassers(summary.value) : undefined,
     });
     if (final) this.finish(final);
   }

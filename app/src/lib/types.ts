@@ -26,7 +26,7 @@ export interface FeedItem {
 
 /** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
 export interface GameSide { team: Team; score: number | null; winner?: boolean }
-export interface AtBatPlayer { id: string; key: string; name: string; line?: string; pitches?: number }
+export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
 export interface GameCard {
   key: string; league: League; id: string;
   state: 'pre' | 'in' | 'post'; startsAt: number; detail: string;
@@ -36,14 +36,26 @@ export interface GameCard {
   batting?: string;
   /** MLB at-bat. Pitcher `pitches` = thrown today; `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K", batter "0-2"). */
   count?: { balls: number; strikes: number };
-  pitcher?: AtBatPlayer;
-  batter?: AtBatPlayer;
+  pitcher?: LivePlayer;
+  batter?: LivePlayer;
   winProb?: { home: number; away: number };
+  /** NBA/NFL/NHL: ESPN's text for the latest play. */
+  lastPlay?: string;
+  /** NBA: each side's top scorer ("10 pts"); NFL: each side's passer ("18/25, 256 YDS, 1 TD"). */
+  leaders?: { home?: LivePlayer; away?: LivePlayer };
+  timeouts?: { home: number; away: number }; // NFL
+  shots?: { home: number; away: number };    // NHL: shots on goal
+  goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: in net, line "9 saves on 10"
   session?: string;
   order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
 }
+/** An F1 race weekend from ESPN's calendar (name includes the sponsor, as ESPN has it): from first practice to the race's end. */
+export interface F1Weekend { name: string; startsAt: number; endsAt: number }
 export interface PlayLine { id: string; text: string; when: string; scoring: boolean }
 export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[] }
+
+/** Settings counter: each time a team you track lost (F1: your constructor scored no points), and per team (most first). */
+export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }
 
 export interface EventType {
   id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;

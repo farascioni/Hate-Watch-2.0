@@ -141,6 +141,72 @@ test('MLB at-bat: pitcher, batter and count from the scoreboard, pitches thrown 
   assert.deepEqual([S.getGame(g.key)!.pitcher!.name, S.getGame(g.key)!.pitcher!.pitches], ['New Guy', 3], "the new pitcher's own count");
 });
 
+test('NBA, NHL, NFL live details: top scorers, shots and goalies, passers and timeouts, the last play', () => {
+  const ev = (lg: string, detail: string, home: object, away: object, situation: object) => ({
+    id: `${lg}1`, date: new Date(T0).toISOString(), status: { type: { state: 'in', shortDetail: detail } },
+    competitions: [{ competitors: [{ homeAway: 'home', ...home }, { homeAway: 'away', ...away }], situation }],
+  });
+  // NBA, as ESPN sent MEM @ ATL (2026-10-05, 6:41 - 2nd).
+  const nba = S.gameCard('nba', ev('nba', '6:41 - 2nd',
+    { id: '1', score: '46', team: { abbreviation: 'ATL' }, leaders: [{ name: 'points', leaders: [{ displayValue: '10', athlete: { id: '3133628', shortName: 'N. Alexander-Walker' } }] }] },
+    { id: '29', score: '51', team: { abbreviation: 'MEM' }, leaders: [{ name: 'points', leaders: [{ displayValue: '12', athlete: { id: '4277905', shortName: 'J. Morant' } }] }] },
+    { lastPlay: { text: 'Jalen Johnson defensive rebound', probability: { homeWinPercentage: 0.184, tiePercentage: 0 } } }))!;
+  assert.deepEqual([nba.leaders!.home!.name, nba.leaders!.home!.line, nba.leaders!.away!.line], ['N. Alexander-Walker', '10 pts', '12 pts']);
+  assert.equal(nba.leaders!.home!.key, 'player:nba:3133628');
+  assert.equal(nba.lastPlay, 'Jalen Johnson defensive rebound');
+  assert.deepEqual(nba.winProb, { home: 0.184, away: 0.816 });
+
+  // NHL, as PHI @ TB at the end of the 1st: TB's goalie made 3 saves, PHI's 9, TB scored once.
+  const nhl = S.gameCard('nhl', ev('nhl', 'End of 1st',
+    { id: '14', score: '1', team: { abbreviation: 'TB' }, statistics: [{ name: 'saves', displayValue: '3' }] },
+    { id: '15', score: '0', team: { abbreviation: 'PHI' }, statistics: [{ name: 'saves', displayValue: '9' }] },
+    { lastPlay: { text: 'End of 1st Period' } }))!;
+  assert.deepEqual(nhl.shots, { home: 10, away: 3 }, "shots on goal: the other goalie's saves plus your goals");
+  assert.equal(nhl.lastPlay, undefined, '"End of 1st Period" is not a play worth showing');
+  const box = { boxscore: { players: [
+    { team: { id: '15' }, statistics: [{ name: 'goalies', labels: ['GA', 'SA', 'SOS', 'SOSA', 'SV', 'SV%'], athletes: [{ athlete: { id: '3', shortName: 'D. Vladar' }, stats: ['1', '10', '0', '0', '9', '.900'] }] }] },
+    { team: { id: '14' }, statistics: [{ name: 'goalies', labels: ['GA', 'SA', 'SOS', 'SOSA', 'SV', 'SV%'], athletes: [
+      { athlete: { id: '4', shortName: 'A. Vasilevskiy' }, stats: ['0', '3', '0', '0', '3', '1.000'] },
+      { athlete: { id: '5', shortName: 'Backup' }, stats: ['0', '0', '0', '0', '0', '.000'] }] }] },
+  ] } };
+  assert.deepEqual(S.boxGoalies(box, new Map([['14', '4']])), {
+    15: { id: '3', key: 'player:nhl:3', name: 'D. Vladar', line: '9 saves on 10' },
+    14: { id: '4', key: 'player:nhl:4', name: 'A. Vasilevskiy', line: '3 saves on 3' },
+  }, 'the goalie the tracker saw in net, not the backup listed after him');
+  assert.equal(S.boxGoalies(box)![14].name, 'Backup', 'without the tracker: the last goalie listed (the one who came in)');
+  S.upsertGame(nhl);
+  S.patchGame(nhl.key, { goalies: S.boxGoalies(box, new Map([['14', '4']])) });
+  assert.deepEqual([S.getGame(nhl.key)!.goalies!.home!.name, S.getGame(nhl.key)!.goalies!.away!.name], ['A. Vasilevskiy', 'D. Vladar']);
+  S.upsertGame(S.gameCard('nhl', { ...ev('nhl', 'Final', {}, {}, {}), id: 'nhl1', status: { type: { state: 'post', shortDetail: 'Final' } },
+    competitions: [{ competitors: [{ homeAway: 'home', id: '14', score: '1', team: {} }, { homeAway: 'away', id: '15', score: '0', team: {} }] }] })!);
+  assert.equal(S.getGame(nhl.key)!.goalies!.home!.name, 'A. Vasilevskiy', 'the final keeps who was in net');
+
+  // NFL: timeouts and the last play from the scoreboard; each side's passer from the box score.
+  const nfl = S.gameCard('nfl', ev('nfl', 'Q2 - 4:10',
+    { id: '18', score: '7', team: { abbreviation: 'NO' } },
+    { id: '1', score: '3', team: { abbreviation: 'ATL' } },
+    { possession: '1', downDistanceText: '2nd & 7 at ATL 33', homeTimeouts: 3, awayTimeouts: 2, lastPlay: { text: 'B.Robinson right end to ATL 33 for 3 yards' } }))!;
+  assert.deepEqual(nfl.timeouts, { home: 3, away: 2 });
+  assert.equal(nfl.lastPlay, 'B.Robinson right end to ATL 33 for 3 yards');
+  assert.equal(S.gameCard('nfl', ev('nfl', 'Q1 - 13:34', { id: '18', score: '0', team: {} }, { id: '1', score: '7', team: {} },
+    { lastPlay: { text: 'Official Timeout at 13:34.' } }))!.lastPlay, undefined, 'a TV timeout is not a play');
+  // As ESPN's summary sent ATL @ NO (2026-10-06): no shortName in the box; the passer is whoever has thrown the most.
+  const labels = ['C/ATT', 'YDS', 'AVG', 'TD', 'INT', 'SACKS', 'RTG'];
+  const passing = { boxscore: { players: [
+    { team: { id: '1' }, statistics: [{ name: 'passing', labels, athletes: [
+      { athlete: { id: '4360423', firstName: 'Michael', lastName: 'Penix Jr.', displayName: 'Michael Penix Jr.' }, stats: ['7/13', '61', '4.7', '0', '1', '1-6', '48.2'] },
+      { athlete: { id: '52', firstName: 'Bijan', lastName: 'Robinson', displayName: 'Bijan Robinson' }, stats: ['1/1', '12', '12.0', '1', '0', '0-0', '158.3'] }] }] },
+    { team: { id: '18' }, statistics: [{ name: 'passing', labels, athletes: [] }] },
+  ] } };
+  assert.deepEqual(S.boxPassers(passing), { 1: { id: '4360423', key: 'player:nfl:4360423', name: 'M. Penix Jr.', line: '7/13, 61 YDS, 1 INT' } },
+    'a trick-play pass does not make the running back the passer; a side that has not thrown has no line');
+  S.upsertGame(nfl);
+  S.patchGame(nfl.key, { passers: S.boxPassers(passing) });
+  assert.deepEqual(S.getGame(nfl.key)!.leaders, { away: { id: '4360423', key: 'player:nfl:4360423', name: 'M. Penix Jr.', line: '7/13, 61 YDS, 1 INT' } });
+  S.upsertGame(S.gameCard('nfl', ev('nfl', 'Q2 - 4:02', { id: '18', score: '7', team: {} }, { id: '1', score: '3', team: {} }, {}))!);
+  assert.equal(S.getGame(nfl.key)!.leaders!.away!.name, 'M. Penix Jr.', 'the next scoreboard read keeps the passers');
+});
+
 test('F1: a session card carries the running order, for anyone tracking F1', () => {
   const ev = { shortName: 'Singapore GP' };
   const comp = { id: 'R1', date: new Date().toISOString(), type: { text: 'Race' }, status: { period: 34, type: { state: 'in' } },
@@ -168,4 +234,19 @@ test('play-by-play for the game screen: newest first, NFL drives flattened, MLB 
   assert.deepEqual(nfl.map((p) => [p.when, p.text, p.scoring]), [['OT 9:01', 'TOUCHDOWN', true], ['Q4 2:14', 'B.Robinson up the middle for 2 yards', false], ['Q1 15:00', 'Kickoff', false]]);
   const mlb = await S.gamePlays(S.getGame('mlb:401907991')!);
   assert.deepEqual(mlb.map((p) => [p.when, p.text]), [['Bot 8th', 'Ramírez doubled to left.']]);
+});
+
+test("F1 between weekends: the next race weekend from ESPN's calendar, the current one while it's on", () => {
+  // As ESPN's F1 scoreboard sent it on 2026-10-06, the day after the Bahrain GP in Malaysia.
+  S.setF1Calendar([
+    { label: 'Gulf Air Bahrain Grand Prix in Malaysia', startDate: '2026-10-02T07:30Z', endDate: '2026-10-04T10:00Z' },
+    { label: 'Singapore Airlines Singapore Grand Prix', startDate: '2026-10-09T11:30Z', endDate: '2026-10-11T15:00Z' },
+    { label: 'MSC Cruises United States Grand Prix', startDate: '2026-10-23T20:30Z', endDate: '2026-10-25T23:00Z' },
+  ]);
+  assert.equal(S.nextF1Weekend(Date.parse('2026-10-06T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix');
+  assert.equal(S.nextF1Weekend(Date.parse('2026-10-10T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix', 'under way: still this one');
+  assert.deepEqual(S.nextF1Weekend(Date.parse('2026-10-12T00:00Z')), { name: 'MSC Cruises United States Grand Prix', startsAt: Date.parse('2026-10-23T20:30Z'), endsAt: Date.parse('2026-10-25T23:00Z') });
+  assert.equal(S.nextF1Weekend(Date.parse('2026-12-31T00:00Z')), undefined, 'the season is over');
+  S.setF1Calendar(undefined); // a scoreboard read without a calendar keeps the last one
+  assert.equal(S.nextF1Weekend(Date.parse('2026-10-06T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix');
 });

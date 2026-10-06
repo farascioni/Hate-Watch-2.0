@@ -3,6 +3,7 @@ import { db, shareCode } from './db.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
+import { hateWatchTally, isHateWatch, recordHateWatch } from './hate-watches.ts';
 import type { League } from './leagues.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
@@ -207,7 +208,13 @@ export function publish(events: Detected[], league: League) {
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId });
     const frame = JSON.stringify({ kind: 'event', item });
+    const hateWatch = isHateWatch(e);
     for (const f of fols) {
+      // A Successful Hate Watch counts for everyone tracking the team, whatever their alert settings.
+      if (hateWatch && recordHateWatch(f.device_id, e)) {
+        const tally = JSON.stringify({ kind: 'hateWatches', tally: hateWatchTally(f.device_id) });
+        for (const ws of sockets.get(f.device_id) ?? []) ws.send(tally);
+      }
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
       const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);

@@ -9,7 +9,7 @@ import { catalog } from './catalog.ts';
 import { urls, playerKey, teamKey } from './leagues.ts';
 import { START_WORD, ordinal, type Detected } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { raceCard, upsertGame } from './scores.ts';
+import { raceCard, setF1Calendar, upsertGame } from './scores.ts';
 
 const F1_SCAN_MS = Number(process.env.HW_F1_SCAN_MS ?? 30_000);     // scoreboard: sessions going live / finishing
 const F1_STATUS_MS = Number(process.env.HW_F1_STATUS_MS ?? 15_000); // followed drivers' race status
@@ -241,6 +241,7 @@ const preSeen = new Set<string>();
 export async function scanF1() {
   if (!watchedF1Drivers().size) { for (const w of races.values()) w.stop(); races.clear(); return; }
   const sb = await getJson(urls.scoreboard('f1'), { bust: true, timeoutMs: 8000 });
+  setF1Calendar(sb.leagues?.[0]?.calendar); // between weekends the scoreboard still shows the last one
   for (const ev of sb.events ?? []) {
     for (const comp of ev.competitions ?? []) {
       const kind = sessionKind(comp);

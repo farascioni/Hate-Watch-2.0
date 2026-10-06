@@ -46,6 +46,14 @@ export function startLabel(ts: number) {
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
+/** A race weekend's dates in the phone's time zone: "Oct 9–11", or "Oct 30 – Nov 1" across months. */
+export function weekendDates(from: number, to: number) {
+  const a = new Date(from), b = new Date(to);
+  const month = (d: Date) => d.toLocaleDateString([], { month: 'short' });
+  if (a.toDateString() === b.toDateString()) return `${month(a)} ${a.getDate()}`;
+  return month(a) === month(b) ? `${month(a)} ${a.getDate()}–${b.getDate()}` : `${month(a)} ${a.getDate()} – ${month(b)} ${b.getDate()}`;
+}
+
 /** The status line under the teams: clock or inning, who has the ball, or the start time. */
 export function statusLine(g: GameCard) {
   if (g.state === 'pre') return startLabel(g.startsAt);

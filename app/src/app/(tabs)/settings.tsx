@@ -4,6 +4,7 @@ import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { TipJar } from '../../components/TipJar';
+import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, leagueColors, radius, space } from '../../theme';
@@ -53,6 +54,8 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: space(16) }}>
+      <HateWatchCounter />
+
       <SectionHeader>Support Hate Watch</SectionHeader>
       <TipJar />
 

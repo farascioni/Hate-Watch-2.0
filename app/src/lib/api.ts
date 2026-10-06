@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, FeedItem, GameCard, GameDetail, League, Prefs, PrefsPatch, Target, Team, Player } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, League, Prefs, PrefsPatch, Target, Team, Player } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -69,7 +69,8 @@ export const api = {
 
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),
   clearFeed: () => request('DELETE', '/me/feed'),
-  scores: () => request<{ games: GameCard[] }>('GET', '/me/scores'),
+  scores: () => request<{ games: GameCard[]; nextF1?: F1Weekend }>('GET', '/me/scores'),
+  hateWatches: () => request<HateWatchTally>('GET', '/me/hate-watches'),
   game: (key: string) => request<GameDetail>('GET', `/me/games/${enc(key)}`),
   deleteMe: () => request('DELETE', '/me'),
   simulate: () => request('POST', '/dev/simulate', {}),

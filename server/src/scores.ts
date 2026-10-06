@@ -19,7 +19,7 @@ type TeamDto = ReturnType<typeof teamDto>;
 export interface Side { team: TeamDto; score: number | null; winner?: boolean }
 export interface Driver { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }
 /** MLB: who's pitching and who's up. `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K"; batter "0-2" today). */
-export interface AtBatPlayer { id: string; key: string; name: string; line?: string; pitches?: number }
+export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
 export interface GameCard {
   key: string;            // `${league}:${ESPN event id}` (F1: `f1:${session id}`)
   league: League;
@@ -35,9 +35,14 @@ export interface GameCard {
   bases?: { first: boolean; second: boolean; third: boolean; outs: number }; // MLB
   batting?: string;       // MLB: team key at bat
   count?: { balls: number; strikes: number }; // MLB: the at-bat's count
-  pitcher?: AtBatPlayer;  // MLB: pitches = thrown today (from the box score)
-  batter?: AtBatPlayer;
-  winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (NFL, MLB)
+  pitcher?: LivePlayer;  // MLB: pitches = thrown today (from the box score)
+  batter?: LivePlayer;
+  winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (NFL, MLB, NBA)
+  lastPlay?: string;      // NBA, NFL, NHL: ESPN's text for the latest play
+  leaders?: { home?: LivePlayer; away?: LivePlayer }; // NBA: each side's top scorer; NFL: each side's passer
+  timeouts?: { home: number; away: number };          // NFL: timeouts left
+  shots?: { home: number; away: number };             // NHL: shots on goal
+  goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: who's in net, with saves (from the box score)
   session?: string;       // F1: "Singapore GP · Race"
   order?: Driver[];       // F1: running order / classification
 }
@@ -82,7 +87,7 @@ export function gameCard(lg: League, ev: any): GameCard | null {
       card.bases = { first: !!sit.onFirst, second: !!sit.onSecond, third: !!sit.onThird, outs: Number(sit.outs ?? 0) };
       const half = card.detail.match(/^(Top|Bot)/)?.[1]; // "Mid 5th" / "End 4th": between halves, nobody's up
       if (half) card.batting = half === 'Top' ? card.away!.team.key : card.home!.team.key;
-      const who = (x: any): AtBatPlayer | undefined => {
+      const who = (x: any): LivePlayer | undefined => {
         const id = x?.playerId ?? x?.athlete?.id;
         if (id == null) return undefined;
         const name = x.athlete?.shortName ?? x.athlete?.displayName ?? catalog.playerByEspn('mlb', String(id))?.name ?? '?';
@@ -94,8 +99,80 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     }
     const pr = sit.lastPlay?.probability;
     if (pr?.homeWinPercentage != null) card.winProb = winProb(pr);
+    // MLB already says who's pitching and who's up; the other sports get the latest play.
+    if (lg !== 'mlb' && sit.lastPlay?.text && !/^((end|start) of |official timeout)/i.test(sit.lastPlay.text)) card.lastPlay = String(sit.lastPlay.text);
+    if (lg === 'nfl' && sit.homeTimeouts != null && sit.awayTimeouts != null) card.timeouts = { home: Number(sit.homeTimeouts), away: Number(sit.awayTimeouts) };
+  }
+  if (state !== 'pre') {
+    // NBA: each side's top scorer, from ESPN's leaders on the scoreboard.
+    if (lg === 'nba') {
+      const h = leader(lg, home, 'points', 'pts'), a = leader(lg, away, 'points', 'pts');
+      if (h || a) card.leaders = { ...(h ? { home: h } : {}), ...(a ? { away: a } : {}) };
+    }
+    // NFL passers: once it kicks off, the scoreboard only has the game's single passing leader, so
+    // each side's comes from the tracker's box score (boxPassers → patchGame).
+    // NHL: a side's shots on goal are the other goalie's saves plus its own goals.
+    if (lg === 'nhl') {
+      const saves = (x: any) => Number(x.statistics?.find((st: any) => st.name === 'saves')?.displayValue);
+      const hs = saves(home), as = saves(away);
+      if (Number.isFinite(hs) && Number.isFinite(as)) card.shots = { home: as + (card.home!.score ?? 0), away: hs + (card.away!.score ?? 0) };
+    }
   }
   return card;
+}
+
+/** One side's leader in a stat from the scoreboard (e.g. NBA points: "N. Alexander-Walker", "10 pts"). */
+function leader(lg: League, side: any, stat: string, unit = ''): LivePlayer | undefined {
+  const top = side.leaders?.find((l: any) => l.name === stat)?.leaders?.[0];
+  const id = top?.athlete?.id;
+  if (id == null) return undefined;
+  return { id: String(id), key: playerKey(lg, String(id)), name: top.athlete.shortName ?? top.athlete.displayName ?? '?', line: unit ? `${top.displayValue ?? top.value} ${unit}` : String(top.displayValue ?? top.value) };
+}
+
+/**
+ * NHL: each side's goalie in net, with saves and shots against, from a summary's box score. `inNet` is
+ * the live tracker's goalie per team (teamId → athleteId); without it, the last goalie listed (the
+ * one who came in) is in net.
+ */
+export function boxGoalies(summary: any, inNet?: Map<string, string>): Record<string, LivePlayer> | undefined {
+  const out: Record<string, LivePlayer> = {};
+  for (const t of summary?.boxscore?.players ?? []) {
+    const st = t.statistics?.find((x: any) => x.name === 'goalies' || x.type === 'goalies');
+    if (!st?.athletes?.length) continue;
+    const labels: string[] = st.labels ?? st.keys ?? [];
+    const sv = labels.indexOf('SV'), sa = labels.indexOf('SA');
+    const teamId = String(t.team?.id);
+    const pick = st.athletes.find((a: any) => String(a.athlete?.id) === inNet?.get(teamId)) ?? st.athletes.at(-1);
+    const id = pick?.athlete?.id;
+    if (id == null) continue;
+    const saves = sv >= 0 ? Number(pick.stats?.[sv]) : NaN, against = sa >= 0 ? Number(pick.stats?.[sa]) : NaN;
+    out[teamId] = {
+      id: String(id), key: playerKey('nhl', String(id)), name: pick.athlete.shortName ?? pick.athlete.displayName ?? '?',
+      ...(Number.isFinite(saves) ? { line: `${saves} save${saves === 1 ? '' : 's'}${Number.isFinite(against) ? ` on ${against}` : ''}` } : {}),
+    };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** NFL: each side's passer (the most attempts) with his line ("14/22, 168 YDS, 1 TD, 1 INT"), from a summary's box score. */
+export function boxPassers(summary: any): Record<string, LivePlayer> | undefined {
+  const out: Record<string, LivePlayer> = {};
+  for (const t of summary?.boxscore?.players ?? []) {
+    const st = t.statistics?.find((x: any) => x.name === 'passing');
+    const labels: string[] = st?.labels ?? [];
+    const at = (a: any, l: string) => a.stats?.[labels.indexOf(l)];
+    const att = (a: any) => Number(String(at(a, 'C/ATT') ?? '').split('/')[1]) || 0;
+    const pick = (st?.athletes ?? []).reduce((best: any, a: any) => (!best || att(a) > att(best) ? a : best), undefined);
+    const p = pick?.athlete;
+    if (p?.id == null || at(pick, 'C/ATT') == null) continue;
+    const td = Number(at(pick, 'TD')), int = Number(at(pick, 'INT'));
+    out[String(t.team?.id)] = {
+      id: String(p.id), key: playerKey('nfl', String(p.id)),
+      name: p.shortName ?? (p.firstName && p.lastName ? `${p.firstName[0]}. ${p.lastName}` : p.displayName ?? '?'), // the box has no shortName
+      line: [at(pick, 'C/ATT'), at(pick, 'YDS') != null && `${at(pick, 'YDS')} YDS`, td > 0 && `${td} TD`, int > 0 && `${int} INT`].filter(Boolean).join(', '),
+    };
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** MLB: pitches thrown by each pitcher today, from a summary's box score ("PC", or the first half of "PC-ST"). */
@@ -165,6 +242,9 @@ export function upsertGame(next: GameCard) {
     }
     if (!next.winProb && prev.winProb) next.winProb = prev.winProb; // from the tracker's summary
   }
+  // NHL goalies and NFL passers come from the tracker's box score (not the scoreboard): keep them, through the final too.
+  if (prev?.goalies && !next.goalies && next.state !== 'pre') next.goalies = prev.goalies;
+  if (prev?.leaders && !next.leaders && next.state !== 'pre') next.leaders = prev.leaders;
   cards.set(next.key, next);
   const json = JSON.stringify(next);
   if (lastSent.get(next.key) === json) return;
@@ -173,7 +253,7 @@ export function upsertGame(next: GameCard) {
 }
 
 /** What the game tracker (2s polls of a live game) knows sooner than the scoreboard. */
-export function patchGame(key: string, patch: { home?: number; away?: number; winProb?: GameCard['winProb']; pitchCounts?: Record<string, number> }) {
+export function patchGame(key: string, patch: { home?: number; away?: number; winProb?: GameCard['winProb']; pitchCounts?: Record<string, number>; goalies?: Record<string, LivePlayer>; passers?: Record<string, LivePlayer> }) {
   if (patch.pitchCounts) pitchCounts.set(key, patch.pitchCounts);
   const cur = cards.get(key);
   if (!cur || cur.state !== 'in') return;
@@ -181,6 +261,13 @@ export function patchGame(key: string, patch: { home?: number; away?: number; wi
   if (patch.home != null && cur.home) next.home = { ...cur.home, score: Math.max(cur.home.score ?? 0, patch.home) };
   if (patch.away != null && cur.away) next.away = { ...cur.away, score: Math.max(cur.away.score ?? 0, patch.away) };
   if (patch.winProb) next.winProb = patch.winProb;
+  // teamId → player (boxGoalies / boxPassers) as the card's home and away.
+  const sides = (byTeam: Record<string, LivePlayer>) => {
+    const h = cur.home && byTeam[cur.home.team.espnId], a = cur.away && byTeam[cur.away.team.espnId];
+    return h || a ? { ...(h ? { home: h } : {}), ...(a ? { away: a } : {}) } : undefined;
+  };
+  if (patch.goalies) next.goalies = sides(patch.goalies) ?? next.goalies;
+  if (patch.passers) next.leaders = sides(patch.passers) ?? next.leaders;
   upsertGame(next);
 }
 
@@ -190,6 +277,17 @@ export function pruneGames(league: League, seen: Set<string>, now = Date.now()) 
     if (g.league === league && !seen.has(k) && now - g.startsAt > 36 * 3600_000) { cards.delete(k); lastSent.delete(k); pitchCounts.delete(k); }
   }
 }
+
+/** F1's race weekends, from the scoreboard's calendar: when no session is on, the Scores tab says when the next one is. */
+export interface F1Weekend { name: string; startsAt: number; endsAt: number }
+let f1Weekends: F1Weekend[] = [];
+export function setF1Calendar(cal: any) {
+  if (!Array.isArray(cal)) return;
+  f1Weekends = cal.map((c: any) => ({ name: String(c.label ?? ''), startsAt: Date.parse(c.startDate), endsAt: Date.parse(c.endDate) }))
+    .filter((w) => w.name && Number.isFinite(w.startsAt) && Number.isFinite(w.endsAt)).sort((a, b) => a.startsAt - b.startsAt);
+}
+/** The weekend under way, or else the next one (none after the season's last race). */
+export const nextF1Weekend = (now = Date.now()) => f1Weekends.find((w) => w.endsAt > now);
 
 // ─── Whose games ──────────────────────────────────────────────────────────────────────────────
 interface Mine { teams: Set<string>; f1: boolean }

@@ -9,7 +9,8 @@ import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
-import { forgetDeviceTeams, gamePlays, gamesFor, getGame } from './scores.ts';
+import { forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
+import { hateWatchTally } from './hate-watches.ts';
 
 class Html {
   body: string;
@@ -96,7 +97,7 @@ route('DELETE', '/me/follows/:key', true, (req, _u, [key]) => {
 });
 
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
-route('GET', '/me/scores', true, (req) => ({ games: gamesFor(req.deviceId!) }));
+route('GET', '/me/scores', true, (req) => ({ games: gamesFor(req.deviceId!), nextF1: nextF1Weekend() }));
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');
@@ -105,6 +106,9 @@ route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const plays = await gamePlays(game).catch(() => []); // the score card still works if ESPN hiccups
   return { game, alerts, plays };
 });
+
+// ─── Settings counter: Successful Hate Watches (a team you track lost) ─────────────────────────
+route('GET', '/me/hate-watches', true, (req) => hateWatchTally(req.deviceId!));
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────
 route('GET', '/me/prefs', true, (req) => getPrefs(req.deviceId!));

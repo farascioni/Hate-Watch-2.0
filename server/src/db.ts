@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS feed (
 );
 CREATE INDEX IF NOT EXISTS feed_order ON feed(device_id, occurred_at DESC);
 
+-- Successful Hate Watches (hate-watches.ts): kept apart from the feed so clearing it doesn't reset the count.
+CREATE TABLE IF NOT EXISTS hate_watches (
+  device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  event_id TEXT NOT NULL, target_key TEXT NOT NULL, occurred_at INTEGER NOT NULL,
+  PRIMARY KEY (device_id, event_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `);
 

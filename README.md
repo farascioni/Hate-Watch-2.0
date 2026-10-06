@@ -228,12 +228,31 @@ The second tab lists today's games for the teams you track and the teams of play
 - **"Up 3" / "Tied" (grey).**
 - **"Successful Hate Watch!" (finals).**
 
-Live MLB cards also show the count next to the bases and outs, plus two lines: "Pitching: S. Armstrong, 6 pitches" and "At bat: M. Murakami, 1 for 3, RBI, K". Tracked players' names show in red, and the game screen adds the pitcher's full line ("0.1 IP, 0 ER, 0 H, 0 BB"). The pitcher, batter, their lines and the count come from the scoreboard's \`situation\`, which leaves them out between innings. Pitches thrown come from the summary's box score ("PC", or the first half of "PC-ST") that the 2s tracker already reads (\`boxPitchCounts\`), matched to the current pitcher's id, so a pitching change shows the new pitcher's own count. Where ESPN publishes win probability (NFL, MLB), a bar shows the chance they lose. The newest alert from the game sits underneath. F1 race, sprint and qualifying sessions show your drivers' (or your constructor's cars') running order. Tapping a card opens `app/src/app/game/[key].tsx`: the live card, your alerts from that game, and the latest 25 plays (MLB at-bat results only; F1, the full running order).
+Live MLB cards also show the count next to the bases and outs, plus two lines: "Pitching: S. Armstrong, 6 pitches" and "At bat: M. Murakami, 1 for 3, RBI, K". Tracked players' names show in red, and the game screen adds the pitcher's full line ("0.1 IP, 0 ER, 0 H, 0 BB"). The pitcher, batter, their lines and the count come from the scoreboard's `situation`, which leaves them out between innings. Pitches thrown come from the summary's box score ("PC", or the first half of "PC-ST") that the 2s tracker already reads (`boxPitchCounts`), matched to the current pitcher's id, so a pitching change shows the new pitcher's own count.
+
+The other sports get their own lines under the score (`LiveDetails` in `app/src/components/GameCard.tsx`). Tracked players show in red there too:
+
+- **NBA:** "Top scorers: T. Jerome 10 pts · N. Alexander-Walker 12 pts", from each competitor's `leaders` on the scoreboard (the game's points leader once it starts).
+- **NFL:** "Timeouts left: ATL 3 · NO 3" from `situation`, and the passer for the team with the ball ("Passing: T. Shough, 0/1, 0 YDS"; TD and INT are added once there are any). The game screen shows both passers. Once a game kicks off, the scoreboard only names one passing leader for the whole game, so each side's passer (whoever has the most attempts) comes from the summary's box score that the 2s tracker reads (`boxPassers`). It's kept through the final.
+- **NHL:** "Shots on goal: OTT 6 · BOS 3" and "In net: L. Ullmark (3 saves on 3) · J. Swayman (4 saves on 6)". The scoreboard only has each team's saves, so shots on goal are the other side's saves plus their goals. The goalie in net and their saves come from the summary's box score that the 2s tracker already reads (`boxGoalies`). It's the goalie the tracker has in net (so a change shows the new goalie), or else the last goalie the box lists. Scoreboard reads don't carry goalies, so the line stays on the card through the final.
+- **NBA, NFL, NHL:** "Last play: …", ESPN's text for the latest play while the game is live ("Start of …", "End of …" and "Official Timeout" are skipped).
+- Checked live on 2026-10-05 against MEM @ ATL, OTT @ BOS and ATL @ NO.
+
+Where ESPN publishes win probability (NBA, NFL, MLB), a bar shows the chance they lose. The newest alert from the game sits underneath. F1 race, sprint and qualifying sessions show your drivers' (or your constructor's cars') running order. Tapping a card opens `app/src/app/game/[key].tsx`: the live card, your alerts from that game, and the latest 25 plays (MLB at-bat results only; F1, the full running order).
 
 - **Where the data comes from** (`server/src/scores.ts`): the live engine already reads every league's ESPN scoreboard every 10s, and F1's every 30s. Each read upserts a card per game (`gameCard` / `raceCard`). The 2s game tracker patches in scores from the play-by-play, which runs ahead of the scoreboard, and win probability from the summary (`patchGame`). While a game is live, each side's score only goes up, so a stale scoreboard read can't undo a run the feed already announced. The final read is exact.
+- **F1 with nothing on** (the F1 filter, or All when you only track F1): "No F1 sessions today", then "Next race weekend: Singapore Airlines Singapore Grand Prix, Oct 9–11." (or "…is this weekend. Practice isn't shown here." once first practice starts), then which sessions show up. Between weekends, ESPN's F1 scoreboard still shows the last one, so the next one comes from its calendar.
 - **Live:** any change is pushed as `{ kind: 'score', game }` over the existing WebSocket, only to connected devices that track a side (`deviceTeams`: teams plus followed players' teams, cached 5s and reset on follow/unfollow). The first sighting of a game (e.g. after a restart) is a baseline, not a push.
-- **API:** `GET /me/scores` lists the device's games. `GET /me/games/<league:id>` adds the device's alerts from that game (`events.game_id`; F1 alerts now store their session id there) and the play-by-play from ESPN's summary, cached 8s while live and 5 min after. Feed items carry `gameId`, so the app links alerts to their game.
+- **API:** `GET /me/scores` lists the device's games, plus `nextF1`: the F1 race weekend that's on, or else the next one, from the F1 scoreboard's calendar (`setF1Calendar` / `nextF1Weekend`). `GET /me/games/<league:id>` adds the device's alerts from that game (`events.game_id`; F1 alerts now store their session id there) and the play-by-play from ESPN's summary, cached 8s while live and 5 min after. Feed items carry `gameId`, so the app links alerts to their game.
 - Checked live against CHW @ CLE on 2026-10-05: the card, the losing chance (Guardians 25% to lose), a pushed update at the top of the 6th, and the game screen's play-by-play.
+
+## Successful Hate Watch counter
+
+The top of Settings shows how many Successful Hate Watches the device has had, with the teams that gave it the most ("Falcons 4 · Hawks 3 · Guardians 2", then "+2 more"). One counts each time a team you track loses (`team.lost`). In F1 it counts when your constructor finishes outside the points (`f1.team.no_points`, a double DNF included).
+
+- **Counted on the server** (`server/src/hate-watches.ts`): `publish()` adds a `hate_watches` row for every device tracking the team, before alert settings are checked. Turning "Loses a game" off doesn't stop the count, and Settings → Clear feed doesn't reset it. "Delete all my data" does, because the rows cascade with the device. Re-polls don't double count (one row per device and event).
+- **Live:** after each new one, the device's sockets get `{ kind: 'hateWatches', tally }`. The app also reads `GET /me/hate-watches` (`{ total, teams: [{ target, count }] }`, most first) whenever its socket connects.
+- **Losses from before the counter:** on the first start with it, the server counts the losses already in each feed, plus the ones that happened while a device tracked the team but never reached the feed (the alert was off). A `kv` flag makes this run once.
 
 ## Startup guide
 
@@ -260,7 +279,7 @@ The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a
 
 ```bash
 cd server
-npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, a simulated F1 race, game starts, share links
+npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, a simulated F1 race, game starts, share links, Scores tab, the hate watch counter
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
 node test/core-vs-site.ts     # both ESPN sources produce identical detections
 HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws delivery, prefs, mute, unfollow, auth
