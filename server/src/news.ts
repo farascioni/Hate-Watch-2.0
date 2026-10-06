@@ -124,9 +124,11 @@ export function newsEvents(lg: League, articles: Article[], since: number): Dete
       const last = p.name.split(' ').filter((w) => !/^(Jr|Sr|II|III|IV)\.?$/.test(w)).at(-1) ?? p.name;
       out.push({ id: `news:${lg}:${a.id}:${key}`, targetKey: key, title: titled(last), ...base });
     }
+    // Teams have their own two switches (in Settings → Team alerts): the same alerts, under team.* types.
+    const forTeam = { type: `team.${kind.type}`, ...(kind.aliases ? { aliases: kind.aliases.map((t) => `team.${t}`) } : {}) };
     for (const key of teams) {
       const t = catalog.team(key)!;
-      out.push({ id: `news:${lg}:${a.id}:${key}`, targetKey: key, title: titled(t.shortName ?? t.name), ...base });
+      out.push({ id: `news:${lg}:${a.id}:${key}`, targetKey: key, title: titled(t.shortName ?? t.name), ...base, ...forTeam });
     }
   }
   return out;

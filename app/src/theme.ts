@@ -14,6 +14,7 @@ export const colors = {
 
 export const leagueColors: Record<string, string> = {
   nba: '#C9082A',
+  wnba: '#E8590C', // WNBA orange
   mlb: '#1D6FD8',
   nfl: '#2E7D32',
   nhl: '#9CA3AF',

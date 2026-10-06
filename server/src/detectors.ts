@@ -1,6 +1,6 @@
 import { athleteIdFromRef, teamIdFromRef } from './espn.ts';
 import { catalog, normalize } from './catalog.ts';
-import { playerKey, teamKey, type League } from './leagues.ts';
+import { BASKETBALL, playerKey, teamKey, type League } from './leagues.ts';
 
 /** League-agnostic view of one play. */
 export interface NPlay {
@@ -644,27 +644,28 @@ function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | u
   return qb ? { qb, named: !!named } : undefined;
 }
 
+/** NBA and WNBA (same play-by-play): alerts are `nba.*` or `wnba.*`, each league with its own switches. */
 function nba(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
-  const t = p.text;
+  const lg = g.league, t = p.text;
   const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id;
   if (!actor && !/technical/i.test(p.type)) return out;
   if (p.shooting && !p.scoring) {
     if (/blocks/i.test(t)) {
       const shooter = onTeam(g, p, p.teamId) ?? p.participants[1]?.id;
-      if (shooter) out.push(mk(g, p, 'nba.got_blocked', shooter, `${nameOf('nba', shooter)} got sent back ✋`, { aliases: ['nba.missed_shot'] }));
+      if (shooter) out.push(mk(g, p, `${lg}.got_blocked`, shooter, `${nameOf(lg, shooter)} got sent back ✋`, { aliases: [`${lg}.missed_shot`] }));
     } else if (/free throw/i.test(t + p.type) && /miss/i.test(t)) {
-      out.push(mk(g, p, 'nba.missed_free_throw', actor!, `${nameOf('nba', actor!)} missed a free throw`));
+      out.push(mk(g, p, `${lg}.missed_free_throw`, actor!, `${nameOf(lg, actor!)} missed a free throw`));
     } else if (/miss/i.test(t)) {
       const three = /three point/i.test(t);
-      out.push(mk(g, p, 'nba.missed_shot', actor!, `${nameOf('nba', actor!)} missed ${three ? 'a three' : 'a shot'}`));
+      out.push(mk(g, p, `${lg}.missed_shot`, actor!, `${nameOf(lg, actor!)} missed ${three ? 'a three' : 'a shot'}`));
     }
   } else if (/turnover/i.test(p.type) && actor && p.participants.length) {
-    out.push(mk(g, p, 'nba.turnover', actor, `${nameOf('nba', actor)} turned it over`));
+    out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`));
   } else if (/technical|flagrant/i.test(p.type) || /ejected/i.test(t)) {
-    for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) out.push(mk(g, p, 'nba.technical', x.id, `${nameOf('nba', x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`));
+    for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) out.push(mk(g, p, `${lg}.technical`, x.id, `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`));
   } else if (/foul/i.test(p.type) && actor) {
-    out.push(mk(g, p, 'nba.foul', actor, `${nameOf('nba', actor)} committed a foul`));
+    out.push(mk(g, p, `${lg}.foul`, actor, `${nameOf(lg, actor)} committed a foul`));
   }
   return out;
 }
@@ -694,7 +695,7 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
 }
 
 // F1 has no play-by-play; its alerts come from session results (f1.ts).
-export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, nhl, f1: () => [] };
+export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, wnba: nba, nhl, f1: () => [] };
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───
 /**
@@ -706,7 +707,7 @@ export function nextScore(prev: { home: number; away: number }, p: NPlay) {
   return { home: Math.max(prev.home, p.home), away: Math.max(prev.away, p.away) };
 }
 
-export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out' };
+export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out' };
 
 /** "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). */
 export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
@@ -756,7 +757,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     if (safety) {
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
       out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind });
-    } else if (delta > 0 && g.league !== 'nba') {
+    } else if (delta > 0 && !BASKETBALL.has(g.league)) {
       out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind });
     }
     if (fellBehind) {

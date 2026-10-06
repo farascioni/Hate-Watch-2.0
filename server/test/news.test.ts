@@ -58,22 +58,24 @@ test('what an item is: trouble, a fine or suspension, both, or neither', () => {
   }
 });
 
-test('who it is about: the tagged player and the team, a lone tagged team, never a former team or the one on the receiving end', () => {
+test('who it is about (teams under their own team.* switches): the tagged player and the team, a lone tagged team, never a former team or the one on the receiving end', () => {
   assert.deepEqual(view(newsEvents('nba', [brooks], 0)), [
     ['off_field', 'player:nba:3155526', "Suns' Dillon Brooks charged with DUI from March arrest"],
-    ['off_field', 'team:nba:21', "Suns' Dillon Brooks charged with DUI from March arrest"],
+    ['team.off_field', 'team:nba:21', "Suns' Dillon Brooks charged with DUI from March arrest"],
   ]);
   const [p, t] = newsEvents('nba', [brooks], 0);
   assert.equal(p.moment, t.moment, 'one item: the player and team alerts share a moment');
+  assert.deepEqual(newsEvents('nfl', [{ ...brooks, id: 3, headline: "Cowboys' George Pickens suspended two games for violating personal conduct policy", categories: [athlete('52', 'George Pickens'), teamTag('6', 'Dallas Cowboys')] }], 0).map((e) => [e.type, e.aliases]),
+    [['fine_suspension', ['off_field']], ['team.fine_suspension', ['team.off_field']]], 'a conduct suspension counts as both, for players and for teams');
   assert.equal(p.body, brooks.description);
-  assert.deepEqual(view(newsEvents('mlb', [rivero], 0)), [['fine_suspension', 'team:mlb:20', 'Nationals: Francisco Rivero, Raudi Perez suspended for positive drug tests']],
+  assert.deepEqual(view(newsEvents('mlb', [rivero], 0)), [['team.fine_suspension', 'team:mlb:20', 'Nationals: Francisco Rivero, Raudi Perez suspended for positive drug tests']],
     'minor leaguers are not tagged: their team, named in the description, is');
   assert.deepEqual(newsEvents('nfl', [exBears], 0), [], 'a former Bear: not the Bears');
   const hit = { id: 1, type: 'HeadlineNews', published: at(1), headline: "Ravens' Roquan Smith fined $25K for hit on Bengals QB Joe Burrow", description: '',
     categories: [athlete('50', 'Roquan Smith'), athlete('51', 'Joe Burrow'), teamTag('33', 'Baltimore Ravens'), teamTag('4', 'Cincinnati Bengals')] };
-  assert.deepEqual(view(newsEvents('nfl', [hit], 0)), [['fine_suspension', 'player:nfl:50', hit.headline], ['fine_suspension', 'team:nfl:33', hit.headline]], 'Burrow and the Bengals took the hit');
+  assert.deepEqual(view(newsEvents('nfl', [hit], 0)), [['fine_suspension', 'player:nfl:50', hit.headline], ['team.fine_suspension', 'team:nfl:33', hit.headline]], 'Burrow and the Bengals took the hit');
   const knicks = { id: 2, type: 'HeadlineNews', published: at(1), headline: 'NBA fines Knicks $25K for violating injury reporting rules', categories: [teamTag('18', 'New York Knicks')] };
-  assert.deepEqual(view(newsEvents('nba', [knicks], 0)), [['fine_suspension', 'team:nba:18', knicks.headline]]);
+  assert.deepEqual(view(newsEvents('nba', [knicks], 0)), [['team.fine_suspension', 'team:nba:18', knicks.headline]]);
 });
 
 test('only ESPN news items, only new ones', () => {
@@ -89,6 +91,8 @@ test('one alert per device and item; the first scan is history', async () => {
     ['team-only', {}, ['team:nba:21']],
     ['trouble-off', { types: { off_field: false } }, ['player:nba:3155526']],
     ['cowboys', { types: { fine_suspension: false } }, ['player:nfl:52']],
+    ['players-off', { types: { off_field: false } }, ['player:nba:3155526', 'team:nba:21']],
+    ['teams-off', { types: { 'team.off_field': false } }, ['team:nba:21']],
   ];
   for (const [id, prefs, targets] of setup) { device.run(id, 's', 'test', JSON.stringify({ ...DEFAULT_PREFS, ...prefs })); for (const t of targets) follow.run(id, t); }
   const feeds: Record<string, any[]> = { nba: [{ ...brooks, published: new Date(Date.now() - 3600_000).toISOString() }], nfl: [] };
@@ -103,7 +107,9 @@ test('one alert per device and item; the first scan is history', async () => {
   await scanNews('nba');
   await scanNews('nba'); // a re-scan
   assert.deepEqual(feed('both'), ['off_field player:nba:3155526'], 'tracking him and the Suns: one alert, his');
-  assert.deepEqual(feed('team-only'), ['off_field team:nba:21']);
+  assert.deepEqual(feed('team-only'), ['team.off_field team:nba:21']);
+  assert.deepEqual(feed('players-off'), ['team.off_field team:nba:21'], 'his switch is off, the team one is on: the team alert comes instead');
+  assert.deepEqual(feed('teams-off'), [], 'team alerts off, tracking only the Suns');
   assert.deepEqual(feed('trouble-off'), []);
 
   await scanNews('nfl');

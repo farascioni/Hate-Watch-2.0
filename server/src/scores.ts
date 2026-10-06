@@ -7,7 +7,7 @@ import { getJson as espnGetJson } from './espn.ts';
 import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
-import { playerKey, teamKey, urls, type League } from './leagues.ts';
+import { BASKETBALL, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { sendToConnected } from './fanout.ts';
 
 /** Seam for tests (test/scores.test.ts). Production never changes it. */
@@ -111,8 +111,8 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     if (lg === 'nfl' && sit.homeTimeouts != null && sit.awayTimeouts != null) card.timeouts = { home: Number(sit.homeTimeouts), away: Number(sit.awayTimeouts) };
   }
   if (state !== 'pre') {
-    // NBA: each side's top scorer, from ESPN's leaders on the scoreboard.
-    if (lg === 'nba') {
+    // NBA/WNBA: each side's top scorer, from ESPN's leaders on the scoreboard.
+    if (BASKETBALL.has(lg)) {
       const h = leader(lg, home, 'points', 'pts'), a = leader(lg, away, 'points', 'pts');
       if (h || a) card.leaders = { ...(h ? { home: h } : {}), ...(a ? { away: a } : {}) };
     }
@@ -329,7 +329,7 @@ const involves = (g: GameCard, mine: Mine) =>
 /** How long a final stays on the Scores tab after it ends: the last game a team played, for a day. */
 export const KEEP_FINALS_MS = 24 * 3600_000;
 /** A typical game, start to final: when a game was already over the first time we saw it. */
-export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
+export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
 /** Live now, starting within a day, or finished in the last 24 hours (every game, so both halves of a doubleheader). */
 export const inWindow = (g: GameCard, now = Date.now()) =>
   g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)

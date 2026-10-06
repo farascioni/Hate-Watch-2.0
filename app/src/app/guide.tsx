@@ -23,7 +23,7 @@ const PAGES: Page[] = [
   },
   {
     key: 'track', icon: 'search', where: 'Search tab', title: 'Pick who to hate',
-    body: 'Type a player or team and tap Track. The NBA, MLB, NFL, NHL and F1 are all here, and you can track as many as you like.',
+    body: 'Type a player or team and tap Track. The NBA, MLB, NFL, NHL, F1 and WNBA are all here, and you can track as many as you like.',
     demo: () => (
       <DemoCard>
         <Badge text="DAL" color="#041E42" />

@@ -14,7 +14,7 @@ export interface EventTypeDef {
 
 // The single source of truth for every notification Hate Watch can send.
 // The app renders its Settings screen from this list (GET /catalog/event-types).
-export const EVENT_TYPES: EventTypeDef[] = [
+const BASE: EventTypeDef[] = [
   // ── MLB players
   { id: 'mlb.batter.strikeout', scope: 'player', leagues: ['mlb'], label: 'Strikes out', description: 'Tracked hitter strikes out (swinging or looking).', defaultOn: true, emoji: '🌀' },
   { id: 'mlb.batter.double_play', scope: 'player', leagues: ['mlb'], label: 'Grounds into a double play', description: 'Tracked hitter hits into a double play.', defaultOn: true, emoji: '✌️' },
@@ -23,8 +23,8 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'mlb.pitcher.home_run_allowed', scope: 'player', leagues: ['mlb'], label: 'Gives up a home run', description: 'Tracked pitcher serves up a homer.', defaultOn: true, emoji: '💣' },
   { id: 'mlb.pitcher.walk', scope: 'player', leagues: ['mlb'], label: 'Issues a walk / HBP', description: 'Tracked pitcher walks or hits a batter.', defaultOn: false, emoji: '🚶' },
   // id kept from when this was caught-stealing only, so existing users' on/off choice carries over.
-  { id: 'off_field', scope: 'player', alsoScope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Off-field trouble', description: 'A tracked player or team is in legal or off-field trouble: an arrest, charges, a lawsuit, allegations or an investigation (from ESPN\'s news).', defaultOn: true, emoji: '🚨' },
-  { id: 'fine_suspension', scope: 'player', alsoScope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Fined or suspended', description: 'A tracked player or team is fined, suspended or banned (from ESPN\'s news). A suspension for off-field trouble counts as both.', defaultOn: true, emoji: '🚫' },
+  { id: 'off_field', scope: 'player', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Off-field trouble', description: 'A tracked player is in legal or off-field trouble: an arrest, charges, a lawsuit, allegations or an investigation (from ESPN\'s news).', defaultOn: true, emoji: '🚨' },
+  { id: 'fine_suspension', scope: 'player', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Fined or suspended', description: 'A tracked player is fined, suspended or banned (from ESPN\'s news). A suspension for off-field trouble counts as both.', defaultOn: true, emoji: '🚫' },
   { id: 'mlb.pitcher.blown_save', scope: 'player', leagues: ['mlb'], label: 'Blows a save', description: 'Tracked pitcher is charged with a blown save: the lead they came in to protect is gone.', defaultOn: true, emoji: '🫠' },
   { id: 'mlb.pitcher.no_quality_start', scope: 'player', leagues: ['mlb'], label: 'No quality start', description: 'Tracked starter won\'t get a quality start (6+ innings, 3 or fewer earned runs). Sent the moment it\'s settled: a 4th earned run, or leaving before 6 innings.', defaultOn: true, emoji: '🥀' },
   { id: 'mlb.pitcher.loss', scope: 'player', leagues: ['mlb'], label: 'Takes the loss', description: 'Tracked pitcher is charged with the loss when the game ends.', defaultOn: true, emoji: '👎' },
@@ -76,6 +76,8 @@ export const EVENT_TYPES: EventTypeDef[] = [
   // ── Teams
   { id: 'team.game_start', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Game starts', description: 'Hate Watch Starting: the tracked team\'s game gets underway (F1: a race or sprint).', defaultOn: true, emoji: '🍿' },
   { id: 'team.lost', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Loses a game', description: 'Final whistle and your tracked team lost.', defaultOn: true, emoji: '🪦' },
+  { id: 'team.off_field', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Off-field trouble', description: 'A tracked team, or one of its players, is in legal or off-field trouble: an arrest, charges, a lawsuit, allegations or an investigation (from ESPN\'s news).', defaultOn: true, emoji: '🚨' },
+  { id: 'team.fine_suspension', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1'], label: 'Fined or suspended', description: 'A tracked team, or one of its players, is fined, suspended or banned (from ESPN\'s news). A suspension for off-field trouble counts as both.', defaultOn: true, emoji: '🚫' },
   { id: 'mlb.team.nobletiger', scope: 'team', leagues: ['mlb'], label: 'NOBLETIGER', description: 'No Outs, Bases Loaded, Ending with Team Incapable of Getting Easy Run: tracked team loads the bases with nobody out and fails to score. Replaces that inning\'s stranded-runners alert.', defaultOn: true, emoji: '🐯' },
   { id: 'mlb.team.stranded_risp', scope: 'team', leagues: ['mlb'], label: 'Strands runners in scoring position', description: 'Tracked team ends an inning with a runner left on second or third (or the bases loaded).', defaultOn: true, emoji: '🏝️' },
   { id: 'mlb.team.opponent_risp', scope: 'team', leagues: ['mlb'], label: 'Opponent has runners in scoring position', description: 'The other team gets a runner to second or third against the tracked team. Once per half-inning; if a run scores on that same play, "Opponent scores" covers it.', defaultOn: true, emoji: '😰' },
@@ -86,6 +88,16 @@ export const EVENT_TYPES: EventTypeDef[] = [
   { id: 'team.losing_streak', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Losing streak', description: 'Tracked team extends a losing streak to 3 or more.', defaultOn: true, emoji: '🧊' },
   { id: 'team.eliminated', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Eliminated from playoffs', description: 'Tracked team is mathematically eliminated from playoff contention.', defaultOn: true, emoji: '⚰️' },
   { id: 'team.player_injured', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'A player gets injured', description: 'Anyone on the tracked team lands on the injury report.', defaultOn: true, emoji: '🚑' },
+];
+
+/**
+ * The WNBA gets every alert the NBA has: a copy of each NBA-only alert (wnba.*, with its own switches
+ * under "WNBA alerts", fed by the same basketball detectors), and every multi-league alert the NBA is in.
+ */
+const withWnba = (lgs: League[]): League[] => lgs.flatMap((lg) => (lg === 'nba' ? ['nba', 'wnba'] as League[] : [lg]));
+export const EVENT_TYPES: EventTypeDef[] = [
+  ...BASE.map((t) => (t.leagues.length > 1 && t.leagues.includes('nba') ? { ...t, leagues: withWnba(t.leagues) } : t)),
+  ...BASE.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'nba').map((t) => ({ ...t, id: t.id.replace(/^nba\./, 'wnba.'), leagues: ['wnba'] as League[] })),
 ];
 
 export const EVENT_TYPE_BY_ID = new Map(EVENT_TYPES.map((t) => [t.id, t]));

@@ -73,5 +73,6 @@ const styles = StyleSheet.create({
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: colors.text },
   leagues: { flexDirection: 'row', gap: space(2), paddingHorizontal: space(3), paddingBottom: space(2) },
-  leagueChip: { flex: 1, paddingHorizontal: 0 },
+  // Sized to their labels, then stretched to fill the row: seven chips fit an iPhone SE without squeezing "WNBA".
+  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(1.5) },
 });

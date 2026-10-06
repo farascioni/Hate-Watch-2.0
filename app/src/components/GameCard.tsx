@@ -124,7 +124,7 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
     if (p) line('p', <>Pitching: {name(p)}{p.pitches != null ? `, ${p.pitches} pitches` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}</>);
     if (b) line('b', <>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</>);
   }
-  if (game.league === 'nba' && game.leaders) line('lead', <>Top scorers: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
+  if ((game.league === 'nba' || game.league === 'wnba') && game.leaders) line('lead', <>Top scorers: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
   if (game.league === 'nfl') {
     if (game.timeouts && game.state === 'in') line('to', `Timeouts left: ${abbr('away')} ${game.timeouts.away} · ${abbr('home')} ${game.timeouts.home}`);
     const withBall: Side | undefined = game.possession === game.home?.team.key ? 'home' : game.possession === game.away?.team.key ? 'away' : undefined;

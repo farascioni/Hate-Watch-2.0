@@ -1,4 +1,6 @@
-export type League = 'nba' | 'mlb' | 'nfl' | 'nhl' | 'f1';
+export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1';
+/** Basketball leagues share detectors (the WNBA's play-by-play is the NBA's shape). */
+export const BASKETBALL = new Set<League>(['nba', 'wnba']);
 
 export const LEAGUES: Record<League, { sport: string; name: string }> = {
   nba: { sport: 'basketball', name: 'NBA' },
@@ -6,6 +8,8 @@ export const LEAGUES: Record<League, { sport: string; name: string }> = {
   nfl: { sport: 'football', name: 'NFL' },
   nhl: { sport: 'hockey', name: 'NHL' },
   f1: { sport: 'racing', name: 'F1' },
+  // Last: the app lists leagues in this order (filter chips, Settings), and the WNBA goes farthest right.
+  wnba: { sport: 'basketball', name: 'WNBA' },
 };
 
 export const LEAGUE_IDS = Object.keys(LEAGUES) as League[];

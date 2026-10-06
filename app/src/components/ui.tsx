@@ -55,7 +55,7 @@ export function HaterCount({ target, size = 12 }: { target: Target; size?: numbe
   const n = trackers.get(target.key) ?? target.haters;
   if (n == null) return null;
   const mine = follows.has(target.key);
-  const label = n === 0 ? 'No haters yet' : n === 1 && mine ? '1 hater (just you)' : `${n.toLocaleString()} hater${n === 1 ? '' : 's'}`;
+  const label = n === 0 ? 'No haters yet' : n === 1 && mine ? 'Just you' : `${n.toLocaleString()} hater${n === 1 ? '' : 's'}`;
   return (
     <View style={styles.haters} accessible accessibilityLabel={n === 0 ? 'Nobody tracks them yet' : `${n} ${n === 1 ? 'person tracks' : 'people track'} them${mine ? ', you included' : ''}`}>
       <Ionicons name="eye" size={size} color={colors.textFaint} />
