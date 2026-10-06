@@ -5,7 +5,7 @@ import { catalog } from './catalog.ts';
 import { GAME_LEAGUES, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, fromCorePlay, fromSitePlay, gameLostEvent, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, teamScoreEvents,
+  PLAYER_DETECTORS, boxPitchers, fromCorePlay, fromSitePlay, gameLostEvent, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -22,6 +22,9 @@ const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
+/** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
+const DECISION_RETRY_MS = Number(process.env.HW_DECISION_RETRY_MS ?? 15_000);
+const DECISION_TRIES = 20;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -55,6 +58,8 @@ export class GameTracker {
   private stopped = false;
   private sawPre: boolean;
   private started = false;
+  /** MLB pitcher alerts this game has already had (pitcherEvents): blown saves, no quality starts, losses. */
+  private pitching = new Set<string>();
   private readonly info: GameInfo;
   finished = false;
   lastPollMs = 0;
@@ -132,6 +137,11 @@ export class GameTracker {
       }
       observePlay(this.ctx, p);
     }
+    // MLB pitchers' lines: a blown save, no quality start. The loss waits for the final (finalPitching).
+    if (league === 'mlb' && summary.status === 'fulfilled') {
+      const es = pitcherEvents(this.ctx, boxPitchers(summary.value), { final: false, score: this.score, at: Date.now() }, this.pitching);
+      if (!this.first) events.push(...es); // attaching mid-game: what already happened is history
+    }
     this.first = false;
     if (events.length) publish(events, league);
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
@@ -157,10 +167,26 @@ export class GameTracker {
     this.finished = true;
     const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
     if (lastHalf.length) publish(lastHalf, this.ctx.league);
+    if (this.ctx.league === 'mlb') void this.finalPitching(final);
     const lost = gameLostEvent(this.ctx, final, Date.now());
     if (!lost) return; // a tie
     publish([lost], this.ctx.league);
     engine.onGameFinal(this.ctx.league);
+  }
+
+  /** MLB: the loss (and whatever else the final box score settles), once ESPN posts the decisions. */
+  async finalPitching(final: { home: number; away: number }) {
+    for (let i = 0; i < DECISION_TRIES; i++) {
+      const s = await liveDeps.getJson(urls.summary('mlb', this.ctx.gameId), { bust: true, timeoutMs: 4000 }).catch(() => null);
+      const pitchers = s ? boxPitchers(s) : [];
+      if (pitchers.some((p) => p.notes.some((n) => /^[WL]\b/.test(n)))) {
+        const es = pitcherEvents(this.ctx, pitchers, { final: true, score: final, at: Date.now() }, this.pitching);
+        if (es.length) publish(es, 'mlb');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, DECISION_RETRY_MS));
+    }
+    log(`[mlb ${this.ctx.gameId}] no pitching decisions ${Math.round((DECISION_TRIES * DECISION_RETRY_MS) / 60000)} min after the final`);
   }
 }
 

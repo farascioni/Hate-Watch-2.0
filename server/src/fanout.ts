@@ -200,6 +200,7 @@ export function setPushSender(fn: typeof pushSender) { pushSender = fn; }
 export function publish(events: Detected[], league: League) {
   const detectedAt = Date.now();
   const pushes: PushMessage[] = [];
+  const got = new Map<string, Set<string>>(); // moment → devices that already have it (see Detected.moment)
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
@@ -217,6 +218,11 @@ export function publish(events: Detected[], league: League) {
       }
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
+      if (e.moment) {
+        const have = got.get(e.moment) ?? got.set(e.moment, new Set()).get(e.moment)!;
+        if (have.has(f.device_id)) continue; // they track the player and the player's team: one alert, not two
+        have.add(f.device_id);
+      }
       const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);

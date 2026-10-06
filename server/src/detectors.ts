@@ -40,6 +40,8 @@ export interface GameCtx {
   half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
+  /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
+  lastPitchAbs?: boolean;
 }
 
 export interface Detected {
@@ -51,6 +53,11 @@ export interface Detected {
    * specifically (a stranded-runners alert is `unless` the NOBLETIGER that covers that inning).
    */
   unless?: string;
+  /**
+   * Events with the same moment are one thing happening, alerted to different targets (a batter's
+   * failed ABS challenge, and the batter's team's). Each device gets only the first of them it wants.
+   */
+  moment?: string;
   targetKey: string;
   title: string;
   body: string;
@@ -147,6 +154,7 @@ export function observePlay(g: GameCtx, p: NPlay) {
   if (g.league === 'mlb') {
     trackHalfInning(g, p);
     if (p.typeSlug === 'play-result') g.lastResult = p;
+    if (PITCH.test(p.text)) g.lastPitchAbs = ABS_PITCH.test(p.type);
     // Pitches and at-bat results list the batter plus every runner: a full snapshot of the bases.
     // Runner events (steals, pickoffs) list only the pitcher, so they must not clear the bases.
     if (p.participants.some((x) => x.role === 'batter')) {
@@ -367,6 +375,135 @@ function runnerOut(g: GameCtx, p: NPlay): Detected | null {
   };
 }
 
+// ─── MLB challenges ───────────────────────────────────────────────────────────────────────────
+const PITCH = /^Pitch \d+\s*:/i;
+/** ESPN's pitch type after an ABS review: the call that stands, and whether the challenge failed ("Confirmed"). */
+const ABS_PITCH = /^(ball|strike looking) - (confirmed|overturned)$/i;
+/** A failed challenge in an at-bat result: "Chicago White Sox challenged: call on the field was upheld." */
+const CHALLENGE_LOST = /\bchallenged\b[^.]*?\bcall on the field (?:was )?(?:upheld|confirmed|stands|stood)\b/i;
+
+/**
+ * A team lost a challenge (one type, `mlb.challenge_lost`, for teams and players).
+ * - ABS (the automated ball-strike system): a pitch whose call was confirmed after a challenge. Only
+ *   the batter can challenge a called strike, so the batting team lost and the batter gets the player alert. A ball
+ *   is challenged by the pitcher or the catcher (ESPN doesn't say which): the fielding team lost, and
+ *   the pitcher's alert says the challenge on that pitch failed.
+ * - Replay: "<Team> challenged: call on the field was upheld" in a result. The manager challenges, so
+ *   it's a team alert only.
+ * No duplicates: an ABS challenge on an at-bat's last pitch is in the result's text too, so a result
+ * right after an ABS-reviewed pitch isn't read as a replay challenge (`g.lastPitchAbs`). The player and
+ * team alerts for one ABS challenge share a `moment`, so tracking the batter and the batter's team gets you one.
+ * ESPN sends runner plays twice with the same text (see runnerOut), so the replay id is built from it.
+ */
+function challengeLost(g: GameCtx, p: NPlay): Detected[] {
+  const key = halfKey(p);
+  if (!key) return [];
+  const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
+  const abs = p.type.match(ABS_PITCH);
+  if (abs) {
+    if (!/^confirmed$/i.test(abs[2])) return []; // overturned: they won it
+    const strike = /^strike/i.test(abs[1]);
+    const [batter] = role(p, 'batter'), [pitcher] = role(p, 'pitcher');
+    const loserId = strike ? battingId : fieldingId;
+    const call = PITCH.test(p.text) ? p.text.replace(PITCH, '').trim().toLowerCase() : strike ? 'a called strike' : 'a ball'; // "strike 3 looking", "ball 2"
+    const batterName = batter ? nameOf('mlb', batter) : 'the batter';
+    const body = (what: string) => `${halfLabel(p)}: ${what} — ${scoreLine(g, p)}`;
+    const moment = `${g.gameId}:${p.id}:abs`;
+    const out: Detected[] = [];
+    if (strike && batter) out.push(mk(g, p, 'mlb.challenge_lost', batter, `${batterName} lost an ABS challenge`, { body: body(`challenged ${call}, and the call stands`), moment }));
+    if (!strike && pitcher) out.push(mk(g, p, 'mlb.challenge_lost', pitcher, `ABS challenge on ${nameOf('mlb', pitcher)}'s pitch failed`, { body: body(`${call} to ${batterName} stands`), moment }));
+    out.push({
+      id: `${g.gameId}:${p.id}:mlb.challenge_lost:team-${loserId}`, type: 'mlb.challenge_lost', targetKey: teamKey('mlb', loserId),
+      title: `${teamName('mlb', loserId)} lost an ABS challenge`,
+      body: body(strike ? `${batterName} challenged ${call}, and the call stands` : `${call} to ${batterName} stands${pitcher ? ` (${nameOf('mlb', pitcher)} pitching)` : ''}`),
+      at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment,
+    });
+    return out;
+  }
+  if (g.lastPitchAbs || !CHALLENGE_LOST.test(p.text)) return [];
+  const said = normalize(p.text);
+  const loserId = [battingId, fieldingId].find((id) => {
+    const t = catalog.teamByEspn('mlb', id);
+    return !!t && [t.name, t.shortName].some((n) => n && said.includes(`${normalize(n)} challenged`));
+  });
+  if (!loserId) return [];
+  return [{
+    id: `${g.gameId}:challenge:${key}:${said.replace(/ /g, '-')}:${loserId}`, type: 'mlb.challenge_lost', targetKey: teamKey('mlb', loserId),
+    title: `${teamName('mlb', loserId)} lost a replay challenge`, body: `${p.text} — ${scoreLine(g, p)}`,
+    at: p.at, meta: { gameId: g.gameId, playId: p.id },
+  }];
+}
+
+// ─── MLB pitchers' nights: blown saves, no quality starts, losses (from the box score) ─────────
+export interface BoxPitcher { id: string; teamId: string; starter: boolean; active: boolean; ip: string; outs: number; er: number; line: string; notes: string[] }
+
+/** Each pitcher's line and decision notes ("W, 2-0", "L, 0-1", "S, 2", "H, 1", and "B, 3" for a blown save) from a summary's box score. */
+export function boxPitchers(summary: any): BoxPitcher[] {
+  const out: BoxPitcher[] = [];
+  for (const t of summary?.boxscore?.players ?? []) {
+    const st = t.statistics?.find((x: any) => x.type === 'pitching' || x.name === 'pitching');
+    const labels: string[] = st?.labels ?? [];
+    for (const a of st?.athletes ?? []) {
+      if (a.athlete?.id == null) continue;
+      const v = (l: string) => a.stats?.[labels.indexOf(l)] ?? '0';
+      const ip = String(v('IP'));
+      const [full, part] = ip.split('.').map(Number);
+      out.push({
+        id: String(a.athlete.id), teamId: String(t.team?.id), starter: !!a.starter, active: !!a.active,
+        ip, outs: (full || 0) * 3 + (part || 0), er: Number(v('ER')) || 0,
+        line: `${ip} IP, ${v('H')} H, ${v('ER')} ER, ${v('BB')} BB, ${v('K')} K`,
+        notes: (a.notes ?? []).filter((n: any) => n.type === 'pitchingDecision').map((n: any) => String(n.text)),
+      });
+    }
+  }
+  return out;
+}
+
+const PITCHER_ORDER = ['mlb.pitcher.blown_save', 'mlb.pitcher.no_quality_start', 'mlb.pitcher.loss'];
+const innings = (p: BoxPitcher) => { const ip = p.ip.replace(/\.0$/, ''); return `${ip} inning${ip === '1' ? '' : 's'}`; };
+
+/**
+ * Tracked pitchers' bad nights, from the box score the game tracker reads every poll. Each fires once
+ * per game and pitcher (`done` remembers; ids are per game and pitcher too):
+ * - Blown save: ESPN's decision note "B, 3" (the 3rd this season), whenever ESPN posts it.
+ * - No quality start (6+ innings with 3 or fewer earned runs): for a starter, the moment it can't
+ *   happen anymore. That's a 4th earned run, leaving before 6 innings, or a final in fewer (a short
+ *   complete game).
+ * - The loss ("L, 0-1"): only with `final`, since ESPN posts no decisions during a game.
+ * Facts that land in the same read for one pitcher (a blown save posted at the final with the loss)
+ * are one alert, under the first type with the others as aliases, so it counts as each toggle.
+ */
+export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: boolean; score: { home: number; away: number }; at: number }, done: Set<string>): Detected[] {
+  const out: Detected[] = [];
+  for (const p of pitchers) {
+    const note = (re: RegExp) => p.notes.find((n) => re.test(n));
+    const bs = note(/^BS?\b/), loss = o.final ? note(/^L\b/) : undefined;
+    const noQs = p.starter && (p.er >= 4 || ((!p.active || o.final) && p.outs < 18));
+    const facts = PITCHER_ORDER.filter((t, i) => [bs, noQs, loss][i] && !done.has(`${t}:${p.id}`));
+    if (!facts.length) continue;
+    for (const t of facts) done.add(`${t}:${p.id}`);
+    const has = (t: string) => facts.includes(`mlb.pitcher.${t}`);
+    const name = nameOf('mlb', p.id);
+    const after = (n?: string) => n?.split(',')[1]?.trim(); // "B, 3" → "3", "L, 0-1" → "0-1"
+    const title = has('blown_save') && has('loss') ? `${name} blew the save and took the loss`
+      : has('no_quality_start') && has('loss') ? `${name} took the loss without a quality start`
+      : has('blown_save') ? `${name} blew the save`
+      : has('loss') ? `${name} took the loss`
+      : `No quality start for ${name}: ${p.er >= 4 ? `${p.er} earned runs in ${innings(p)}` : `${p.active ? 'went' : 'pulled after'} ${innings(p)}`}`;
+    const extra = [
+      has('blown_save') && Number(after(bs)) ? `${ordinal(Number(after(bs)))} blown save this season` : '',
+      has('loss') && after(loss) ? `now ${after(loss)}` : '',
+    ].filter(Boolean);
+    out.push({
+      id: `${g.gameId}:${facts[0]}:${p.id}`, type: facts[0], ...(facts.length > 1 ? { aliases: facts.slice(1) } : {}),
+      targetKey: playerKey('mlb', p.id), title,
+      body: `${p.line}${extra.length ? ` · ${extra.join(' · ')}` : ''} — ${o.final ? 'Final: ' : ''}${scoreLine(g, o.score)}`,
+      at: o.at, meta: { gameId: g.gameId, athleteId: p.id },
+    });
+  }
+  return out;
+}
+
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
 function mlb(g: GameCtx, p: NPlay): Detected[] {
   // ESPN marks every half-inning except the game's last with an "End Inning" play.
@@ -396,6 +533,7 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   const runner = runnerOut(g, p);
   if (runner) out.push(runner);
   out.push(...opponentRisp(g, p));
+  out.push(...challengeLost(g, p));
   const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;
