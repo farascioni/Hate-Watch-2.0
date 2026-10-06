@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { GAME_LEAGUES, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { GAME_LEAGUES, LEAGUE_IDS, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { scanNews } from './news.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, boxPitchers, fromCorePlay, fromSitePlay, gameLostEvent, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
@@ -21,6 +22,7 @@ const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discov
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yesterday's finals, for the Scores tab
+const NEWS_MS = Number(process.env.HW_NEWS_MS ?? 3 * 60_000); // off-field trouble, fines and suspensions (news.ts)
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
@@ -232,6 +234,7 @@ class LiveEngine {
       every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
+    for (const lg of LEAGUE_IDS) every(NEWS_MS, () => scanNews(lg));
   }
 
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */

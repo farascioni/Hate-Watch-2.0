@@ -26,6 +26,8 @@ export const urls = {
     `${CORE}/${LEAGUES[lg].sport}/leagues/${lg}/events/${eventId}/competitions/${eventId}/plays?limit=1000`,
   standings: (lg: League) => `https://site.api.espn.com/apis/v2/sports/${LEAGUES[lg].sport}/${lg}/standings`,
   injuries: (lg: League) => `${SITE}/${LEAGUES[lg].sport}/${lg}/injuries`,
+  /** ESPN's league news: the latest ~50 articles, tagged with the athletes and teams they're about. */
+  news: (lg: League) => `${SITE}/${LEAGUES[lg].sport}/${lg}/news?limit=50`,
   // F1 (ESPN "racing"): drivers are athletes, constructors are teams, a race weekend is one event
   // whose sessions (FP1..Race) are competitions.
   f1Athletes: (season: number) => `${CORE}/racing/leagues/f1/seasons/${season}/athletes?limit=200`,
