@@ -133,16 +133,17 @@ After editing the script, regenerate with `cd app && npm run icons`.
 
 Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, MLB, NFL, NHL and Formula 1**. The NHL is included because several of the requested alerts are hockey alerts.
 
-Last ingest (2026-10-04): **135 teams, 5,074 players**.
+Last ingest (2026-10-06): **135 teams, 5,284 players**, 214 of them from injured lists.
 
 | | Teams | Players | Verified headshots | Logo fallback |
 |---|---|---|---|---|
-| NBA | 30 | 605 | 546 | 59 |
-| MLB | 30 | 1,080 | 1,037 | 43 |
-| NFL | 32 | 2,544 | 2,541 | 3 |
-| NHL | 32 | 822 | 789 | 33 |
+| NBA | 30 | 607 | 546 | 61 |
+| MLB | 30 | 1,269 (189 injured) | 1,222 | 47 |
+| NFL | 32 | 2,542 | 2,539 | 3 |
+| NHL | 32 | 843 (25 injured) | 826 | 17 |
 | F1 | 11 constructors | 23 drivers | 15 | 8 (team badge) |
 
+- **Injured lists too.** A player on MLB's 60-day IL comes off the 40-man roster ESPN serves, and NHL long-term injured reserve players are left off too, so Carlos Correa wasn't on the Astros. The ingest also reads each league's injury report and adds anyone on it who isn't on a roster to the team it lists them under (`injuredOffRoster` in `catalog.ts`), with the same duplicate checks and headshot verification. NBA and NFL rosters already include their injured players.
 - **No duplicates.** Players are deduped on ESPN athlete ID, with a second pass on normalized name + birth date. Teams are deduped on ID and abbreviation. The ingest throws rather than commit a duplicate key, and the database primary keys enforce it again.
 - **Every team and player has an image.** The ingest won't commit a row without one.
 - **Images are accurate.** Each headshot URL must be keyed by that athlete's own ESPN ID, and ESPN's alt text must match the player's name (0 mismatches). Every image is fetched (PNG header via HTTP Range) to confirm it exists and to record its true pixel size.

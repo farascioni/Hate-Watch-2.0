@@ -15,6 +15,8 @@ export interface IngestReport {
   at: string;
   leagues: Record<string, {
     teams: number; players: number;
+    /** Players on an injured list but off their team's roster (MLB's 60-day IL), added from the injury report. */
+    injuredAdded?: number;
     duplicateIdsRemoved: number; duplicateNamesRemoved: number;
     headshotsVerified: number; headshotFallbackToLogo: number; headshotAltMismatch: number;
   }>;
@@ -65,6 +67,27 @@ function pickLogo(t: any, rel: string): string | undefined {
     ?? (rel === 'dark' ? t.logos?.find((l: any) => l.rel?.includes('dark'))?.href : undefined);
 }
 
+/**
+ * Everyone on a league's injury report who isn't on a roster, each under the team the report lists
+ * them with. The report's athletes have what a roster entry needs: name, position, headshot.
+ */
+export function injuredOffRoster(report: any, teams: Team[], onRoster: Set<string>): { a: any; team: Team }[] {
+  const byId = new Map(teams.map((t) => [t.espnId, t]));
+  const out: { a: any; team: Team }[] = [];
+  for (const group of report?.injuries ?? []) {
+    const team = byId.get(String(group.id));
+    if (!team) continue;
+    for (const inj of group.injuries ?? []) {
+      const a = inj.athlete ?? {};
+      const id = a.id ?? a.links?.map((l: any) => l.href?.match(/\/id\/(\d+)/)?.[1]).find(Boolean);
+      if (!id || onRoster.has(String(id))) continue;
+      onRoster.add(String(id));
+      out.push({ a: { ...a, id: String(id) }, team });
+    }
+  }
+  return out;
+}
+
 export async function ingest(log: (m: string) => void = console.log): Promise<IngestReport> {
   const report: IngestReport = { at: new Date().toISOString(), leagues: {}, problems: [] };
   const newTeams: Team[] = [];
@@ -112,9 +135,14 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
       const athletes: any[] = (r.athletes ?? []).flatMap((a: any) => (Array.isArray(a.items) ? a.items : [a]));
       return athletes.map((a) => ({ a, team }));
     });
+    // Injured lists: a player on MLB's 60-day IL comes off the 40-man roster ESPN gives us (Carlos
+    // Correa on the Astros), but the league's injury report still lists him under his team.
+    const injuryReport = await getJson(urls.injuries(lg)).catch(() => null); // without it, just the rosters
+    const injured = injuredOffRoster(injuryReport, lgTeams, new Set(rosters.flat().map((e) => String(e.a.id))));
+    stats.injuredAdded = injured.length;
 
     const byId = new Map<string, { a: any; team: Team }>();
-    for (const entry of rosters.flat()) {
+    for (const entry of [...rosters.flat(), ...injured]) {
       if (byId.has(entry.a.id)) {
         stats.duplicateIdsRemoved++;
         report.problems.push(`${lg}: ${entry.a.displayName} (${entry.a.id}) listed on ${byId.get(entry.a.id)!.team.abbrev} and ${entry.team.abbrev}; kept first`);
@@ -159,7 +187,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     });
     stats.players = lgPlayers.length;
     newPlayers.push(...lgPlayers);
-    log(`[ingest] ${LEAGUES[lg].name}: ${stats.teams} teams, ${stats.players} players (${stats.headshotsVerified} headshots, ${stats.headshotFallbackToLogo} logo fallbacks, ${stats.duplicateIdsRemoved + stats.duplicateNamesRemoved} dupes removed)`);
+    log(`[ingest] ${LEAGUES[lg].name}: ${stats.teams} teams, ${stats.players} players (${stats.injuredAdded} from injured lists, ${stats.headshotsVerified} headshots, ${stats.headshotFallbackToLogo} logo fallbacks, ${stats.duplicateIdsRemoved + stats.duplicateNamesRemoved} dupes removed)`);
   }
 
   // Invariants before we commit anything.
