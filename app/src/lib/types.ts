@@ -10,6 +10,9 @@ export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;
   location: string | null; color: string | null; altColor: string | null;
   logo: string; logoDark: string | null; logoW: number; logoH: number;
+  /** In a team list sorted by division: "AL East", "East · Atlantic" ("Constructors" in F1), and ESPN's order of them. */
+  division?: string;
+  divisionOrder?: number;
   /** How many people track them, where the server includes it (Search, team lists, rosters, their page). */
   haters?: number;
 }

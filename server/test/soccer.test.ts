@@ -163,13 +163,13 @@ test('a live match: fouls from the commentary as it grows, touches from the newe
 test('a loss by 3+ goals: "thrashed" instead of the plain loss for those who want it, one Successful Hate Watch either way', () => {
   new GameTracker('epl', 'F1', '388', '331').finish({ home: 0, away: 5 });
   assert.deepEqual(feed('coventry-hater').slice(-1), ['epl.team.heavy_loss: Successful Hate Watch! Coventry were thrashed 5-0 by Brighton']);
-  assert.deepEqual(feed('coventry-no-thrashing').slice(-1), ['team.lost: Successful Hate Watch! Coventry lost to Brighton']);
+  assert.deepEqual(feed('coventry-no-thrashing').slice(-1), ['team.lost: Successful Hate Watch! Coventry were thrashed 5-0 by Brighton'], 'the plain loss says it was a thrashing too');
   assert.deepEqual(feed('thomas-and-coventry').slice(-1), ['epl.team.heavy_loss: Successful Hate Watch! Coventry were thrashed 5-0 by Brighton']);
   for (const dev of ['coventry-hater', 'coventry-no-thrashing', 'thomas-and-coventry']) {
     const t = hateWatchTally(dev);
     assert.deepEqual([t.total, t.teams.map((x: any) => x.target.key)], [1, ['team:epl:388']], dev);
   }
-  assert.deepEqual(feed('rudoni-fan').slice(-1), ['player.team_lost: Successful Hate Watch! Jack Rudoni and Coventry lost to Brighton'], 'tracks a Coventry player');
+  assert.deepEqual(feed('rudoni-fan').slice(-1), ['player.team_lost: Successful Hate Watch! Jack Rudoni and Coventry were thrashed 5-0 by Brighton'], 'tracks a Coventry player: a thrashing there too');
   // "3 other hate watchers": four devices got one of the loss's alerts.
   const others = db.prepare(`SELECT ${RECIPIENTS} FROM events e WHERE e.id = ?`).get('F1:final:epl.team.heavy_loss:388') as any;
   assert.equal(others.recipients, 4);

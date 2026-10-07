@@ -988,6 +988,16 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
 }
 
 /**
+ * Losing by this much is a blowout, and the loss alert says so ("Yankees got BLOWN OUT by the Rays",
+ * "A 10-run blowout."). Set so about 1 in 8 losses qualifies, from full 2025-26 seasons of four teams a
+ * league: MLB 7+ runs is 12% of losses (6+ is 20%), NFL 21+ points (three scores) 14%, NBA 25+ 14% (20+
+ * is 26%), WNBA 20+ 11%, NHL 4+ goals 19% (5+ is only 7%), soccer 3+ goals 12% (its "thrashed").
+ */
+export const BLOWOUT_MARGIN: Partial<Record<League, number>> = { mlb: 7, nfl: 21, nba: 25, wnba: 20, nhl: 4, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 3])) };
+const MARGIN_UNIT: Partial<Record<League, string>> = { mlb: 'run', nhl: 'goal' };
+export const isBlowout = (lg: League, margin: number) => BLOWOUT_MARGIN[lg] != null && margin >= BLOWOUT_MARGIN[lg]!;
+
+/**
  * The loser's final-whistle alert. Ties (NFL, NHL preseason) are miserable for everyone, but not a loss.
  * Its moment is shared with the "their team lost" alerts for the loser's players (playerTeamLostEvents).
  * A playoff loss that ends their season (`out`, from eliminationOf) says so, in the same alert:
@@ -998,16 +1008,24 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
 export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number, out?: Elimination | null): Detected | null {
   if (final.home === final.away) return null;
   const [loserId, winnerId] = final.home < final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
-  const team = teamName(g.league, loserId), score = `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`;
+  const [w, l] = [Math.max(final.home, final.away), Math.min(final.home, final.away)];
+  const team = teamName(g.league, loserId), winner = the(g.league, teamName(g.league, winnerId));
   const elim = out?.loserId === loserId ? out : null;
+  const blowout = isBlowout(g.league, w - l);
+  // "Final Score: 12 to 2. A 10-run blowout." (soccer's "thrashed" title says it already).
+  const by = w - l, an = by === 11 || by === 18 || String(by).startsWith('8') ? 'An' : 'A'; // "An 8-run", "An 11-point"
+  const score = `Final Score: ${w} to ${l}${blowout && !SOCCER.has(g.league) ? `. ${an} ${by}-${MARGIN_UNIT[g.league] ?? 'point'} blowout.` : ''}`;
+  const what = elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} are ELIMINATED ⚰️`)
+    : blowout ? (SOCCER.has(g.league) ? `${team} were thrashed ${w}-${l} by ${winner}` : `${team} got BLOWN OUT by ${winner}`)
+    : `${team} lost to ${winner}`;
   return {
     id: `${g.gameId}:final:team.lost:${loserId}`,
     type: 'team.lost',
     targetKey: teamKey(g.league, loserId),
-    title: `Successful Hate Watch! ${elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} are ELIMINATED ⚰️`) : `${team} lost to ${the(g.league, teamName(g.league, winnerId))}`}`,
+    title: `Successful Hate Watch! ${what}`,
     body: elim ? `${elim.line}. ${score}` : score,
     at,
-    meta: { gameId: g.gameId, winnerId, ...(elim ? { eliminated: true, sweep: elim.sweep } : {}) },
+    meta: { gameId: g.gameId, winnerId, margin: w - l, score: `${w}-${l}`, ...(blowout ? { blowout: true } : {}), ...(elim ? { eliminated: true, sweep: elim.sweep } : {}) },
     ...(elim ? { aliases: ['team.eliminated'] } : {}),
     moment: `${g.gameId}:final:lost`,
   };
@@ -1020,7 +1038,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
  */
 export function heavyLossEvent(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Detected, final: { home: number; away: number }): Detected | null {
   const [w, l] = [Math.max(final.home, final.away), Math.min(final.home, final.away)];
-  if (!SOCCER.has(g.league) || w - l < 3) return null;
+  if (!SOCCER.has(g.league) || !isBlowout(g.league, w - l)) return null;
   const loserId = lost.targetKey.split(':')[2], winnerId = String(lost.meta?.winnerId ?? '');
   return {
     id: `${g.gameId}:final:${g.league}.team.heavy_loss:${loserId}`,
@@ -1046,11 +1064,13 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
   const loserId = lost.targetKey.split(':')[2];
   const winnerId = (lost.meta?.winnerId as string | undefined) ?? '';
   const team = teamName(g.league, loserId), winner = teamName(g.league, winnerId);
+  // A blowout says so here too ("got BLOWN OUT by"); an elimination's own line is in the body.
+  const how = lost.meta?.blowout && !lost.meta?.eliminated ? (SOCCER.has(g.league) ? `were thrashed ${lost.meta.score} by` : 'got BLOWN OUT by') : 'lost to';
   return [...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({
     id: `${g.gameId}:final:player.team_lost:${p.espnId}`,
     type: 'player.team_lost',
     targetKey: p.key,
-    title: `Successful Hate Watch! ${p.name} and ${the(g.league, team)} lost to ${the(g.league, winner)}`,
+    title: `Successful Hate Watch! ${p.name} and ${the(g.league, team)} ${how} ${the(g.league, winner)}`,
     body: lost.body,
     at: lost.at,
     meta: { gameId: g.gameId, athleteId: p.espnId, lostId: lost.id, teamKey: lost.targetKey },

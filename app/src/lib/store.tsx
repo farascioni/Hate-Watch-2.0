@@ -97,6 +97,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [leagues, setLeagues] = useState<LeagueInfo[]>([]);
+  /** The initial load has worked (see "Initial load"). */
+  const loaded = useRef(false);
+  const loadCore = useCallback(async () => {
+    const [cat, f, p] = await Promise.all([api.eventTypes(), api.follows(), api.prefs()]);
+    setEventTypes(cat.types);
+    setLeagues(cat.leagues);
+    setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
+    setTrackers(countsFrom(f.follows));
+    setPrefs(p);
+    loaded.current = true;
+  }, []);
+  const loadCoreRef = useRef(loadCore);
+  loadCoreRef.current = loadCore;
   const leagueInfo = useCallback((id: string) => leagues.find((l) => l.id === id), [leagues]);
   const [push, setPush] = useState<Store['push']>({ status: 'unknown' });
   const ws = useRef<WebSocket | null>(null);
@@ -129,7 +142,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!token) { timer = setTimeout(connect, 3000); return; }
       const sock = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
       ws.current = sock;
-      sock.onopen = () => { attempt = 0; setLive('live'); refreshFeed().catch(() => {}); refreshScores().catch(() => {}); api.hateWatches().then(setHateWatches, () => {}); };
+      sock.onopen = () => {
+        attempt = 0; setLive('live');
+        if (!loaded.current) loadCoreRef.current().catch(() => {}); // the server's reachable again: finish the initial load now
+        refreshFeed().catch(() => {}); refreshScores().catch(() => {}); api.hateWatches().then(setHateWatches, () => {});
+      };
       sock.onmessage = (m) => {
         const frame = JSON.parse(String(m.data));
         // Score frames are everyone's copy of the card: keep this device's own Successful Hate Watch count on it.
@@ -160,28 +177,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { closed = true; clearTimeout(timer); ws.current?.close(); sub.remove(); };
   }, [refreshFeed, refreshScores]);
 
-  // ── Initial load
+  // ── Initial load: the leagues and alert types (filters, Settings), your follows and your settings. Until it
+  // works it's retried, more slowly each time (opening the app with no signal), and again the moment the
+  // live connection opens (the signal is back).
   useEffect(() => {
+    let stopped = false;
     (async () => {
-      try {
-        const [cat, f, p] = await Promise.all([api.eventTypes(), api.follows(), api.prefs()]);
-        setEventTypes(cat.types);
-        setLeagues(cat.leagues);
-        setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
-        setTrackers(countsFrom(f.follows));
-        setPrefs(p);
-        await refreshFeed();
-      } catch (e) {
-        console.warn('initial load failed', e);
-      } finally {
-        setReady(true);
+      for (let attempt = 0; !stopped && !loaded.current; attempt++) {
+        try {
+          await loadCore();
+          await refreshFeed();
+        } catch (e) {
+          console.warn('initial load failed, will retry', e);
+          setReady(true); // show the app (empty) rather than a spinner forever
+          if (attempt === 0) void registerOnce();
+          await new Promise((r) => setTimeout(r, Math.min(30_000, 2000 * 2 ** attempt)));
+        }
       }
-      await guideSettled; // on first launch, ask for notification permission after the startup guide, not over it
-      const r = await registerForPush();
-      setPush({ status: r.status, reason: r.reason });
-      if (r.token) api.setPushToken(r.token).catch(() => {});
+      setReady(true);
+      void registerOnce();
     })();
-  }, [refreshFeed]);
+    return () => { stopped = true; };
+  }, [refreshFeed, loadCore]);
+
+  const pushAsked = useRef(false);
+  const registerOnce = async () => {
+    if (pushAsked.current) return;
+    pushAsked.current = true;
+    await guideSettled; // on first launch, ask for notification permission after the startup guide, not over it
+    const r = await registerForPush();
+    setPush({ status: r.status, reason: r.reason });
+    if (r.token) api.setPushToken(r.token).catch(() => {});
+  };
 
   const value = useMemo<Store>(() => ({
     ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,

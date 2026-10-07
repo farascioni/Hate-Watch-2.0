@@ -61,8 +61,25 @@ test('a loss is a "Successful Hate Watch!", with the final score winner first; a
   assert.equal(lost.title, 'Successful Hate Watch! Eagles lost to the Bears');
   assert.equal(lost.body, 'Final Score: 24 to 17');
   assert.equal(lost.id, 'G9:final:team.lost:21', 'same id as before the wording change: no repeat for a game final across the deploy');
-  assert.equal(gameLostEvent(g, { home: 31, away: 10 }, 0)!.title, 'Successful Hate Watch! Bears lost to the Eagles');
+  assert.equal(gameLostEvent(g, { home: 30, away: 10 }, 0)!.title, 'Successful Hate Watch! Bears lost to the Eagles', 'by 20: one short of a blowout');
   assert.equal(gameLostEvent(g, { home: 20, away: 20 }, 0), null);
+});
+
+test('a blowout loss says so: "got BLOWN OUT", and by how much', async () => {
+  const { gameLostEvent, playerTeamLostEvents, isBlowout } = await import('../src/detectors.ts');
+  const g = { league: 'nfl' as const, gameId: 'B1', homeId: '21', awayId: '3' };
+  const lost = gameLostEvent(g, { home: 31, away: 10 }, 0)!;
+  assert.deepEqual([lost.title, lost.body, lost.meta?.blowout], ['Successful Hate Watch! Bears got BLOWN OUT by the Eagles', 'Final Score: 31 to 10. A 21-point blowout.', true]);
+  assert.equal(lost.id, 'B1:final:team.lost:3', 'the same alert, just its words');
+  assert.equal(playerTeamLostEvents(g, lost, [{ key: 'player:nfl:9', espnId: '9', name: 'Caleb Williams' }])[0].title, 'Successful Hate Watch! Caleb Williams and the Bears got BLOWN OUT by the Eagles');
+  // Each sport's line: at it is a blowout, one short isn't.
+  for (const [lg, at] of [['mlb', 7], ['nfl', 21], ['nba', 25], ['wnba', 20], ['nhl', 4], ['epl', 3]] as const) {
+    assert.ok(isBlowout(lg, at) && !isBlowout(lg, at - 1), lg);
+  }
+  assert.equal(isBlowout('f1', 99), false);
+  assert.equal(gameLostEvent({ league: 'mlb', gameId: 'M1', homeId: '21', awayId: '3' }, { home: 2, away: 9 }, 0)!.body, 'Final Score: 9 to 2. A 7-run blowout.');
+  assert.equal(gameLostEvent({ league: 'nhl', gameId: 'H1', homeId: '21', awayId: '3' }, { home: 1, away: 5 }, 0)!.body, 'Final Score: 5 to 1. A 4-goal blowout.');
+  assert.equal(gameLostEvent({ league: 'mlb', gameId: 'M2', homeId: '21', awayId: '3' }, { home: 0, away: 8 }, 0)!.body, 'Final Score: 8 to 0. An 8-run blowout.');
 });
 
 test('a game first seen already under way never gets a late "starting" alert', async () => {

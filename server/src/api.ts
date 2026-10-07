@@ -14,6 +14,7 @@ import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
 import { statsFor } from './stats.ts';
+import { divisionsOf } from './divisions.ts';
 
 class Html {
   body: string;
@@ -56,10 +57,18 @@ route('GET', '/search', false, (_r, url) => ({
     limit: Math.min(Number(url.searchParams.get('limit') ?? 40), 100),
   })),
 }));
-route('GET', '/teams', false, (_r, url) => ({
-  teams: withHaters(catalog.allTeams().filter((t) => !url.searchParams.get('league') || t.league === url.searchParams.get('league'))
-    .sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)),
-}));
+// ?by=division: each team says its division (`division`, and `divisionOrder`: ESPN's order of them), and
+// the list comes by league (the app's order), then division, then name. Otherwise A-Z.
+route('GET', '/teams', false, async (_r, url) => {
+  const lg = url.searchParams.get('league');
+  const teams = catalog.allTeams().filter((t) => !lg || t.league === lg);
+  if (url.searchParams.get('by') !== 'division') return { teams: withHaters(teams.sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)) };
+  const leagues = [...new Set(teams.map((t) => t.league))];
+  const div = new Map(await Promise.all(leagues.map(async (l) => [l, await divisionsOf(l)] as const)));
+  const rows = teams.map((t) => ({ ...teamDto(t), division: div.get(t.league)?.get(t.espnId)?.name ?? (t.league === 'f1' ? 'Constructors' : LEAGUES[t.league].name), divisionOrder: div.get(t.league)?.get(t.espnId)?.order ?? 99 }));
+  rows.sort((a, b) => LEAGUE_IDS.indexOf(a.league) - LEAGUE_IDS.indexOf(b.league) || a.divisionOrder - b.divisionOrder || a.name.localeCompare(b.name));
+  return { teams: withHaters(rows) };
+});
 // A player's or team's stats page (not F1 yet).
 route('GET', '/targets/:key/stats', false, async (_r, _u, [key]) => {
   const page = await statsFor(decodeURIComponent(key));

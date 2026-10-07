@@ -54,7 +54,11 @@ export const api = {
   eventTypes: () => request<{ leagues: { id: League; name: string }[]; types: EventType[] }>('GET', '/catalog/event-types', undefined, false),
   search: (q: string, league?: League, kind?: 'team' | 'player') =>
     request<{ results: Target[] }>('GET', `/search?q=${enc(q)}${league ? `&league=${league}` : ''}${kind ? `&kind=${kind}` : ''}&limit=50`, undefined, false),
-  teams: (league?: League) => request<{ teams: Team[] }>('GET', `/teams${league ? `?league=${league}` : ''}`, undefined, false),
+  /** Every team (in a league): A-Z, or by league and division (each with its `division`). */
+  teams: (league?: League, byDivision = false) => {
+    const q = [league && `league=${league}`, byDivision && 'by=division'].filter(Boolean).join('&');
+    return request<{ teams: Team[] }>('GET', `/teams${q ? `?${q}` : ''}`, undefined, false);
+  },
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
   /** A player's or team's stats page (not F1). */
   stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
