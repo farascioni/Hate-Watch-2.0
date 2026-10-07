@@ -61,6 +61,11 @@ export interface Detected {
    * failed ABS challenge, and the batter's team's). Each device gets only the first of them it wants.
    */
   moment?: string;
+  /**
+   * Among a moment's alerts marked this way, a device gets the one about the target it followed first,
+   * not the first in the list: tracking Gerrit Cole and then Aaron Judge, a Yankees loss is Cole's.
+   */
+  firstFollowed?: boolean;
   targetKey: string;
   title: string;
   body: string;
@@ -942,21 +947,68 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
   }));
 }
 
+/** ESPN's short names for rounds that aren't household words. */
+const ROUND_NAMES: Record<string, string> = { ALWC: 'AL Wild Card Series', NLWC: 'NL Wild Card Series' };
+
+/** A playoff loss that ends a team's season: who, whether it was a sweep, and the line that says so. */
+export interface Elimination { loserId: string; winnerId: string; sweep: boolean; line: string }
+
+/**
+ * Knocked out of the playoffs, from the final on the scoreboard. MLB, the NBA, the WNBA and the NHL play
+ * series, with each side's wins on the scoreboard ("NYY win series 2-0"): the side with fewer is out when
+ * ESPN marks the series completed, or when this game is the one that wins it (the scoreboard can show a
+ * final before it counts it: the wins add up to one less than "Game 3"). In the NFL every postseason
+ * game is a knockout. The standings never mark these teams eliminated (they keep the "x"/"y" they
+ * clinched with). A series lost without a win is a sweep: "Swept 3-0 by the Rays in the ALDS".
+ */
+export function eliminationOf(lg: League, ev: any): Elimination | null {
+  const c = ev?.competitions?.[0];
+  if (ev?.season?.type !== 3 || !ev.status?.type?.completed || !c) return null;
+  const headline = String(c.notes?.[0]?.headline ?? '');
+  const said = headline.replace(/\s*-\s*Game \d+$/i, '').trim(); // "ALDS - Game 3" → "ALDS"
+  const round = ROUND_NAMES[said] ?? said;
+  const [x, y] = c.competitors ?? [];
+  if (!x || !y || Number(x.score) === Number(y.score)) return null;
+  const gameWinner = String(Number(x.score) > Number(y.score) ? x.id : y.id);
+  if (c.series?.type === 'playoff') {
+    const sides: { id: string; wins: number }[] = (c.series.competitors ?? []).map((t: any) => ({ id: String(t.id), wins: Number(t.wins) || 0 }));
+    if (sides.length !== 2) return null;
+    const game = Number(headline.match(/\bGame (\d+)$/i)?.[1]);
+    const counted = !game || sides[0].wins + sides[1].wins >= game;
+    if (!counted) { const w = sides.find((t) => t.id === gameWinner); if (w) w.wins++; }
+    const need = Math.floor(Number(c.series.totalCompetitions) / 2) + 1;
+    const [lose, win] = sides[0].wins < sides[1].wins ? [sides[0], sides[1]] : [sides[1], sides[0]];
+    if (lose.wins === win.wins || (!c.series.completed && win.wins < need)) return null;
+    const winner = the(lg, teamName(lg, win.id)), score = `${win.wins}-${lose.wins}`, sweep = lose.wins === 0;
+    return { loserId: lose.id, winnerId: win.id, sweep, line: sweep ? `Swept ${score} by ${winner}${round ? ` in the ${round}` : ''}` : `Lost the ${round || 'series'} ${score} to ${winner}` };
+  }
+  if (lg !== 'nfl') return null;
+  const loserId = String(gameWinner === String(x.id) ? y.id : x.id), winner = the(lg, teamName(lg, gameWinner));
+  return { loserId, winnerId: gameWinner, sweep: false, line: /super bowl/i.test(round) ? `Lost ${round} to ${winner}` : `Lost to ${winner}${round ? ` in the ${round}` : ''}` };
+}
+
 /**
  * The loser's final-whistle alert. Ties (NFL, NHL preseason) are miserable for everyone, but not a loss.
  * Its moment is shared with the "their team lost" alerts for the loser's players (playerTeamLostEvents).
+ * A playoff loss that ends their season (`out`, from eliminationOf) says so, in the same alert:
+ * "Successful Hate Watch! Yankees got SWEPT 🧹 and are ELIMINATED ⚰️", "Swept 3-0 by the Rays in the
+ * ALDS. Final Score: 5 to 2". It counts for "Loses a game" and for "Eliminated from playoffs" (aliases):
+ * one alert, for anyone who wants either.
  */
-export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number): Detected | null {
+export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number, out?: Elimination | null): Detected | null {
   if (final.home === final.away) return null;
   const [loserId, winnerId] = final.home < final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
+  const team = teamName(g.league, loserId), score = `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`;
+  const elim = out?.loserId === loserId ? out : null;
   return {
     id: `${g.gameId}:final:team.lost:${loserId}`,
     type: 'team.lost',
     targetKey: teamKey(g.league, loserId),
-    title: `Successful Hate Watch! ${teamName(g.league, loserId)} lost to ${the(g.league, teamName(g.league, winnerId))}`,
-    body: `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`,
+    title: `Successful Hate Watch! ${elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} are ELIMINATED ⚰️`) : `${team} lost to ${the(g.league, teamName(g.league, winnerId))}`}`,
+    body: elim ? `${elim.line}. ${score}` : score,
     at,
-    meta: { gameId: g.gameId, winnerId },
+    meta: { gameId: g.gameId, winnerId, ...(elim ? { eliminated: true, sweep: elim.sweep } : {}) },
+    ...(elim ? { aliases: ['team.eliminated'] } : {}),
     moment: `${g.gameId}:final:lost`,
   };
 }
@@ -985,8 +1037,9 @@ export function heavyLossEvent(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Dete
 /**
  * "Successful Hate Watch! Freddie Freeman and the Dodgers lost to the Giants", for people who track a
  * player on the losing team (`players`: the ones anyone tracks). Every one shares the loss's moment, and
- * publish() sends a device only the first of them it wants, so tracking the player and the team, or two
- * players on it, is one alert. Publish the team's loss first, then these, by name. Each counts as a
+ * publish() sends a device one of them, so tracking the player and the team, or two players on it, is one
+ * alert. Publish the team's loss first (it wins), then these: of those, a device gets the player it
+ * started tracking first (firstFollowed), by name when it followed them in the same moment. Each counts as a
  * Successful Hate Watch for the team (`lostId`, `teamKey`: see hateWatchOf), once per device.
  */
 export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Detected, players: { key: string; espnId: string; name: string }[]): Detected[] {
@@ -1002,6 +1055,7 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
     at: lost.at,
     meta: { gameId: g.gameId, athleteId: p.espnId, lostId: lost.id, teamKey: lost.targetKey },
     moment: lost.moment,
+    firstFollowed: true,
   }));
 }
 

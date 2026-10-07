@@ -46,6 +46,14 @@ for (const [id, keys, prefs] of fans) {
   device.run(id, 's', 'test', JSON.stringify({ ...DEFAULT_PREFS, ...prefs }));
   for (const k of keys) follow.run(id, k);
 }
+// Two Falcons tracked, Penix first: the alert is his, though Bijan Robinson comes first by name. Unless
+// Penix's alert is switched off: then it's the next one they track.
+const followAt = db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, ?)');
+for (const [id, prefs] of [['penix-first', {}], ['penix-first-but-off', { targetTypes: { 'player:nfl:9': { 'player.team_lost': false } } }]] as const) {
+  device.run(id, 's', 'test', JSON.stringify({ ...DEFAULT_PREFS, ...prefs }));
+  followAt.run(id, 'player:nfl:9', 100);
+  followAt.run(id, 'player:nfl:7', 200);
+}
 const feed = (dev: string) => (db.prepare(`SELECT e.type, e.title, e.body FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? ORDER BY e.id`).all(dev) as any[])
   .map((r) => `${r.type}: ${r.title} | ${r.body}`);
 
@@ -63,7 +71,9 @@ test("a tracked player's team loses: their fans hear it once, and nobody trackin
   assert.deepEqual(feed('penix-fan'), [penix]);
   assert.deepEqual(feed('both'), [loss], 'tracks the team too: the team loss only');
   assert.deepEqual(feed('both-team-loss-off'), [penix], 'team loss alerts off: the player one instead');
-  assert.deepEqual(feed('two-players'), ['player.team_lost: Successful Hate Watch! Bijan Robinson and the Falcons lost to the Saints | Final Score: 27 to 13'], 'two players on one team: one alert');
+  assert.deepEqual(feed('two-players'), ['player.team_lost: Successful Hate Watch! Bijan Robinson and the Falcons lost to the Saints | Final Score: 27 to 13'], 'two players on one team, followed at the same moment: one alert, by name');
+  assert.deepEqual(feed('penix-first'), [penix], 'the one they tracked first');
+  assert.deepEqual(feed('penix-first-but-off'), ['player.team_lost: Successful Hate Watch! Bijan Robinson and the Falcons lost to the Saints | Final Score: 27 to 13'], "the first one's alert is off: the next");
   assert.deepEqual(feed('switched-off'), [], 'the Settings switch');
   assert.deepEqual(feed('off-for-penix'), [], "the player's own ⚙️ switch");
   assert.deepEqual(feed('kamara-fan'), [], 'his team won');
@@ -77,14 +87,15 @@ test("a player's team losing is a Successful Hate Watch for that team, once per 
   assert.deepEqual(tally('switched-off'), [1, ['team:nfl:1 1']], 'counted whatever the alert settings, like a team loss');
   assert.deepEqual(tally('kamara-fan'), [0, []], 'his team won');
   // "N other hate watchers": everyone who got one of the loss's alerts. Penix's fan, the team alert in
-  // "both", Penix's in "both-team-loss-off", Bijan's in "two-players": 4 devices, so 3 others each.
+  // "both", Penix's in "both-team-loss-off", Bijan's in "two-players", and the two who followed Penix
+  // first: 6 devices, so 5 others each.
   const items = (dev: string) => (db.prepare(`SELECT e.*, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ?`).all(dev) as any[]).map((r) => feedItem(r));
-  for (const dev of ['penix-fan', 'both', 'both-team-loss-off', 'two-players']) assert.deepEqual(items(dev).map((i) => i.alsoGot), [3], dev);
+  for (const dev of ['penix-fan', 'both', 'both-team-loss-off', 'two-players']) assert.deepEqual(items(dev).map((i) => i.alsoGot), [5], dev);
   // The final on the Scores tab says the same, for the player's fan as for the team's.
-  for (const dev of ['penix-fan', 'both']) assert.deepEqual(withHateWatch(dev, [{ id: 'G1', state: 'post' }])[0].hateWatch, { alsoGot: 3 }, dev);
+  for (const dev of ['penix-fan', 'both']) assert.deepEqual(withHateWatch(dev, [{ id: 'G1', state: 'post' }])[0].hateWatch, { alsoGot: 5 }, dev);
   // Live too: the alert's own frame already counts both kinds, and the counter's new tally follows it.
   for (const dev of ['penix-fan', 'both']) {
-    assert.deepEqual(frames.get(dev)!.filter((x) => x.kind === 'event').map((x) => [x.item.type, x.item.alsoGot]), [[dev === 'both' ? 'team.lost' : 'player.team_lost', 3]], dev);
+    assert.deepEqual(frames.get(dev)!.filter((x) => x.kind === 'event').map((x) => [x.item.type, x.item.alsoGot]), [[dev === 'both' ? 'team.lost' : 'player.team_lost', 5]], dev);
     assert.deepEqual(frames.get(dev)!.filter((x) => x.kind === 'hateWatches').map((x) => x.tally.total), [1], `${dev}: one new tally`);
   }
 });

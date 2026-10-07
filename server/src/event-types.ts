@@ -114,7 +114,7 @@ const BASE: EventTypeDef[] = [
   { id: 'team.fell_behind', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', ...SOCCER_LEAGUES], label: 'Falls behind', description: "Tracked team goes from tied/leading to trailing. Replaces that play's \"Opponent scores\" alert, so you get one alert, not two.", defaultOn: true, emoji: '⬇️' },
   { id: 'team.standings_drop', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl', 'f1', ...SOCCER_LEAGUES], label: 'Drops in standings', description: "Tracked team slides down the conference/league standings (F1: the constructors' championship; EPL: the table).", defaultOn: true, emoji: '📊' },
   { id: 'team.losing_streak', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Losing streak', description: 'Tracked team extends a losing streak to 3 or more.', defaultOn: true, emoji: '🧊' },
-  { id: 'team.eliminated', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Eliminated from playoffs', description: 'Tracked team is mathematically eliminated from playoff contention.', defaultOn: true, emoji: '⚰️' },
+  { id: 'team.eliminated', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'Eliminated from playoffs', description: 'Tracked team is mathematically eliminated from playoff contention, or knocked out of the playoffs. A knockout comes in that game\'s Successful Hate Watch, one alert (a sweep says so).', defaultOn: true, emoji: '⚰️' },
   { id: 'team.player_injured', scope: 'team', leagues: ['nba', 'mlb', 'nfl', 'nhl'], label: 'A player gets injured', description: 'Anyone on the tracked team lands on the injury report.', defaultOn: true, emoji: '🚑' },
 ];
 

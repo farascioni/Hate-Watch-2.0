@@ -193,7 +193,7 @@ export function feedItem(row: { id: string; type: string; league: string; target
 const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)
   VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
 const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
-const followers = () => db.prepare('SELECT f.device_id, d.push_token FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
+const followers = () => db.prepare('SELECT f.device_id, d.push_token, f.created_at FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
 
 export type PushMessage = { to: string; title: string; body: string; sound: 'default' | null; priority: 'high'; channelId: string; interruptionLevel: string; threadId: string; data: Record<string, unknown> };
 
@@ -209,6 +209,16 @@ export function publish(events: Detected[], league: League) {
   // Who gets what first, then the feed rows, frames and pushes: a Successful Hate Watch says how many
   // others got it, and a team's loss counts everyone who got one of its alerts (the team's or a player's).
   const planned: { e: Detected; gameId: string | null; deliver: { f: { device_id: string; push_token: string | null }; prefs: Prefs }[]; followers: number }[] = [];
+  // Of a moment's firstFollowed alerts, each device's is the one about what it followed first (and wants).
+  const firstFollowed = new Map<string, Map<string, { key: string; at: number }>>(); // moment → device → target
+  for (const e of events) {
+    if (!e.firstFollowed || !e.moment) continue;
+    const mine = firstFollowed.get(e.moment) ?? firstFollowed.set(e.moment, new Map()).get(e.moment)!;
+    for (const f of followers().all(e.targetKey) as { device_id: string; created_at: number }[]) {
+      const had = mine.get(f.device_id);
+      if ((!had || f.created_at < had.at) && shouldDeliver(getPrefs(f.device_id), e, league)) mine.set(f.device_id, { key: e.targetKey, at: f.created_at });
+    }
+  }
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
@@ -226,6 +236,7 @@ export function publish(events: Detected[], league: League) {
       }
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
+      if (e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
       if (e.moment) {
         const have = got.get(e.moment) ?? got.set(e.moment, new Set()).get(e.moment)!;
         if (have.has(f.device_id)) continue; // they track the player and the player's team: one alert, not two

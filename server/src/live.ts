@@ -6,7 +6,7 @@ import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League
 import { scanNews } from './news.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -31,6 +31,8 @@ const DECISION_TRIES = 20;
 /** Soccer: how often to read the touch-by-touch feed (passes, dribbles), only while someone tracks a player in the match. */
 const TOUCH_MS = Number(process.env.HW_TOUCH_MS ?? 10_000);
 const TOUCH_PAGE = 100;
+/** A playoff final waits for the scoreboard (the series: is this the end of their season?), but not forever. */
+const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -87,6 +89,9 @@ export class GameTracker {
   private touchesFrom = 0; // touches before this (less a margin) are history
   private playersAt = 0;
   private hasPlayers = false;
+  /** A postseason game (ESPN season type 3): its final waits for the scoreboard's series (see finish). */
+  private postseason = false;
+  private finalSeenAt = 0;
   private readonly info: GameInfo;
   finished = false;
   lastPollMs = 0;
@@ -141,6 +146,7 @@ export class GameTracker {
           if (!this.keepersSeeded.has(teamId)) { this.keepersSeeded.add(teamId); this.ctx.goalies.set(teamId, gk); }
         }
       }
+      if (s.header?.season?.type === 3) this.postseason = true;
       const comp = s.header?.competitions?.[0];
       // "Hate Watch Starting" goes out once, on the pre → in flip. A game first seen already under
       // way (a follow in the 3rd quarter, a server restart) never gets a late "starting" alert.
@@ -224,7 +230,11 @@ export class GameTracker {
       goalies: league === 'nhl' && summary.status === 'fulfilled' ? boxGoalies(summary.value, this.ctx.goalies) : undefined,
       passers: league === 'nfl' && summary.status === 'fulfilled' ? boxPassers(summary.value) : undefined,
     });
-    if (final) this.finish(final);
+    if (final && this.postseason) {
+      // The scoreboard's read (every 10s) finishes it with the series; this is the fallback.
+      this.finalSeenAt ||= Date.now();
+      if (Date.now() - this.finalSeenAt >= PLAYOFF_FINAL_WAIT_MS) { log(`[${league} ${gameId}] playoff final without the scoreboard's series after ${PLAYOFF_FINAL_WAIT_MS / 1000}s`); this.finish(final); }
+    } else if (final) this.finish(final);
   }
 
   /** Soccer: someone tracks a player on either side (checked every 30s). */
@@ -271,13 +281,14 @@ export class GameTracker {
     }
   }
 
-  finish(final: { home: number; away: number }) {
+  /** `ev`: the scoreboard's event, when it's the scoreboard that saw the final (a playoff loss can end a season: eliminationOf). */
+  finish(final: { home: number; away: number }, ev?: any) {
     if (this.finished) return;
     this.finished = true;
     const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
     if (lastHalf.length) publish(lastHalf, this.ctx.league);
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
-    const lost = gameLostEvent(this.ctx, final, Date.now());
+    const lost = gameLostEvent(this.ctx, final, Date.now(), ev ? eliminationOf(this.ctx.league, ev) : null);
     if (!lost) return; // a tie
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
     // (3+ goals), then the team's loss, then "their team lost" for its tracked players.
@@ -334,7 +345,7 @@ class LiveEngine {
   }
 
   private async scanScoreboard(lg: League) {
-    const sb = await getJson(urls.scoreboard(lg), { timeoutMs: 6000, bust: true });
+    const sb = await liveDeps.getJson(urls.scoreboard(lg), { timeoutMs: 6000, bust: true });
     const watched = watchedTeamKeys();
     // Every game on the board gets a Scores-tab card (they're pushed only to devices that track a side).
     const seen = new Set<string>();
@@ -370,7 +381,7 @@ class LiveEngine {
           tr = new GameTracker(lg, ev.id, home.id, away.id);
           this.trackers.set(key, tr);
         }
-        tr?.finish({ home: Number(home.score), away: Number(away.score) });
+        tr?.finish({ home: Number(home.score), away: Number(away.score) }, ev); // with the series: a playoff loss can end their season
         tr?.stop();
       }
       if (tr && !relevant && !tr.finished) {
