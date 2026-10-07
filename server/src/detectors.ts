@@ -1,6 +1,6 @@
 import { athleteIdFromRef, teamIdFromRef } from './espn.ts';
 import { catalog, normalize } from './catalog.ts';
-import { BASKETBALL, playerKey, teamKey, type League } from './leagues.ts';
+import { BASKETBALL, SOCCER, playerKey, teamKey, type League } from './leagues.ts';
 
 /** League-agnostic view of one play. */
 export interface NPlay {
@@ -27,8 +27,10 @@ export interface GameCtx {
   gameId: string;
   homeId: string;
   awayId: string;
-  /** NHL: who is in net for each team right now (teamId -> athleteId). Updated as plays stream in. */
+  /** NHL and soccer: who is in goal for each team right now (teamId -> athleteId). Updated as plays stream in. */
   goalies: Map<string, string>;
+  /** Soccer: red cards so far per team (teamId -> count), for "down to 10 men". */
+  sentOff?: Record<string, number>;
   /** MLB: the latest at-bat result. Its onFirst/onSecond/onThird roles are the bases AFTER that play. */
   lastResult?: NPlay;
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
@@ -114,6 +116,52 @@ export function fromCorePlay(p: any): NPlay {
 }
 
 /**
+ * Soccer: the summary's key events (goals, cards, penalties, substitutions) as plays. ESPN leaves the
+ * score off them, so it's counted here from the goals: each is the credited team's, and an own goal is
+ * credited to the team it counts for. The text gets the minute in front ("57' Alexander Isak (Liverpool)
+ * right footed shot…") and loses ESPN's "Goal! Bournemouth 0, Liverpool 1." (alerts add the score).
+ * Roles: a goal's scorer then the assist, a substitution's player coming on then the one going off.
+ */
+export function fromKeyEvents(summary: any, homeId: string, awayId: string): NPlay[] {
+  const score = { home: 0, away: 0 };
+  return (summary?.keyEvents ?? []).map((k: any): NPlay => {
+    const teamId = k.team?.id != null ? String(k.team.id) : undefined;
+    const scoring = !!k.scoringPlay && !k.shootout;
+    if (scoring && teamId === homeId) score.home++;
+    if (scoring && teamId === awayId) score.away++;
+    const type = String(k.type?.text ?? ''), slug = String(k.type?.type ?? '');
+    const roles = slug === 'substitution' ? ['on', 'off'] : scoring ? ['scorer', 'assist'] : [];
+    let said = String(k.text ?? '');
+    if (/^Goal!/.test(said)) said = said.replace(/^Goal!\s.*?\d+,\s.*?\d+\.\s*/, '');
+    if (/^own goal/i.test(type)) said = said.replace(/\s+[^.]*?\s\d+,\s[^.]*?\s\d+\.$/, ''); // "… Fulham 1, Manchester United 0."
+    return {
+      id: String(k.id), type, typeSlug: slug,
+      text: [k.clock?.displayValue, said].filter(Boolean).join(' '),
+      teamId,
+      participants: (k.participants ?? []).map((x: any, i: number) => ({ id: String(x.athlete?.id), ...(roles[i] ? { role: roles[i] } : {}) }))
+        .filter((x: { id: string }) => x.id !== 'undefined'),
+      scoring,
+      scoreValue: scoring ? 1 : 0,
+      home: score.home,
+      away: score.away,
+      at: k.wallclock ? Date.parse(k.wallclock) : Date.now(),
+      shooting: false,
+    };
+  });
+}
+
+/** Soccer: each side's goalkeeper on the pitch, from the summary's line-ups (teamId -> athleteId), once they're out. */
+export function keepers(summary: any): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of summary?.rosters ?? []) {
+    const gks = (r.roster ?? []).filter((x: any) => x.position?.abbreviation === 'G' && !x.subbedOut);
+    const gk = gks.find((x: any) => x.subbedIn) ?? gks.find((x: any) => x.starter);
+    if (gk?.athlete?.id != null && r.team?.id != null) out.set(String(r.team.id), String(gk.athlete.id));
+  }
+  return out;
+}
+
+/**
  * Merge two chronologically ordered play lists by id, keeping play order. Plays only in
  * `secondary` are placed right after the play that preceded them there. (ESPN's sequenceNumber
  * restarts every MLB at-bat, so sorting by it scrambles a baseball game.)
@@ -144,6 +192,15 @@ export function observePlay(g: GameCtx, p: NPlay) {
   if (g.league === 'nhl') {
     const [saver] = p.participants.filter((x) => x.role === 'saver').map((x) => x.id);
     if (saver && p.teamId) g.goalies.set(p.teamId === g.homeId ? g.awayId : g.homeId, saver);
+  }
+  if (SOCCER.has(g.league) && p.teamId) {
+    // Keepers start from the line-ups (keepers()); then a keeper comes on, or the one in goal is sent off.
+    const [on] = role(p, 'on');
+    if (p.typeSlug === 'substitution' && on && catalog.playerByEspn(g.league, on)?.position === 'G') g.goalies.set(p.teamId, on);
+    if (/^red card/i.test(p.type)) {
+      (g.sentOff ??= {})[p.teamId] = (g.sentOff[p.teamId] ?? 0) + 1;
+      if (p.participants[0] && g.goalies.get(p.teamId) === p.participants[0].id) g.goalies.delete(p.teamId);
+    }
   }
   if (g.league === 'nfl' && p.teamId) {
     // Core plays' team is the offense. A trick-play pass by a non-QB doesn't change who is under center.
@@ -694,8 +751,45 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
+/**
+ * Soccer, from the key events (fromKeyEvents). Alerts are `<league>.*` (the EPL's are `epl.*`), so another
+ * league can share these the way the WNBA shares the NBA's. g.goalies and g.sentOff are kept by observePlay().
+ * A red card or a missed penalty is one alert type for the player and their team: the two share a moment,
+ * so tracking both gets you one.
+ */
+function soccer(g: GameCtx, p: NPlay): Detected[] {
+  const lg = g.league, out: Detected[] = [];
+  const who = p.participants[0]?.id;
+  const other = (id?: string) => (id === g.homeId ? g.awayId : id === g.awayId ? g.homeId : undefined);
+  const forTeam = (type: string, title: string, moment: string): Detected => ({
+    id: `${g.gameId}:${p.id}:${type}:team-${p.teamId}`, type, targetKey: teamKey(lg, p.teamId!), title,
+    body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment,
+  });
+  if (p.scoring) {
+    // An own goal is credited to the team it counts for, so either way the other side conceded.
+    const conceding = other(p.teamId);
+    const keeper = conceding ? g.goalies.get(conceding) : undefined;
+    const own = /^own goal/i.test(p.type) ? who : undefined;
+    if (own) out.push(mk(g, p, `${lg}.own_goal`, own, `${nameOf(lg, own)} scored an own goal 🤡`, own === keeper ? { aliases: [`${lg}.goal_conceded`] } : {}));
+    if (keeper && keeper !== own) out.push(mk(g, p, `${lg}.goal_conceded`, keeper, `${nameOf(lg, keeper)} conceded a goal 🥅`));
+  } else if (who && p.teamId && /^penalty\b/i.test(p.type)) { // "Penalty - Saved", "Penalty - Missed"
+    const what = /saved/i.test(p.type) ? 'had a penalty saved' : 'missed a penalty';
+    const type = `${lg}.penalty_missed`, moment = `${g.gameId}:${p.id}:penalty`;
+    out.push(mk(g, p, type, who, `${nameOf(lg, who)} ${what} 😬`, { moment }));
+    out.push(forTeam(type, `${teamName(lg, p.teamId)} ${what} 😬`, moment));
+  } else if (who && /^yellow card/i.test(p.type)) {
+    out.push(mk(g, p, `${lg}.yellow_card`, who, `${nameOf(lg, who)} was booked 🟨`));
+  } else if (who && p.teamId && /^red card/i.test(p.type)) {
+    const type = `${lg}.red_card`, moment = `${g.gameId}:${p.id}:red`;
+    const left = 11 - ((g.sentOff?.[p.teamId] ?? 0) + 1); // observePlay counts this one after the detectors run
+    out.push(mk(g, p, type, who, `${nameOf(lg, who)} was sent off${/second yellow/i.test(p.text) ? ' (second yellow)' : ''} 🟥`, { moment }));
+    out.push(forTeam(type, `${teamName(lg, p.teamId)} are down to ${left} men 🟥`, moment));
+  }
+  return out;
+}
+
 // F1 has no play-by-play; its alerts come from session results (f1.ts).
-export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, wnba: nba, nhl, f1: () => [] };
+export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, wnba: nba, nhl, epl: soccer, f1: () => [] };
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───
 /**
@@ -707,7 +801,9 @@ export function nextScore(prev: { home: number; away: number }, p: NPlay) {
   return { home: Math.max(prev.home, p.home), away: Math.max(prev.away, p.away) };
 }
 
-export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out' };
+export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', epl: 'Kickoff', f1: 'Lights out' };
+/** "the Falcons", but plain "Liverpool": clubs don't take "the". */
+const the = (lg: League, team: string) => (SOCCER.has(lg) ? team : `the ${team}`);
 
 /** "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). */
 export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
@@ -731,7 +827,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
     id: `${g.gameId}:final:team.lost:${loserId}`,
     type: 'team.lost',
     targetKey: teamKey(g.league, loserId),
-    title: `Successful Hate Watch! ${teamName(g.league, loserId)} lost to the ${teamName(g.league, winnerId)}`,
+    title: `Successful Hate Watch! ${teamName(g.league, loserId)} lost to ${the(g.league, teamName(g.league, winnerId))}`,
     body: `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`,
     at,
     meta: { gameId: g.gameId },
@@ -747,7 +843,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const delta = p[opp] - prev[opp];
     const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
     const [team, oppName] = [teamName(g.league, teamId), teamName(g.league, oppId)];
-    const what = g.league === 'nhl' ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
+    const what = g.league === 'nhl' || SOCCER.has(g.league) ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
     const safety = delta === 2 && g.league === 'nfl' && isSafety(p);
     // Falling behind can only happen because the opponent just scored, so the two alerts always
     // coincide. The fell-behind alert carries both facts; the scored-on alert for this play is
@@ -758,12 +854,12 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
       out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind });
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind });
     }
     if (fellBehind) {
       out.push({
         id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
-        title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over the ${team}`,
+        title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
         ...base,
       });
     }

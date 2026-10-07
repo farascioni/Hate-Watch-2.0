@@ -32,7 +32,7 @@ export function describeFilter(f: Filter, noun = 'players and teams') {
 }
 
 /**
- * Everything / Players / Teams, plus All / NBA / MLB / NFL / NHL. Two fixed rows rather than a
+ * Everything / Players / Teams, plus All and each league (NBA … EPL, WNBA). Two fixed rows rather than a
  * horizontal scroller, so every option is always visible (same on iOS, Android and web).
  */
 export function FilterBar({ filter, onChange, kinds = true }: { filter: Filter; onChange: (f: Filter) => void; /** false: league chips only (Scores tab) */ kinds?: boolean }) {
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: colors.surfaceHi },
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: colors.text },
-  leagues: { flexDirection: 'row', gap: space(2), paddingHorizontal: space(3), paddingBottom: space(2) },
-  // Sized to their labels, then stretched to fill the row: seven chips fit an iPhone SE without squeezing "WNBA".
-  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(1.5) },
+  leagues: { flexDirection: 'row', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2) },
+  // Sized to their labels, then stretched to fill the row: eight chips fit an iPhone SE without squeezing "WNBA".
+  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(1) },
 });

@@ -11,7 +11,8 @@ const { classify, newsEvents, scanNews, newsDeps } = await import('../src/news.t
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'x', 1, 1, 0)`);
 for (const [lg, id, name, short, abbr] of [['nba', '21', 'Phoenix Suns', 'Suns', 'PHX'], ['nba', '18', 'New York Knicks', 'Knicks', 'NY'], ['mlb', '20', 'Washington Nationals', 'Nationals', 'WSH'],
-  ['nfl', '3', 'Chicago Bears', 'Bears', 'CHI'], ['nfl', '33', 'Baltimore Ravens', 'Ravens', 'BAL'], ['nfl', '4', 'Cincinnati Bengals', 'Bengals', 'CIN'], ['nfl', '6', 'Dallas Cowboys', 'Cowboys', 'DAL']]) {
+  ['nfl', '3', 'Chicago Bears', 'Bears', 'CHI'], ['nfl', '33', 'Baltimore Ravens', 'Ravens', 'BAL'], ['nfl', '4', 'Cincinnati Bengals', 'Bengals', 'CIN'], ['nfl', '6', 'Dallas Cowboys', 'Cowboys', 'DAL'],
+  ['epl', '370', 'Fulham', 'Fulham', 'FUL'], ['epl', '360', 'Manchester United', 'Man United', 'MAN']]) {
   team.run(`team:${lg}:${id}`, lg, id, name, short, abbr);
 }
 const player = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, image, image_w, image_h, image_kind, updated_at) VALUES (?, ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
@@ -52,10 +53,13 @@ test('what an item is: trouble, a fine or suspension, both, or neither', () => {
   assert.deepEqual(classify('Sources: Ravens LB to be suspended two games for hit'), { type: 'fine_suspension' }, 'a reported suspension still counts');
   for (const t of ["Spurs' Victor Wembanyama not interested in promoting betting sites", 'Rain suspends game in the 5th; resumes Tuesday', 'Charges dropped against Bills LB',
     'Suspension of Pacers guard reduced to two games on appeal', 'Sources: Ravens QB Lamar Jackson dealing with ankle sprain', 'Rookie is fine after scare in practice',
-    // As ESPN had it on 2026-10-06: an opinion, not a ban.
+    // As ESPN had it on 2026-10-06: an opinion, not a ban. Then name-calling, not an accusation of wrongdoing (EPL).
+    "Erik ten Hag 'was a piece of crap' with Man United squad - Fred. Former Manchester United midfielder Fred has accused ex-boss Erik ten Hag of being a 'piece of crap' when it came to squad management.",
+    'Arteta accuses referee of bias after Arsenal loss',
     "Lando Norris: Drivers should have 'one-race ban' after collision with Franco Colapinto at Azerbaijan GP. Lando Norris has said Franco Colapinto should be banned for the pile-up which ended his Azerbaijan Grand Prix."]) {
     assert.equal(classify(t), null, t);
   }
+  assert.deepEqual(classify('Winger accused of racist abuse by opponent'), { type: 'off_field' }, 'being accused still counts');
 });
 
 test('who it is about (teams under their own team.* switches): the tagged player and the team, a lone tagged team, never a former team or the one on the receiving end', () => {
@@ -76,6 +80,11 @@ test('who it is about (teams under their own team.* switches): the tagged player
   assert.deepEqual(view(newsEvents('nfl', [hit], 0)), [['fine_suspension', 'player:nfl:50', hit.headline], ['team.fine_suspension', 'team:nfl:33', hit.headline]], 'Burrow and the Bengals took the hit');
   const knicks = { id: 2, type: 'HeadlineNews', published: at(1), headline: 'NBA fines Knicks $25K for violating injury reporting rules', categories: [teamTag('18', 'New York Knicks')] };
   assert.deepEqual(view(newsEvents('nba', [knicks], 0)), [['team.fine_suspension', 'team:nba:18', knicks.headline]]);
+  // As ESPN had it on 2026-10-06 (EPL): about Fulham. Man United are only the game, and his quote.
+  const arbeloa = { id: 4, type: 'HeadlineNews', published: at(1), headline: 'FA charges Fulham boss Álvaro Arbeloa with misconduct for comments after Man United draw',
+    description: 'Fulham boss Alvaro Arbeloa has been charged with misconduct by the FA  for claiming officials would "not let Manchester United lose" after Michael Carrick\'s side scored a late equaliser to draw their Premier League match at Craven Cottage.',
+    categories: [teamTag('360', 'Manchester United'), teamTag('370', 'Fulham')] };
+  assert.deepEqual(view(newsEvents('epl', [arbeloa], 0)), [['team.off_field', 'team:epl:370', arbeloa.headline]]);
 });
 
 test('only ESPN news items, only new ones', () => {

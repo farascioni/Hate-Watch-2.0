@@ -73,7 +73,7 @@ export function statusLine(g: GameCard, now = Date.now()) {
 }
 
 /** A typical game, start to final (the server's GAME_LENGTH_MS), for a final without an end time. */
-const GAME_LENGTH_MS: Record<GameCard['league'], number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
+const GAME_LENGTH_MS: Record<GameCard['league'], number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, epl: 2 * 3600_000, f1: 2 * 3600_000 };
 /** Same window as the server: live, starting within a day, or finished in the last 24 hours. */
 export const inWindow = (g: GameCard, now = Date.now()) =>
   g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)

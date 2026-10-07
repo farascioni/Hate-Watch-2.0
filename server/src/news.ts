@@ -43,12 +43,19 @@ const RESOLVED = /\breinstat\w*|\bsuspension\b.{0,40}?\b(?:lifted|overturned|red
 /** Someone's opinion or a maybe, not a ruling: "Norris: Colapinto should be banned", "calls for a suspension". */
 const SPECULATIVE = /\b(?:should|could|would|might|may|must)\s+(?:not\s+)?(?:be|have|get|face|receive)\s+(?:been\s+)?(?:an?\s+)?(?:[\w-]+\s+)?(?:fined|suspended|banned|ban|suspension|fine)\b|\bcalls? for\b.{0,40}?\b(?:ban|suspension|fine)\b|\b(?:possible|potential)\s+(?:ban|suspension|fine)\b/gi;
 
+/**
+ * Someone running someone else down, not an accusation of wrongdoing: "Fred has accused ex-boss Erik ten
+ * Hag of being a 'piece of crap'", "Arteta accuses referee of bias". (Being accused of something still counts.)
+ */
+const CRITICISM = /\baccus(?:es|ed|ing)\s+(?:[\w'’-]+\s+){1,5}?of being\b|\baccus(?:es|ed|ing)\s+(?:the\s+)?(?:referees?|refs?|officials|officiating|var|umpires?)\b/gi;
+
 /** Which of the two an item is: a fine or suspension (also counting as off-field trouble when it's for that), or trouble. */
 export function classify(text: string): { type: string; aliases?: string[] } | null {
   if (RESOLVED.test(text)) return null;
   const ruling = text.replace(SPECULATIVE, ' ');
   const discipline = DISCIPLINE.some((re) => re.test(ruling)) && !(SUSPENDED_GAME.test(ruling) && !/\bfined\b|\bbann?ed\b/i.test(ruling));
-  const trouble = TROUBLE.some((re) => re.test(text));
+  const said = text.replace(CRITICISM, ' ');
+  const trouble = TROUBLE.some((re) => re.test(said));
   if (discipline) return trouble ? { type: FINE_SUSPENSION, aliases: [OFF_FIELD] } : { type: FINE_SUSPENSION };
   return trouble ? { type: OFF_FIELD } : null;
 }
@@ -59,6 +66,8 @@ export function classify(text: string): { type: string; aliases?: string[] } | n
  * normalizes to "ex bears"), or as on the receiving end ("a hit on Bengals QB Joe Burrow").
  */
 const FORMER = /\b(?:ex|former)\s+$/;
+/** A team named as the game something happened after: "charged for comments after Man United draw". */
+const AFTER_THEIR_GAME = /\b(?:after|following)\s+(?:the\s+)?$/;
 const ON_THE_RECEIVING_END = /\b(?:on|toward|towards|involving|vs|(?:collision|crash|contact|altercation|fight|clash|scuffle|incident)s?\s+with)\s+(?:[a-z0-9]+\s+){0,3}$/;
 const WORD = (s: string) => new RegExp(`(^|[^a-z0-9])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9])`, 'g');
 
@@ -75,8 +84,11 @@ export interface Article { id: number | string; type?: string; headline?: string
 /**
  * Tracked-target candidates for an item. A tagged athlete counts when their name (full, or last name) is
  * in the headline or description, and not only as the one something happened to. Their team counts too.
- * A tagged team counts when it's named and not as a former team ("Ex-Bears LB"), or when it's the
- * only team tagged and no athlete is (minor leaguers aren't tagged: "Nationals catcher Francisco Rivero").
+ * A tagged team counts when it's named and not as a former team ("Ex-Bears LB") or the game something
+ * happened after ("after Man United draw"), or when it's the only team tagged and no athlete is (minor
+ * leaguers aren't tagged: "Nationals catcher Francisco Rivero"). When the headline names a team, teams
+ * named only further down don't count: "FA charges Fulham boss … after Man United draw" is about Fulham,
+ * though the story goes on to quote him saying officials "would not let Manchester United lose".
  */
 export function affected(lg: League, a: Article): { players: string[]; teams: string[] } {
   const text = normalize(`${a.headline ?? ''}. ${a.description ?? ''}`);
@@ -93,13 +105,18 @@ export function affected(lg: League, a: Article): { players: string[]; teams: st
     }
   }
   const tagged = (a.categories ?? []).filter((c) => c.type === 'team' && c.teamId != null);
+  const headline = normalize(a.headline ?? '').length; // the text starts with it
+  const named: { key: string; inHeadline: boolean }[] = [];
   for (const c of tagged) {
     const t = catalog.team(teamKey(lg, String(c.teamId)));
     if (!t) continue;
     const seen = [...new Set([t.name, t.shortName].map((n) => normalize(n ?? '')))].flatMap((n) => mentions(text, n));
-    const named = seen.filter((before) => !FORMER.test(before) && !ON_THE_RECEIVING_END.test(before));
-    if (named.length || (!seen.length && !players.length && tagged.length === 1)) teams.add(t.key);
+    const fair = seen.filter((before) => !FORMER.test(before) && !ON_THE_RECEIVING_END.test(before) && !AFTER_THEIR_GAME.test(before));
+    if (fair.length) named.push({ key: t.key, inHeadline: fair.some((before) => before.length < headline) });
+    else if (!seen.length && !players.length && tagged.length === 1) teams.add(t.key);
   }
+  const headlined = named.some((n) => n.inHeadline);
+  for (const n of named) if (n.inHeadline || !headlined) teams.add(n.key);
   return { players, teams: [...teams] };
 }
 

@@ -133,7 +133,7 @@ After editing the script, regenerate with `cd app && npm run icons`.
 
 ## Data: rosters, duplicates, and images
 
-Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, MLB, NFL, NHL and Formula 1**. The NHL is included because several of the requested alerts are hockey alerts.
+Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, WNBA, MLB, NFL, NHL, Formula 1 and the Premier League (EPL)**. The NHL is included because several of the requested alerts are hockey alerts. ESPN files soccer leagues under a code rather than a name (the EPL is `soccer/eng.1`), kept as `slug` in `leagues.ts`; every ESPN URL goes through it.
 
 Last ingest (2026-10-06): **150 teams, 5,505 players**, 214 of them from injured lists.
 
@@ -145,7 +145,9 @@ Last ingest (2026-10-06): **150 teams, 5,505 players**, 214 of them from injured
 | NFL | 32 | 2,542 | 2,539 | 3 |
 | NHL | 32 | 843 (25 injured) | 826 | 17 |
 | F1 | 11 constructors | 23 drivers | 15 | 8 (team badge) |
+| EPL | 20 | 585 | 38 | 547 (club crest) |
 
+- **EPL players mostly show their club crest.** ESPN has photos for only a few Premier League players (38 of 585), so the rest get the crest, the same accuracy-first fallback as call-ups elsewhere. ESPN's EPL injury report is empty, so nobody is added from it.
 - **Injured lists too.** A player on MLB's 60-day IL comes off the 40-man roster ESPN serves, and NHL long-term injured reserve players are left off too, so Carlos Correa wasn't on the Astros. The ingest also reads each league's injury report and adds anyone on it who isn't on a roster to the team it lists them under (`injuredOffRoster` in `catalog.ts`), with the same duplicate checks and headshot verification. NBA and NFL rosters already include their injured players.
 - **Refreshes every 6 hours, counted from the last one.** Deploys restart the server, and a timer that started over each time kept putting refreshes off. A change to what the ingest collects bumps `INGEST_VERSION`, so the next boot rebuilds in the background right away (`nextIngestIn`).
 - **No duplicates.** Players are deduped on ESPN athlete ID, with a second pass on normalized name + birth date. Teams are deduped on ID and abbreviation. The ingest throws rather than commit a duplicate key, and the database primary keys enforce it again.
@@ -184,7 +186,7 @@ Ways the delay is kept down:
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
-## Notifications (64 types, all user-controllable)
+## Notifications (69 types, all user-controllable)
 
 | | |
 |---|---|
@@ -194,6 +196,8 @@ Ways the delay is kept down:
 | NFL onside kick | Sent to the **receiving** team when the other side kicks onside and keeps the ball: "Titans recovered an onside kick against the Ravens", with the play. ESPN writes these kickoffs as "J.Slye kicks onside 9 yards from TEN 35 to TEN 44. …"; the kick starts with the kicking team (`start.team`), and it's a success when the kicking team still has the ball at the end (`end.team`, on every kickoff in the core feed). If ESPN ever leaves the end team out, the last "RECOVERED by TEN-…" in the text decides (NFL codes like BLT map to ESPN's BAL). Kicks wiped out by a penalty ("- No Play", "NULLIFIED") don't count. Checked against the four real onside attempts in 2026 weeks 3–4 (all recovered by the receivers, so no alerts). |
 | NBA | missed shot, missed FT, got blocked, turnover, foul (off by default), technical/ejection |
 | WNBA | every NBA alert: its own copy of each NBA-only one (`wnba.*`, under "WNBA alerts" with its own switches), fed by the same basketball detectors (ESPN's WNBA play-by-play has the NBA's shape), and every alert the NBA shares with other leagues (losses, lead changes, injuries, standings, off-field trouble…). The copies are derived from the NBA list in `event-types.ts`, so they can't drift apart. Checked on NY @ ATL (WNBA playoffs, 2026-10-04) through the live tracker: "Breanna Stewart missed a three", 8 lead changes a side, "Successful Hate Watch! Liberty lost to the Dream". |
+| EPL | keeper concedes a goal (own goals too), scores an own goal, misses a penalty or has it saved (players and teams), gets booked, sent off (players and teams: "Ipswich are down to 10 men 🟥"); plus the shared team alerts: game starts ("Kickoff at Emirates Stadium"), lost, opponent scored ("Liverpool scored against Bournemouth": clubs don't get "the"), fell behind, dropped in the table ("…Into the relegation zone 🪂" when it is), off-field trouble, fined or suspended |
+| EPL how | Soccer has no play-by-play worth reading (ESPN's core feed has every touch, 1,500 a match). The tracker reads the summary's **key events** every 2s instead: goals, own goals, penalties, cards, substitutions (`fromKeyEvents` in `detectors.ts`). They carry no score, so it's counted from the goals: each goal is the credited team's, and an own goal is credited to the team it counts for. The keeper in goal starts from the line-ups (`keepers`), then follows substitutions (a player listed as a keeper coming on) and red cards (a keeper sent off is out of goal). A penalty miss or a red card is one alert type for the player and the team, sharing a moment, so tracking both gets you one. A keeper who scores an own goal gets the own-goal alert, which counts for "concedes" too. A draw isn't a loss, so it sends no "Successful Hate Watch". Replayed against five real September 2026 matches (an own goal, a saved penalty, a second yellow, a straight red, a 5-0): every counted score matched ESPN's final. |
 | NHL | goalie allows a goal, shot missed, shot blocked (off by default), shot saved (off by default), giveaway (off by default), penalty |
 | F1 drivers | doesn't finish (retired / DSQ / DNS, **live**), outside the points, lost 3+ places from the grid, behind teammate, knocked out in Q1/Q2, drops in the drivers' championship |
 | F1 constructors | double DNF (**live**), no points, drops in the constructors' championship (the shared "Drops in standings" toggle) |
@@ -249,6 +253,7 @@ The other sports get their own lines under the score (`LiveDetails` in `app/src/
 
 - **NBA, WNBA:** "Top scorers: T. Jerome 10 pts · N. Alexander-Walker 12 pts", from each competitor's `leaders` on the scoreboard (the game's points leader once it starts).
 - **NFL:** "Timeouts left: ATL 3 · NO 3" from `situation`, and the passer for the team with the ball ("Passing: T. Shough, 0/1, 0 YDS"; TD and INT are added once there are any). The game screen shows both passers. Once a game kicks off, the scoreboard only names one passing leader for the whole game, so each side's passer (whoever has the most attempts) comes from the summary's box score that the 2s tracker reads (`boxPassers`). It's kept through the final.
+- **EPL:** "Shots on target: LIV 3 · BOU 2" and, once anyone's been sent off, "Red cards 🟥 IPS 1 · EVE 0", from the scoreboard's stats and match details. Its last play is the latest goal or card ("Last play: 63' Own Goal: L. Martínez"). The game screen's play list is the key events with their minute.
 - **NHL:** "Shots on goal: OTT 6 · BOS 3" and "In net: L. Ullmark (3 saves on 3) · J. Swayman (4 saves on 6)". The scoreboard only has each team's saves, so shots on goal are the other side's saves plus their goals. The goalie in net and their saves come from the summary's box score that the 2s tracker already reads (`boxGoalies`). It's the goalie the tracker has in net (so a change shows the new goalie), or else the last goalie the box lists. Scoreboard reads don't carry goalies, so the line stays on the card through the final.
 - **NBA, WNBA, NFL, NHL:** "Last play: …", ESPN's text for the latest play while the game is live ("Start of …", "End of …" and "Official Timeout" are skipped).
 - Checked live on 2026-10-05 against MEM @ ATL, OTT @ BOS and ATL @ NO.
@@ -315,4 +320,5 @@ node test/f1-replay.ts        # F1 alert logic on the real, current race weekend
 - MLB "gives up runs" credits the pitcher on the mound, not official earned-run or inherited-runner accounting.
 - Standings and injury alerts fire on change. The first snapshot after a fresh install is a silent baseline.
 - F1's live path (in-race DNFs and double DNFs) is tested with a simulated race through the real engine (`test/f1-live.test.ts`). Its first run against a real live race is the next race weekend after this was added.
+- EPL: no injury alerts (ESPN's EPL injury report is empty), no losing streaks (the table has no streak) and no elimination. The first live EPL matches after this was added are on 2026-10-10.
 - F1 sprint qualifying sessions don't generate alerts (only Qualifying, Sprint and Race do). F1 has no injury report on ESPN.

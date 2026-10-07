@@ -111,7 +111,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
   const newPlayers: Player[] = [];
 
   for (const lg of LEAGUE_IDS) {
-    const stats = { teams: 0, players: 0, duplicateIdsRemoved: 0, duplicateNamesRemoved: 0, headshotsVerified: 0, headshotFallbackToLogo: 0, headshotAltMismatch: 0 };
+    const stats: IngestReport['leagues'][string] = { teams: 0, players: 0, duplicateIdsRemoved: 0, duplicateNamesRemoved: 0, headshotsVerified: 0, headshotFallbackToLogo: 0, headshotAltMismatch: 0 };
     report.leagues[lg] = stats;
 
     if (lg === 'f1') {

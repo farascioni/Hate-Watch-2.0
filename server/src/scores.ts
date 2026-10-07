@@ -7,7 +7,7 @@ import { getJson as espnGetJson } from './espn.ts';
 import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
-import { BASKETBALL, playerKey, teamKey, urls, type League } from './leagues.ts';
+import { BASKETBALL, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { sendToConnected } from './fanout.ts';
 
 /** Seam for tests (test/scores.test.ts). Production never changes it. */
@@ -42,10 +42,11 @@ export interface GameCard {
   pitcher?: LivePlayer;  // MLB: pitches = thrown today (from the box score)
   batter?: LivePlayer;
   winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (NFL, MLB, NBA)
-  lastPlay?: string;      // NBA, NFL, NHL: ESPN's text for the latest play
+  lastPlay?: string;      // NBA, NFL, NHL: ESPN's text for the latest play (soccer: the latest goal or card, "57' Goal: A. Isak")
   leaders?: { home?: LivePlayer; away?: LivePlayer }; // NBA: each side's top scorer; NFL: each side's passer
   timeouts?: { home: number; away: number };          // NFL: timeouts left
-  shots?: { home: number; away: number };             // NHL: shots on goal
+  shots?: { home: number; away: number };             // NHL: shots on goal (soccer: shots on target)
+  redCards?: { home: number; away: number };          // soccer, once anyone's been sent off
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: who's in net, with saves (from the box score)
   session?: string;       // F1: "Singapore GP · Race"
   order?: Driver[];       // F1: running order / classification
@@ -63,7 +64,7 @@ function sideTeam(lg: League, c: any): TeamDto {
   };
 }
 
-/** One game from a scoreboard event (NBA, MLB, NFL, NHL). Pure, so it can be tested on real payloads. */
+/** One game from a scoreboard event (NBA, MLB, NFL, NHL, EPL). Pure, so it can be tested on real payloads. */
 export function gameCard(lg: League, ev: any): GameCard | null {
   const c = ev?.competitions?.[0];
   const home = c?.competitors?.find((x: any) => x.homeAway === 'home');
@@ -123,6 +124,18 @@ export function gameCard(lg: League, ev: any): GameCard | null {
       const saves = (x: any) => Number(x.statistics?.find((st: any) => st.name === 'saves')?.displayValue);
       const hs = saves(home), as = saves(away);
       if (Number.isFinite(hs) && Number.isFinite(as)) card.shots = { home: as + (card.home!.score ?? 0), away: hs + (card.away!.score ?? 0) };
+    }
+    // Soccer: shots on target, red cards and the latest goal or card, from the scoreboard's stats and match details.
+    if (SOCCER.has(lg)) {
+      const onTarget = (x: any) => Number(x.statistics?.find((st: any) => st.name === 'shotsOnTarget')?.displayValue);
+      const hs = onTarget(home), as = onTarget(away);
+      if (Number.isFinite(hs) && Number.isFinite(as)) card.shots = { home: hs, away: as };
+      const details: any[] = c.details ?? [];
+      const reds = (x: any) => details.filter((d) => d.redCard && String(d.team?.id) === String(x.id)).length;
+      if (details.some((d) => d.redCard)) card.redCards = { home: reds(home), away: reds(away) };
+      const last = details.at(-1);
+      const who = (last?.athletesInvolved ?? []).map((a: any) => a.shortName ?? a.displayName).filter(Boolean).join(', ');
+      if (state === 'in' && last?.type?.text) card.lastPlay = `${last.clock?.displayValue ? `${last.clock.displayValue} ` : ''}${last.type.text}${who ? `: ${who}` : ''}`;
     }
   }
   return card;
@@ -329,7 +342,7 @@ const involves = (g: GameCard, mine: Mine) =>
 /** How long a final stays on the Scores tab after it ends: the last game a team played, for a day. */
 export const KEEP_FINALS_MS = 24 * 3600_000;
 /** A typical game, start to final: when a game was already over the first time we saw it. */
-export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000 };
+export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, epl: 2 * 3600_000, f1: 2 * 3600_000 };
 /** Live now, starting within a day, or finished in the last 24 hours (every game, so both halves of a doubleheader). */
 export const inWindow = (g: GameCard, now = Date.now()) =>
   g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)
@@ -358,10 +371,11 @@ function when(lg: League, p: any) {
   const clock = p.clock?.displayValue ? ` ${p.clock.displayValue}` : '';
   if (lg === 'mlb') return `${/top/i.test(p.period?.type ?? '') ? 'Top' : 'Bot'} ${ordinal(n)}`;
   if (lg === 'nhl') return `${n > 3 ? 'OT' : `P${n}`}${clock}`;
+  if (SOCCER.has(lg)) return p.clock?.displayValue || (n === 2 ? '2nd half' : '1st half'); // the minute: "57'", "90'+4'"
   return `${n > 4 ? 'OT' : `Q${n}`}${clock}`;
 }
 
-/** The latest 25 plays, newest first. MLB keeps at-bat results only (not every pitch). */
+/** The latest 25 plays, newest first. MLB keeps at-bat results only (not every pitch); soccer is its key events (goals, cards, subs). */
 export async function gamePlays(g: GameCard): Promise<PlayLine[]> {
   if (g.league === 'f1') return [];
   const hit = playCache.get(g.key);
@@ -369,6 +383,7 @@ export async function gamePlays(g: GameCard): Promise<PlayLine[]> {
   const s = await scoresDeps.getJson(urls.summary(g.league, g.id), { timeoutMs: 6000, bust: g.state === 'in' });
   let raw: any[] = g.league === 'nfl'
     ? [...(s.drives?.previous ?? []).flatMap((d: any) => d.plays ?? []), ...(s.drives?.current?.plays ?? [])]
+    : SOCCER.has(g.league) ? (s.keyEvents ?? []).filter((k: any) => !/delay/.test(k.type?.type ?? ''))
     : (s.plays ?? []);
   if (g.league === 'mlb') raw = raw.filter((p) => p.type?.type === 'play-result' || p.scoringPlay);
   const seen = new Set<string>();

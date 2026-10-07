@@ -105,7 +105,8 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
 /**
  * The live detail lines under the score, per sport. MLB: who's pitching (and how many he's thrown) and
  * who's up. NBA: each side's top scorer. NFL: timeouts left and the passer (both on the game screen).
- * NHL: shots on goal and who's in net. NBA/NFL/NHL: the last play. Tracked players in red.
+ * NHL: shots on goal and who's in net. Soccer: shots on target and red cards. All but MLB: the last play
+ * (soccer: the latest goal or card). Tracked players in red.
  */
 function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
   const { follows } = useStore();
@@ -134,6 +135,10 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
   if (game.league === 'nhl') {
     if (game.shots) line('sog', `Shots on goal: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
     if (game.goalies) line('g', <>In net: {both(game.goalies, (p) => <>{name(p)}{p.line ? ` (${p.line})` : ''}</>)}</>);
+  }
+  if (game.league === 'epl') {
+    if (game.shots) line('sot', `Shots on target: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
+    if (game.redCards) line('red', `Red cards 🟥 ${abbr('away')} ${game.redCards.away} · ${abbr('home')} ${game.redCards.home}`);
   }
   if (game.lastPlay && game.state === 'in') line('last', <>Last play: <Text style={styles.who}>{game.lastPlay}</Text></>);
   return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;

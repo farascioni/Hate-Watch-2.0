@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { GAME_LEAGUES, LEAGUE_IDS, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, boxPitchers, fromCorePlay, fromSitePlay, gameLostEvent, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
+  PLAYER_DETECTORS, boxPitchers, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, keepers, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -65,6 +65,8 @@ export class GameTracker {
   private started = false;
   /** MLB pitcher alerts this game has already had (pitcherEvents): blown saves, no quality starts, losses. */
   private pitching = new Set<string>();
+  /** Soccer: teams whose keeper came from the line-ups. Only once: after that, subs and red cards say (observePlay). */
+  private keepersSeeded = new Set<string>();
   private readonly info: GameInfo;
   finished = false;
   lastPollMs = 0;
@@ -92,18 +94,21 @@ export class GameTracker {
    * Polls BOTH ESPN sources in parallel and merges by play id (ids are identical across them).
    * Measured live: the core API publishes plays ~15-20s before the site summary does, while the
    * summary carries game status, boxscore goalies, and is a fallback if core hiccups.
+   * Soccer is the summary alone: its key events are the plays (the core API has every touch, thousands a match).
    */
   async poll() {
-    const { league, gameId } = this.ctx;
+    const { league, gameId, homeId, awayId } = this.ctx;
+    const soccer = SOCCER.has(league);
     const [core, summary] = await Promise.allSettled([
-      liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
+      soccer ? Promise.resolve({ items: [] }) : liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
       liveDeps.getJson(urls.summary(league, gameId), { bust: true, timeoutMs: 4000 }),
     ]);
-    if (core.status === 'rejected' && summary.status === 'rejected') throw core.reason;
+    if (summary.status === 'rejected' && (soccer || core.status === 'rejected')) throw summary.reason;
 
     const corePlays: NPlay[] = core.status === 'fulfilled' ? (core.value.items ?? []).map(fromCorePlay) : [];
     // NFL summary has no flat plays list (drives only, without participants); core covers it.
-    const sitePlays: NPlay[] = summary.status === 'fulfilled' && league !== 'nfl' ? (summary.value.plays ?? []).map(fromSitePlay) : [];
+    const sitePlays: NPlay[] = summary.status !== 'fulfilled' || league === 'nfl' ? []
+      : soccer ? fromKeyEvents(summary.value, homeId, awayId) : (summary.value.plays ?? []).map(fromSitePlay);
     const plays = mergePlays(corePlays, sitePlays);
 
     const events: Detected[] = [];
@@ -111,6 +116,11 @@ export class GameTracker {
     if (summary.status === 'fulfilled') {
       const s = summary.value;
       if (this.first && league === 'nhl') this.seedGoalies(s);
+      if (soccer) {
+        for (const [teamId, gk] of keepers(s)) {
+          if (!this.keepersSeeded.has(teamId)) { this.keepersSeeded.add(teamId); this.ctx.goalies.set(teamId, gk); }
+        }
+      }
       const comp = s.header?.competitions?.[0];
       // "Hate Watch Starting" goes out once, on the pre → in flip. A game first seen already under
       // way (a follow in the 3rd quarter, a server restart) never gets a late "starting" alert.
@@ -240,7 +250,7 @@ class LiveEngine {
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */
   kick() { invalidateWatched(); for (const k of Object.values(this.kickers)) k?.(); }
 
-  onGameFinal(lg: League) { setTimeout(() => this.standingsKick[lg]?.(), 15_000); }
+  onGameFinal(lg: League) { setTimeout(() => this.standingsKick[lg]?.(), 15_000).unref(); }
 
   status() {
     return [
@@ -331,27 +341,40 @@ function every(ms: number, fn: () => Promise<void>): () => void {
 }
 
 // ─── Standings: drops, losing streaks, elimination ────────────────────────────────────────────
-interface StandingSnap { rank: number; group: string; clincher: string; streak: string }
+/** `note`: the zone a table position is in, where ESPN marks it (EPL: "Champions League", "Relegation"). */
+interface StandingSnap { rank: number; group: string; clincher: string; streak: string; note?: string }
 
 export function parseStandings(res: any): Map<string, StandingSnap> {
   const out = new Map<string, StandingSnap>();
-  const walk = (node: any) => {
+  const walk = (node: any, parent?: any) => {
     if (node.standings?.entries?.length) {
       const stat = (e: any, n: string) => e.stats?.find((s: any) => s.name === n || s.type === n);
+      // Soccer tables have no playoff seed; their "rank" is the table position.
+      const seed = (e: any) => Number(stat(e, 'playoffSeed')?.value) || Number(stat(e, 'rank')?.value) || 0;
       const entries = [...node.standings.entries].sort((a, b) =>
-        (Number(stat(a, 'playoffSeed')?.value) || 99) - (Number(stat(b, 'playoffSeed')?.value) || 99)
+        (seed(a) || 99) - (seed(b) || 99)
         || Number(stat(b, 'winPercent')?.value ?? 0) - Number(stat(a, 'winPercent')?.value ?? 0));
+      // The EPL's one group is named for the season ("2026-2027"); the league's own name reads better.
+      const name = node.abbreviation ?? node.name ?? '';
+      const group = /^\d{4}-\d{2,4}$/.test(name) && parent ? parent.abbreviation ?? parent.name ?? name : name;
       entries.forEach((e, i) => out.set(String(e.team.id), {
-        rank: Number(stat(e, 'playoffSeed')?.value) || i + 1,
-        group: node.abbreviation ?? node.name ?? '',
+        rank: seed(e) || i + 1,
+        group,
         clincher: String(stat(e, 'clincher')?.displayValue ?? ''),
         streak: String(stat(e, 'streak')?.displayValue ?? ''),
+        ...(e.note?.description ? { note: String(e.note.description) } : {}),
       }));
     }
-    for (const c of node.children ?? []) walk(c);
+    for (const c of node.children ?? []) walk(c, node);
   };
   walk(res);
   return out;
+}
+
+/** "Down from 16th. Into the relegation zone 🪂 Streak: L3" (the parts ESPN has). */
+export function dropBody(was: StandingSnap, cur: StandingSnap) {
+  const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');
+  return [`Down from ${ordinal(was.rank)}.`, relegation(cur) && !relegation(was) && 'Into the relegation zone 🪂', cur.streak && `Streak: ${cur.streak}`].filter(Boolean).join(' ');
 }
 
 async function scanStandings(lg: League) {
@@ -368,7 +391,7 @@ async function scanStandings(lg: League) {
     if (!was || !team) continue;
     const base = { targetKey: team.key, at: Date.now(), meta: { teamId } };
     if (cur.group === was.group && cur.rank > was.rank) {
-      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: `Down from ${ordinal(was.rank)}. Streak: ${cur.streak || '—'}` });
+      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur) });
     }
     if (/e/i.test(cur.clincher) && !/e/i.test(was.clincher)) {
       events.push({ ...base, id: `elim:${lg}:${teamId}:${new Date().getFullYear()}`, type: 'team.eliminated', title: `${team.shortName} are ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.` });

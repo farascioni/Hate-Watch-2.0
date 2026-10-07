@@ -1,4 +1,4 @@
-export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1';
+export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl';
 
 export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;
@@ -56,7 +56,8 @@ export interface GameCard {
   /** NBA: each side's top scorer ("10 pts"); NFL: each side's passer ("18/25, 256 YDS, 1 TD"). */
   leaders?: { home?: LivePlayer; away?: LivePlayer };
   timeouts?: { home: number; away: number }; // NFL
-  shots?: { home: number; away: number };    // NHL: shots on goal
+  shots?: { home: number; away: number };    // NHL: shots on goal (soccer: shots on target)
+  redCards?: { home: number; away: number }; // soccer, once anyone has been sent off
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: in net, line "9 saves on 10"
   session?: string;
   order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
