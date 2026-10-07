@@ -648,9 +648,21 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
 
   if (isResult && batter) {
     if (/struck out/i.test(t)) out.push(mk(g, p, 'mlb.batter.strikeout', batter, `${nameOf('mlb', batter)} struck out ${/looking/i.test(t) ? 'looking 👀' : 'swinging'}`));
-    else if (/double play/i.test(t)) out.push(mk(g, p, 'mlb.batter.double_play', batter, `${nameOf('mlb', batter)} grounded into a double play`));
-    else if (/\b(flied|grounded|lined|popped|fouled|bunted) out\b|\bout at\b|fielder'?s choice/i.test(t))
-      out.push(mk(g, p, 'mlb.batter.popout', batter, `${nameOf('mlb', batter)} made an out`));
+    else if (/\b(double|triple) play\b/i.test(t)) {
+      // "Busch grounded into double play, …", "Pham flied into double play, …", a triple play the same way.
+      // It's an out too: someone with only "Makes an out" on gets this one (aliases), and nobody gets two.
+      const [, how = 'hit', kind] = t.match(/\b(grounded|lined|flied|popped|bunted|fouled|hit) into (?:a )?(double|triple) play\b/i) ?? [, 'hit', /triple play/i.test(t) ? 'triple' : 'double'];
+      const play = /^triple$/i.test(kind ?? '') ? 'a TRIPLE PLAY 😱' : 'a double play';
+      out.push(mk(g, p, 'mlb.batter.double_play', batter, `${nameOf('mlb', batter)} ${how.toLowerCase()} into ${play}`, { aliases: ['mlb.batter.popout'] }));
+    } else if (/\b(flied|grounded|lined|popped|fouled|bunted) out\b|,\s*(?:thrown )?out at\b|fielder'?s choice/i.test(t)) {
+      // How: "grounded out", "flied out", "grounded into a fielder's choice" (an at-bat, no hit). Out on the
+      // bases counts only when it's the batter's own: "doubled to left, out at third", not "singled to
+      // right, Shaw to second, Conforto thrown out at home" (a hit; a runner was out).
+      const how = t.match(/\b(flied|grounded|lined|popped|fouled|bunted) out\b/i)?.[1]?.toLowerCase();
+      const fc = t.match(/\b(grounded|popped|lined|flied|bunted|hit) into (?:a )?fielder'?s choice/i)?.[1]?.toLowerCase();
+      const what = how ? `${how} out` : fc ? `${fc} into a fielder's choice` : /fielder'?s choice/i.test(t) ? "hit into a fielder's choice" : 'made an out';
+      out.push(mk(g, p, 'mlb.batter.popout', batter, `${nameOf('mlb', batter)} ${what}`));
+    }
   }
   if (pitcher) {
     const runs = p.scoring ? Math.max(p.scoreValue, 1) : 0;

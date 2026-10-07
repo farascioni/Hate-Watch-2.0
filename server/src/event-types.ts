@@ -41,8 +41,8 @@ export const SOCCER_ALERT_KEYS = SOCCER_ALERTS.map((t) => t.key);
 const BASE: EventTypeDef[] = [
   // ── MLB players
   { id: 'mlb.batter.strikeout', scope: 'player', leagues: ['mlb'], label: 'Strikes out', description: 'Tracked hitter strikes out (swinging or looking).', defaultOn: true, emoji: '🌀' },
-  { id: 'mlb.batter.double_play', scope: 'player', leagues: ['mlb'], label: 'Grounds into a double play', description: 'Tracked hitter hits into a double play.', defaultOn: true, emoji: '✌️' },
-  { id: 'mlb.batter.popout', scope: 'player', leagues: ['mlb'], label: 'Makes an out', description: 'Any other out by a tracked hitter (fly, ground, line, pop out).', defaultOn: false, emoji: '🙄' },
+  { id: 'mlb.batter.double_play', scope: 'player', leagues: ['mlb'], label: 'Hits into a double or triple play', description: 'Tracked hitter grounds, lines or flies into a double play, or a triple play. It counts as "Makes an out" too.', defaultOn: true, emoji: '✌️' },
+  { id: 'mlb.batter.popout', scope: 'player', leagues: ['mlb'], label: 'Makes an out', description: 'Any out by a tracked hitter other than a strikeout: "grounded out", "flied out", and double and triple plays, which say so.', defaultOn: false, emoji: '🙄' },
   { id: 'mlb.pitcher.runs_allowed', scope: 'player', leagues: ['mlb'], label: 'Gives up runs', description: 'Tracked pitcher allows a run to score.', defaultOn: true, emoji: '🩸' },
   { id: 'mlb.pitcher.home_run_allowed', scope: 'player', leagues: ['mlb'], label: 'Gives up a home run', description: 'Tracked pitcher serves up a homer.', defaultOn: true, emoji: '💣' },
   { id: 'mlb.pitcher.walk', scope: 'player', leagues: ['mlb'], label: 'Issues a walk / HBP', description: 'Tracked pitcher walks or hits a batter.', defaultOn: false, emoji: '🚶' },
