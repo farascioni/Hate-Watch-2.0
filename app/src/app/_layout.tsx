@@ -46,6 +46,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="target/[key]" options={{ title: '', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="stats/[key]" options={{ title: 'Stats', headerBackTitle: 'Back' }} />
         <Stack.Screen name="alerts/[key]" options={{ title: 'Alerts', headerBackTitle: 'Back' }} />
         <Stack.Screen name="game/[key]" options={{ title: '', headerBackTitle: 'Back' }} />
         <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard', headerBackTitle: 'Back' }} />

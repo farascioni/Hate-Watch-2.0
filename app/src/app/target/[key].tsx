@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
@@ -44,7 +44,17 @@ export default function TargetScreen() {
           <Text style={styles.sub}>{target.kind === 'player' ? `${target.teamName ?? ''} · ${subtitle(target)}` : subtitle(target)}</Text>
         </View>
         <HaterCount target={target} size={14} />
-        <View style={{ marginTop: space(3) }}><FollowButton target={target} /></View>
+        <View style={styles.actions}>
+          <FollowButton target={target} />
+          {/* Stats: every league but F1 (for now). */}
+          {target.league !== 'f1' ? (
+            <Pressable onPress={() => router.push(`/stats/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.stats, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button" accessibilityLabel={`${target.name} stats`}>
+              <Ionicons name="stats-chart" size={14} color={colors.text} />
+              <Text style={styles.statsText}>Stats</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       {history.length ? <SectionHeader>Recent misery · last 24 hours</SectionHeader> : null}
       {(open ? history : history.slice(0, 1)).map((h) => <FeedCard key={h.id} item={h} now={now} />)}
@@ -81,4 +91,7 @@ const styles = StyleSheet.create({
   sub: { color: colors.textDim, fontSize: 14 },
   more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(1), alignSelf: 'center', paddingVertical: space(2), paddingHorizontal: space(4), marginBottom: space(2) },
   moreText: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(3) },
+  stats: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingHorizontal: space(4), paddingVertical: space(2), borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi },
+  statsText: { color: colors.text, fontWeight: '800', fontSize: 13 },
 });

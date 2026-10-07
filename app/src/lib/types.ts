@@ -70,6 +70,17 @@ export interface GameCard {
 }
 /** An F1 race weekend from ESPN's calendar (name includes the sponsor, as ESPN has it): from first practice to the race's end. */
 export interface F1Weekend { name: string; startsAt: number; endsAt: number }
+/** A stats page (GET /targets/:key/stats): ESPN's numbers, with the ones a hater wants to see marked `bad`. */
+export interface StatTile { label: string; name: string; value: string; bad?: boolean }
+export interface StatGroup { title: string; tiles: StatTile[] }
+export interface GameLine { id: string; date: number; home: boolean; opponent: string; opponentLogo?: string; result: 'W' | 'L' | 'T' | 'D' | ''; score: string; line?: string }
+export interface StatsPage {
+  key: string; kind: 'team' | 'player'; league: League;
+  record?: { overall: string; standing?: string; splits: { label: string; value: string }[] };
+  groups: StatGroup[];
+  recent: GameLine[];
+  next: NextGame | null;
+}
 /** A tracked team's next game, for the Scores tab's "Up next" (the server reads each team's ESPN schedule). */
 export interface NextGame {
   key: string; league: League; id: string;

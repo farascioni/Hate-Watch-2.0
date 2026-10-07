@@ -8,14 +8,17 @@ export const BASKETBALL = new Set<League>(['nba', 'wnba']);
  */
 export const SOCCER = new Set<League>(['epl']);
 
-/** `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1"). */
-export const LEAGUES: Record<League, { sport: string; name: string; slug?: string }> = {
+/**
+ * `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1").
+ * `fullName`: ESPN's own name for it, where it splits a player's stats by competition (soccer).
+ */
+export const LEAGUES: Record<League, { sport: string; name: string; slug?: string; fullName?: string }> = {
   nba: { sport: 'basketball', name: 'NBA' },
   mlb: { sport: 'baseball', name: 'MLB' },
   nfl: { sport: 'football', name: 'NFL' },
   nhl: { sport: 'hockey', name: 'NHL' },
   f1: { sport: 'racing', name: 'F1' },
-  epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1' },
+  epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League' },
   // Last: the app lists leagues in this order (filter chips, Settings), and the WNBA goes farthest right.
   wnba: { sport: 'basketball', name: 'WNBA' },
 };
@@ -32,6 +35,12 @@ const path = (lg: League) => `${LEAGUES[lg].sport}/${LEAGUES[lg].slug ?? lg}`;
 export const urls = {
   teams: (lg: League) => `${SITE}/${path(lg)}/teams?limit=100`,
   roster: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/roster`,
+  team: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}`,
+  teamStats: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/statistics`,
+  /** A player's season, postseason and career lines (the stats ESPN picks for their position), last games and next game. */
+  athleteOverview: (lg: League, athleteId: string) => `https://site.web.api.espn.com/apis/common/v3/sports/${path(lg)}/athletes/${athleteId}/overview`,
+  /** Every season, by category (MLB hitters' season rows are only here). */
+  athleteStats: (lg: League, athleteId: string) => `https://site.web.api.espn.com/apis/common/v3/sports/${path(lg)}/athletes/${athleteId}/stats`,
   /** A team's games this season part (preseason / regular / postseason; ?seasontype=N for another; soccer: ?fixture=true for what's to come). */
   teamSchedule: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/schedule`,
   scoreboard: (lg: League, yyyymmdd?: string) =>

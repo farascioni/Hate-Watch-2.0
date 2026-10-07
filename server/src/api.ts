@@ -13,6 +13,7 @@ import { deviceTeams, forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Wee
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
+import { statsFor } from './stats.ts';
 
 class Html {
   body: string;
@@ -59,6 +60,12 @@ route('GET', '/teams', false, (_r, url) => ({
   teams: withHaters(catalog.allTeams().filter((t) => !url.searchParams.get('league') || t.league === url.searchParams.get('league'))
     .sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)),
 }));
+// A player's or team's stats page (not F1 yet).
+route('GET', '/targets/:key/stats', false, async (_r, _u, [key]) => {
+  const page = await statsFor(decodeURIComponent(key));
+  if (!page) throw new HttpError(404, 'no stats for this one');
+  return page;
+});
 route('GET', '/targets/:key', false, (_r, _u, [key]) => {
   const k = decodeURIComponent(key);
   const t = targetDto(k);

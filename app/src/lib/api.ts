@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -56,6 +56,8 @@ export const api = {
     request<{ results: Target[] }>('GET', `/search?q=${enc(q)}${league ? `&league=${league}` : ''}${kind ? `&kind=${kind}` : ''}&limit=50`, undefined, false),
   teams: (league?: League) => request<{ teams: Team[] }>('GET', `/teams${league ? `?league=${league}` : ''}`, undefined, false),
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
+  /** A player's or team's stats page (not F1). */
+  stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
   /** The alert behind a share link (/a/<code>), for the screen that link opens in the app. */
   /** The most hated players and teams. No kind = both; no league = every sport. */
   leaderboard: (f: { kind?: 'team' | 'player'; league?: League }) =>

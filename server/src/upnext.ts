@@ -96,6 +96,16 @@ export async function refreshUpNext(teamKeys: Iterable<string>, now = Date.now()
   } finally { running = false; }
 }
 
+/** A team's next game for its stats page: the one we have, or read now if nobody tracks the team. */
+export async function nextGameOf(key: string): Promise<NextGame | null> {
+  const have = known.get(key);
+  if (have && Date.now() - have.at < REFRESH_MS) return have.next;
+  const [, lg, id] = key.split(':') as [string, League, string];
+  const next = await fetchNext(lg, id);
+  known.set(key, { at: Date.now(), next });
+  return next;
+}
+
 /** After a team's game ends, its next game is a different one: read it again on the next tick. */
 export const staleUpNext = (key: string) => known.delete(key);
 
