@@ -25,7 +25,8 @@ export interface LeaderboardEntry { rank: number; tied: boolean; haters: number;
 /**
  * The leaderboard: players and teams by how many people (devices) track them, most hated first. It
  * filters like the Feed and Tracking tabs: players, teams or both, in one league or every sport. Ties
- * share a rank (1, 2, 2, 4) and are listed by name. Counted live from `follows`, so a follow shows at once.
+ * share a rank and the next count is the next rank, with no gap (1, T-2, T-2, 3: "3rd most hated"),
+ * listed by name. Counted live from `follows`, so a follow shows at once.
  */
 export function leaderboard(o: { kind?: 'team' | 'player'; league?: League; limit?: number } = {}): LeaderboardEntry[] {
   // Target keys are `${kind}:${league}:${espnId}`, so a filter is a key prefix.
@@ -39,7 +40,8 @@ export function leaderboard(o: { kind?: 'team' | 'player'; league?: League; limi
   for (const e of ranked) sharing.set(e.haters, (sharing.get(e.haters) ?? 0) + 1);
   const out: LeaderboardEntry[] = [];
   for (const [i, e] of ranked.slice(0, o.limit ?? 100).entries()) {
-    out.push({ rank: i > 0 && e.haters === ranked[i - 1].haters ? out[i - 1].rank : i + 1, tied: sharing.get(e.haters)! > 1, ...e });
+    const rank = i === 0 ? 1 : e.haters === ranked[i - 1].haters ? out[i - 1].rank : out[i - 1].rank + 1;
+    out.push({ rank, tied: sharing.get(e.haters)! > 1, ...e });
   }
   return out;
 }

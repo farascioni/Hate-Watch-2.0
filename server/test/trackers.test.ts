@@ -50,7 +50,7 @@ test('the leaderboard: most hated first, ties share a rank, filtered like the Fe
   await follow('team:nfl:18', 3);
   await follow('team:nba:1', 2);
   await follow('team:nfl:1', 1);
-  assert.deepEqual(await get(), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2', 'T-2. Atlanta Hawks 2', '4. Michael Penix Jr. 1'], 'everything, every sport');
+  assert.deepEqual(await get(), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2', 'T-2. Atlanta Hawks 2', '3. Michael Penix Jr. 1'], 'everything, every sport: after a tie for 2nd comes 3rd, not 4th');
   assert.deepEqual(await get('?kind=team'), ['1. New Orleans Saints 3', 'T-2. Atlanta Falcons 2', 'T-2. Atlanta Hawks 2'], 'all sports teams');
   assert.deepEqual(await get('?kind=player'), ['1. Michael Penix Jr. 1'], 'all athletes');
   assert.deepEqual(await get('?league=nba'), ['1. Atlanta Hawks 2'], 'ranked within the filter: the Hawks are 1st in the NBA, not tied for 2nd');
