@@ -161,12 +161,14 @@ test('a live match end to end: key events from the summary, alerts to whoever tr
     device.run(dev, 's', 'test', JSON.stringify(DEFAULT_PREFS));
     for (const k of keys) follow.run(dev, k);
   }
-  const feed = (dev: string) => (db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? ORDER BY e.occurred_at, e.id`).all(dev) as any[]).map((r) => r.title);
+  // In the order they were delivered (two alerts can share a millisecond).
+  const feed = (dev: string) => (db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? ORDER BY f.rowid`).all(dev) as any[]).map((r) => r.title);
   const keyEvents: any[] = [];
   let state = 'in', score = { home: '0', away: '0' };
   const fetched: string[] = [];
   liveDeps.getJson = async (url: string) => {
     fetched.push(url);
+    if (url.startsWith(urls.corePlays('epl', 'M1').split('?')[0])) return { count: 0, pageCount: 0, items: [] }; // the touch feed: nothing here
     if (url !== urls.summary('epl', 'M1')) throw new Error(`unexpected fetch ${url}`);
     return { keyEvents, rosters: LINEUPS, header: { competitions: [{ status: { type: { state, completed: state === 'post' } }, competitors: [{ homeAway: 'home', score: score.home }, { homeAway: 'away', score: score.away }] }] } };
   };
@@ -180,13 +182,14 @@ test('a live match end to end: key events from the summary, alerts to whoever tr
   keyEvents.push({ ...OWN_GOAL, id: 'late', clock: { displayValue: "90'+3'" }, wallclock: new Date().toISOString() });
   state = 'post'; score = { home: '2', away: '1' };
   await game.poll();
-  assert.ok(fetched.every((u) => !u.includes('sports.core.api')), 'no core play-by-play for soccer');
+  assert.equal(fetched.filter((u) => u.includes('sports.core.api')).length, 1, 'the touch feed (players are tracked here): at most every 10s, not every poll');
   assert.deepEqual(feed('united-hater'), [
     'Fulham scored to take the lead over Man United',
     'Fulham scored to take the lead over Man United',
     'Successful Hate Watch! Man United lost to Fulham',
   ]);
-  assert.deepEqual(feed('keeper-hater'), ['Senne Lammens conceded a goal 🥅', 'Senne Lammens conceded a goal 🥅']);
+  assert.deepEqual(feed('keeper-hater'), ['Senne Lammens conceded a goal 🥅', 'Senne Lammens conceded a goal 🥅', 'Successful Hate Watch! Senne Lammens and Man United lost to Fulham']);
+  assert.ok(!feed('both').includes('Successful Hate Watch! Lisandro Martínez and Man United lost to Fulham'), 'tracks Man United too: their loss once');
   assert.deepEqual(feed('both').filter((t) => /own goal/.test(t)), ['Lisandro Martínez scored an own goal 🤡', 'Lisandro Martínez scored an own goal 🤡']);
   assert.deepEqual(feed('fulham-hater'), ['Man United scored against Fulham']);
 });

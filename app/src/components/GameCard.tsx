@@ -109,7 +109,7 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
  * (soccer: the latest goal or card). Tracked players in red.
  */
 function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
-  const { follows } = useStore();
+  const { follows, leagueInfo } = useStore();
   const name = (x: { key: string; name: string }) => <Text style={follows.has(x.key) ? styles.mine : styles.who}>{x.name}</Text>;
   const abbr = (side: Side) => game[side]?.team.abbrev ?? '';
   const lines: ReactNode[] = [];
@@ -136,7 +136,7 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
     if (game.shots) line('sog', `Shots on goal: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
     if (game.goalies) line('g', <>In net: {both(game.goalies, (p) => <>{name(p)}{p.line ? ` (${p.line})` : ''}</>)}</>);
   }
-  if (game.league === 'epl') {
+  if (leagueInfo(game.league)?.sport === 'soccer') {
     if (game.shots) line('sot', `Shots on target: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
     if (game.redCards) line('red', `Red cards 🟥 ${abbr('away')} ${game.redCards.away} · ${abbr('home')} ${game.redCards.home}`);
   }

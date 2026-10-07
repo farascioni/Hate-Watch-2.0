@@ -6,7 +6,7 @@ import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League
 import { scanNews } from './news.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, boxPitchers, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, keepers, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
+  PLAYER_DETECTORS, playerTeamLostEvents, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -28,6 +28,9 @@ const BACKFILL_WINDOW_MS = 90_000;
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
 const DECISION_RETRY_MS = Number(process.env.HW_DECISION_RETRY_MS ?? 15_000);
 const DECISION_TRIES = 20;
+/** Soccer: how often to read the touch-by-touch feed (passes, dribbles), only while someone tracks a player in the match. */
+const TOUCH_MS = Number(process.env.HW_TOUCH_MS ?? 10_000);
+const TOUCH_PAGE = 100;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -44,6 +47,14 @@ export function watchedTeamKeys(): Set<string> {
   return teams;
 }
 export function invalidateWatched() { watchedCache.at = 0; }
+
+/** The players on a team that anyone tracks (for "their team lost"). */
+export function trackedPlayersOn(teamKey: string) {
+  const lg = teamKey.split(':')[1];
+  return (db.prepare('SELECT DISTINCT target_key FROM follows WHERE target_key LIKE ?').all(`player:${lg}:%`) as { target_key: string }[])
+    .map((r) => catalog.player(r.target_key))
+    .filter((p): p is NonNullable<typeof p> => p?.teamKey === teamKey);
+}
 
 // ─── One live game ────────────────────────────────────────────────────────────────────────────
 export interface GameInfo {
@@ -67,6 +78,15 @@ export class GameTracker {
   private pitching = new Set<string>();
   /** Soccer: teams whose keeper came from the line-ups. Only once: after that, subs and red cards say (observePlay). */
   private keepersSeeded = new Set<string>();
+  /** Soccer: commentary fouls already alerted (play id → 'foul' / 'penalty-conceded'). */
+  private fouls = new Map<string, string>();
+  /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
+  private touches: (NPlay | undefined)[] = [];
+  private touchNext = 0;
+  private touchesAt = 0;
+  private touchesFrom = 0; // touches before this (less a margin) are history
+  private playersAt = 0;
+  private hasPlayers = false;
   private readonly info: GameInfo;
   finished = false;
   lastPollMs = 0;
@@ -175,6 +195,20 @@ export class GameTracker {
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
     this.score = score;
+    if (soccer && summary.status === 'fulfilled') {
+      // Fouls and penalties conceded, from the commentary. A foul's penalty can be written a moment later.
+      for (const p of fromCommentary(summary.value, score)) {
+        const was = this.fouls.get(p.id);
+        if (was === p.typeSlug || was === 'penalty-conceded') continue;
+        this.fouls.set(p.id, p.typeSlug);
+        if (!(this.first && p.at < cutoff)) events.push(...soccerFoul(this.ctx, p));
+      }
+      // Passes and dribbles, from the touch-by-touch feed, if anyone tracks a player in the match.
+      if (Date.now() - this.touchesAt >= TOUCH_MS && this.tracksPlayers()) {
+        this.touchesAt = Date.now();
+        events.push(...await this.readTouches().catch((e) => { log(`[${league} ${gameId}] touches`, String(e)); return [] as Detected[]; }));
+      }
+    }
     // MLB pitchers' lines: a blown save, no quality start. The loss waits for the final (finalPitching).
     if (league === 'mlb' && summary.status === 'fulfilled') {
       const es = pitcherEvents(this.ctx, boxPitchers(summary.value), { final: false, score: this.score, at: Date.now() }, this.pitching);
@@ -193,6 +227,43 @@ export class GameTracker {
     if (final) this.finish(final);
   }
 
+  /** Soccer: someone tracks a player on either side (checked every 30s). */
+  private tracksPlayers() {
+    if (Date.now() - this.playersAt > 30_000) {
+      this.playersAt = Date.now();
+      this.hasPlayers = [this.ctx.homeId, this.ctx.awayId].some((id) => trackedPlayersOn(teamKey(this.ctx.league, id)).length > 0);
+    }
+    return this.hasPlayers;
+  }
+
+  /**
+   * Soccer: the touches since the last read, a page of 100 at a time from the one we stopped in. The
+   * first read starts at the newest page (what came before is history). A touch is judged once the
+   * next one is in (soccerTouch), so the latest waits for the next read.
+   */
+  async readTouches(): Promise<Detected[]> {
+    const { league, gameId } = this.ctx;
+    const get = (page: number) => liveDeps.getJson(urls.corePlays(league, gameId, { limit: TOUCH_PAGE, page }), { bust: true, timeoutMs: 6000 });
+    let page = Math.floor(this.touches.length / TOUCH_PAGE) + 1;
+    let res = await get(page);
+    if (!this.touchesFrom) {
+      this.touchesFrom = Date.now();
+      const last = Math.max(1, Math.ceil(Number(res.count ?? 0) / TOUCH_PAGE));
+      if (last > page) { page = last; this.touches.length = this.touchNext = (last - 1) * TOUCH_PAGE; res = await get(page); }
+    }
+    for (let reads = 0; reads < 20; reads++) {
+      (res.items ?? []).forEach((it: any, i: number) => { this.touches[(page - 1) * TOUCH_PAGE + i] = fromCorePlay(it); });
+      if (!(res.items ?? []).length || page >= Number(res.pageCount ?? 1)) break;
+      res = await get(++page);
+    }
+    const out: Detected[] = [], cutoff = this.touchesFrom - BACKFILL_WINDOW_MS;
+    for (; this.touchNext < this.touches.length - 1; this.touchNext++) {
+      const p = this.touches[this.touchNext], next = this.touches[this.touchNext + 1];
+      if (p && next && p.at >= cutoff) out.push(...soccerTouch(this.ctx, p, next));
+    }
+    return out;
+  }
+
   private seedGoalies(s: any) {
     for (const t of s.boxscore?.players ?? []) {
       const g = t.statistics?.find((x: any) => x.name === 'goalies')?.athletes?.[0]?.athlete?.id;
@@ -208,7 +279,10 @@ export class GameTracker {
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
     const lost = gameLostEvent(this.ctx, final, Date.now());
     if (!lost) return; // a tie
-    publish([lost], this.ctx.league);
+    // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
+    // (3+ goals), then the team's loss, then "their team lost" for its tracked players.
+    const heavy = heavyLossEvent(this.ctx, lost, final);
+    publish([...(heavy ? [heavy] : []), lost, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey))], this.ctx.league);
     engine.onGameFinal(this.ctx.league);
   }
 

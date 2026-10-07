@@ -342,7 +342,10 @@ const involves = (g: GameCard, mine: Mine) =>
 /** How long a final stays on the Scores tab after it ends: the last game a team played, for a day. */
 export const KEEP_FINALS_MS = 24 * 3600_000;
 /** A typical game, start to final: when a game was already over the first time we saw it. */
-export const GAME_LENGTH_MS: Record<League, number> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, epl: 2 * 3600_000, f1: 2 * 3600_000 };
+export const GAME_LENGTH_MS = {
+  mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000,
+  ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2 * 3600_000])),
+} as Record<League, number>;
 /** Live now, starting within a day, or finished in the last 24 hours (every game, so both halves of a doubleheader). */
 export const inWindow = (g: GameCard, now = Date.now()) =>
   g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)

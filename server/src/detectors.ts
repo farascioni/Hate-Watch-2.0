@@ -1,6 +1,6 @@
 import { athleteIdFromRef, teamIdFromRef } from './espn.ts';
 import { catalog, normalize } from './catalog.ts';
-import { BASKETBALL, SOCCER, playerKey, teamKey, type League } from './leagues.ts';
+import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, type League } from './leagues.ts';
 
 /** League-agnostic view of one play. */
 export interface NPlay {
@@ -20,6 +20,7 @@ export interface NPlay {
   penaltyMinutes?: number;
   outs?: number;           // MLB: outs in the half-inning after this play
   period?: { type: string; number: number }; // MLB: { type: 'Top' | 'Bottom' | 'Mid' | 'End', number }
+  clock?: string;          // soccer: the minute, "57'" or "90'+4'"
 }
 
 export interface GameCtx {
@@ -112,6 +113,7 @@ export function fromCorePlay(p: any): NPlay {
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : p.penalty?.minutes ? Number(p.penalty.minutes) : undefined,
     ...mlbFields(p),
+    ...(p.clock?.displayValue ? { clock: String(p.clock.displayValue) } : {}),
   };
 }
 
@@ -146,9 +148,77 @@ export function fromKeyEvents(summary: any, homeId: string, awayId: string): NPl
       away: score.away,
       at: k.wallclock ? Date.parse(k.wallclock) : Date.now(),
       shooting: false,
+      ...(k.clock?.displayValue ? { clock: String(k.clock.displayValue) } : {}),
     };
   });
 }
+
+/**
+ * Soccer: fouls, handballs, penalties conceded and dives, from the summary's commentary. ESPN writes
+ * each foul twice under one play id ("Foul by Kobbie Mainoo (Manchester United)." and "Josh King (Fulham)
+ * wins a free kick…"); a foul in the box adds "Penalty conceded by …" / "… draws a foul in the penalty
+ * area". The fouler is the one the text names, matched to the line-ups (commentary spells some names its
+ * own way: "Abdul Fatawu" is "Fatawu Issahaku" there), because the play's participants can be stale: on
+ * 2026-09-13 one said Maxim De Cuyper for "Foul by Chema Andrés", and ESPN's stats charged Andrés. A dive
+ * ("… has gone down, but the referee deems it simulation.") has no play, and ESPN counts it as a foul.
+ * Checked against ESPN's foulsCommitted for every player in five September 2026 matches.
+ * `score` is the score now (commentary doesn't carry it).
+ */
+export function fromCommentary(summary: any, score: { home: number; away: number }): NPlay[] {
+  const squad = (summary?.rosters ?? []).flatMap((r: any) => (r.roster ?? []).filter((x: any) => x.athlete?.id != null).map((x: any) => ({
+    id: String(x.athlete.id), name: String(x.athlete.displayName ?? ''), teamId: String(r.team?.id), team: clubName(r.team?.displayName),
+  })));
+  /** "Abdul Fatawu", "Ipswich Town" → the player in the line-ups: same name, or the one on that team who shares part of it. */
+  const find = (name?: string, team?: string) => {
+    if (!name) return undefined;
+    const n = normalize(name), words = n.split(' ').filter((w) => w.length >= 3);
+    const side = squad.filter((x: any) => !team || x.team === clubName(team));
+    const exact = side.filter((x: any) => normalize(x.name) === n);
+    if (exact.length === 1) return exact[0];
+    const near = side.filter((x: any) => normalize(x.name).split(' ').some((w) => words.includes(w)));
+    return near.length === 1 ? near[0] : undefined;
+  };
+  const named = (t: string, lead: RegExp) => { const m = t.match(lead); return m ? find(m[1], m[2]) : undefined; };
+  const BY = /^(?:foul|handball|hand ball|penalty conceded) by (.+?) \((.+?)\)/i;
+
+  const plays = new Map<string, any[]>(), out: NPlay[] = [], order = new Map<string, number>(); // id → ESPN's commentary sequence
+  let lastAt = 0;
+  const push = (id: string, slug: string, type: string, said: string, clock: string, at: number, fouler?: { id: string; teamId: string }, fouled?: { id: string }) => out.push({
+    id, type, typeSlug: slug, text: [clock, said].filter(Boolean).join(' '), teamId: fouler?.teamId,
+    participants: [...(fouler ? [{ id: fouler.id, role: 'fouler' }] : []), ...(fouled ? [{ id: fouled.id, role: 'fouled' }] : [])],
+    scoring: false, scoreValue: 0, home: score.home, away: score.away, at, shooting: false, ...(clock ? { clock } : {}),
+  });
+  for (const c of summary?.commentary ?? []) {
+    if (c.play?.wallclock) lastAt = Date.parse(c.play.wallclock);
+    const seq = Number(c.sequence ?? order.size);
+    const dive = String(c.text ?? '').match(/^(.+?) \((.+?)\) has gone down, but the referee deems it simulation/i);
+    if (dive) {
+      const who = find(dive[1], dive[2]);
+      const id = `dive:${c.time?.value ?? c.time?.displayValue}:${normalize(dive[1]).replace(/ /g, '-')}`;
+      order.set(id, seq);
+      push(id, 'simulation', 'Simulation', String(c.text), String(c.time?.displayValue ?? ''), lastAt || Date.now(), who);
+      continue;
+    }
+    const slug = c.play?.type?.type;
+    if (c.play?.id == null || (slug !== 'foul' && slug !== 'handball')) continue;
+    plays.set(String(c.play.id), [...(plays.get(String(c.play.id)) ?? []), c]);
+    if (!order.has(String(c.play.id))) order.set(String(c.play.id), seq);
+  }
+  for (const [id, lines] of plays) {
+    const p = lines[0].play;
+    const texts: string[] = lines.map((l: any) => String(l.text ?? ''));
+    const [first, second] = (p.participants ?? []).map((x: any) => find(x.athlete?.displayName));
+    const said = texts.find((t) => BY.test(t)) ?? texts[0];
+    const fouler = named(said, BY) ?? first;
+    const penalty = texts.some((t) => /\bpenalty conceded by\b|\bdraws a foul in the penalty area\b/i.test(t));
+    const kind = penalty ? 'penalty-conceded' : String(p.type?.type ?? 'foul');
+    push(id, kind, penalty ? 'Penalty Conceded' : kind === 'handball' ? 'Handball' : 'Foul', said, String(lines[0].time?.displayValue ?? p.clock?.displayValue ?? ''),
+      p.wallclock ? Date.parse(p.wallclock) : Date.now(), fouler, second && second.id !== fouler?.id ? second : undefined);
+  }
+  return out.sort((a, b) => order.get(a.id)! - order.get(b.id)!);
+}
+/** "Brighton and Hove Albion" and "Brighton & Hove Albion" are one club. */
+const clubName = (name?: string) => normalize(String(name ?? '').replace(/&/g, ' and '));
 
 /** Soccer: each side's goalkeeper on the pitch, from the summary's line-ups (teamId -> athleteId), once they're out. */
 export function keepers(summary: any): Map<string, string> {
@@ -788,8 +858,61 @@ function soccer(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
-// F1 has no play-by-play; its alerts come from session results (f1.ts).
-export const PLAYER_DETECTORS: Record<League, (g: GameCtx, p: NPlay) => Detected[]> = { mlb, nfl, nba, wnba: nba, nhl, epl: soccer, f1: () => [] };
+/**
+ * Soccer fouls (fromCommentary): the fouler's alert, and for a penalty conceded the fouler's and their
+ * team's, sharing a moment (one alert for someone tracking both). A penalty conceded counts as the
+ * player's foul too (aliases), so it's never two alerts for one foul.
+ */
+export function soccerFoul(g: GameCtx, p: NPlay): Detected[] {
+  const lg = g.league, [fouler] = role(p, 'fouler');
+  if (!fouler || !p.teamId) return [];
+  const body = `${p.text} — ${scoreLine(g, p)}`;
+  if (p.typeSlug === 'penalty-conceded') {
+    const type = `${lg}.penalty_conceded`, moment = `${g.gameId}:${p.id}:penalty-conceded`;
+    return [
+      mk(g, p, type, fouler, `${nameOf(lg, fouler)} gave away a penalty 🤦`, { moment, aliases: [`${lg}.foul`] }),
+      { id: `${g.gameId}:${p.id}:${type}:team-${p.teamId}`, type, targetKey: teamKey(lg, p.teamId), title: `${teamName(lg, p.teamId)} gave away a penalty 🤦`, body, at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment },
+    ];
+  }
+  const what = p.typeSlug === 'handball' ? 'was called for a handball' : p.typeSlug === 'simulation' ? 'went down, and the referee called it a dive 🤿' : 'committed a foul';
+  return [mk(g, p, `${lg}.foul`, fouler, `${nameOf(lg, fouler)} ${what}`)];
+}
+
+/** Whoever made a play: the catalog's name, or the one in its text ("Lisandro Martínez (Manchester United) Interception at 2'"). */
+const whoDid = (lg: League, p: NPlay) => {
+  const id = p.participants[0]?.id;
+  return (id && catalog.playerByEspn(lg, id)?.name) || p.text.match(/^(.+?) \(/)?.[1] || 'an opponent';
+};
+/** The other team's play that took the ball off a pass: how it went wrong. */
+const PASS_LOST: Record<string, string> = { interception: 'intercepted by', 'blocked-pass': 'blocked by', clear: 'cleared by', pass: 'straight to', 'take-on': 'straight to', cross: 'straight to', 'ball-recovery': 'picked up by' };
+
+/**
+ * Soccer touches, from the full play-by-play (the core feed: every pass, dribble and tackle). ESPN
+ * doesn't say whether a pass or a dribble worked, so it's judged from the next touch:
+ * - a dribble ("Take On") straight into the other team's tackle lost the ball; so does being
+ *   "Dispossessed" (always followed by the tackle that did it);
+ * - a pass whose next touch is the other team's (intercepted, blocked, cleared, or played on by them) was
+ *   given away. Their foul, a failed tackle or a header duel is not.
+ * Checked against Fulham 1-1 Man United (2026-09-20): 14 of 29 take-ons ended in the other team's tackle.
+ */
+export function soccerTouch(g: GameCtx, p: NPlay, next: NPlay): Detected[] {
+  const lg = g.league, who = p.participants[0]?.id;
+  if (!who || !p.teamId || !next.teamId || next.teamId === p.teamId) return [];
+  const body = (what: string) => `${[p.clock, what].filter(Boolean).join(' ')} — ${scoreLine(g, p)}`;
+  if ((p.typeSlug === 'take-on' || p.typeSlug === 'dispossessed') && next.typeSlug === 'tackle') {
+    const how = p.typeSlug === 'take-on' ? `Tackled trying to get past ${whoDid(lg, next)}` : `Dispossessed by ${whoDid(lg, next)}`;
+    return [mk(g, p, `${lg}.lost_ball`, who, `${nameOf(lg, who)} lost the ball`, { body: body(how) })];
+  }
+  if (p.typeSlug === 'pass' && PASS_LOST[next.typeSlug]) {
+    return [mk(g, p, `${lg}.pass_given_away`, who, `${nameOf(lg, who)} gave the ball away`, { body: body(`Pass ${PASS_LOST[next.typeSlug]} ${whoDid(lg, next)}`) })];
+  }
+  return [];
+}
+
+// F1 has no play-by-play; its alerts come from session results (f1.ts). Every soccer league uses the soccer detectors.
+type Detector = (g: GameCtx, p: NPlay) => Detected[];
+const OTHER_DETECTORS: Partial<Record<League, Detector>> = { mlb, nfl, nba, wnba: nba, nhl, f1: () => [] };
+export const PLAYER_DETECTORS = Object.fromEntries(LEAGUE_IDS.map((lg) => [lg, SOCCER.has(lg) ? soccer : OTHER_DETECTORS[lg]])) as Record<League, Detector>;
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───
 /**
@@ -801,7 +924,7 @@ export function nextScore(prev: { home: number; away: number }, p: NPlay) {
   return { home: Math.max(prev.home, p.home), away: Math.max(prev.away, p.away) };
 }
 
-export const START_WORD: Record<League, string> = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', epl: 'Kickoff', f1: 'Lights out' };
+export const START_WORD = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out', ...Object.fromEntries([...SOCCER].map((lg) => [lg, 'Kickoff'])) } as Record<League, string>;
 /** "the Falcons", but plain "Liverpool": clubs don't take "the". */
 const the = (lg: League, team: string) => (SOCCER.has(lg) ? team : `the ${team}`);
 
@@ -819,7 +942,10 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
   }));
 }
 
-/** The loser's final-whistle alert. Ties (NFL, NHL preseason) are miserable for everyone, but not a loss. */
+/**
+ * The loser's final-whistle alert. Ties (NFL, NHL preseason) are miserable for everyone, but not a loss.
+ * Its moment is shared with the "their team lost" alerts for the loser's players (playerTeamLostEvents).
+ */
 export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number): Detected | null {
   if (final.home === final.away) return null;
   const [loserId, winnerId] = final.home < final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
@@ -830,8 +956,53 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
     title: `Successful Hate Watch! ${teamName(g.league, loserId)} lost to ${the(g.league, teamName(g.league, winnerId))}`,
     body: `Final Score: ${Math.max(final.home, final.away)} to ${Math.min(final.home, final.away)}`,
     at,
-    meta: { gameId: g.gameId },
+    meta: { gameId: g.gameId, winnerId },
+    moment: `${g.gameId}:final:lost`,
   };
+}
+
+/**
+ * Soccer: "Successful Hate Watch! Coventry were thrashed 5-0 by Brighton", a loss by three goals or more.
+ * It has the loss's moment and goes out first, so anyone with it on gets it instead of the plain loss;
+ * it's the same Successful Hate Watch (`lostId`: counted once, see hateWatchOf).
+ */
+export function heavyLossEvent(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Detected, final: { home: number; away: number }): Detected | null {
+  const [w, l] = [Math.max(final.home, final.away), Math.min(final.home, final.away)];
+  if (!SOCCER.has(g.league) || w - l < 3) return null;
+  const loserId = lost.targetKey.split(':')[2], winnerId = String(lost.meta?.winnerId ?? '');
+  return {
+    id: `${g.gameId}:final:${g.league}.team.heavy_loss:${loserId}`,
+    type: `${g.league}.team.heavy_loss`,
+    targetKey: lost.targetKey,
+    title: `Successful Hate Watch! ${teamName(g.league, loserId)} were thrashed ${w}-${l} by ${the(g.league, teamName(g.league, winnerId))}`,
+    body: lost.body,
+    at: lost.at,
+    meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey },
+    moment: lost.moment,
+  };
+}
+
+/**
+ * "Successful Hate Watch! Freddie Freeman and the Dodgers lost to the Giants", for people who track a
+ * player on the losing team (`players`: the ones anyone tracks). Every one shares the loss's moment, and
+ * publish() sends a device only the first of them it wants, so tracking the player and the team, or two
+ * players on it, is one alert. Publish the team's loss first, then these, by name. Each counts as a
+ * Successful Hate Watch for the team (`lostId`, `teamKey`: see hateWatchOf), once per device.
+ */
+export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Detected, players: { key: string; espnId: string; name: string }[]): Detected[] {
+  const loserId = lost.targetKey.split(':')[2];
+  const winnerId = (lost.meta?.winnerId as string | undefined) ?? '';
+  const team = teamName(g.league, loserId), winner = teamName(g.league, winnerId);
+  return [...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({
+    id: `${g.gameId}:final:player.team_lost:${p.espnId}`,
+    type: 'player.team_lost',
+    targetKey: p.key,
+    title: `Successful Hate Watch! ${p.name} and ${the(g.league, team)} lost to ${the(g.league, winner)}`,
+    body: lost.body,
+    at: lost.at,
+    meta: { gameId: g.gameId, athleteId: p.espnId, lostId: lost.id, teamKey: lost.targetKey },
+    moment: lost.moment,
+  }));
 }
 
 export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay): Detected[] {

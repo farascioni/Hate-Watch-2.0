@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Avatar } from '../components/Avatar';
@@ -7,31 +7,36 @@ import { FilterBar, describeFilter, useFilter } from '../components/FilterBar';
 import { useStore } from '../lib/store';
 import { api } from '../lib/api';
 import { colors, radius, space } from '../theme';
-import type { LeaderboardEntry } from '../lib/types';
+import type { Leaderboard, LeaderboardEntry } from '../lib/types';
 
 /**
  * The most hated players and teams: how many people track each one. The same filter as the Feed and
- * Tracking tabs; "All" is every sport, so Teams + All is every team in every league. Opened from the
- * button at the top left of every tab.
+ * Tracking tabs; "All" is every sport, so Teams + All is every team in every league. The top 100 of each
+ * filter, ranked by the server within that filter. Opened from the button at the top left of every tab.
  */
 export default function LeaderboardScreen() {
   const { follows } = useStore();
   const { filter, setFilter, active, reset } = useFilter();
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
+  const [board, setBoard] = useState<Leaderboard | null>(null);
+  const entries = board?.entries ?? null;
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Only the latest request may land: tap MLB then NBA quickly and a slow MLB reply mustn't fill the NBA board.
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    const mine = ++latest.current;
     try {
       const r = await api.leaderboard({ kind: filter.kind === 'all' ? undefined : filter.kind, league: filter.league });
-      setEntries(r.entries);
+      if (mine !== latest.current) return;
+      setBoard(r);
       setFailed(false);
-    } catch { setFailed(true); }
+    } catch { if (mine === latest.current) setFailed(true); }
   }, [filter]);
   // On open, on each filter change, and on coming back (follows change, here and everywhere).
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const change = (f: typeof filter) => { setEntries(null); setFilter(f); };
+  const change = (f: typeof filter) => { setBoard(null); setFilter(f); };
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   return (
@@ -43,8 +48,9 @@ export default function LeaderboardScreen() {
           keyExtractor={(e) => e.target.key}
           renderItem={({ item }) => <Row entry={item} tied={item.tied ?? (entries ?? []).some((e) => e !== item && e.rank === item.rank)} mine={follows.has(item.target.key)} />}
           ListHeaderComponent={entries?.length ? <Text style={styles.hint}>Ranked by how many people track them on Hate Watch.</Text> : null}
+          ListFooterComponent={board ? <Cut board={board} /> : null}
           ListEmptyComponent={failed
-            ? <Empty emoji="📡" title="Couldn't load the leaderboard" body="Check your connection and try again." action={<PrimaryButton label="Try again" onPress={() => { setFailed(false); setEntries(null); void load(); }} />} />
+            ? <Empty emoji="📡" title="Couldn't load the leaderboard" body="Check your connection and try again." action={<PrimaryButton label="Try again" onPress={() => { setFailed(false); setBoard(null); void load(); }} />} />
             : <Empty emoji="🏆" title={`Nobody hates any ${describeFilter(filter)} yet`} body="Track someone and they'll show up here."
                 action={active ? <PrimaryButton label="Show everything" onPress={() => change({ kind: 'all' })} /> : <PrimaryButton label="Find someone to hate" onPress={() => router.navigate('/search')} />} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.hate} />}
@@ -54,6 +60,19 @@ export default function LeaderboardScreen() {
     </View>
   );
 }
+
+/** Under a list that's been cut at 100: how many there are in all, and anyone tied with #100 who didn't fit. */
+function Cut({ board: { entries, total, moreTied } }: { board: Leaderboard }) {
+  if (total == null || total <= entries.length) return null;
+  const last = entries.at(-1)!;
+  return (
+    <Text style={styles.cut}>
+      Showing the top {entries.length} of {total.toLocaleString()}.
+      {moreTied ? ` ${moreTied.toLocaleString()} more ${moreTied === 1 ? 'is' : 'are'} also tied for ${last.rank}${ordinalSuffix(last.rank)} with ${last.haters.toLocaleString()} ${last.haters === 1 ? 'hater' : 'haters'}.` : ''}
+    </Text>
+  );
+}
+const ordinalSuffix = (n: number) => { const v = n % 100; return v >= 11 && v <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'; };
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -89,6 +108,7 @@ function Row({ entry: { rank, haters, target }, tied, mine }: { entry: Leaderboa
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(1) },
+  cut: { color: colors.textFaint, fontSize: 13, lineHeight: 18, textAlign: 'center', paddingHorizontal: space(6), paddingTop: space(4) },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
   rank: { width: 40, alignItems: 'center' },
   rankText: { color: colors.textDim, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },

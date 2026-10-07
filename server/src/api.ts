@@ -11,7 +11,7 @@ import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 import { forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
-import { leaderboard, withHaters } from './leaderboard.ts';
+import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 
 class Html {
   body: string;
@@ -44,7 +44,8 @@ function authDevice(header: string | undefined | null): string | undefined {
 
 // ─── Public ───────────────────────────────────────────────────────────────────────────────────
 route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status() }));
-route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name })), types: EVENT_TYPES }));
+// Each league's sport too: the app shows any soccer league's matches the soccer way.
+route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport })), types: EVENT_TYPES }));
 route('GET', '/catalog/report', false, () => kvGet('ingest:report'));
 route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {
@@ -117,8 +118,8 @@ route('GET', '/leaderboard', false, (_r, url) => {
   const kind = url.searchParams.get('kind'), league = url.searchParams.get('league');
   if (kind && kind !== 'team' && kind !== 'player') throw new HttpError(400, 'kind is team or player');
   if (league && !LEAGUE_IDS.includes(league as League)) throw new HttpError(400, 'unknown league');
-  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 100) || 100, 1), 200);
-  return { entries: leaderboard({ kind: (kind ?? undefined) as 'team' | 'player' | undefined, league: (league ?? undefined) as League | undefined, limit }) };
+  const limit = Number(url.searchParams.get('limit') ?? LEADERBOARD_MAX) || LEADERBOARD_MAX; // capped at the top 100 by leaderboard()
+  return leaderboard({ kind: (kind ?? undefined) as 'team' | 'player' | undefined, league: (league ?? undefined) as League | undefined, limit });
 });
 
 // ─── Settings counter: Successful Hate Watches (a team you track lost) ─────────────────────────

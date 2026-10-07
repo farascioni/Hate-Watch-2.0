@@ -16,9 +16,10 @@ export function Chip({ label, active, onPress, color, style }: { label: string; 
 }
 
 export function LeagueTag({ league }: { league: string }) {
+  const { leagueInfo } = useStore(); // its short name from the server ("EPL"), for leagues this build doesn't know too
   return (
     <View style={[styles.tag, { backgroundColor: leagueColors[league] ?? colors.surfaceHi }]}>
-      <Text style={styles.tagText}>{league.toUpperCase()}</Text>
+      <Text style={styles.tagText}>{leagueInfo(league)?.name ?? league.toUpperCase()}</Text>
     </View>
   );
 }

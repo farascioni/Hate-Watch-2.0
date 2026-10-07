@@ -206,6 +206,9 @@ export function publish(events: Detected[], league: League) {
   const detectedAt = Date.now();
   const pushes: PushMessage[] = [];
   const got = new Map<string, Set<string>>(); // moment → devices that already have it (see Detected.moment)
+  // Who gets what first, then the feed rows, frames and pushes: a Successful Hate Watch says how many
+  // others got it, and a team's loss counts everyone who got one of its alerts (the team's or a player's).
+  const planned: { e: Detected; gameId: string | null; deliver: { f: { device_id: string; push_token: string | null }; prefs: Prefs }[]; followers: number }[] = [];
   for (const e of events) {
     const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
     if (!fols.length) continue; // nobody tracks this target: don't even store it
@@ -216,7 +219,7 @@ export function publish(events: Detected[], league: League) {
     // Who gets it, first: a Successful Hate Watch says how many others got it too, from the first frame.
     const deliver: { f: (typeof fols)[number]; prefs: Prefs }[] = [];
     for (const f of fols) {
-      // A Successful Hate Watch counts for everyone tracking the team, whatever their alert settings.
+      // A Successful Hate Watch counts for everyone tracking the team (or a player on it), whatever their alert settings.
       if (hateWatch && recordHateWatch(f.device_id, e)) {
         const tally = JSON.stringify({ kind: 'hateWatches', tally: hateWatchTally(f.device_id) });
         for (const ws of sockets.get(f.device_id) ?? []) ws.send(tally);
@@ -230,7 +233,13 @@ export function publish(events: Detected[], league: League) {
       }
       deliver.push({ f, prefs });
     }
-    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId, recipients: deliver.length });
+    planned.push({ e, gameId, deliver, followers: fols.length });
+  }
+  const perMoment = new Map<string, number>();
+  for (const { e, deliver } of planned) if (e.moment && isHateWatch(e)) perMoment.set(e.moment, (perMoment.get(e.moment) ?? 0) + deliver.length);
+  for (const { e, gameId, deliver, followers } of planned) {
+    const recipients = e.moment && isHateWatch(e) ? perMoment.get(e.moment)! : deliver.length;
+    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId, recipients });
     const frame = JSON.stringify({ kind: 'event', item });
     for (const { f, prefs } of deliver) {
       const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);
@@ -242,7 +251,7 @@ export function publish(events: Detected[], league: League) {
         data: { eventId: e.id, targetKey: e.targetKey, type: e.type },
       });
     }
-    console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${fols.length} followers)`);
+    console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers)`);
   }
   if (pushes.length) pushSender(pushes);
 }

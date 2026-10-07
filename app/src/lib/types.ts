@@ -1,4 +1,10 @@
+/**
+ * The leagues this build knows by name. The server sends the full list (with each one's name and sport),
+ * and screens draw from that, so a league added on the server (another soccer league) works without an
+ * app update; it just has no colour of its own until one is added to theme.ts.
+ */
 export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl';
+export interface LeagueInfo { id: League; name: string; sport?: string }
 
 export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;
@@ -72,6 +78,8 @@ export interface HateWatchTally { total: number; teams: { target: Target; count:
 
 /** The leaderboard: a player or team and how many people track them. `rank` is within the filter; ties share it (`tied`: shown "T-2"). */
 export interface LeaderboardEntry { rank: number; tied?: boolean; haters: number; target: Target }
+/** The top 100 in a filter. `total`: everyone in it; `moreTied`: tied with the last one shown but past the cut. Missing from older servers. */
+export interface Leaderboard { entries: LeaderboardEntry[]; total?: number; moreTied?: number }
 
 export interface EventType {
   id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;

@@ -5,7 +5,7 @@ import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
-import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -40,7 +40,9 @@ interface Store {
   prefs: Prefs | null;
   updatePrefs: (patch: PrefsPatch) => Promise<void>;
   eventTypes: EventType[];
-  leagues: { id: League; name: string }[];
+  leagues: LeagueInfo[];
+  /** A league's info from the server (name, sport), for leagues this build may not know. */
+  leagueInfo: (id: string) => LeagueInfo | undefined;
   push: { status: PushStatus | 'unknown'; reason?: string };
   enablePush: () => Promise<void>;
   deleteAllData: () => Promise<void>;
@@ -91,7 +93,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshTrackers = useCallback(async () => { noteTrackers((await api.follows()).follows); }, [noteTrackers]);
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
-  const [leagues, setLeagues] = useState<{ id: League; name: string }[]>([]);
+  const [leagues, setLeagues] = useState<LeagueInfo[]>([]);
+  const leagueInfo = useCallback((id: string) => leagues.find((l) => l.id === id), [leagues]);
   const [push, setPush] = useState<Store['push']>({ status: 'unknown' });
   const ws = useRef<WebSocket | null>(null);
   // Read inside the socket handler (which outlives renders), so it must be a ref, not state.
@@ -177,7 +180,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
+    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -230,7 +233,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

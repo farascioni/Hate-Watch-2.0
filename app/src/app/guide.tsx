@@ -115,7 +115,7 @@ const PAGES: Page[] = [
   },
   {
     key: 'record', icon: 'medal', where: 'Settings tab', title: 'Keep score',
-    body: 'The top of Settings counts your Successful Hate Watches: every time a team you track loses. Tap "+3 more" to see every team.',
+    body: 'The top of Settings counts your Successful Hate Watches: every time a team you track loses, or the team of a player you track. Tap "+3 more" to see every team.',
     demo: () => (
       <View style={[styles.demoCard, { borderColor: colors.hateDim, gap: space(3) }]}>
         <View style={[styles.row, { gap: space(4) }]}>

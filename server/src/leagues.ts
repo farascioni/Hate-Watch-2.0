@@ -1,7 +1,11 @@
 export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl';
 /** Basketball leagues share detectors (the WNBA's play-by-play is the NBA's shape). */
 export const BASKETBALL = new Set<League>(['nba', 'wnba']);
-/** Soccer leagues: matches come as key events (goals, cards, penalties, subs), not a play-by-play. EPL only, for now. */
+/**
+ * Soccer leagues: matches come as key events (goals, cards, penalties, subs), commentary (fouls) and a
+ * touch-by-touch feed (passes, dribbles), not a play-by-play. To add one (La Liga is ESPN's "esp.1"):
+ * add it to League and LEAGUES with its slug, and here. Its alerts, detectors, scores and catalog follow.
+ */
 export const SOCCER = new Set<League>(['epl']);
 
 /** `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1"). */
@@ -31,9 +35,10 @@ export const urls = {
   scoreboard: (lg: League, yyyymmdd?: string) =>
     `${SITE}/${path(lg)}/scoreboard${yyyymmdd ? `?dates=${yyyymmdd}` : ''}`,
   summary: (lg: League, eventId: string) => `${SITE}/${path(lg)}/summary?event=${eventId}`,
-  // NFL site-API plays carry no participants; the core API does (passer, fumbler, kicker...).
-  corePlays: (lg: League, eventId: string) =>
-    `${CORE}/${LEAGUES[lg].sport}/leagues/${LEAGUES[lg].slug ?? lg}/events/${eventId}/competitions/${eventId}/plays?limit=1000`,
+  // NFL site-API plays carry no participants; the core API does (passer, fumbler, kicker...). Soccer's is
+  // every touch (1,500 a match), read a page at a time (`page`: 1-based, of `limit`).
+  corePlays: (lg: League, eventId: string, page?: { limit: number; page: number }) =>
+    `${CORE}/${LEAGUES[lg].sport}/leagues/${LEAGUES[lg].slug ?? lg}/events/${eventId}/competitions/${eventId}/plays?limit=${page?.limit ?? 1000}${page ? `&page=${page.page}` : ''}`,
   standings: (lg: League) => `https://site.api.espn.com/apis/v2/sports/${path(lg)}/standings`,
   injuries: (lg: League) => `${SITE}/${path(lg)}/injuries`,
   /** ESPN's league news: the latest ~50 articles, tagged with the athletes and teams they're about. */

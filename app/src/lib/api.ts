@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, LeaderboardEntry, League, Prefs, PrefsPatch, Target, Team, Player } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -59,7 +59,7 @@ export const api = {
   /** The alert behind a share link (/a/<code>), for the screen that link opens in the app. */
   /** The most hated players and teams. No kind = both; no league = every sport. */
   leaderboard: (f: { kind?: 'team' | 'player'; league?: League }) =>
-    request<{ entries: LeaderboardEntry[] }>('GET', `/leaderboard?limit=100${f.kind ? `&kind=${f.kind}` : ''}${f.league ? `&league=${f.league}` : ''}`, undefined, false),
+    request<Leaderboard>('GET', `/leaderboard?limit=100${f.kind ? `&kind=${f.kind}` : ''}${f.league ? `&league=${f.league}` : ''}`, undefined, false),
   shared: (code: string) => request<{ item: FeedItem }>('GET', `/shared/${enc(code)}`, undefined, false),
 
   /** `trackers`: how many people (devices) track each one, you included. */
