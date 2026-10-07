@@ -70,6 +70,19 @@ export interface GameCard {
 }
 /** An F1 race weekend from ESPN's calendar (name includes the sponsor, as ESPN has it): from first practice to the race's end. */
 export interface F1Weekend { name: string; startsAt: number; endsAt: number }
+/** A tracked team's next game, for the Scores tab's "Up next" (the server reads each team's ESPN schedule). */
+export interface NextGame {
+  key: string; league: League; id: string;
+  /** The tracked team it's the next game of. */
+  teamKey: string;
+  startsAt: number;
+  /** false: the date is set, the time isn't yet. */
+  timeValid: boolean;
+  home: Team; away: Team;
+  tv?: string;
+  /** "ALDS Game 4 · if necessary", "Preseason". */
+  note?: string;
+}
 export interface PlayLine { id: string; text: string; when: string; scoring: boolean }
 export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[] }
 

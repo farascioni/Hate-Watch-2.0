@@ -32,6 +32,8 @@ const path = (lg: League) => `${LEAGUES[lg].sport}/${LEAGUES[lg].slug ?? lg}`;
 export const urls = {
   teams: (lg: League) => `${SITE}/${path(lg)}/teams?limit=100`,
   roster: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/roster`,
+  /** A team's games this season part (preseason / regular / postseason; ?seasontype=N for another; soccer: ?fixture=true for what's to come). */
+  teamSchedule: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/schedule`,
   scoreboard: (lg: League, yyyymmdd?: string) =>
     `${SITE}/${path(lg)}/scoreboard${yyyymmdd ? `?dates=${yyyymmdd}` : ''}`,
   summary: (lg: League, eventId: string) => `${SITE}/${path(lg)}/summary?event=${eventId}`,

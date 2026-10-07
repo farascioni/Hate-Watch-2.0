@@ -5,7 +5,7 @@ import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
-import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -23,6 +23,8 @@ interface Store {
   games: Map<string, GameCard>;
   /** F1's race weekend under way, or the next one: what the Scores tab says when no session is on. */
   nextF1: F1Weekend | null;
+  /** Each tracked team's next game (Scores tab, "Up next"). Older servers don't send it. */
+  upNext: NextGame[];
   refreshScores: () => Promise<void>;
 
   /** Successful Hate Watches, for the counter at the top of Settings. The server sends the new tally after each one. */
@@ -81,6 +83,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [games, setGames] = useState<Map<string, GameCard>>(new Map());
   const [hateWatches, setHateWatches] = useState<HateWatchTally | null>(null);
   const [nextF1, setNextF1] = useState<F1Weekend | null>(null);
+  const [upNext, setUpNext] = useState<NextGame[]>([]);
   const [unseen, setUnseen] = useState(0);
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
   const [trackers, setTrackers] = useState<Map<string, number>>(new Map());
@@ -108,7 +111,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // The server decides which games are yours today; live frames then update them in place.
   const refreshScores = useCallback(async () => {
-    const { games: list, nextF1: next } = await api.scores();
+    const { games: list, nextF1: next, upNext: coming } = await api.scores();
+    setUpNext(coming ?? []);
     setGames(new Map(list.map((g) => [g.key, g])));
     setNextF1(next ?? null);
   }, []);
@@ -180,7 +184,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refreshFeed]);
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
+    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -233,7 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, refreshFeed, games, nextF1, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, refreshFeed, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -9,9 +9,10 @@ import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
-import { forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
+import { deviceTeams, forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
+import { upNextFor } from './upnext.ts';
 
 class Html {
   body: string;
@@ -103,7 +104,8 @@ route('DELETE', '/me/follows/:key', true, (req, _u, [key]) => {
 });
 
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
-route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend() }));
+// upNext: each of the device's teams' next game (the app leaves out any already on the tab as a card).
+route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend(), upNext: upNextFor(deviceTeams(req.deviceId!).teams) }));
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');

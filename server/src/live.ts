@@ -4,6 +4,7 @@ import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
 import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
+import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
@@ -285,6 +286,7 @@ export class GameTracker {
   finish(final: { home: number; away: number }, ev?: any) {
     if (this.finished) return;
     this.finished = true;
+    for (const id of [this.ctx.homeId, this.ctx.awayId]) staleUpNext(teamKey(this.ctx.league, id)); // their next game is another one now
     const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
     if (lastHalf.length) publish(lastHalf, this.ctx.league);
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
@@ -320,6 +322,7 @@ class LiveEngine {
   private preSeen = new Set<string>();
   private kickers: Partial<Record<League, () => void>> = {};
   private standingsKick: Partial<Record<League, () => void>> = {};
+  private upNextKick?: () => void;
 
   start() {
     for (const lg of GAME_LEAGUES) {
@@ -330,10 +333,11 @@ class LiveEngine {
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
     for (const lg of LEAGUE_IDS) every(NEWS_MS, () => scanNews(lg));
+    this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
   }
 
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */
-  kick() { invalidateWatched(); for (const k of Object.values(this.kickers)) k?.(); }
+  kick() { invalidateWatched(); for (const k of Object.values(this.kickers)) k?.(); this.upNextKick?.(); }
 
   onGameFinal(lg: League) { setTimeout(() => this.standingsKick[lg]?.(), 15_000).unref(); }
 

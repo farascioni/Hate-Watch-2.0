@@ -46,6 +46,17 @@ export function startLabel(ts: number) {
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
+/**
+ * When an "Up next" game is, as two lines: the day ("Today", "Tomorrow", "Sun", or "Oct 19" past a week)
+ * and the time ("8:20 PM", or "Time TBA" before ESPN sets it).
+ */
+export function upNextWhen(ts: number, timeValid: boolean, now = Date.now()) {
+  const d = new Date(ts), today = new Date(now);
+  const days = Math.round((new Date(d.toDateString()).getTime() - new Date(today.toDateString()).getTime()) / 86400_000);
+  const day = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : days < 7 ? d.toLocaleDateString([], { weekday: 'short' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return { day, time: timeValid ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time TBA' };
+}
+
 /** A race weekend's dates in the phone's time zone: "Oct 9–11", or "Oct 30 – Nov 1" across months. */
 export function weekendDates(from: number, to: number) {
   const a = new Date(from), b = new Date(to);
