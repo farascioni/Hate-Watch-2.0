@@ -133,9 +133,11 @@ route('GET', '/me/feed', true, (req, url) => {
   const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200);
   const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
   const after = Number(url.searchParams.get('after') ?? 0);
+  const target = url.searchParams.get('target'); // one player's or team's alerts (their page's "Recent misery")
   const rows = db.prepare(`SELECT e.*, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
-    WHERE f.device_id = ? AND f.occurred_at < ? AND f.occurred_at > ? ORDER BY f.occurred_at DESC, e.detected_at DESC LIMIT ?`)
-    .all(req.deviceId!, before, after, limit) as any[];
+    WHERE f.device_id = ? AND f.occurred_at < ? AND f.occurred_at > ?${target ? ' AND e.target_key = ?' : ''}
+    ORDER BY f.occurred_at DESC, e.detected_at DESC LIMIT ?`)
+    .all(req.deviceId!, before, after, ...(target ? [target] : []), limit) as any[];
   return { items: rows.map(feedItem) };
 });
 route('DELETE', '/me/feed', true, (req) => {

@@ -76,3 +76,22 @@ test('search, the team list, and a team page with its roster say how many people
   assert.deepEqual(falcons.roster.map((p: any) => `${p.name} ${p.haters}`), ['Michael Penix Jr. 1']);
   server.close();
 });
+
+test("a player or team page's recent alerts: only theirs, only since a time", async () => {
+  const server = startApi(0);
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const token = (await (await fetch(`${base}/devices`, { method: 'POST', body: '{}' })).json()).token as string;
+  const me = token.split('.')[0], now = Date.now(), h = 3600_000;
+  const ev = db.prepare(`INSERT INTO events (id, type, league, target_key, title, body, occurred_at, detected_at) VALUES (?, 'team.lost', 'nfl', ?, ?, '', ?, ?)`);
+  const feed = db.prepare('INSERT INTO feed (device_id, event_id, occurred_at) VALUES (?, ?, ?)');
+  for (const [id, key, ago] of [['f1', 'team:nfl:1', 2], ['f2', 'team:nfl:1', 30], ['s1', 'team:nfl:18', 1]] as const) {
+    ev.run(id, key, id, now - ago * h, now - ago * h);
+    feed.run(me, id, now - ago * h);
+  }
+  const get = async (q: string) => (await (await fetch(`${base}/me/feed${q}`, { headers: { authorization: `Bearer ${token}` } })).json()).items.map((i: any) => i.id);
+  assert.deepEqual(await get(`?target=${encodeURIComponent('team:nfl:1')}&after=${now - 24 * h}`), ['f1'], 'the Falcons, the last day');
+  assert.deepEqual(await get(`?target=${encodeURIComponent('team:nfl:1')}`), ['f1', 'f2']);
+  assert.deepEqual(await get(''), ['s1', 'f1', 'f2'], 'without a target: the whole feed, as before');
+  server.close();
+});

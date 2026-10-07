@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
@@ -7,17 +8,28 @@ import { Avatar } from '../../components/Avatar';
 import { FeedCard } from '../../components/FeedCard';
 import { FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
-import type { Player, Target } from '../../lib/types';
+import type { FeedItem, Player, Target } from '../../lib/types';
+
+const DAY = 24 * 3600_000; // "Recent misery" is the last day's alerts
 
 export default function TargetScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
   const { feed, noteTrackers } = useStore();
+  const [recent, setRecent] = useState<FeedItem[]>([]);
+  const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);
   const now = useNow();
 
   useEffect(() => { api.target(targetKey).then((t) => { setTarget(t); noteTrackers([t, ...(t.roster ?? [])]); }).catch(() => {}); }, [targetKey, noteTrackers]);
-  const history = useMemo(() => feed.filter((f) => f.target.key === targetKey).slice(0, 20), [feed, targetKey]);
+  // Their last day of alerts from the server (the app's loaded feed may not reach back that far),
+  // plus any that arrive live while you're here.
+  useEffect(() => { api.targetFeed(targetKey, Date.now() - DAY).then((r) => setRecent(r.items)).catch(() => {}); }, [targetKey]);
+  const history = useMemo(() => {
+    const byId = new Map<string, FeedItem>();
+    for (const f of [...recent, ...feed]) if (f.target.key === targetKey && now - f.occurredAt < DAY) byId.set(f.id, f);
+    return [...byId.values()].sort((a, b) => b.occurredAt - a.occurredAt);
+  }, [recent, feed, targetKey, now]);
 
   if (!target) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   const accent = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.hate;
@@ -34,8 +46,15 @@ export default function TargetScreen() {
         <HaterCount target={target} size={14} />
         <View style={{ marginTop: space(3) }}><FollowButton target={target} /></View>
       </View>
-      {history.length ? <SectionHeader>Recent misery</SectionHeader> : null}
-      {history.map((h) => <FeedCard key={h.id} item={h} now={now} />)}
+      {history.length ? <SectionHeader>Recent misery · last 24 hours</SectionHeader> : null}
+      {(open ? history : history.slice(0, 1)).map((h) => <FeedCard key={h.id} item={h} now={now} />)}
+      {history.length > 1 ? (
+        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={8} style={({ pressed }) => [styles.more, pressed && { opacity: 0.6 }]}
+          accessibilityRole="button" aria-expanded={open} accessibilityLabel={open ? 'Show only the latest alert' : `Show ${history.length - 1} more alert${history.length === 2 ? '' : 's'} from the last 24 hours`}>
+          <Text style={styles.moreText}>{open ? 'Show less' : `Show ${history.length - 1} more`}</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textDim} />
+        </Pressable>
+      ) : null}
       {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
     </View>
   );
@@ -60,4 +79,6 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: space(2), paddingVertical: space(6), borderBottomWidth: 3, backgroundColor: colors.surface },
   name: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: space(2), textAlign: 'center', paddingHorizontal: space(4) },
   sub: { color: colors.textDim, fontSize: 14 },
+  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(1), alignSelf: 'center', paddingVertical: space(2), paddingHorizontal: space(4), marginBottom: space(2) },
+  moreText: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
 });

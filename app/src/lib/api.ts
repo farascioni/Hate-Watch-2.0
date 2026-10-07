@@ -71,6 +71,8 @@ export const api = {
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),
   setPushToken: (pushToken: string | null) => request('PUT', '/me/push-token', { pushToken }),
 
+  /** One player's or team's alerts since a time, for their page ("Recent misery"). */
+  targetFeed: (key: string, after: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=100&target=${enc(key)}&after=${after}`),
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),
   clearFeed: () => request('DELETE', '/me/feed'),
   scores: () => request<{ games: GameCard[]; nextF1?: F1Weekend }>('GET', '/me/scores'),
