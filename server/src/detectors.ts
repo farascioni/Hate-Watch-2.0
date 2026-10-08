@@ -555,6 +555,49 @@ export const absCall = (p: Pick<NPlay, 'type'>) => (p.type.match(ABS_PITCH)?.[2]
 export const pitchSlot = (id: string) => (/^\d{9,}$/.test(id) ? id.slice(0, -4) : id);
 /** A failed challenge in an at-bat result: "Chicago White Sox challenged: call on the field was upheld." */
 const CHALLENGE_LOST = /\bchallenged\b[^.]*?\bcall on the field (?:was )?(?:upheld|confirmed|stands|stood)\b/i;
+/**
+ * A crew chief review (the umpires review a call themselves, no team challenged it), in an at-bat result:
+ * "Umpire review: call on the field was overturned." and, Rays @ Yankees 2026-10-07, "Umpire review: HR call
+ * on the field was overturned due to fan interference." Groups: the call ("HR"), the outcome, and the reason.
+ */
+const UMPIRE_REVIEW = /\s*\bumpire review:\s*(?:(.+?)\s+)?call on the field (?:was )?(overturned|upheld|confirmed|stands|stood)\b(?:\s+due to ([^.]+))?\.?/i;
+/** Outs in an at-bat result: after an overturned review, the call that was taken away was a safe one. */
+const RESULT_OUT = /\bout\b|\bcaught stealing\b|\bpicked off\b|\bdouble play\b|\btriple play\b/i;
+
+/**
+ * A crew chief review that overturned a call: the team the call had gone for lost it, as if it had lost a
+ * challenge. ESPN's result is what stands after the review and only sometimes names the call ("HR call"):
+ * - A home run call overturned: the batting team lost it, and the batter lost the home run (Volpe, fan interference).
+ * - Otherwise, a result with an out in it: a runner or the batter was safe, now he's out, so the batting team
+ *   lost it (Meckler's fielder's choice, Peraza out at second). Anything else (a hit, a home run, a runner safe,
+ *   interference): an out became something better, so the fielding team lost it. A result with both an out and
+ *   a run counts as the out, and a hit after an overturn as the hit (it may have been a home run taken back).
+ * An upheld review is no alert: nobody asked for it, so nobody lost it. The ids come from the play, not its text,
+ * which ESPN can rewrite (the review sentence is added to a result posted before it, see live.ts).
+ */
+export function umpireReviewLost(g: GameCtx, p: NPlay): Detected[] {
+  const key = halfKey(p), m = p.text.match(UMPIRE_REVIEW);
+  if (!key || !m || !/^overturned$/i.test(m[2])) return [];
+  const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
+  const homer = !!m[1] && /^(?:hr|home run)$/i.test(m[1].trim());
+  const result = p.text.replace(UMPIRE_REVIEW, '').trim();
+  const loserId = homer || RESULT_OUT.test(result) ? battingId : fieldingId;
+  const [batter] = role(p, 'batter');
+  const why = m[3] ? ` (${m[3].trim()})` : '';
+  const body = (what: string) => `${halfLabel(p)}: ${what} ${result} — ${scoreLine(g, p)}`;
+  const moment = `${g.gameId}:${p.id}:review`;
+  const out: Detected[] = [];
+  if (homer && batter) {
+    out.push(mk(g, p, 'mlb.challenge_lost', batter, `${nameOf('mlb', batter)}'s home run was overturned`, { body: body(`a crew chief review took it away${why}.`), moment }));
+  }
+  out.push({
+    id: `${g.gameId}:${p.id}:mlb.challenge_lost:review-${loserId}`, type: 'mlb.challenge_lost', targetKey: teamKey('mlb', loserId),
+    title: `${teamName('mlb', loserId)} lost a crew chief review`,
+    body: body(homer ? `${batter ? `${nameOf('mlb', batter)}'s` : 'a'} home run was overturned${why}.` : `the call on the field was overturned${why}.`),
+    at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment,
+  });
+  return out;
+}
 
 /**
  * A team lost a challenge (one type, `mlb.challenge_lost`, for teams and players).
@@ -568,10 +611,12 @@ const CHALLENGE_LOST = /\bchallenged\b[^.]*?\bcall on the field (?:was )?(?:uphe
  * right after an ABS-reviewed pitch isn't read as a replay challenge (`g.lastPitchAbs`). The player and
  * team alerts for one ABS challenge share a `moment`, so tracking the batter and the batter's team gets you one.
  * ESPN sends runner plays twice with the same text (see runnerOut), so the replay id is built from it.
+ * - Crew chief review: the umpires overturned a call (umpireReviewLost).
  */
 function challengeLost(g: GameCtx, p: NPlay): Detected[] {
   const key = halfKey(p);
   if (!key) return [];
+  if (UMPIRE_REVIEW.test(p.text)) return umpireReviewLost(g, p);
   const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
   const abs = p.type.match(ABS_PITCH);
   if (abs) {

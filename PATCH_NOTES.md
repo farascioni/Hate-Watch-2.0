@@ -19,6 +19,9 @@ PLAYER AND TEAM PAGES
 PLAYER ALERT SETTINGS
 - Their team: a player's alert settings have two new switches. Show their team's games (on by default) decides whether the team's games appear on the Scores tab, and Get their team's alerts (off by default) sends the team's own alerts too, as if you tracked the team.
 
+MLB ALERTS
+- Crew chief reviews count as lost challenges: when the umpires review a call themselves and overturn it, the team the call went for gets "lost a crew chief review", and a batter whose home run is overturned gets "home run was overturned" (Volpe's, for fan interference, Rays @ Yankees on October 7). An upheld review sends nothing, as no team asked for it. (Server)
+
 FIXES
 - ABS challenge alerts wait until the review is over. ESPN first posts every challenged pitch as confirmed and corrects it if the call is overturned, which sent "lost an ABS challenge" alerts for challenges that were won. A lost challenge now goes out about a minute later, once ESPN has settled it. (Server)
 - A called third strike or ball four whose challenge was upheld is labeled an ABS challenge, not a replay challenge. (Server)

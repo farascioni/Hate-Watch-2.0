@@ -7,7 +7,7 @@ import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -87,6 +87,8 @@ export class GameTracker {
   private fouls = new Map<string, string>();
   /** Lost ABS challenges waiting for the review to settle, by pitch (holdAbs). */
   private absHeld = new Map<string, { events: Detected[]; since: number }>();
+  /** MLB: each at-bat result's text as last seen, to catch a crew chief review ESPN writes into it later. */
+  private resultTexts = new Map<string, string>();
   /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
   private touches: (NPlay | undefined)[] = [];
   private touchNext = 0;
@@ -221,6 +223,15 @@ export class GameTracker {
         this.seen.add(p.id);
         if (!history) events.push(...PLAYER_DETECTORS[league](this.ctx, p));
         observePlay(this.ctx, p);
+      }
+      // A crew chief review can be added to an at-bat's result after it was posted ("Volpe homered…"
+      // rewritten as "Volpe doubled, Lombard Jr. scored. Umpire review: HR call on the field was
+      // overturned…"). Detectors see a play once, so a rewritten result is checked for a review alone,
+      // and only when the review is what's new (a result that had one when we attached is history).
+      if (league === 'mlb' && p.typeSlug === 'play-result') {
+        const was = this.resultTexts.get(p.id);
+        this.resultTexts.set(p.id, p.text);
+        if (!fresh && !history && was !== undefined && was !== p.text && !/\bumpire review:/i.test(was)) events.push(...umpireReviewLost(this.ctx, p));
       }
       const up = (s: 'home' | 'away') => score[s] > this.announced[s];
       if (up('home') || up('away')) {
