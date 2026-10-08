@@ -61,7 +61,7 @@ test('one player: the same alert and id as before batching', () => {
 });
 
 test('delivery: one Falcons notification for the batch, stacked with the player alerts on iOS', () => {
-  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('fan', 's', 'ios', 'ExponentPushToken[t]', JSON.stringify(DEFAULT_PREFS));
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('fan', 's', 'ios', 'ExponentPushToken[t]', JSON.stringify({ ...DEFAULT_PREFS, pushTypes: { 'team.player_injured': true } })); // feed only by default
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('fan', 'team:nfl:1');
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('fan', 'player:nfl:101');
   const sent: { title: string; threadId: string }[] = [];

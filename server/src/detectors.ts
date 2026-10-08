@@ -38,9 +38,10 @@ export interface GameCtx {
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
   /**
    * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs) and for
-   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half).
+   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half), and
+   * "goes down in order" (`pas`: each plate appearance's result; `reached`: anyone got on or scored).
    */
-  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean };
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; pas: { id: string; text: string }[]; reached: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
@@ -339,7 +340,8 @@ export const ordinal = (n: number) => {
 };
 
 /**
- * Team alert: the half-inning just ended with runners on second and/or third.
+ * Team alert: the half-inning just ended with runners on second and/or third. A runner left on first
+ * is in it too: "stranded runners on first and second".
  * Uses the half-inning's last at-bat result, whose runner roles are the bases after the third out.
  */
 function strandedRisp(g: GameCtx): Detected[] {
@@ -351,6 +353,7 @@ function strandedRisp(g: GameCtx): Detected[] {
   if (!risp) return [];
   const what = first && second && third ? 'left the bases loaded 🤦'
     : risp === 2 ? 'stranded 2 runners in scoring position'
+    : first ? `stranded runners on first and ${third ? 'third' : 'second'}`
     : `stranded a runner on ${third ? 'third' : 'second'}`;
   return [{
     id: `${g.gameId}:${r.id}:mlb.team.stranded_risp:${r.teamId}`,
@@ -374,7 +377,7 @@ const halfLabel = (p: NPlay) => (p.period ? `${p.period.type === 'Top' ? 'Top' :
 function trackHalfInning(g: GameCtx, p: NPlay) {
   const key = halfKey(p);
   if (!key) return; // "End Inning" / "Mid" / "End" markers
-  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false, risp: false };
+  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false, risp: false, pas: [], reached: false };
   // Checked before this play can load the bases: a run that scores on the loading play doesn't count.
   if (g.half.loadedNoOuts && p.scoring) g.half.scoredSince = true;
   if (p.typeSlug === 'play-result' && p.outs === 0 && p.participants.some((x) => x.role === 'batter')) {
@@ -382,6 +385,12 @@ function trackHalfInning(g: GameCtx, p: NPlay) {
     if (on('onFirst') && on('onSecond') && on('onThird')) g.half.loadedNoOuts = true;
   }
   if (inScoringPosition(basesAfter(p))) g.half.risp = true;
+  // An at-bat result lists the runners after it: anyone on (a hit, a walk, an error, extra innings' runner
+  // on second) or a run (a solo homer leaves the bases empty) means it wasn't 1-2-3.
+  if (p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter') && !g.half.pas.some((x) => x.id === p.id)) {
+    g.half.pas.push({ id: p.id, text: p.text });
+    if (p.scoring || p.participants.some((x) => x.role === 'onFirst' || x.role === 'onSecond' || x.role === 'onThird')) g.half.reached = true;
+  }
 }
 
 /**
@@ -449,7 +458,26 @@ function halfInningEnded(g: GameCtx): Detected[] {
     meta: { gameId: g.gameId, playId: r.id },
   });
   for (const s of strandedRisp(g)) out.push(noble ? { ...s, unless: 'mlb.team.nobletiger' } : s);
+  out.push(...downInOrder(g, r, key));
   return out;
+}
+
+/** Team alert: three up, three down, nobody on. "Struck out in order" when all three struck out. */
+function downInOrder(g: GameCtx, r: NPlay, key: string | undefined): Detected[] {
+  const h = g.half;
+  if (!key || h?.key !== key || h.reached || h.pas.length !== 3) return [];
+  const ks = h.pas.filter((x) => /struck out/i.test(x.text)).length;
+  const team = teamName('mlb', r.teamId!);
+  return [{
+    id: `${g.gameId}:${key}:mlb.team.down_in_order:${r.teamId}`,
+    type: 'mlb.team.down_in_order',
+    targetKey: teamKey('mlb', r.teamId!),
+    title: ks === 3 ? `${team} struck out in order 🌀` : `${team} went down in order`,
+    // An ABS challenge's sentence rides along in the play's text ("Milwaukee Brewers challenged: call on the field was overturned.").
+    body: `${halfLabel(r)}: ${h.pas.map((x) => x.text.replace(/\s*[^.]*\bchallenged:[^.]*\.?/g, '')).join(' ')} — ${scoreLine(g, r)}`,
+    at: r.at,
+    meta: { gameId: g.gameId, playId: r.id, strikeouts: ks },
+  }];
 }
 
 /** The game's final half-inning has no "End Inning" play; the tracker calls this at the final. */

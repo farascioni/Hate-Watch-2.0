@@ -91,6 +91,8 @@ test('MLB: stranding runners in scoring position', () => {
   assert.match(second[0].title, /stranded a runner on second/);
   assert.match(second[0].body, /^Top 4th: Stott struck out looking\./);
   assert.match(run(['onSecond', 'onThird'])[0].title, /stranded 2 runners in scoring position/);
+  assert.match(run(['onFirst', 'onSecond'])[0].title, / stranded runners on first and second$/, 'a runner left on first is in it too');
+  assert.match(run(['onFirst', 'onThird'])[0].title, / stranded runners on first and third$/);
   assert.match(run(['onFirst', 'onSecond', 'onThird'])[0].title, /left the bases loaded/);
   assert.equal(run(['onFirst']).length, 0, 'a runner on first is not in scoring position');
   assert.equal(run([]).length, 0);
@@ -100,6 +102,48 @@ test('MLB: stranding runners in scoring position', () => {
   assert.equal(mlbFinalHalfInning(g).length, 1);
   const walkoff = ctx(); observePlay(walkoff, result(['onSecond'], { outs: 1 }));
   assert.equal(mlbFinalHalfInning(walkoff).length, 0, 'a walk-off ends with fewer than 3 outs');
+});
+
+test('MLB: going down in order, and striking out in order', () => {
+  const ctx = (): any => ({ league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() });
+  let n = 0;
+  // At-bat results as ESPN writes them (Brewers v Padres, October 2026): the batter, and any runners after the play.
+  const ab = (text: string, o: { runners?: string[]; outs?: number; scoring?: boolean } = {}) => play({
+    id: `ab${n++}`, typeSlug: 'play-result', teamId: '22', text, outs: o.outs ?? 0, scoring: !!o.scoring, period: { type: 'Bottom', number: 2 },
+    participants: [{ id: 'P', role: 'pitcher' }, { id: 'B', role: 'batter' }, ...(o.runners ?? []).map((r, i) => ({ id: `R${i}`, role: r }))],
+  });
+  const inning = (...plays: ReturnType<typeof play>[]) => {
+    const g = ctx();
+    for (const p of plays) observePlay(g, p);
+    return PLAYER_DETECTORS.mlb(g, play({ id: `end${n++}`, typeSlug: 'end-inning', teamId: '22' })).filter((e) => e.type === 'mlb.team.down_in_order');
+  };
+
+  const [dio] = inning(ab('Chourio grounded out to third.', { outs: 1 }), ab('Turang grounded out to third.', { outs: 2 }), ab('Bauers struck out swinging.', { outs: 3 }));
+  assert.equal(dio.targetKey, 'team:mlb:22', 'the batting team');
+  assert.match(dio.title, / went down in order$/);
+  assert.ok(dio.body.startsWith('Bottom 2nd: Chourio grounded out to third. Turang grounded out to third. Bauers struck out swinging. — '), dio.body);
+
+  const [ks] = inning(ab('Contreras struck out swinging.', { outs: 1 }), ab('Mitchell struck out looking.', { outs: 2 }),
+    ab('Yelich struck out swinging. San Diego Padres challenged: call on the field was upheld.', { outs: 3 }));
+  assert.match(ks.title, / struck out in order 🌀$/, 'all three strikeouts say so');
+  assert.ok(ks.body.startsWith('Bottom 2nd: Contreras struck out swinging. Mitchell struck out looking. Yelich struck out swinging. — '), "a challenge's sentence is left out");
+  assert.equal(ks.meta!.strikeouts, 3);
+
+  // Somebody got on, so it wasn't 1-2-3, even when three batters made three outs.
+  assert.deepEqual(inning(ab('Yelich singled to left.', { runners: ['onFirst'] }), ab('Contreras grounded into double play, second to shortstop to first, Yelich out at second.', { outs: 2 }),
+    ab('Mitchell flied out to center.', { outs: 3 })), [], 'a single, then a double play: three batters, but not in order');
+  assert.deepEqual(inning(ab('Bauers homered to right (402 feet).', { scoring: true }), ab('Chourio struck out swinging.', { outs: 1 }), ab('Turang flied out to left.', { outs: 2 }),
+    ab('Contreras grounded out to second.', { outs: 3 })), [], 'a solo homer leaves the bases empty');
+  assert.deepEqual(inning(ab('Mitchell struck out swinging, reached first on wild pitch.', { runners: ['onFirst'] }), ab('Yelich struck out looking.', { outs: 1 }),
+    ab('Turang struck out swinging.', { outs: 2 }), ab('Bauers struck out swinging.', { outs: 3 })), [], 'four strikeouts, one of them reaching');
+  assert.deepEqual(inning(ab('Bauers flied out to center.', { runners: ['onSecond'], outs: 1 }), ab('Chourio struck out swinging.', { runners: ['onSecond'], outs: 2 }),
+    ab('Turang grounded out to first.', { runners: ['onSecond'], outs: 3 })), [], "extra innings' runner on second");
+  assert.deepEqual(inning(ab('Bauers flied out to center.', { outs: 1 }), ab('Bauers flied out to center.', { outs: 1 })), [], 'two outs is not an inning');
+
+  // The game's last half-inning has no End Inning play: checked at the final.
+  const g = ctx();
+  for (const p of [ab('Jones grounded out to first.', { outs: 1 }), ab('Lombard Jr. grounded out to second.', { outs: 2 }), ab('Chisholm Jr. grounded out to first.', { outs: 3 })]) observePlay(g, p);
+  assert.deepEqual(mlbFinalHalfInning(g).map((e) => e.type), ['mlb.team.down_in_order']);
 });
 
 test('MLB: caught stealing is pinned on the runner from the base they left', () => {
@@ -279,8 +323,9 @@ test('MLB: opponent gets a runner in scoring position: the fielding team hears i
   // A run scoring on the same play: "Opponent scores" says more, so this one is `unless` it.
   const [scored] = live(g, ab('Top 5', 'Ohtani doubled, Betts scored.', ['onSecond'], { scoring: true, scoreValue: 1 }));
   assert.equal(scored.unless, 'team.opponent_scored');
-  assert.equal(shouldDeliver(prefs(), scored, 'mlb'), false, 'default: the scored-on alert covers it');
-  assert.equal(shouldDeliver(prefs({ types: { 'team.opponent_scored': false } }), scored, 'mlb'), true, '"Opponent scores" off: this one arrives');
+  const risp = { 'mlb.team.opponent_risp': true }; // off by default
+  assert.equal(shouldDeliver(prefs({ types: risp }), scored, 'mlb'), false, 'the scored-on alert covers it');
+  assert.equal(shouldDeliver(prefs({ types: { ...risp, 'team.opponent_scored': false } }), scored, 'mlb'), true, '"Opponent scores" off: this one arrives');
 
   // Attaching mid-threat (history is observed, never alerted) must not send a late alert.
   const late = newGame();
@@ -394,7 +439,7 @@ test('per-alert 🔔: an alert can go to the feed without a push, globally or fo
   const JONES = 'player:nfl:1', OTHER_QB = 'player:nfl:2';
   const int = (targetKey: string) => ({ type: 'nfl.qb.interception', targetKey });
 
-  assert.equal(pushWanted(prefs(), int(JONES), 'nfl'), true, 'default: everything that is on also pushes, as before');
+  assert.equal(pushWanted(prefs(), int(JONES), 'nfl'), true, 'default: an interception pushes');
   const feedOnly = prefs({ pushTypes: { 'nfl.qb.interception': false } });
   assert.equal(shouldDeliver(feedOnly, int(JONES), 'nfl'), true, 'feed-only still lands in the feed');
   assert.equal(pushWanted(feedOnly, int(JONES), 'nfl'), false);
@@ -410,7 +455,8 @@ test('per-alert 🔔: an alert can go to the feed without a push, globally or fo
   // An alert that counts for several types follows the most specific one that's switched on.
   const homer = { type: 'mlb.pitcher.home_run_allowed', aliases: ['mlb.pitcher.runs_allowed'], targetKey: 'player:mlb:9' };
   assert.equal(pushWanted(prefs({ pushTypes: { 'mlb.pitcher.home_run_allowed': false } }), homer, 'mlb'), false, 'homers feed-only, runs pushed: the homer is quiet');
-  assert.equal(pushWanted(prefs({ types: { 'mlb.pitcher.home_run_allowed': false }, pushTypes: { 'mlb.pitcher.home_run_allowed': false } }), homer, 'mlb'), true, 'homers switched off: it arrives as a run, and runs push');
+  assert.equal(pushWanted(prefs({ types: { 'mlb.pitcher.home_run_allowed': false } }), homer, 'mlb'), false, 'homers switched off: it arrives as a run, and runs are feed only by default');
+  assert.equal(pushWanted(prefs({ types: { 'mlb.pitcher.home_run_allowed': false }, pushTypes: { 'mlb.pitcher.home_run_allowed': false, 'mlb.pitcher.runs_allowed': true } }), homer, 'mlb'), true, '…and with the runs 🔔 on, it pushes');
   assert.equal(pushWanted(prefs({ types: { 'nfl.qb.interception': false } }), int(JONES), 'nfl'), false, 'an alert that is not wanted never pushes');
 
   // End to end: the feed-only alert is stored and delivered, but no notification is sent for it.

@@ -6,19 +6,21 @@ import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { FeedCard } from '../../components/FeedCard';
-import { FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
+import { Chip, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
 import type { FeedItem, Player, Target } from '../../lib/types';
+import { ROSTER_GROUPS } from '../../lib/positions';
 
 const DAY = 24 * 3600_000; // "Recent misery" is the last day's alerts
 
 export default function TargetScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
-  const { feed, noteTrackers } = useStore();
+  const { feed, noteTrackers, leagueInfo } = useStore();
   const [recent, setRecent] = useState<FeedItem[]>([]);
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);
+  const [position, setPosition] = useState<string | null>(null); // the roster filter: a group's label, or all
   const now = useNow();
 
   useEffect(() => { api.target(targetKey).then((t) => { setTarget(t); noteTrackers([t, ...(t.roster ?? [])]); }).catch(() => {}); }, [targetKey, noteTrackers]);
@@ -30,9 +32,17 @@ export default function TargetScreen() {
     for (const f of [...recent, ...feed]) if (f.target.key === targetKey && now - f.occurredAt < DAY) byId.set(f.id, f);
     return [...byId.values()].sort((a, b) => b.occurredAt - a.occurredAt);
   }, [recent, feed, targetKey, now]);
+  // The roster by position group (MLB starters, relievers, catchers…), each with its players; only groups that have some.
+  const groups = useMemo(() => {
+    const roster = target?.roster ?? [];
+    return (ROSTER_GROUPS[leagueInfo(target?.league ?? '')?.sport ?? ''] ?? [])
+      .map((g) => ({ label: g.label, players: roster.filter((p) => !!p.position && g.positions.includes(p.position)) }))
+      .filter((g) => g.players.length);
+  }, [target, leagueInfo]);
 
   if (!target) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   const accent = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.hate;
+  const roster = (position && groups.find((g) => g.label === position)?.players) || target.roster || [];
 
   const header = (
     <View>
@@ -66,6 +76,14 @@ export default function TargetScreen() {
         </Pressable>
       ) : null}
       {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
+      {groups.length > 1 ? (
+        <View style={styles.positions} accessibilityLabel="Filter the roster by position">
+          <Chip label={`All ${target.roster!.length}`} active={!position} onPress={() => setPosition(null)} style={styles.positionChip} />
+          {groups.map((g) => (
+            <Chip key={g.label} label={`${g.label} ${g.players.length}`} active={position === g.label} onPress={() => setPosition(position === g.label ? null : g.label)} style={styles.positionChip} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 
@@ -73,7 +91,7 @@ export default function TargetScreen() {
     <>
       <Stack.Screen options={{ title: target.kind === 'team' ? target.abbrev : target.shortName ?? target.name }} />
       <FlatList
-        data={target.roster ?? []}
+        data={roster}
         keyExtractor={(p) => p.key}
         ListHeaderComponent={header}
         renderItem={({ item }) => <TargetRow target={item} />}
@@ -93,5 +111,8 @@ const styles = StyleSheet.create({
   moreText: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(3) },
   stats: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingHorizontal: space(4), paddingVertical: space(2), borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi },
+  // Wraps like the league chips in Search: every position group in view, each chip whole.
+  positions: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2) },
+  positionChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(2) },
   statsText: { color: colors.text, fontWeight: '800', fontSize: 13 },
 });

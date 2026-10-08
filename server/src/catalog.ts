@@ -8,11 +8,13 @@ export interface Team {
 }
 export interface Player {
   key: string; league: League; espnId: string; name: string; shortName: string | null; position: string | null; jersey: string | null;
+  /** Every position ESPN lists them at this season (Ohtani: P, DH, SP), for which alerts fit them; null when it lists none. */
+  positions: string[] | null;
   teamKey: string; image: string; imageW: number; imageH: number; imageKind: 'headshot' | 'team_logo';
 }
 
-/** Bump when what ingest() collects changes (2: injured lists), so the next boot rebuilds the catalog instead of waiting. */
-export const INGEST_VERSION = 2;
+/** Bump when what ingest() collects changes (2: injured lists, 3: every position played), so the next boot rebuilds the catalog instead of waiting. */
+export const INGEST_VERSION = 3;
 export const INGEST_EVERY_MS = 6 * 3600_000;
 
 /**
@@ -66,7 +68,7 @@ export function loadCatalog() {
   for (const r of db.prepare('SELECT * FROM players ORDER BY name').all() as any[]) {
     const p: Player = {
       key: r.key, league: r.league, espnId: r.espn_id, name: r.name, shortName: r.short_name, position: r.position, jersey: r.jersey,
-      teamKey: r.team_key, image: r.image, imageW: r.image_w, imageH: r.image_h, imageKind: r.image_kind,
+      positions: r.positions ? String(r.positions).split(',') : null, teamKey: r.team_key, image: r.image, imageW: r.image_w, imageH: r.image_h, imageKind: r.image_kind,
     };
     players.set(p.key, p);
     if (!rosterByTeam.has(p.teamKey)) rosterByTeam.set(p.teamKey, []);
@@ -82,6 +84,12 @@ export const normalize = (s: string) =>
 function pickLogo(t: any, rel: string): string | undefined {
   return t.logos?.find((l: any) => l.rel?.includes(rel) && !l.rel?.includes('dark'))?.href
     ?? (rel === 'dark' ? t.logos?.find((l: any) => l.rel?.includes('dark'))?.href : undefined);
+}
+
+/** Every position a roster entry lists (`positions`: "P", "DH", "SP" for Ohtani), its main one if that's all. */
+export function positionsOf(a: any): string[] | null {
+  const all = [a.position, ...(a.positions ?? [])].map((p: any) => p?.abbreviation).filter((p: unknown): p is string => typeof p === 'string' && !!p);
+  return all.length ? [...new Set(all)] : null;
 }
 
 /**
@@ -181,7 +189,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     const lgPlayers = await mapLimit([...byId.values()], 24, async ({ a, team }) => {
       const p: Player = {
         key: playerKey(lg, a.id), league: lg, espnId: a.id, name: a.displayName ?? a.fullName, shortName: a.shortName ?? null,
-        position: a.position?.abbreviation ?? null, jersey: a.jersey ?? null, teamKey: team.key,
+        position: a.position?.abbreviation ?? null, jersey: a.jersey ?? null, positions: positionsOf(a), teamKey: team.key,
         image: '', imageW: 0, imageH: 0, imageKind: 'headshot',
       };
       // Accuracy: the headshot URL must be keyed by this athlete's own id; ESPN's alt text should name them.
@@ -224,9 +232,9 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     for (const t of newTeams) upTeam.run(t.key, t.league, t.espnId, t.name, t.shortName, t.abbrev, t.location, t.color, t.altColor, t.logo, t.logoDark, t.logoW, t.logoH, now);
     // Players who left every roster are removed from the catalog (follows are kept so they reappear if re-signed).
     db.prepare('DELETE FROM players').run();
-    const insP = db.prepare(`INSERT INTO players (key, league, espn_id, name, short_name, position, jersey, team_key, image, image_w, image_h, image_kind, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-    for (const p of newPlayers) insP.run(p.key, p.league, p.espnId, p.name, p.shortName, p.position, p.jersey, p.teamKey, p.image, p.imageW, p.imageH, p.imageKind, now);
+    const insP = db.prepare(`INSERT INTO players (key, league, espn_id, name, short_name, position, positions, jersey, team_key, image, image_w, image_h, image_kind, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    for (const p of newPlayers) insP.run(p.key, p.league, p.espnId, p.name, p.shortName, p.position, p.positions?.join(',') ?? null, p.jersey, p.teamKey, p.image, p.imageW, p.imageH, p.imageKind, now);
   });
   kvSet('ingest:report', report);
   loadCatalog();
@@ -292,7 +300,7 @@ async function ingestF1(stats: IngestReport['leagues'][string], report: IngestRe
     if (!team) { report.problems.push(`f1: ${a.displayName} (${a.id}) drives for "${vehicle?.team}", which matches no constructor; skipped`); return null; }
     const p: Player = {
       key: playerKey('f1', a.id), league: 'f1', espnId: String(a.id), name: a.displayName, shortName: a.shortName ?? null,
-      position: null, jersey: vehicle?.number ?? null, teamKey: team.key,
+      position: null, positions: null, jersey: vehicle?.number ?? null, teamKey: team.key,
       image: '', imageW: 0, imageH: 0, imageKind: 'headshot',
     };
     const candidate: string = a.headshot?.href ?? urls.headshot('f1', a.id);

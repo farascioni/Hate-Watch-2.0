@@ -20,6 +20,8 @@ export interface Team {
 export interface Player {
   kind: 'player'; key: string; league: League; espnId: string; name: string; shortName: string | null;
   position: string | null; jersey: string | null; teamKey: string;
+  /** Every position they've played this season (Ohtani: DH, P, SP). Missing from older servers. */
+  positions?: string[] | null;
   image: string; imageW: number; imageH: number; imageKind: 'headshot' | 'team_logo';
   teamName: string | null; teamAbbrev: string | null; teamColor: string | null; teamLogo: string | null;
   /** How many people track them, where the server includes it (Search, rosters, their page). */
@@ -109,7 +111,24 @@ export interface LeaderboardEntry { rank: number; tied?: boolean; haters: number
 export interface Leaderboard { entries: LeaderboardEntry[]; total?: number; moreTied?: number }
 
 export interface EventType {
-  id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean; emoji: string;
+  id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean;
+  /** false: on by default but feed only (no push) until its 🔔 is tapped. Missing means pushed. */
+  defaultPush?: boolean; emoji: string;
+  /** The heading it's listed under ("Offense", "Pitching", "Team"…). The server lists alerts in section order. Missing from older servers. */
+  section?: string;
+  /** Which players it's about, by position: `only` these, or any but `not` these (see lib/positions.ts). Missing: everyone. */
+  positions?: { only?: string[]; not?: string[] };
+}
+
+/** Alerts under their section headings, in the order they come (the server's: offense, defense, pitching, team…). */
+export function bySection(types: EventType[]): { section: string; types: EventType[] }[] {
+  const out: { section: string; types: EventType[] }[] = [];
+  for (const t of types) {
+    const s = t.section ?? '';
+    const into = out.find((g) => g.section === s);
+    if (into) into.types.push(t); else out.push({ section: s, types: [t] });
+  }
+  return out;
 }
 
 export interface Prefs {

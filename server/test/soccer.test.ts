@@ -56,12 +56,12 @@ test('every soccer league gets every soccer alert, under its own switches', () =
     for (const id of ['team.lost', 'player.team_lost', 'team.opponent_scored', 'off_field']) assert.ok(EVENT_TYPES.find((t) => t.id === id)!.leagues.includes(lg), `${id} covers ${lg}`);
   }
   const byId = (id: string) => EVENT_TYPES.find((t) => t.id === id)!;
-  assert.deepEqual(['epl.foul', 'epl.penalty_conceded', 'epl.lost_ball', 'epl.pass_given_away', 'epl.team.heavy_loss'].map((id) => [id, byId(id).scope, byId(id).alsoScope ?? null, byId(id).defaultOn]), [
-    ['epl.foul', 'player', null, true],
-    ['epl.penalty_conceded', 'player', 'team', true],
-    ['epl.lost_ball', 'player', null, true],
-    ['epl.pass_given_away', 'player', null, false],
-    ['epl.team.heavy_loss', 'team', null, true],
+  assert.deepEqual(['epl.foul', 'epl.penalty_conceded', 'epl.lost_ball', 'epl.pass_given_away', 'epl.team.heavy_loss'].map((id) => [id, byId(id).scope, byId(id).alsoScope ?? null, byId(id).defaultOn, byId(id).defaultPush ?? true]), [
+    ['epl.foul', 'player', null, true, false],
+    ['epl.penalty_conceded', 'player', 'team', true, true],
+    ['epl.lost_ball', 'player', null, false, true],
+    ['epl.pass_given_away', 'player', null, false, true],
+    ['epl.team.heavy_loss', 'team', null, true, true],
   ]);
 });
 
@@ -117,7 +117,7 @@ test('losing the ball and giving it away, judged from the next touch', () => {
 const device = db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)');
 const follow = db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)');
 for (const [id, keys, prefs] of [
-  ['rudoni-fan', ['player:epl:300001'], { types: { 'epl.pass_given_away': true } }],
+  ['rudoni-fan', ['player:epl:300001'], { types: { 'epl.lost_ball': true, 'epl.pass_given_away': true } }],
   ['thomas-and-coventry', ['player:epl:303931', 'team:epl:388'], {}],
   ['coventry-hater', ['team:epl:388'], {}],
   ['coventry-no-thrashing', ['team:epl:388'], { types: { 'epl.team.heavy_loss': false } }],

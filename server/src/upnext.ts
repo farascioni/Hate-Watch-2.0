@@ -65,15 +65,15 @@ export function nextFromSchedule(lg: League, teamId: string, res: any, now = Dat
  * that part has nothing left (the last preseason game is played), the next part's schedule has it.
  * Soccer schedules list results unless asked for fixtures.
  */
-async function fetchNext(lg: League, teamId: string): Promise<NextGame | null> {
+async function fetchNext(lg: League, teamId: string, at = Date.now()): Promise<NextGame | null> {
   const get = (q = '') => upNextDeps.getJson(`${urls.teamSchedule(lg, teamId)}${q}`, { timeoutMs: 10_000 });
-  if (SOCCER.has(lg)) return nextFromSchedule(lg, teamId, await get('?fixture=true'));
-  const now = await get();
-  const found = nextFromSchedule(lg, teamId, now);
+  if (SOCCER.has(lg)) return nextFromSchedule(lg, teamId, await get('?fixture=true'), at);
+  const current = await get();
+  const found = nextFromSchedule(lg, teamId, current, at);
   if (found) return found;
-  const part = Number(now?.requestedSeason?.type ?? 0);
+  const part = Number(current?.requestedSeason?.type ?? 0);
   for (const type of [2, 3].filter((t) => t > part)) {
-    const later = nextFromSchedule(lg, teamId, await get(`?seasontype=${type}`));
+    const later = nextFromSchedule(lg, teamId, await get(`?seasontype=${type}`), at);
     if (later) return later;
   }
   return null;
@@ -91,7 +91,7 @@ export async function refreshUpNext(teamKeys: Iterable<string>, now = Date.now()
     const due = [...teamKeys].filter((k) => !k.includes(':f1:') && (!known.has(k) || now - known.get(k)!.at >= REFRESH_MS));
     await mapLimit(due, 4, async (key) => {
       const [, lg, id] = key.split(':') as [string, League, string];
-      try { known.set(key, { at: Date.now(), next: await fetchNext(lg, id) }); } catch { /* try again next tick */ }
+      try { known.set(key, { at: Date.now(), next: await fetchNext(lg, id, now) }); } catch { /* try again next tick */ }
     });
   } finally { running = false; }
 }

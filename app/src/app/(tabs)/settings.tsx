@@ -7,10 +7,10 @@ import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { TipJar } from '../../components/TipJar';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
-import { SettingRow } from '../../components/SettingRow';
+import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, leagueColors, radius, space } from '../../theme';
-import type { EventType, League } from '../../lib/types';
+import { bySection, type EventType, type League } from '../../lib/types';
 
 /** A folded alert group shows this many of its emoji (the last place becomes "+N" when there are more). Cutting the line short would split an emoji. */
 const FOLDED_EMOJI = 6;
@@ -47,16 +47,17 @@ export default function SettingsScreen() {
   const on = (t: EventType) => prefs.types[t.id] ?? t.defaultOn;
   const setType = (id: string, v: boolean) => updatePrefs({ types: { [id]: v } });
   // An alert's 🔔: off keeps it in the feed without a notification.
-  const pushOn = (t: EventType) => prefs.pushTypes?.[t.id] ?? true;
+  const pushOn = (t: EventType) => prefs.pushTypes?.[t.id] ?? t.defaultPush ?? true;
   const setPush = (id: string, v: boolean) => updatePrefs({ pushTypes: { [id]: v } });
   const leagueOn = (l: League) => prefs.leagues[l] !== false;
   const setAll = (types: EventType[], v: boolean) => updatePrefs({ types: Object.fromEntries(types.map((t) => [t.id, v])) });
 
   const groups: { title: string; color?: string; league?: League; types: EventType[] }[] = [
-    // League-only alerts (player ones first, then team ones like MLB "strands runners") live under their league.
+    // League-only alerts live under their league, in the server's order: offense, defense, pitching, then
+    // team ones like MLB "strands runners", each under its section heading.
     ...leagues.map((l) => ({
       title: `${l.name} alerts`, color: leagueColors[l.id], league: l.id,
-      types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id).sort((a, b) => Number(a.scope === 'team') - Number(b.scope === 'team')),
+      types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id),
     })),
     { title: 'All player alerts', types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
     { title: 'Team alerts', types: eventTypes.filter((t) => t.scope === 'team' && t.leagues.length > 1) },
@@ -106,9 +107,14 @@ export default function SettingsScreen() {
               <Pressable onPress={() => setAll(g.types, !allOn)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
             </View>
             <View style={[styles.card, g.color ? { borderLeftColor: g.color, borderLeftWidth: 3 } : null]}>
-              {isOpen ? g.types.map((t) => (
-                <SettingRow key={t.id} emoji={t.emoji} title={t.label} desc={t.description} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off}
-                  push={{ on: pushOn(t), onChange: (v) => setPush(t.id, v) }} />
+              {isOpen ? bySection(g.types).map((s) => (
+                <View key={s.section}>
+                  <SettingSection title={s.section} />
+                  {s.types.map((t) => (
+                    <SettingRow key={t.id} emoji={t.emoji} title={t.label} value={on(t)} onChange={(v) => setType(t.id, v)} disabled={off}
+                      push={{ on: pushOn(t), onChange: (v) => setPush(t.id, v) }} />
+                  ))}
+                </View>
               )) : (
                 // Folded: the group's alerts at a glance, and how many are on. Tapping opens it.
                 <Pressable onPress={() => toggleGroup(g.title)} style={({ pressed }) => [styles.folded, off && { opacity: 0.45 }, pressed && { opacity: 0.6 }]}
@@ -128,7 +134,7 @@ export default function SettingsScreen() {
 
       <SectionHeader>Data</SectionHeader>
       <View style={styles.card}>
-        <Pressable style={styles.action} onPress={() => updatePrefs({ types: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultOn])), leagues: Object.fromEntries(leagues.map((l) => [l.id, true])) })}>
+        <Pressable style={styles.action} onPress={() => updatePrefs({ types: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultOn])), pushTypes: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultPush ?? true])), leagues: Object.fromEntries(leagues.map((l) => [l.id, true])) })}>
           <Text style={styles.actionText}>Reset alerts to defaults</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => {

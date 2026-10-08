@@ -3,10 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
-import { SettingRow } from '../../components/SettingRow';
+import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { LeagueTag, SectionHeader, subtitle } from '../../components/ui';
 import { colors, leagueColors, radius, space } from '../../theme';
-import type { EventType } from '../../lib/types';
+import { bySection, type EventType } from '../../lib/types';
+import { fitsPosition, positionsOf } from '../../lib/positions';
 
 /**
  * Alert choices for ONE tracked player or team. Anything set here beats the global Settings tab for
@@ -18,12 +19,16 @@ export default function TargetAlertsScreen() {
   const { follows, prefs, updatePrefs, eventTypes } = useStore();
   const target = follows.get(targetKey);
 
-  // Only the alerts that can actually fire for this kind of target in this league.
-  const types = useMemo(() => {
-    if (!target) return [];
+  // Only the alerts that can actually fire for this kind of target in this league, and for a player, at
+  // their positions: a pitcher has no hitting alerts, a skater no goalie ones (lib/positions.ts).
+  const { types, hidden } = useMemo(() => {
+    if (!target) return { types: [], hidden: 0 };
     const applies = (t: EventType) => t.leagues.includes(target.league) && (t.scope === target.kind || t.alsoScope === target.kind);
-    // League-specific alerts first, then the ones every league shares (injuries, losses…).
-    return eventTypes.filter(applies).sort((a, b) => Number(a.leagues.length > 1) - Number(b.leagues.length > 1));
+    const all = eventTypes.filter(applies);
+    const fits = target.kind === 'player' ? all.filter((t) => fitsPosition(t, target)) : all;
+    // League-specific alerts first (offense, defense, pitching, team…), then the ones every league shares
+    // (the game, injuries and news), each under its section heading as in Settings.
+    return { types: fits.sort((a, b) => Number(a.leagues.length > 1) - Number(b.leagues.length > 1)), hidden: all.length - fits.length };
   }, [eventTypes, target]);
 
   if (!target || !prefs) {
@@ -33,7 +38,7 @@ export default function TargetAlertsScreen() {
   const own = prefs.targetTypes?.[targetKey] ?? {};
   const ownPush = prefs.targetPushTypes?.[targetKey] ?? {};
   const globalOn = (t: EventType) => prefs.leagues[target.league] !== false && (prefs.types[t.id] ?? t.defaultOn);
-  const globalPush = (t: EventType) => prefs.pushTypes?.[t.id] ?? true;
+  const globalPush = (t: EventType) => prefs.pushTypes?.[t.id] ?? t.defaultPush ?? true;
   const setOne = (typeId: string, value: boolean | null) => updatePrefs({ targetTypes: { [targetKey]: { [typeId]: value } } });
   const setPush = (typeId: string, value: boolean | null) => updatePrefs({ targetPushTypes: { [targetKey]: { [typeId]: value } } });
   // "Use global setting" and "Reset all" clear both the switch and the 🔔 overrides.
@@ -75,31 +80,40 @@ export default function TargetAlertsScreen() {
         </View>
 
         <SectionHeader>Alerts for {name}</SectionHeader>
+        {hidden && target.kind === 'player' ? (
+          <Text style={styles.positionNote}>
+            Showing the alerts that fit {name}'s position{positionsOf(target).length > 1 ? 's' : ''} ({positionsOf(target).join(', ')}). {hidden} that don't {hidden === 1 ? 'is' : 'are'} hidden.
+          </Text>
+        ) : null}
         <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: leagueColors[target.league] ?? colors.border }]}>
-          {types.map((t) => {
-            const custom = own[t.id] !== undefined || ownPush[t.id] !== undefined;
-            return (
-              <SettingRow
-                key={t.id}
-                emoji={t.emoji}
-                title={t.label}
-                desc={t.description}
-                value={own[t.id] ?? globalOn(t)}
-                onChange={(v) => setOne(t.id, v)}
-                push={{ on: ownPush[t.id] ?? globalPush(t), onChange: (v) => setPush(t.id, v) }}
-                footer={custom ? (
-                  <View style={styles.footer}>
-                    <Text style={styles.custom}>Custom for {name}</Text>
-                    <Pressable onPress={() => resetTypes([t.id])} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Use the global setting for ${t.label}`}>
-                      <Text style={styles.reset}>Use global setting</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Text style={styles.global}>Global setting ({!globalOn(t) ? 'off' : globalPush(t) ? 'on' : 'on, feed only'})</Text>
-                )}
-              />
-            );
-          })}
+          {bySection(types).map((s) => (
+            <View key={s.section}>
+              <SettingSection title={s.section} />
+              {s.types.map((t) => {
+                const custom = own[t.id] !== undefined || ownPush[t.id] !== undefined;
+                return (
+                  <SettingRow
+                    key={t.id}
+                    emoji={t.emoji}
+                    title={t.label}
+                    value={own[t.id] ?? globalOn(t)}
+                    onChange={(v) => setOne(t.id, v)}
+                    push={{ on: ownPush[t.id] ?? globalPush(t), onChange: (v) => setPush(t.id, v) }}
+                    footer={custom ? (
+                      <View style={styles.footer}>
+                        <Text style={styles.custom}>Custom for {name}</Text>
+                        <Pressable onPress={() => resetTypes([t.id])} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Use the global setting for ${t.label}`}>
+                          <Text style={styles.reset}>Use global setting</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Text style={styles.global}>Global setting ({!globalOn(t) ? 'off' : globalPush(t) ? 'on' : 'on, feed only'})</Text>
+                    )}
+                  />
+                );
+              })}
+            </View>
+          ))}
         </View>
 
         <Pressable onPress={() => resetTypes(customIds)} disabled={!customCount} style={({ pressed }) => [styles.resetAll, !customCount && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}>
@@ -115,6 +129,7 @@ const styles = StyleSheet.create({
   hero: { flexDirection: 'row', alignItems: 'center', gap: space(4), padding: space(4), backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   name: { color: colors.text, fontSize: 20, fontWeight: '900' },
   dim: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
+  positionNote: { color: colors.textFaint, fontSize: 12, lineHeight: 17, paddingHorizontal: space(4), paddingBottom: space(2) },
   explain: { color: colors.textFaint, fontSize: 13, lineHeight: 18, paddingHorizontal: space(4), paddingTop: space(3) },
   card: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   footer: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space(2), marginTop: 4 },

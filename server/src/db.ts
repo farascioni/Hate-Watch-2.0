@@ -75,6 +75,10 @@ if (!(db.prepare('PRAGMA table_info(events)').all() as { name: string }[]).some(
   db.exec('ALTER TABLE events ADD COLUMN share_code TEXT');
 }
 db.exec('CREATE INDEX IF NOT EXISTS events_share ON events(share_code)');
+// Every position a player has played this season ("P,DH,SP"), for which alerts fit them: added later.
+if (!(db.prepare('PRAGMA table_info(players)').all() as { name: string }[]).some((c) => c.name === 'positions')) {
+  db.exec('ALTER TABLE players ADD COLUMN positions TEXT');
+}
 db.exec('CREATE INDEX IF NOT EXISTS events_game ON events(game_id)'); // a loss's alerts, together (RECIPIENTS)
 {
   const missing = db.prepare('SELECT id FROM events WHERE share_code IS NULL').all() as { id: string }[];

@@ -5,7 +5,7 @@ import { db, kvGet } from './db.ts';
 import { catalog, search, teamDto, playerDto, targetDto } from './catalog.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
-import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
+import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
@@ -144,8 +144,8 @@ route('GET', '/leaderboard', false, (_r, url) => {
 route('GET', '/me/hate-watches', true, (req) => hateWatchTally(req.deviceId!));
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────
-route('GET', '/me/prefs', true, (req) => getPrefs(req.deviceId!));
-route('PUT', '/me/prefs', true, (req, _u, _p, body) => setPrefs(req.deviceId!, body ?? {}));
+route('GET', '/me/prefs', true, (req) => prefsDto(getPrefs(req.deviceId!)));
+route('PUT', '/me/prefs', true, (req, _u, _p, body) => prefsDto(setPrefs(req.deviceId!, body ?? {})));
 
 // ─── Feed (chronological by when it happened, newest first) ───────────────────────────────────
 route('GET', '/me/feed', true, (req, url) => {

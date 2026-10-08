@@ -55,7 +55,14 @@ export function SettingRow({ title, desc, value, onChange, emoji, disabled, foot
   );
 }
 
+/** A heading inside a card of alerts: "Offense", "Pitching", "Team". Nothing for an alert without one (older servers). */
+export function SettingSection({ title }: { title: string }) {
+  if (!title) return null;
+  return <Text style={styles.section} accessibilityRole="header">{title}</Text>;
+}
+
 const styles = StyleSheet.create({
+  section: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(2), backgroundColor: colors.surfaceHi, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   emoji: { fontSize: 20, width: 26, textAlign: 'center' },
   title: { color: colors.text, fontSize: 15, fontWeight: '700' },

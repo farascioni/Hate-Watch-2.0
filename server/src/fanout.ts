@@ -1,10 +1,10 @@
 import type { WebSocket } from 'ws';
-import { db, shareCode } from './db.ts';
-import { EVENT_TYPE_BY_ID } from './event-types.ts';
+import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
+import { EVENT_TYPES, EVENT_TYPE_BY_ID, soccerType } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
 import { HATE_WATCH_TYPES, hateWatchTally, isHateWatch, recordHateWatch } from './hate-watches.ts';
-import type { League } from './leagues.ts';
+import { SOCCER, type League } from './leagues.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
 export interface Prefs {
@@ -117,10 +117,51 @@ export function pushAllowed(p: Prefs, targetKey: string, now = new Date()) {
   return p.pushEnabled && !p.muted.includes(targetKey) && !inQuietHours(p, now);
 }
 
-/** Push or feed-only for one alert type and target: that target's own 🔔 wins, then the Settings 🔔, then push. */
+/**
+ * Push or feed-only for one alert type and target: that target's own 🔔 wins, then the Settings 🔔, then
+ * the type's default (`defaultPush`: the in-game drip is feed-only until its 🔔 is tapped), then push.
+ */
 export function pushTypeFor(p: Prefs, targetKey: string, typeId: string) {
-  return p.targetPushTypes?.[targetKey]?.[typeId] ?? p.pushTypes?.[typeId] ?? true;
+  return p.targetPushTypes?.[targetKey]?.[typeId] ?? p.pushTypes?.[typeId] ?? EVENT_TYPE_BY_ID.get(typeId)?.defaultPush ?? true;
 }
+
+const FEED_ONLY_BY_DEFAULT = Object.fromEntries(EVENT_TYPES.filter((t) => t.defaultPush === false).map((t) => [t.id, false]));
+
+/**
+ * Prefs as the app sees them (GET and PUT /me/prefs): the 🔔 of every feed-only-by-default alert filled
+ * in, so app builds that read a missing bell as "push" show it right.
+ */
+export const prefsDto = (p: Prefs): Prefs => ({ ...p, pushTypes: { ...FEED_ONLY_BY_DEFAULT, ...p.pushTypes } });
+
+/**
+ * October 2026: new installs got quieter defaults, with these alerts off or feed-only. Installs from
+ * before keep what they had: once, each existing device's settings get the old defaults written out
+ * wherever it hadn't chosen. A later default change needs its own list and kv key.
+ */
+export const WERE_ON = ['mlb.team.opponent_risp', 'nba.missed_shot', 'wnba.missed_shot', ...[...SOCCER].map((lg) => soccerType(lg, 'lost_ball'))];
+export const WERE_PUSHED = [
+  'mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.challenge_lost', 'mlb.team.stranded_risp', 'nfl.qb.sacked',
+  'nba.missed_free_throw', 'nba.turnover', 'wnba.missed_free_throw', 'wnba.turnover', 'nhl.shot_missed', 'f1.driver.standings_drop',
+  'team.opponent_scored', 'team.fell_behind', 'team.standings_drop', 'team.losing_streak', 'team.player_injured',
+  ...[...SOCCER].map((lg) => soccerType(lg, 'foul')),
+];
+export function keepOldDefaults() {
+  if (kvGet('prefs:quiet-defaults')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      p.types = { ...Object.fromEntries(WERE_ON.map((t) => [t, true])), ...p.types };
+      p.pushTypes = { ...Object.fromEntries(WERE_PUSHED.map((t) => [t, true])), ...p.pushTypes };
+      save.run(JSON.stringify(p), id);
+    }
+    kvSet('prefs:quiet-defaults', { at: Date.now(), devices: rows.length });
+  });
+  prefsCache.clear();
+  if (rows.length) console.log(`[prefs] kept the old alert defaults for ${rows.length} existing devices`);
+}
+keepOldDefaults();
 
 /**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
