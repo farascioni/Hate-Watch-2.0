@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { FeedCard } from '../../components/FeedCard';
+import { StatsView } from '../../components/StatsView';
 import { Chip, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
-import type { FeedItem, Player, Target } from '../../lib/types';
+import type { FeedItem, Player, StatsPage, Target } from '../../lib/types';
 import { ROSTER_GROUPS } from '../../lib/positions';
 
 const DAY = 24 * 3600_000; // "Recent misery" is the last day's alerts
@@ -18,12 +18,17 @@ export default function TargetScreen() {
   const targetKey = decodeURIComponent(key);
   const { feed, noteTrackers, leagueInfo } = useStore();
   const [recent, setRecent] = useState<FeedItem[]>([]);
-  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first; F1 has no stats yet, so only misery
+  const [stats, setStats] = useState<StatsPage | null>(null);
+  const [statsFailed, setStatsFailed] = useState(false);
   const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);
   const [position, setPosition] = useState<string | null>(null); // the roster filter: a group's label, or all
   const now = useNow();
 
   useEffect(() => { api.target(targetKey).then((t) => { setTarget(t); noteTrackers([t, ...(t.roster ?? [])]); }).catch(() => {}); }, [targetKey, noteTrackers]);
+  // Fetched alongside the target, since Stats is the tab that shows first (F1's 404 is ignored).
+  const loadStats = () => { setStatsFailed(false); api.stats(targetKey).then(setStats).catch(() => setStatsFailed(true)); };
+  useEffect(loadStats, [targetKey]);
   // Their last day of alerts from the server (the app's loaded feed may not reach back that far),
   // plus any that arrive live while you're here.
   useEffect(() => { api.targetFeed(targetKey, Date.now() - DAY).then((r) => setRecent(r.items)).catch(() => {}); }, [targetKey]);
@@ -43,6 +48,8 @@ export default function TargetScreen() {
   if (!target) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   const accent = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.hate;
   const roster = (position && groups.find((g) => g.label === position)?.players) || target.roster || [];
+  const hasStats = target.league !== 'f1';
+  const view = hasStats ? tab : 'misery';
 
   const header = (
     <View>
@@ -56,25 +63,33 @@ export default function TargetScreen() {
         <HaterCount target={target} size={14} />
         <View style={styles.actions}>
           <FollowButton target={target} />
-          {/* Stats: every league but F1 (for now). */}
-          {target.league !== 'f1' ? (
-            <Pressable onPress={() => router.push(`/stats/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.stats, pressed && { opacity: 0.7 }]}
-              accessibilityRole="button" accessibilityLabel={`${target.name} stats`}>
-              <Ionicons name="stats-chart" size={14} color={colors.text} />
-              <Text style={styles.statsText}>Stats</Text>
-            </Pressable>
-          ) : null}
         </View>
       </View>
-      {history.length ? <SectionHeader>Recent misery · last 24 hours</SectionHeader> : null}
-      {(open ? history : history.slice(0, 1)).map((h) => <FeedCard key={h.id} item={h} now={now} />)}
-      {history.length > 1 ? (
-        <Pressable onPress={() => setOpen((o) => !o)} hitSlop={8} style={({ pressed }) => [styles.more, pressed && { opacity: 0.6 }]}
-          accessibilityRole="button" aria-expanded={open} accessibilityLabel={open ? 'Show only the latest alert' : `Show ${history.length - 1} more alert${history.length === 2 ? '' : 's'} from the last 24 hours`}>
-          <Text style={styles.moreText}>{open ? 'Show less' : `Show ${history.length - 1} more`}</Text>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textDim} />
-        </Pressable>
+      {hasStats ? (
+        <View style={styles.tabs} accessibilityRole="tablist">
+          {([['stats', 'Stats'], ['misery', 'Recent misery']] as const).map(([id, label]) => (
+            <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, view === id && styles.tabOn]}
+              accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
+              <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
       ) : null}
+      {view === 'stats' ? (
+        stats ? <StatsView page={stats} target={target} now={now} />
+        : statsFailed ? (
+          <View style={styles.note}>
+            <Text style={styles.noteText}>Couldn't load the stats. ESPN didn't answer.</Text>
+            <Pressable onPress={loadStats} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>Try again</Text></Pressable>
+          </View>
+        ) : <ActivityIndicator color={colors.hate} style={styles.note} />
+      ) : (
+        <>
+          <SectionHeader>Last 24 hours</SectionHeader>
+          {history.length ? history.map((h) => <FeedCard key={h.id} item={h} now={now} />)
+            : <Text style={[styles.noteText, styles.note]}>No misery in the last 24 hours. Give it time.</Text>}
+        </>
+      )}
       {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
       {groups.length > 1 ? (
         <View style={styles.positions} accessibilityLabel="Filter the roster by position">
@@ -107,12 +122,17 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: space(2), paddingVertical: space(6), borderBottomWidth: 3, backgroundColor: colors.surface },
   name: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: space(2), textAlign: 'center', paddingHorizontal: space(4) },
   sub: { color: colors.textDim, fontSize: 14 },
-  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(1), alignSelf: 'center', paddingVertical: space(2), paddingHorizontal: space(4), marginBottom: space(2) },
-  moreText: { color: colors.textDim, fontSize: 14, fontWeight: '700' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(3) },
-  stats: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingHorizontal: space(4), paddingVertical: space(2), borderRadius: 999, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi },
+  // Stats and Recent misery: edge-to-edge tabs, the open one underlined in red.
+  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.bg },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: space(3), borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -StyleSheet.hairlineWidth },
+  tabOn: { borderBottomColor: colors.hate },
+  tabText: { color: colors.textDim, fontSize: 15, fontWeight: '800' },
+  tabTextOn: { color: colors.text },
+  note: { alignItems: 'center', gap: space(2), paddingVertical: space(8), paddingHorizontal: space(6) },
+  noteText: { color: colors.textDim, fontSize: 14, textAlign: 'center' },
+  retry: { color: colors.text, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   // Wraps like the league chips in Search: every position group in view, each chip whole.
   positions: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2) },
   positionChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(2) },
-  statsText: { color: colors.text, fontWeight: '800', fontSize: 13 },
 });

@@ -7,6 +7,12 @@
       "runtimeArgs": ["--prefix", "app", "expo", "start", "--web", "--port", "8081"],
       "cwd": "app",
       "port": 8081
+    },
+    {
+      "name": "hate-watch-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server", "start"],
+      "port": 8787
     }
   ]
 }
