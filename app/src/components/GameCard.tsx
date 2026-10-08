@@ -23,6 +23,8 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   const tag = hateTag(game, side);
   const lose = loseChance(game, side);
   const open = () => router.push(`/game/${encodeURIComponent(game.key)}`);
+  // A team's row opens its page; VoiceOver reads the card as one button, so the teams are its actions too.
+  const teams = game.league === 'f1' ? [] : (['away', 'home'] as const).filter((k) => game[k]);
 
   const body = game.league === 'f1' ? <F1Body game={game} big={big} /> : (
     <>
@@ -56,11 +58,16 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   if (big) return <View style={[styles.card, styles.bigCard]}>{content}</View>;
   return (
     <Pressable onPress={open} style={({ pressed }) => [styles.card, game.state === 'post' && { opacity: 0.8 }, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityHint="Opens the play-by-play and your alerts from this game">
+      accessibilityRole="button" accessibilityHint="Opens the play-by-play and your alerts from this game"
+      accessibilityActions={teams.map((k) => ({ name: k, label: `Open the ${game[k]!.team.shortName} page` }))}
+      onAccessibilityAction={(e) => { const k = teams.find((t) => t === e.nativeEvent.actionName); if (k) openTeam(game[k]!.team.key); }}>
       {content}
     </Pressable>
   );
 });
+
+/** A team's page, as Search opens it: their stats, recent misery and roster. */
+const openTeam = (key: string) => router.push(`/target/${encodeURIComponent(key)}`);
 
 function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tracked: boolean; big?: boolean }) {
   const { follows } = useStore();
@@ -73,15 +80,18 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   const chance = pv?.chance?.[side];
   return (
     <View style={styles.team}>
-      <Avatar target={s.team} size={big ? 40 : 30} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={styles.inline}>
-          <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]} numberOfLines={1}>{s.team.shortName}</Text>
-          {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
+      <Pressable onPress={() => openTeam(s.team.key)} hitSlop={{ top: 4, bottom: 4 }} style={({ pressed }) => [styles.teamTap, pressed && { opacity: 0.6 }]}
+        accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint="Opens their page">
+        <Avatar target={s.team} size={big ? 40 : 30} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.inline}>
+            <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]} numberOfLines={1}>{s.team.shortName}</Text>
+            {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
+          </View>
+          {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
+          {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
         </View>
-        {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
-        {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
-      </View>
+      </Pressable>
       {chance != null
         ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={`${chance}% chance to win`}>{chance}%</Text>
         : <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>}
@@ -199,6 +209,8 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: space(3), marginBottom: space(2), padding: space(3), gap: space(2), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
   bigCard: { marginTop: space(3), padding: space(4) },
   team: { flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
+  // The logo and name: a tap here opens the team's page, anywhere else on the card the game.
+  teamTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   teamName: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
   tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' },

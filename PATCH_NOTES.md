@@ -12,6 +12,7 @@ Changes since build 11. Server updates already work on every build.
 SCORES
 - All games: a new switch at the top of the Scores tab shows every game live right now, then every game starting in the next 24 hours, whether you track a team in it or not, grouped by league. The league chips filter it, and the switch shows how many games are live. Tap any game to open it.
 - Upcoming games show a preview: each team's chance to win (from the betting line), its record, MLB probable pitchers with their record and ERA, NHL probable goalies, the line and over/under, soccer form and draw chance, and the playoff series. A team you track shows its chance to lose.
+- Tap a team on a game card, or at the top of a game's screen, to open that team's page, the same one Search opens. Tapping anywhere else on the card still opens the game.
 
 PLAYER AND TEAM PAGES
 - Stats and Recent misery tabs: a player's or team's page opens on their stats (the season line, last five games and next game) right on the page, no separate Stats button. Recent misery lists every alert about them from the last 24 hours, not just the latest. F1 drivers and teams show Recent misery only, as they have no stats yet.
