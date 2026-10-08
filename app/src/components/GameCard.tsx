@@ -78,20 +78,24 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   const record = pv?.records?.[side];
   const split = side === 'home' ? pv?.records?.homeSplit : pv?.records?.awaySplit;
   const chance = pv?.chance?.[side];
+  const open = () => openTeam(s.team.key);
   return (
     <View style={styles.team}>
-      <Pressable onPress={() => openTeam(s.team.key)} hitSlop={{ top: 4, bottom: 4 }} style={({ pressed }) => [styles.teamTap, pressed && { opacity: 0.6 }]}
-        accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint="Opens their page">
+      {/* The logo and the name (as wide as it is) open the team's page; the rest of the card, the game. */}
+      <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && { opacity: 0.6 }}>
         <Avatar target={s.team} size={big ? 40 : 30} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={styles.inline}>
-            <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]} numberOfLines={1}>{s.team.shortName}</Text>
-            {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
-          </View>
-          {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
-          {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
-        </View>
       </Pressable>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={styles.inline}>
+          <Pressable onPress={open} hitSlop={{ top: 4, bottom: 4 }} style={({ pressed }) => [styles.nameTap, pressed && { opacity: 0.6 }]}
+            accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint="Opens their page">
+            <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]} numberOfLines={1}>{s.team.shortName}</Text>
+          </Pressable>
+          {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
+        </View>
+        {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
+        {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
+      </View>
       {chance != null
         ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={`${chance}% chance to win`}>{chance}%</Text>
         : <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>}
@@ -209,8 +213,8 @@ const styles = StyleSheet.create({
   card: { marginHorizontal: space(3), marginBottom: space(2), padding: space(3), gap: space(2), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
   bigCard: { marginTop: space(3), padding: space(4) },
   team: { flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
-  // The logo and name: a tap here opens the team's page, anywhere else on the card the game.
-  teamTap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
+  // Around a team's name: only as wide as the name, so the space after it still opens the game.
+  nameTap: { flexShrink: 1, minWidth: 0 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   teamName: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
   tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' },
