@@ -67,6 +67,11 @@ export interface Detected {
    * not the first in the list: tracking Gerrit Cole and then Aaron Judge, a Yankees loss is Cole's.
    */
   firstFollowed?: boolean;
+  /**
+   * MLB: a lost ABS challenge, held by the game tracker until the review is settled (holdAbs in live.ts):
+   * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.
+   */
+  absSlot?: string;
   targetKey: string;
   title: string;
   body: string;
@@ -539,6 +544,15 @@ function runnerOut(g: GameCtx, p: NPlay): Detected | null {
 const PITCH = /^Pitch \d+\s*:/i;
 /** ESPN's pitch type after an ABS review: the call that stands, and whether the challenge failed ("Confirmed"). */
 const ABS_PITCH = /^(ball|strike looking) - (confirmed|overturned)$/i;
+export const isPitch = (p: Pick<NPlay, 'text'>) => PITCH.test(p.text);
+/** An ABS-reviewed pitch's outcome: "confirmed" (the challenge failed), "overturned", or null for any other play. */
+export const absCall = (p: Pick<NPlay, 'type'>) => (p.type.match(ABS_PITCH)?.[2]?.toLowerCase() as 'confirmed' | 'overturned' | undefined) ?? null;
+/**
+ * A play's place in the game: ESPN's id is the game, half-inning, batter and pitch, then a 4-digit type
+ * (4019079871102060092: Bottom 6th, 2nd batter, 6th play, "Strike Looking - Confirmed"; "...0089" once
+ * overturned to "Ball - Overturned"). Other ids are their own place.
+ */
+export const pitchSlot = (id: string) => (/^\d{9,}$/.test(id) ? id.slice(0, -4) : id);
 /** A failed challenge in an at-bat result: "Chicago White Sox challenged: call on the field was upheld." */
 const CHALLENGE_LOST = /\bchallenged\b[^.]*?\bcall on the field (?:was )?(?:upheld|confirmed|stands|stood)\b/i;
 
@@ -569,14 +583,17 @@ function challengeLost(g: GameCtx, p: NPlay): Detected[] {
     const batterName = batter ? nameOf('mlb', batter) : 'the batter';
     const body = (what: string) => `${halfLabel(p)}: ${what} — ${scoreLine(g, p)}`;
     const moment = `${g.gameId}:${p.id}:abs`;
+    // ESPN posts every challenged pitch as "Confirmed" first and changes it if the call is overturned:
+    // these wait in the game tracker until the review is over (absSlot).
+    const absSlot = pitchSlot(p.id);
     const out: Detected[] = [];
-    if (strike && batter) out.push(mk(g, p, 'mlb.challenge_lost', batter, `${batterName} lost an ABS challenge`, { body: body(`challenged ${call}, and the call stands`), moment }));
-    if (!strike && pitcher) out.push(mk(g, p, 'mlb.challenge_lost', pitcher, `ABS challenge on ${nameOf('mlb', pitcher)}'s pitch failed`, { body: body(`${call} to ${batterName} stands`), moment }));
+    if (strike && batter) out.push(mk(g, p, 'mlb.challenge_lost', batter, `${batterName} lost an ABS challenge`, { body: body(`challenged ${call}, and the call stands`), moment, absSlot }));
+    if (!strike && pitcher) out.push(mk(g, p, 'mlb.challenge_lost', pitcher, `ABS challenge on ${nameOf('mlb', pitcher)}'s pitch failed`, { body: body(`${call} to ${batterName} stands`), moment, absSlot }));
     out.push({
       id: `${g.gameId}:${p.id}:mlb.challenge_lost:team-${loserId}`, type: 'mlb.challenge_lost', targetKey: teamKey('mlb', loserId),
       title: `${teamName('mlb', loserId)} lost an ABS challenge`,
       body: body(strike ? `${batterName} challenged ${call}, and the call stands` : `${call} to ${batterName} stands${pitcher ? ` (${nameOf('mlb', pitcher)} pitching)` : ''}`),
-      at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment,
+      at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment, absSlot,
     });
     return out;
   }
@@ -589,7 +606,7 @@ function challengeLost(g: GameCtx, p: NPlay): Detected[] {
   if (!loserId) return [];
   return [{
     id: `${g.gameId}:challenge:${key}:${said.replace(/ /g, '-')}:${loserId}`, type: 'mlb.challenge_lost', targetKey: teamKey('mlb', loserId),
-    title: `${teamName('mlb', loserId)} lost a replay challenge`, body: `${p.text} — ${scoreLine(g, p)}`,
+    title: `${teamName('mlb', loserId)} lost ${/\b(?:struck out looking|walked)\b/i.test(p.text) ? 'an ABS' : 'a replay'} challenge`, body: `${p.text} — ${scoreLine(g, p)}`,
     at: p.at, meta: { gameId: g.gameId, playId: p.id },
   }];
 }

@@ -7,7 +7,7 @@ import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, ordinal, pitcherEvents, teamScoreEvents,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents,
   type Detected, type GameCtx, type NPlay,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
@@ -34,6 +34,8 @@ const TOUCH_MS = Number(process.env.HW_TOUCH_MS ?? 10_000);
 const TOUCH_PAGE = 100;
 /** A playoff final waits for the scoreboard (the series: is this the end of their season?), but not forever. */
 const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
+/** How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). */
+const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 
@@ -83,6 +85,8 @@ export class GameTracker {
   private keepersSeeded = new Set<string>();
   /** Soccer: commentary fouls already alerted (play id → 'foul' / 'penalty-conceded'). */
   private fouls = new Map<string, string>();
+  /** Lost ABS challenges waiting for the review to settle, by pitch (holdAbs). */
+  private absHeld = new Map<string, { events: Detected[]; since: number }>();
   /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
   private touches: (NPlay | undefined)[] = [];
   private touchNext = 0;
@@ -122,6 +126,41 @@ export class GameTracker {
    * summary carries game status, boxscore goalies, and is a fallback if core hiccups.
    * Soccer is the summary alone: its key events are the plays (the core API has every touch, thousands a match).
    */
+  /**
+   * Lost ABS challenges wait until the review is over. ESPN posts a challenged pitch as its call
+   * "- Confirmed" right away and, if the call is overturned, swaps in an "- Overturned" pitch in the same
+   * place under a new id (Lombard Jr.'s strike 2 became ball 4, Rays @ Yankees, 2026-10-07: three alerts
+   * that night were challenges won). So a loss goes out once the game has moved past that pitch and
+   * ABS_SETTLE_MS have passed (at the final, at once), and only if the pitch still reads Confirmed and,
+   * on an at-bat's last pitch, the result doesn't say it was overturned. Returns what to send now.
+   */
+  private holdAbs(events: Detected[], plays: NPlay[], over: boolean): Detected[] {
+    const send: Detected[] = [];
+    for (const e of events) {
+      if (!e.absSlot) { send.push(e); continue; }
+      const held = this.absHeld.get(e.absSlot) ?? { events: [], since: Date.now() };
+      held.events.push(e);
+      this.absHeld.set(e.absSlot, held);
+    }
+    for (const [slot, held] of this.absHeld) {
+      const versions = plays.filter((p) => pitchSlot(p.id) === slot);
+      const latest = versions.length ? plays.lastIndexOf(versions[versions.length - 1]) : -1;
+      if (!over && (latest === plays.length - 1 || Date.now() - held.since < ABS_SETTLE_MS)) continue;
+      this.absHeld.delete(slot);
+      const atBat = slot.slice(0, -2), pitchNo = slot.slice(-2);
+      const inAtBat = (p: NPlay) => pitchSlot(p.id).length === slot.length && pitchSlot(p.id).startsWith(atBat);
+      const lastPitch = !plays.some((p) => inAtBat(p) && isPitch(p) && pitchSlot(p.id).slice(-2) > pitchNo);
+      const result = plays.find((p) => inAtBat(p) && p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter'));
+      const why = !versions.length ? 'was taken back'
+        : versions.some((p) => absCall(p) === 'overturned') ? 'was overturned'
+        : lastPitch && result && /\bchallenged:? call on the field (?:was )?overturned\b/i.test(result.text) ? "was overturned (the at-bat's result says so)"
+        : null;
+      if (why) { log(`[mlb ${this.ctx.gameId}] ABS challenge at ${slot} ${why} after ESPN first posted it confirmed: no alert`); continue; }
+      send.push(...held.events);
+    }
+    return send;
+  }
+
   async poll() {
     const { league, gameId, homeId, awayId } = this.ctx;
     const soccer = SOCCER.has(league);
@@ -222,6 +261,7 @@ export class GameTracker {
       if (!this.first) events.push(...es); // attaching mid-game: what already happened is history
     }
     this.first = false;
+    if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
     if (events.length) publish(events, league);
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
