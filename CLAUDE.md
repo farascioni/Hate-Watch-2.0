@@ -23,5 +23,5 @@ A sibling app, Fantasy Sweat (live fantasy-football matchup alerts for Sleeper l
 ## Two machines (Windows and Mac)
 Both machines work from this repo, and neither needs the other turned on. Production runs on Fly and builds run on EAS.
 - On a new machine, or after a `git pull`: `bash claude-config/install.sh` sets Claude Code's user settings, this file's notes and the two scouts to the repo's copies. Anything it replaces is kept beside it as `<name>.before-<time>`. Then `npm ci` in `app/` and in `server/`.
-- Logins, once per machine: Claude Code itself, `npx eas-cli@latest login`, and `fly auth login`.
+- Logins, once per machine: Claude Code itself, `npx eas-cli@latest login`, `fly auth login`, and GitHub for `git push`. GitHub takes a personal access token (classic, `repo` scope, from github.com/settings/tokens), not the account password: run `git push` in a terminal, give the username `farascioni` and paste the token as the password, and the keychain or credential manager keeps it.
 - Not in git, so each machine keeps its own: `.claude/settings.local.json`, `app/.expo/`, `server/data/` (the dev database, which the server rebuilds from ESPN on first start), and Claude's memory under `~/.claude/projects/`. This file is the shared copy of the notes that matter.
