@@ -1,13 +1,13 @@
 // Live scores for the app's Scores tab. The live engine already reads every league's ESPN scoreboard
 // every 10s (and each tracked live game's summary every 2s, F1's scoreboard every 30s). This keeps one
 // card per game from those reads and pushes { kind: 'score', game } to connected devices that track a
-// team in the game, or a player on one. GET /me/scores lists a device's games; GET /me/games/<key> adds
-// its alerts from that game and the play-by-play.
+// team in the game, or a player on one. GET /me/scores lists a device's games, GET /me/scores/all every
+// game live or starting within a day (tracked or not); GET /me/games/<key> adds its alerts from that game and the play-by-play.
 import { getJson as espnGetJson } from './espn.ts';
 import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
-import { BASKETBALL, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
+import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { sendToConnected } from './fanout.ts';
 
 /** Seam for tests (test/scores.test.ts). Production never changes it. */
@@ -358,6 +358,20 @@ export function gamesFor(deviceId: string, now = Date.now()): GameCard[] {
   return [...cards.values()]
     .filter((g) => involves(g, mine) && inWindow(g, now))
     .sort((a, b) => RANK[a.state] - RANK[b.state] || (a.state === 'post' ? b.startsAt - a.startsAt : a.startsAt - b.startsAt));
+}
+
+/**
+ * Every game live right now, then every one starting within a day, whoever plays in it: the Scores tab's
+ * "All games". Each by league in the app's order, then soonest start. These cards come from the scoreboard
+ * reads (every 10s), and from the 2s game tracker too when someone tracks a side; they're pushed only to
+ * devices that track a side, so the app polls this.
+ */
+export function allGames(now = Date.now()): GameCard[] {
+  const order = (g: GameCard) => LEAGUE_IDS.indexOf(g.league);
+  return [...cards.values()]
+    .filter((g) => g.state === 'in' || (g.state === 'pre' && inWindow(g, now)))
+    .map(withPitches)
+    .sort((a, b) => RANK[a.state] - RANK[b.state] || order(a) - order(b) || a.startsAt - b.startsAt);
 }
 
 function broadcast(g: GameCard) {

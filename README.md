@@ -252,6 +252,8 @@ A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won'
 
 ## Scores tab
 
+**My games | All games:** a switch at the top of the tab. My games is described below. All games is every game live right now, then every one starting in the next 24 hours, whether you track a team in it or not. Each is grouped by league in the league chips' order ("NBA · 3 live", "NHL · 10 upcoming"), soonest first. The league chips filter it too, and the switch shows how many are live ("All games · 9 live"). The server already makes a card for every game on each league's scoreboard (read every 10s), so this is `allGames()` in `scores.ts`, served at `GET /me/scores/all`. Score pushes go only to devices that track a side, so the app re-reads the list every 15 seconds while All games is open, and uses the pushed copy of any game you do track. Tapping a game opens its game screen, tracked or not.
+
 The second tab lists today's games for the teams you track and the teams of players you track. Live games come first, then later today, then finals. Each final stays for 24 hours after it ends, so the last game a team played is still there the next day ("Final · Yesterday"). Every game shows, so both halves of a doubleheader are there, labelled from ESPN's note ("Doubleheader - Game 1 - Makeup from May 23" → "Game 1 · Final", "Game 2 · 7:05 PM").
 
 - **When a final ends:** the server records the moment it sees a game go final (`endedAt`). For one already over when first seen (after a restart), it uses a typical game length after the start (MLB 3h, NFL 3¼h, NBA 2¼h, NHL 2½h, F1 2h; `GAME_LENGTH_MS`). The app applies the same 24-hour rule on its own clock, so a final drops off even with the tab open.

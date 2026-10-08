@@ -290,3 +290,25 @@ test('finals stay a day after they end, and both games of a doubleheader show, l
   S.pruneGames('mlb', new Set(), Date.now() + 40 * 3600_000);
   assert.equal(S.getGame('mlb:dh1'), undefined);
 });
+
+test('All games: every game live now, then every one starting within a day, tracked or not, by league in the app order, then start', async () => {
+  const { startApi } = await import('../src/api.ts');
+  const live = (id: string, ago: number) => ({ ...nflEvent('in', '7', '3'), id, date: new Date(Date.now() - ago).toISOString() });
+  S.upsertGame(S.gameCard('nfl', live('404', 3600_000))!);
+  S.upsertGame(S.gameCard('nfl', live('405', 600_000))!);
+  S.upsertGame(S.gameCard('nfl', { ...nflEvent('pre', '0', '0'), id: '406', date: new Date(Date.now() + 3600_000).toISOString(), status: { type: { state: 'pre' } } })!);
+  S.upsertGame(S.gameCard('mlb', mlbEvent('Bot 8th', { onFirst: true }))!);
+  const keys = S.allGames().map((g) => g.key);
+  assert.deepEqual(keys.filter((k) => ['mlb:401907991', 'nfl:402', 'nfl:403', 'nfl:404', 'nfl:405', 'nfl:406'].includes(k)), ['mlb:401907991', 'nfl:404', 'nfl:405', 'nfl:406', 'nfl:402'],
+    'live first (MLB before the NFL, earlier start first), then upcoming, soonest first; not next week\'s');
+  assert.ok(S.allGames().every((g) => g.state !== 'post'), 'no finals');
+
+  // Served to any device, even one tracking nobody.
+  device.run('new-install', 'secret', 'ios', JSON.stringify(DEFAULT_PREFS));
+  const server = startApi(0);
+  await new Promise((r) => server.once('listening', r));
+  const { port } = server.address() as import('node:net').AddressInfo;
+  const res = await (await fetch(`http://127.0.0.1:${port}/me/scores/all`, { headers: { authorization: 'Bearer new-install.secret' } })).json();
+  assert.deepEqual(res.games.map((g: any) => g.key), keys);
+  server.close();
+});

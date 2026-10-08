@@ -82,6 +82,8 @@ export const api = {
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),
   clearFeed: () => request('DELETE', '/me/feed'),
   scores: () => request<{ games: GameCard[]; nextF1?: F1Weekend; upNext?: NextGame[] }>('GET', '/me/scores'),
+  /** Every game live now, then every one starting within a day, tracked or not (the Scores tab's All games). */
+  allScores: () => request<{ games: GameCard[] }>('GET', '/me/scores/all'),
   hateWatches: () => request<HateWatchTally>('GET', '/me/hate-watches'),
   game: (key: string) => request<GameDetail>('GET', `/me/games/${enc(key)}`),
   deleteMe: () => request('DELETE', '/me'),
