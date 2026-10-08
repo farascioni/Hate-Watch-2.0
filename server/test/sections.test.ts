@@ -25,7 +25,7 @@ test("each Settings group's sections, in order, each in one piece", () => {
     'f1 alerts': ['Race', 'Qualifying', 'Championship', 'Team'],
     'epl alerts': ['Attack', 'Defense', 'Cards & fouls', 'Goalkeeping', 'Team'],
     'All player alerts': ['Game', 'Injuries & news'],
-    'Team alerts': ['Game', 'Season', 'Injuries & news'],
+    'Team alerts': ['Game', 'Season', 'Injuries & news', 'Your Hate Watch'],
   });
   for (const [g, types] of GROUPS) assert.equal(new Set(sectionsOf(types)).size, sectionsOf(types).length, `${g}: a section comes back later`);
   assert.ok(EVENT_TYPES.every((t) => t.section), 'every alert has a section');

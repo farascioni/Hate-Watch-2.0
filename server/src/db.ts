@@ -80,6 +80,10 @@ if (!(db.prepare('PRAGMA table_info(players)').all() as { name: string }[]).some
   db.exec('ALTER TABLE players ADD COLUMN positions TEXT');
 }
 db.exec('CREATE INDEX IF NOT EXISTS events_game ON events(game_id)'); // a loss's alerts, together (RECIPIENTS)
+// One device's lines on a feed alert: other facts of its moment folded into it (Detected.fold), as JSON.
+if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'extra')) {
+  db.exec('ALTER TABLE feed ADD COLUMN extra TEXT');
+}
 {
   const missing = db.prepare('SELECT id FROM events WHERE share_code IS NULL').all() as { id: string }[];
   const set = db.prepare('UPDATE events SET share_code = ? WHERE id = ?');

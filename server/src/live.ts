@@ -8,10 +8,12 @@ import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
-  type Detected, type GameCtx, type NPlay,
+  lossFacts, seriesSpot, type Detected, type GameCtx, type NPlay, type Pregame,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { divisionsOf } from './divisions.ts';
+import { weeklyRecaps } from './recap.ts';
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -36,8 +38,15 @@ const TOUCH_PAGE = 100;
 const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
 /** How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). */
 const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
+/** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
+const RECAP_MS = Number(process.env.HW_RECAP_MS ?? 15 * 60_000);
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
+/** Each side's biggest lead so far, given the score now. */
+const bump = (led: { home: number; away: number }, s: { home: number; away: number }) => {
+  led.home = Math.max(led.home, s.home - s.away);
+  led.away = Math.max(led.away, s.away - s.home);
+};
 
 // ─── Which teams does anyone care about? ──────────────────────────────────────────────────────
 let watchedCache = { at: 0, teams: new Set<string>() };
@@ -100,6 +109,12 @@ export class GameTracker {
   private postseason = false;
   private finalSeenAt = 0;
   private readonly info: GameInfo;
+  /** Every play as of the last poll, for the facts of a loss (how it ended, the biggest leads: lossFacts). */
+  private plays: NPlay[] = [];
+  /** What we knew before the game (odds, records, streaks, the series), kept in kv for restarts: lossFacts. */
+  private pre: Pregame;
+  /** NHL: the game went to overtime or a shootout (the summary's "Final/OT", "Final/SO"). */
+  private overtime: 'ot' | 'so' | null = null;
   finished = false;
   lastPollMs = 0;
 
@@ -107,9 +122,47 @@ export class GameTracker {
     this.ctx = { league, gameId, homeId, awayId, goalies: new Map() };
     this.info = info;
     this.sawPre = !!info.sawPre;
+    this.pre = kvGet<Pregame>(this.preKey) ?? {};
   }
 
-  start() { void this.loop(); }
+  private get preKey() { return `pregame:${this.ctx.league}:${this.ctx.gameId}`; }
+  private savePre(patch: Pregame) {
+    const next = { ...this.pre, ...patch };
+    if (JSON.stringify(next) === JSON.stringify(this.pre)) return;
+    this.pre = next;
+    kvSet(this.preKey, next);
+  }
+
+  /**
+   * Before or during the game, what the facts of a loss need from before it: the line (a summary keeps
+   * it after the final, in `pickcenter`), and while the game isn't over, both records and ESPN's streaks
+   * (the standings as last read: they move only after the final).
+   */
+  private readPregame(s: any) {
+    const { league, homeId, awayId } = this.ctx;
+    const chance = oddsChance(league, s.pickcenter?.[0] ?? s.odds?.[0]);
+    if (chance && !this.pre.chance) this.savePre({ chance: { home: chance.home, away: chance.away } });
+    const comp = s.header?.competitions?.[0];
+    if (!['pre', 'in'].includes(comp?.status?.type?.state) || this.pre.records) return;
+    const rec = (side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.record?.find((r: any) => r.type === 'total')?.summary;
+    const standings = kvGet<Record<string, { streak?: string }>>(`standings:${league}`) ?? {};
+    this.savePre({
+      records: { home: rec('home'), away: rec('away') },
+      streak: { home: standings[homeId]?.streak ?? '', away: standings[awayId]?.streak ?? '' },
+      seasonType: Number(s.header?.season?.type) || undefined,
+    });
+  }
+
+  /** Regular season: each side's place among its meetings with the other (sweeps). Read once, at the start. */
+  private async readSeries() {
+    const { league, gameId, homeId, awayId } = this.ctx;
+    if (this.pre.series || SOCCER.has(league)) return;
+    const spot = async (teamId: string) => seriesSpot(league, await liveDeps.getJson(`${urls.teamSchedule(league, teamId)}?seasontype=2`, { timeoutMs: 8000 }), gameId, teamId);
+    const [home, away] = await Promise.all([spot(homeId).catch(() => undefined), spot(awayId).catch(() => undefined)]);
+    if (home || away) this.savePre({ series: { home, away } });
+  }
+
+  start() { void this.readSeries(); void this.loop(); }
   stop() { this.stopped = true; }
 
   private async loop() {
@@ -177,6 +230,7 @@ export class GameTracker {
     const sitePlays: NPlay[] = summary.status !== 'fulfilled' || league === 'nfl' ? []
       : soccer ? fromKeyEvents(summary.value, homeId, awayId) : (summary.value.plays ?? []).map(fromSitePlay);
     const plays = mergePlays(corePlays, sitePlays);
+    if (plays.length) this.plays = plays;
 
     const events: Detected[] = [];
     let final: { home: number; away: number } | null = null;
@@ -189,7 +243,10 @@ export class GameTracker {
         }
       }
       if (s.header?.season?.type === 3) this.postseason = true;
+      this.readPregame(s);
       const comp = s.header?.competitions?.[0];
+      const detail = String(comp?.status?.type?.detail ?? '');
+      if (league === 'nhl' && /\/(OT|SO)\b/.test(detail)) this.overtime = /SO/.test(detail) ? 'so' : 'ot';
       // "Hate Watch Starting" goes out once, on the pre → in flip. A game first seen already under
       // way (a follow in the 3rd quarter, a server restart) never gets a late "starting" alert.
       const state = comp?.status?.type?.state;
@@ -213,7 +270,9 @@ export class GameTracker {
     // disallowed goal is taken back. A running total would miss the first and, after the second,
     // the team's next goal. `announced` is the score each side's alerts have gone out for.
     let score = { home: 0, away: 0 };
+    const led = { home: 0, away: 0 }; // each side's biggest lead before this play ("blew a big lead")
     for (const p of plays) {
+      bump(led, score);
       const prev = score;
       score = nextScore(prev, p);
       // History from before we attached updates state but is never notified.
@@ -240,7 +299,7 @@ export class GameTracker {
         const from = { home: up('home') ? prev.home : score.home, away: up('away') ? prev.away : score.away };
         this.announced = { home: Math.max(this.announced.home, score.home), away: Math.max(this.announced.away, score.away) };
         if (history) continue;
-        events.push(...teamScoreEvents(this.ctx, from, p));
+        events.push(...teamScoreEvents(this.ctx, from, p, { ...led }));
         if (!fresh) {
           log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
@@ -342,11 +401,23 @@ export class GameTracker {
     if (lastHalf.length) publish(lastHalf, this.ctx.league);
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
     const lost = gameLostEvent(this.ctx, final, Date.now(), ev ? eliminationOf(this.ctx.league, ev) : null);
+    db.prepare('DELETE FROM kv WHERE key = ?').run(this.preKey); // the game is over: its pregame is spent (this.pre has it)
     if (!lost) return; // a tie
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
-    // (3+ goals), then the team's loss, then "their team lost" for its tracked players.
+    // (3+ goals), then the team's loss, then its facts (a walk-off, losing as the favorite…: each a line on
+    // the loss, or the alert itself for a device with the loss off), then "their team lost" for its players.
     const heavy = heavyLossEvent(this.ctx, lost, final);
-    publish([...(heavy ? [heavy] : []), lost, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey))], this.ctx.league);
+    const postseason = this.postseason || ev?.season?.type === 3;
+    // NHL overtime: the summary's "Final/OT" (poll), else the scoreboard's, else the periods played (4 is OT;
+    // a regular-season 5th is the shootout).
+    const detail = String(ev?.status?.type?.detail ?? '');
+    const periods = Math.max(0, ...this.plays.map((p) => p.periodNum ?? 0));
+    const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
+    const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason });
+    publish([...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey))], this.ctx.league);
+    // The standings will say the same streak in a minute (scanStandings): it's been said.
+    const streak = facts.find((f) => f.type === 'team.losing_streak');
+    if (streak) kvSet(`streak-told:${this.ctx.league}:${lost.targetKey.split(':')[2]}`, `L${streak.meta?.streak}`);
     engine.onGameFinal(this.ctx.league);
   }
 
@@ -383,6 +454,7 @@ class LiveEngine {
       every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
+    every(RECAP_MS, async () => weeklyRecaps());
     for (const lg of LEAGUE_IDS) every(NEWS_MS, () => scanNews(lg));
     this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
   }
@@ -517,28 +589,46 @@ export function dropBody(was: StandingSnap, cur: StandingSnap) {
   return [`Down from ${ordinal(was.rank)}.`, relegation(cur) && !relegation(was) && 'Into the relegation zone 🪂', cur.streak && `Streak: ${cur.streak}`].filter(Boolean).join(' ');
 }
 
-async function scanStandings(lg: League) {
-  const now = parseStandings(await getJson(urls.standings(lg), { timeoutMs: 8000 }));
+/** ESPN's clincher marks that mean a division title: y, and the ones that include it (z: the conference or league's best, *: home field, p: Presidents' Trophy). */
+const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
+
+/**
+ * Standings news, one alert per team per read: being eliminated, a division rival clinching the division,
+ * dropping in the standings, a losing streak. They share a moment, in that order, and each one after the
+ * first a device wants is a line on it ("Down to 4th in the AL East. Officially out of playoff contention.").
+ * A streak the loss alert already gave (lossFacts, `streak-told`) isn't said again.
+ */
+export async function scanStandings(lg: League) {
+  const now = parseStandings(await liveDeps.getJson(urls.standings(lg), { timeoutMs: 8000 }));
   if (!now.size) return;
   const prev = new Map(Object.entries(kvGet<Record<string, StandingSnap>>(`standings:${lg}`) ?? {}));
   kvSet(`standings:${lg}`, Object.fromEntries(now));
   if (!prev.size) return; // first snapshot is the baseline
-  const day = new Date().toISOString().slice(0, 10);
+  const day = new Date().toISOString().slice(0, 10), year = new Date().getFullYear(), at = Date.now();
+  // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions).
+  const clinched = [...now].filter(([id, cur]) => DIVISION_TITLE.has(cur.clincher) && !DIVISION_TITLE.has(prev.get(id)?.clincher ?? ''));
+  const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
   const events: Detected[] = [];
   for (const [teamId, cur] of now) {
     const was = prev.get(teamId);
     const team = catalog.teamByEspn(lg, teamId);
     if (!was || !team) continue;
-    const base = { targetKey: team.key, at: Date.now(), meta: { teamId } };
-    if (cur.group === was.group && cur.rank > was.rank) {
-      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur) });
-    }
+    const base = { targetKey: team.key, at, meta: { teamId }, moment: `standings:${lg}:${teamId}:${at}` };
     if (/e/i.test(cur.clincher) && !/e/i.test(was.clincher)) {
-      events.push({ ...base, id: `elim:${lg}:${teamId}:${new Date().getFullYear()}`, type: 'team.eliminated', title: `${team.shortName} are ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.` });
+      events.push({ ...base, id: `elim:${lg}:${teamId}:${year}`, type: 'team.eliminated', title: `${team.shortName} are ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.`, fold: 'Officially out of playoff contention.' });
+    }
+    for (const [rivalId] of clinched) {
+      const div = divisions.get(teamId)?.name;
+      if (rivalId === teamId || !div || divisions.get(rivalId)?.name !== div) continue;
+      const rival = catalog.teamByEspn(lg, rivalId)?.shortName ?? 'A rival';
+      events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched the ${div}`, body: `${team.shortName} won't win the division.`, fold: `The ${rival} clinched the ${div}.`, meta: { teamId, rivalId } });
+    }
+    if (cur.group === was.group && cur.rank > was.rank) {
+      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur), fold: `Down to ${ordinal(cur.rank)} in the ${cur.group}.` });
     }
     const m = cur.streak.match(/^L(\d+)$/);
-    if (m && Number(m[1]) >= 3 && cur.streak !== was.streak) {
-      events.push({ ...base, id: `streak:${lg}:${teamId}:${day}:${cur.streak}`, type: 'team.losing_streak', title: `${team.shortName} have lost ${m[1]} straight`, body: `Current streak: ${cur.streak}` });
+    if (m && Number(m[1]) >= 3 && cur.streak !== was.streak && kvGet(`streak-told:${lg}:${teamId}`) !== cur.streak) {
+      events.push({ ...base, id: `streak:${lg}:${teamId}:${day}:${cur.streak}`, type: 'team.losing_streak', title: `${team.shortName} have lost ${m[1]} straight`, body: `Current streak: ${cur.streak}`, fold: `Lost ${m[1]} straight.` });
     }
   }
   if (events.length) publish(events, lg);

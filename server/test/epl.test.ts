@@ -76,8 +76,8 @@ test('an own goal: the scorer, their keeper, and their team each get theirs', ()
   assert.equal(PLAYER_DETECTORS.epl(g, og)[0].body, "63' Own Goal by Lisandro Martínez, Manchester United. — MAN 0, FUL 1");
   // Team alerts: no "the" for clubs. Going behind is one alert (it's `unless` for the scored-on one).
   assert.deepEqual(teamScoreEvents(g, { home: 0, away: 0 }, og).map((e) => [e.type, e.targetKey, e.title, e.unless]), [
-    ['team.opponent_scored', 'team:epl:360', 'Fulham scored against Man United', 'team.fell_behind'],
     ['team.fell_behind', 'team:epl:360', 'Fulham scored to take the lead over Man United', undefined],
+    ['team.opponent_scored', 'team:epl:360', 'Fulham scored against Man United', 'team.fell_behind'],
   ]);
   assert.deepEqual(PLAYER_DETECTORS.epl(g, eq).map((e) => [e.type, e.targetKey]), [['epl.goal_conceded', 'player:epl:153765']]);
   assert.equal(gameLostEvent({ league: 'epl', gameId: 'M', homeId: '370', awayId: '360' }, { home: 2, away: 1 }, 0)!.title, 'Successful Hate Watch! Man United lost to Fulham');

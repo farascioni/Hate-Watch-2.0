@@ -20,6 +20,15 @@ PLAYER AND TEAM PAGES
 PLAYER ALERT SETTINGS
 - Their team: a player's alert settings have two new switches. Show their team's games (on by default) decides whether the team's games appear on the Scores tab, and Get their team's alerts (off by default) sends the team's own alerts too, as if you tracked the team.
 
+NEW ALERTS, STILL ONE ALERT AT A TIME
+- How they lost comes on the loss alert, as lines: a walk-off or last-second loss (a buzzer-beater, overtime or a shootout, a stoppage-time winner), blowing a big lead, losing as the betting favorite, a shutout, a sweep, losing to a much worse team, falling below .500, the losing streak. Each has its own switch under Team alerts. With "Loses a game" off, the first one you have on is the alert (if you'd turned it off before, these start off too). (Server)
+- Blows a big lead: live, when a team falls behind after leading big (NBA 18 points, MLB 5 runs, NFL 17, NHL 3 goals), in place of that play's "Falls behind". Once a game. (Server)
+- Rival clinches the division (feed only to start). Standings news that lands together (eliminated, a rival clinching, a drop, a streak) is one alert. (Server)
+- Gets ejected: an NFL disqualification or an NHL game misconduct, in place of that penalty alert. (Server)
+- Your Hate Watch streak: on a loss, how many in a row you've watched ("Lost 5 straight, every one on your Hate Watch"). (Server)
+- Weekly misery recap, Mondays at 9 am: last week's Successful Hate Watches by team, how many alerts, and the low point. (Server)
+- A team's or player's own alert settings no longer list the streak and recap switches, which are about you, not one team, and a team's Recent misery leaves out the recap.
+
 MLB ALERTS
 - Crew chief reviews count as lost challenges: when the umpires review a call themselves and overturn it, the team the call went for gets "lost a crew chief review", and a batter whose home run is overturned gets "home run was overturned" (Volpe's, for fan interference, Rays @ Yankees on October 7). An upheld review sends nothing, as no team asked for it. (Server)
 

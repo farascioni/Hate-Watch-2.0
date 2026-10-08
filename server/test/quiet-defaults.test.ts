@@ -25,9 +25,10 @@ const OFF = ['mlb.batter.popout', 'mlb.pitcher.walk', 'mlb.team.opponent_risp', 
   'wnba.missed_shot', 'wnba.foul', 'nhl.shot_blocked', 'nhl.shot_saved', 'nhl.giveaway', 'epl.lost_ball', 'epl.pass_given_away'];
 const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.challenge_lost', 'mlb.team.stranded_risp', 'nfl.qb.sacked',
   'nba.missed_free_throw', 'nba.turnover', 'wnba.missed_free_throw', 'wnba.turnover', 'nhl.shot_missed', 'f1.driver.standings_drop',
-  'team.opponent_scored', 'team.fell_behind', 'team.standings_drop', 'team.losing_streak', 'team.player_injured', 'epl.foul', 'mlb.team.down_in_order'];
+  'team.opponent_scored', 'team.fell_behind', 'team.standings_drop', 'team.losing_streak', 'team.player_injured', 'epl.foul', 'mlb.team.down_in_order',
+  'team.rival_clinched'];
 // Alerts added since: nobody had them, so they come with the new defaults for everyone.
-const ADDED = ['mlb.team.down_in_order'];
+const ADDED = ['mlb.team.down_in_order', 'team.rival_clinched'];
 const NEW = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : FEED.includes(t.id) ? 'feed' : 'push']));
 
 test('a new install: the result and the rare headline failures push, the in-game drip is feed only, the noisiest are off', () => {

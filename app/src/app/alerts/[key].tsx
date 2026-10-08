@@ -23,7 +23,8 @@ export default function TargetAlertsScreen() {
   // their positions: a pitcher has no hitting alerts, a skater no goalie ones (lib/positions.ts).
   const { types, hidden } = useMemo(() => {
     if (!target) return { types: [], hidden: 0 };
-    const applies = (t: EventType) => t.leagues.includes(target.league) && (t.scope === target.kind || t.alsoScope === target.kind);
+    // "Your Hate Watch" alerts (your streak, the weekly recap) are about you, not one team: Settings only.
+    const applies = (t: EventType) => t.leagues.includes(target.league) && (t.scope === target.kind || t.alsoScope === target.kind) && t.section !== 'Your Hate Watch';
     const all = eventTypes.filter(applies);
     const fits = target.kind === 'player' ? all.filter((t) => fitsPosition(t, target)) : all;
     // League-specific alerts first (offense, defense, pitching, team…), then the ones every league shares

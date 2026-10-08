@@ -3,7 +3,7 @@ import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
 import { EVENT_TYPES, EVENT_TYPE_BY_ID, soccerType } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
-import { HATE_WATCH_TYPES, hateWatchTally, isHateWatch, recordHateWatch } from './hate-watches.ts';
+import { hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
@@ -189,6 +189,35 @@ export function keepOldDefaults() {
 keepOldDefaults();
 
 /**
+ * October 2026: a loss's facts (lossFacts) are new alerts, on by default, and with "Loses a game" off the
+ * first one a device wants is its alert. Whoever had turned the loss off (in Settings, or for one team)
+ * gets them off too, once, so a loss they'd silenced doesn't come back as "lost as 64% favorites".
+ */
+export const LOSS_FACT_TYPES = ['team.last_second_loss', 'team.lost_as_favorite', 'team.shut_out', 'team.swept', 'team.lost_to_worse', 'team.below_500'];
+export function lossFactsFollowLoss() {
+  if (kvGet('prefs:loss-facts')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  const off = Object.fromEntries(LOSS_FACT_TYPES.map((t) => [t, false]));
+  let changed = 0;
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      let touched = false;
+      if (p.types?.['team.lost'] === false) { p.types = { ...off, ...p.types }; touched = true; }
+      for (const [k, t] of Object.entries((p.targetTypes ?? {}) as Record<string, Record<string, boolean>>)) {
+        if (t['team.lost'] === false) { p.targetTypes[k] = { ...off, ...t }; touched = true; }
+      }
+      if (touched) { save.run(JSON.stringify(p), id); changed++; }
+    }
+    kvSet('prefs:loss-facts', { at: Date.now(), devices: changed });
+  });
+  prefsCache.clear();
+  if (changed) console.log(`[prefs] the loss's new facts are off for ${changed} devices that had the loss off`);
+}
+lossFactsFollowLoss();
+
+/**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
  * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
  * with home runs switched off, it arrives as a run and pushes.
@@ -238,17 +267,22 @@ export function forgetDevice(deviceId: string) {
 /** Where links that leave the app point (an alert's share link). */
 export const PUBLIC_URL = process.env.HW_PUBLIC_URL ?? 'https://hate-watch-api.fly.dev';
 
+/** An alert's body with a device's folded lines first (publish(), Detected.fold): "Walk-off in the 10th. Final Score: 4 to 3". */
+export const withLines = (body: string, lines: string[] | null | undefined) => (lines?.length ? `${lines.join(' ')} ${body}` : body);
+
 /**
  * `recipients`: how many devices got this alert in their feed (see RECIPIENTS). A Successful Hate Watch
- * then says how many others got it too (`alsoGot`, the reader not counted).
+ * then says how many others got it too (`alsoGot`, the reader not counted). `extra`: the feed row's lines
+ * for this device (other facts of the moment, folded in).
  */
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number }) {
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);
+  const meta = row.meta ? JSON.parse(row.meta) : null;
   return {
-    ...(row.recipients != null && HATE_WATCH_TYPES.has(row.type) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
+    ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
-    title: row.title, body: row.body, occurredAt: row.occurred_at, detectedAt: row.detected_at,
+    title: row.title, body: withLines(row.body, row.extra ? JSON.parse(row.extra) : null), occurredAt: row.occurred_at, detectedAt: row.detected_at,
     target: targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
     // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
     shareUrl: `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`,
@@ -258,7 +292,7 @@ export function feedItem(row: { id: string; type: string; league: string; target
 // ─── Publish: persist once, then fan out to every follower who wants it ───────────────────────
 const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)
   VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
-const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
+const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed, extra) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING');
 const followers = () => db.prepare('SELECT f.device_id, d.push_token, f.created_at FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
 /** Devices tracking a player on a team, with which player (`via`). */
 const playerFollowers = () => db.prepare(`SELECT f.device_id, d.push_token, f.created_at, f.target_key AS via FROM follows f
@@ -287,13 +321,24 @@ export const pushThread = (targetKey: string) => (targetKey.startsWith('team:') 
 let pushSender: (msgs: PushMessage[]) => void = () => {};
 export function setPushSender(fn: typeof pushSender) { pushSender = fn; }
 
+/** One device's copy of an alert: who, their settings, and the other facts of its moment folded into it. */
+type Delivery = { f: Recipient; prefs: Prefs; folded: Detected[] };
+
+/**
+ * Store each new alert once, then send it to every follower who wants it. Alerts that share a moment are
+ * one thing happening, and a device gets one alert for it: the first in the list it wants. Each later
+ * one it wants either adds its `fold` sentence to that alert (a fact it doesn't say: "Lost as 78%
+ * favorites.") or, without one, is dropped (the same news about another target). The device's alert is
+ * pushed if any of what it carries would be.
+ */
 export function publish(events: Detected[], league: League) {
   const detectedAt = Date.now();
   const pushes: PushMessage[] = [];
-  const got = new Map<string, Set<string>>(); // moment → devices that already have it (see Detected.moment)
+  const got = new Map<string, Map<string, Delivery>>(); // moment → device → the alert it gets for it
+  const waiting = new Map<string, Map<string, Detected[]>>(); // moment → device → fold-only lines before its alert
   // Who gets what first, then the feed rows, frames and pushes: a Successful Hate Watch says how many
   // others got it, and a team's loss counts everyone who got one of its alerts (the team's or a player's).
-  const planned: { e: Detected; gameId: string | null; deliver: { f: Recipient; prefs: Prefs }[]; followers: number }[] = [];
+  const planned: { e: Detected; gameId: string | null; deliver: Delivery[]; followers: number }[] = [];
   // Of a moment's firstFollowed alerts, each device's is the one about what it followed first (and wants).
   const firstFollowed = new Map<string, Map<string, { key: string; at: number }>>(); // moment → device → target
   for (const e of events) {
@@ -312,7 +357,7 @@ export function publish(events: Detected[], league: League) {
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
     const hateWatch = isHateWatch(e);
     // Who gets it, first: a Successful Hate Watch says how many others got it too, from the first frame.
-    const deliver: { f: (typeof fols)[number]; prefs: Prefs }[] = [];
+    const deliver: Delivery[] = [];
     for (const f of fols) {
       // A Successful Hate Watch counts for everyone tracking the team (or a player on it), whatever their alert settings.
       if (hateWatch && recordHateWatch(f.device_id, e)) {
@@ -322,33 +367,85 @@ export function publish(events: Detected[], league: League) {
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
       if (e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
+      const d: Delivery = { f, prefs, folded: [] };
       if (e.moment) {
-        const have = got.get(e.moment) ?? got.set(e.moment, new Set()).get(e.moment)!;
-        if (have.has(f.device_id)) continue; // they track the player and the player's team: one alert, not two
-        have.add(f.device_id);
+        const mine = got.get(e.moment) ?? got.set(e.moment, new Map()).get(e.moment)!;
+        const first = mine.get(f.device_id);
+        if (first) {
+          // They already get this moment's alert: a fact it doesn't say goes on it, the same news again doesn't.
+          if (e.fold && !first.folded.some((x) => x.fold === e.fold)) first.folded.push(e);
+          continue;
+        }
+        const held = waiting.get(e.moment) ?? waiting.set(e.moment, new Map()).get(e.moment)!;
+        if (e.foldOnly) { held.set(f.device_id, [...(held.get(f.device_id) ?? []), e]); continue; } // a line on its alert, once there is one
+        d.folded.push(...(held.get(f.device_id) ?? []));
+        mine.set(f.device_id, d);
       }
-      deliver.push({ f, prefs });
+      deliver.push(d);
     }
     planned.push({ e, gameId, deliver, followers: fols.length });
   }
   const perMoment = new Map<string, number>();
-  for (const { e, deliver } of planned) if (e.moment && isHateWatch(e)) perMoment.set(e.moment, (perMoment.get(e.moment) ?? 0) + deliver.length);
+  for (const { e, deliver } of planned) if (e.moment && isLossAlert(e)) perMoment.set(e.moment, (perMoment.get(e.moment) ?? 0) + deliver.length);
   for (const { e, gameId, deliver, followers } of planned) {
-    const recipients = e.moment && isHateWatch(e) ? perMoment.get(e.moment)! : deliver.length;
-    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId, recipients });
+    const recipients = e.moment && isLossAlert(e) ? perMoment.get(e.moment)! : deliver.length;
+    const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: JSON.stringify(e.meta ?? null), game_id: gameId, recipients });
     const frame = JSON.stringify({ kind: 'event', item });
-    for (const { f, prefs } of deliver) {
+    const moment = e.moment ? events.filter((x) => x.moment === e.moment) : [];
+    for (const { f, prefs, folded } of deliver) {
+      const streak = streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line
+      const lines = [...folded.map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
-      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && pushWanted(prefs, e, league);
-      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
-      for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
+      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
+      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null);
+      const body = withLines(e.body, lines);
+      for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length ? JSON.stringify({ kind: 'event', item: { ...item, body } }) : frame);
       if (willPush) pushes.push({
-        to: f.push_token!, title: `${item.emoji} ${e.title}`, body: e.body, sound: prefs.sound ? 'default' : null,
+        to: f.push_token!, title: `${item.emoji} ${e.title}`, body, sound: prefs.sound ? 'default' : null,
         priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive', threadId: pushThread(e.targetKey),
         data: { eventId: e.id, targetKey: e.targetKey, type: e.type },
       });
     }
-    console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers)`);
+    console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers${deliver.some((d) => d.folded.length) ? ', with folded facts' : ''})`);
   }
   if (pushes.length) pushSender(pushes);
+}
+
+/**
+ * An alert for one device only (its weekly recap, recap.ts): stored once, put in its feed, sent live, and
+ * pushed if its settings allow (the type's 🔔, push on, not in quiet hours). False if it was sent before.
+ */
+export function publishTo(deviceId: string, e: Detected, league: League): boolean {
+  const res = insEvent().run(e.id, e.type, league, null, e.targetKey, e.title, e.body, e.at, Date.now(), JSON.stringify(e.meta ?? null), shareCode(e.id));
+  if (!res.changes) return false;
+  const prefs = getPrefs(deviceId);
+  const token = (db.prepare('SELECT push_token FROM devices WHERE id = ?').get(deviceId) as { push_token: string | null } | undefined)?.push_token;
+  const willPush = !!token && prefs.pushEnabled && !inQuietHours(prefs) && pushTypeFor(prefs, e.targetKey, e.type);
+  insFeed().run(deviceId, e.id, e.at, willPush ? 1 : 0, null);
+  const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: Date.now(), meta: JSON.stringify(e.meta ?? null) });
+  for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'event', item }));
+  if (willPush) pushSender([{ to: token!, title: `${item.emoji} ${e.title}`, body: e.body, sound: prefs.sound ? 'default' : null, priority: 'high', channelId: 'hate-events', interruptionLevel: 'active', threadId: 'recap', data: { eventId: e.id, targetKey: e.targetKey, type: e.type } }]);
+  console.log(`[recap] ${deviceId.slice(0, 6)}… ${e.title}${willPush ? ' (pushed)' : ''}`);
+  return true;
+}
+
+/**
+ * A loss's streak lines for one device. The team's losing streak (a fact of the loss, `team.losing_streak`)
+ * and the device's own Hate Watch streak (how many of those losses it watched, `team.hate_watch_streak`)
+ * make one line, not two: "Lost 5 straight, every one on your Hate Watch." / "Lost 9 straight, 5 on your
+ * Hate Watch." With only the Hate Watch streak on: "Your Hate Watch streak: 5 straight losses." Returns
+ * lines to add; a team streak line already folded in is rewritten in place.
+ */
+function streakLines(deviceId: string, prefs: Prefs, e: Detected, folded: Detected[], moment: Detected[], league: League): string[] {
+  if (!isLossAlert(e)) return [];
+  const streak = moment.find((x) => x.type === 'team.losing_streak');
+  const n = Number(streak?.meta?.streak ?? 0);
+  if (n < 3 || !shouldDeliver(prefs, { type: 'team.hate_watch_streak', targetKey: e.targetKey }, league)) return [];
+  const watched = watchedOfLast(deviceId, hateWatchOf(streak!).targetKey, n);
+  if (watched < 3) return [];
+  const mine = watched === n ? 'every one' : String(watched);
+  const i = folded.indexOf(streak!);
+  if (i >= 0) { folded[i] = { ...streak!, fold: `Lost ${n} straight, ${mine} on your Hate Watch.` }; return []; }
+  if (e === streak) return [`${watched === n ? 'Every one' : watched} on your Hate Watch.`];
+  return [`Your Hate Watch streak: ${watched} straight losses.`];
 }

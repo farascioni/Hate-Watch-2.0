@@ -340,8 +340,10 @@ test('scored on AND fell behind on the same play: one alert per user, not two', 
   const forHome = (prev: { home: number; away: number }, p: ReturnType<typeof play>) =>
     teamScoreEvents(g, prev, p).filter((e) => e.targetKey === 'team:nhl:1');
 
-  // Tied 1-1, away team scores: home is scored on AND falls behind.
-  const [scored, behind] = forHome({ home: 1, away: 1 }, goal(1, 2));
+  // Tied 1-1, away team scores: home is scored on AND falls behind. Falling behind comes first: of a play's
+  // alerts for a team (one moment), a device gets the first it wants.
+  const [behind, scored] = forHome({ home: 1, away: 1 }, goal(1, 2));
+  assert.equal(behind.moment, scored.moment, 'one moment');
   assert.equal(scored.type, 'team.opponent_scored');
   assert.equal(scored.unless, 'team.fell_behind');
   assert.equal(behind.type, 'team.fell_behind');

@@ -34,7 +34,8 @@ export default function TargetScreen() {
   useEffect(() => { api.targetFeed(targetKey, Date.now() - DAY).then((r) => setRecent(r.items)).catch(() => {}); }, [targetKey]);
   const history = useMemo(() => {
     const byId = new Map<string, FeedItem>();
-    for (const f of [...recent, ...feed]) if (f.target.key === targetKey && now - f.occurredAt < DAY) byId.set(f.id, f);
+    // The weekly recap is filed under your top team, but it's about your week, not theirs.
+    for (const f of [...recent, ...feed]) if (f.target.key === targetKey && f.type !== 'app.weekly_recap' && now - f.occurredAt < DAY) byId.set(f.id, f);
     return [...byId.values()].sort((a, b) => b.occurredAt - a.occurredAt);
   }, [recent, feed, targetKey, now]);
   // The roster by position group (MLB starters, relievers, catchers…), each with its players; only groups that have some.

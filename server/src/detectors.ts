@@ -21,6 +21,8 @@ export interface NPlay {
   outs?: number;           // MLB: outs in the half-inning after this play
   period?: { type: string; number: number }; // MLB: { type: 'Top' | 'Bottom' | 'Mid' | 'End', number }
   clock?: string;          // soccer: the minute, "57'" or "90'+4'"
+  periodNum?: number;      // quarter, period or inning number (every league; MLB's half is in `period`)
+  clockSec?: number;       // seconds left in the period (NBA, WNBA, NFL, NHL), from ESPN's game clock
 }
 
 export interface GameCtx {
@@ -46,6 +48,8 @@ export interface GameCtx {
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
   lastPitchAbs?: boolean;
+  /** Teams that have had their "blew a big lead" alert this game (teamScoreEvents): once each. */
+  blewLead?: Set<string>;
 }
 
 export interface Detected {
@@ -67,6 +71,14 @@ export interface Detected {
    * not the first in the list: tracking Gerrit Cole and then Aaron Judge, a Yankees loss is Cole's.
    */
   firstFollowed?: boolean;
+  /**
+   * A fact to add to another alert of the same moment instead of sending this one too: a device that
+   * gets one of the moment's alerts first gets this sentence on it ("Lost as 78% favorites."). Alerts
+   * without one are the same news about another target (a player's "their team lost"), and are dropped.
+   */
+  fold?: string;
+  /** Only ever a line on another alert of its moment, never an alert of its own (a blown lead, at the final). */
+  foldOnly?: boolean;
   /**
    * MLB: a lost ABS challenge, held by the game tracker until the review is settled (holdAbs in live.ts):
    * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.
@@ -96,15 +108,24 @@ export function fromSitePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : undefined,
-    ...mlbFields(p),
+    ...periodFields(p),
   };
 }
 
-function mlbFields(p: any): Pick<NPlay, 'outs' | 'period'> {
+function periodFields(p: any): Pick<NPlay, 'outs' | 'period' | 'periodNum' | 'clockSec'> {
   return {
     outs: p.outs != null ? Number(p.outs) : undefined,
     period: p.period?.type ? { type: String(p.period.type), number: Number(p.period.number ?? 0) } : undefined,
+    periodNum: p.period?.number != null ? Number(p.period.number) : undefined,
+    clockSec: clockSeconds(p.clock),
   };
+}
+
+/** Seconds left from ESPN's clock: the core API's `value`, or the display ("0:02.1", "1.0", "14:01"). */
+export function clockSeconds(clock: any): number | undefined {
+  if (typeof clock?.value === 'number') return clock.value;
+  const m = String(clock?.displayValue ?? '').match(/^(?:(\d+):)?(\d+(?:\.\d+)?)$/);
+  return m ? Number(m[1] ?? 0) * 60 + Number(m[2]) : undefined;
 }
 
 export function fromCorePlay(p: any): NPlay {
@@ -123,7 +144,7 @@ export function fromCorePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : p.penalty?.minutes ? Number(p.penalty.minutes) : undefined,
-    ...mlbFields(p),
+    ...periodFields(p),
     ...(p.clock?.displayValue ? { clock: String(p.clock.displayValue) } : {}),
   };
 }
@@ -811,7 +832,29 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (dog) replace(mk(g, p, 'nfl.qb.delay_of_game', dog.qb, `${nameOf('nfl', dog.qb)} took a delay of game penalty`), dog.named ? 'nfl.penalty' : undefined);
   const onside = onsideRecovered(g, p);
   if (onside) out.push(onside);
+  const tossed = disqualified(g, p);
+  if (tossed) replace(mk(g, p, 'player.ejected', tossed, `${nameOf('nfl', tossed)} got ejected`), 'nfl.penalty');
   return out;
+}
+
+/**
+ * NFL: a player thrown out ("PENALTY on WAS-D.Payne, Disqualification"), from the penalized players the
+ * play names: the one ESPN abbreviates that way, or the only one. Not when it's wiped out ("No Play" is
+ * about the down, not the ejection, so that one counts).
+ */
+function disqualified(g: GameCtx, p: NPlay): string | undefined {
+  const m = p.text.match(/PENALTY on ([A-Z]{2,3})-([A-Z][\w.'-]*\.[\w'-]+(?: [\w'-]+)?), Disqualification/i);
+  if (!m) return;
+  const penalized = role(p, 'penalized');
+  const [initial, last] = [m[2][0].toLowerCase(), normalize(m[2].split('.').slice(1).join('.'))];
+  const named = (name: string) => { const n = normalize(name); return n.startsWith(initial) && n.endsWith(last); };
+  if (penalized.length === 1) return penalized[0];
+  const hits = penalized.filter((id) => named(catalog.playerByEspn('nfl', id)?.name ?? ''));
+  if (hits.length === 1) return hits[0];
+  // Offsetting flags can leave ESPN's penalized players out (TEN-M.Brown, 2025): find them on their team.
+  const teamId = [g.homeId, g.awayId].find((id) => teamAbbrev('nfl', id) === (NFL_CODE[m[1]] ?? m[1]));
+  const roster = teamId ? catalog.roster(teamKey('nfl', teamId)).filter((pl) => named(pl.name)) : [];
+  return roster.length === 1 ? roster[0].espnId : undefined;
 }
 
 /**
@@ -923,7 +966,15 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   } else if (/giveaway/i.test(p.type) && p.participants[0]) {
     out.push(mk(g, p, 'nhl.giveaway', p.participants[0].id, `${nameOf('nhl', p.participants[0].id)} gave the puck away`));
   } else if (p.penaltyMinutes && p.participants[0]) {
-    out.push(mk(g, p, 'nhl.penalty', p.participants[0].id, `${nameOf('nhl', p.participants[0].id)} went to the box (${p.penaltyMinutes} min, ${p.type})`));
+    const who = p.participants[0].id;
+    // Thrown out: a game misconduct or a match penalty (a plain misconduct is 10 minutes, then back). It's
+    // their penalty alert too (aliases): one alert. An instigator's misconduct and game misconduct come as
+    // two plays at the same moment (Olivier, 14:27 of the 3rd): one moment, the ejection a line on the first.
+    const ejected = /game misconduct|match penalty|^match$/i.test(p.type);
+    const moment = { moment: `${g.gameId}:penalty:${who}:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` };
+    out.push(ejected
+      ? mk(g, p, 'player.ejected', who, `${nameOf('nhl', who)} got ejected (${p.type.toLowerCase()})`, { aliases: ['nhl.penalty'], fold: `Ejected (${p.type.toLowerCase()}).`, ...moment })
+      : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${p.type})`, moment));
   }
   return out;
 }
@@ -1095,6 +1146,9 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
  * league: MLB 7+ runs is 12% of losses (6+ is 20%), NFL 21+ points (three scores) 14%, NBA 25+ 14% (20+
  * is 26%), WNBA 20+ 11%, NHL 4+ goals 19% (5+ is only 7%), soccer 3+ goals 12% (its "thrashed").
  */
+/** "an 8-run", "an 11-point", "an 18-point", "a 15-point". */
+export const aOrAn = (n: number) => (n === 11 || n === 18 || String(n).startsWith('8') ? 'an' : 'a');
+
 export const BLOWOUT_MARGIN: Partial<Record<League, number>> = { mlb: 7, nfl: 21, nba: 25, wnba: 20, nhl: 4, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 3])) };
 const MARGIN_UNIT: Partial<Record<League, string>> = { mlb: 'run', nhl: 'goal' };
 export const isBlowout = (lg: League, margin: number) => BLOWOUT_MARGIN[lg] != null && margin >= BLOWOUT_MARGIN[lg]!;
@@ -1115,7 +1169,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
   const elim = out?.loserId === loserId ? out : null;
   const blowout = isBlowout(g.league, w - l);
   // "Final Score: 12 to 2. A 10-run blowout." (soccer's "thrashed" title says it already).
-  const by = w - l, an = by === 11 || by === 18 || String(by).startsWith('8') ? 'An' : 'A'; // "An 8-run", "An 11-point"
+  const by = w - l, an = aOrAn(by) === 'an' ? 'An' : 'A'; // "An 8-run", "An 11-point"
   const score = `Final Score: ${w} to ${l}${blowout && !SOCCER.has(g.league) ? `. ${an} ${by}-${MARGIN_UNIT[g.league] ?? 'point'} blowout.` : ''}`;
   const what = elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} are ELIMINATED ⚰️`)
     : blowout ? (SOCCER.has(g.league) ? `${team} were thrashed ${w}-${l} by ${winner}` : `${team} got BLOWN OUT by ${winner}`)
@@ -1181,7 +1235,12 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
   }));
 }
 
-export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay): Detected[] {
+/**
+ * A team's alerts for a play that scored on them. They're one moment per team: blowing a big lead (`led`:
+ * each side's biggest lead before this play, live.ts), falling behind, and being scored on are one alert
+ * for a device, the first it wants of those three. A team blows a lead once a game (`g.blewLead`).
+ */
+export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay, led?: { home: number; away: number }): Detected[] {
   const out: Detected[] = [];
   for (const side of ['home', 'away'] as const) {
     const teamId = side === 'home' ? g.homeId : g.awayId;
@@ -1197,19 +1256,224 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     // then `unless` it: each user gets one (the combined one if they want "falls behind").
     const fellBehind = prev[side] - prev[opp] >= 0 && p[side] - p[opp] < 0;
     const unlessBehind = fellBehind ? { unless: 'team.fell_behind' } : {};
-    if (safety) {
-      // Replaces "opponent scored 2" for this play, and counts as that toggle too.
-      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind });
-    } else if (delta > 0 && !BASKETBALL.has(g.league)) {
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind });
+    const moment = { moment: `${g.gameId}:${p.id}:scored-on:${teamId}` };
+    const lead = led?.[side] ?? 0;
+    if (fellBehind && lead >= (BLEW_LEAD_LIVE[g.league] ?? Infinity) && !g.blewLead?.has(teamId)) {
+      (g.blewLead ??= new Set()).add(teamId);
+      const unit = MARGIN_UNIT[g.league] ?? (SOCCER.has(g.league) ? 'goal' : 'point');
+      out.push({ id: `${g.gameId}:${p.id}:team.blew_lead:${teamId}`, type: 'team.blew_lead', title: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead to ${the(g.league, oppName)}`, ...base, meta: { ...base.meta, led: lead }, ...moment });
     }
     if (fellBehind) {
       out.push({
         id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
         title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
-        ...base,
+        ...base, ...moment,
+      });
+    }
+    if (safety) {
+      // Replaces "opponent scored 2" for this play, and counts as that toggle too.
+      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment });
+    } else if (delta > 0 && !BASKETBALL.has(g.league)) {
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind, ...moment });
+    }
+  }
+  return out;
+}
+
+// ─── A loss's facts: one alert per device, with every fact it wants (publish, Detected.fold) ────────
+/**
+ * What the game tracker knew before the game, for the facts of a loss (live.ts keeps it in kv, so a
+ * restart mid-game still has it). Every part is optional: a fact without its input is left out.
+ */
+export interface Pregame {
+  /** Each side's chance to win from the betting line (lineChances), in percents. */
+  chance?: { home: number; away: number };
+  /** Records before the game: "45-37", NHL "40-30-12" (W-L-OTL), NFL "8-8-1" (W-L-T). */
+  records?: { home?: string; away?: string };
+  /** ESPN's standings streak before the game: "L3", "W2". */
+  streak?: { home?: string; away?: string };
+  /** Regular season: this game's place among the meetings with this opponent (seriesSpot). */
+  series?: { home?: SeriesSpot; away?: SeriesSpot };
+  /** ESPN's season type: 1 preseason, 2 regular season, 3 postseason. Streaks count in the regular season only. */
+  seasonType?: number;
+}
+/**
+ * MLB: the games just before this one against the same opponent (its series), and whether this one ends
+ * it. Everyone else: the season's other meetings (a season series), and whether this is the last.
+ */
+export interface SeriesSpot { kind: 'series' | 'season'; before: number; lostBefore: number; last: boolean }
+
+/*
+ * The thresholds, each set so the fact is news, from 1,807 decided regular-season games (2025-26 NBA, NHL,
+ * NFL and EPL, 2026 MLB and WNBA) and every team's 2025-26 schedule. Share of losses each one fires on:
+ *   lost as favorite   MLB 62%+: 5%   NBA 75%+: 6%   WNBA 75%+: 5%   NFL 75%+: 8%   NHL 65%+: 5%   EPL 60%+: 4%
+ *   blew a lead, lost  MLB 3: 9%   NBA 15: 8%   WNBA 12: 11%   NFL 14: 5%   NHL 2: 10%   EPL 2: 1%
+ *   live, of games     MLB 5: 2%   NBA 18: 7%   WNBA 15: 6%   NFL 17: 3%   NHL 3: 2%    EPL 2: 1%  (a push)
+ *   last seconds       MLB walk-off 7%   NBA/WNBA 10s: 4%   NFL 30s in the 4th: 13%, OT 5%   NHL OT/SO 28%   EPL 90'+: 12%
+ *   shut out           MLB 14%   NHL 8%   NFL 2%   (EPL 51%: not news, left out)
+ *   worse team         MLB .15: 6%   NBA .20: 9%   WNBA .20: 7%   NFL .20: 12%   NHL .15: 8%
+ *   below .500         MLB 3.6%   NBA 1.1%   WNBA 2.7%   NFL 6.3%   NHL 2.7%
+ */
+/** The loser's chance to win before the game, at least (percent). */
+export const FAVORITE_CHANCE: Partial<Record<League, number>> = { mlb: 62, nba: 75, wnba: 75, nfl: 75, nhl: 65, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 60])) };
+/** The loser's biggest lead, at least (points, runs or goals), for the line on the loss. */
+export const BLEW_LEAD: Partial<Record<League, number>> = { mlb: 3, nba: 15, wnba: 12, nfl: 14, nhl: 2, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
+/** The same, live: losing a lead this big is an alert of its own (a push), so it takes more. */
+export const BLEW_LEAD_LIVE: Partial<Record<League, number>> = { mlb: 5, nba: 18, wnba: 15, nfl: 17, nhl: 3, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
+/** The winner's go-ahead score with this many seconds left or fewer (NBA and WNBA in the 4th or OT, NFL in the 4th). */
+export const LAST_SECONDS: Partial<Record<League, number>> = { nba: 10, wnba: 10, nfl: 30 };
+/** "Lost to a worse team": the winner's win percentage at least this far below the loser's, both MIN_GAMES in. */
+export const WORSE_GAP: Partial<Record<League, number>> = { mlb: 0.15, nba: 0.2, wnba: 0.2, nfl: 0.2, nhl: 0.15 };
+export const MIN_GAMES: Partial<Record<League, number>> = { mlb: 20, nba: 10, wnba: 8, nfl: 4, nhl: 10 };
+/** A sweep takes this many games: an MLB series of 3+, a season series of 3+ (NFL division rivals meet twice). */
+export const SWEEP_GAMES: Partial<Record<League, number>> = { mlb: 3, nba: 3, wnba: 3, nfl: 2, nhl: 3 };
+
+/** Wins, losses and the rest from a record ("40-30-12"): NHL's third is OT losses, the NFL's ties. */
+export function parseRecord(rec: string | undefined): { w: number; l: number; x: number } | null {
+  const m = String(rec ?? '').match(/^(\d+)-(\d+)(?:-(\d+))?$/);
+  return m ? { w: Number(m[1]), l: Number(m[2]), x: Number(m[3] ?? 0) } : null;
+}
+/** Win percentage: NHL points percentage, the NFL with ties as half. */
+function winPct(lg: League, r: { w: number; l: number; x: number }) {
+  const gp = r.w + r.l + r.x;
+  if (!gp) return 0;
+  return lg === 'nhl' ? (2 * r.w + r.x) / (2 * gp) : (r.w + (lg === 'nfl' ? r.x / 2 : 0)) / gp;
+}
+
+/** The play on which the winner went ahead for good, and each side's biggest lead, from every play of the game. */
+export function leadStory(plays: NPlay[], winner: 'home' | 'away') {
+  let score = { home: 0, away: 0 }, goAhead: NPlay | undefined;
+  const led = { home: 0, away: 0 };
+  for (const p of plays) {
+    const prev = score;
+    score = nextScore(prev, p);
+    const lead = (s: 'home' | 'away', x: typeof score) => x[s] - x[s === 'home' ? 'away' : 'home'];
+    if (lead(winner, prev) <= 0 && lead(winner, score) > 0) goAhead = p;
+    led.home = Math.max(led.home, lead('home', score));
+    led.away = Math.max(led.away, lead('away', score));
+  }
+  return { goAhead, led };
+}
+
+/** "2.1 seconds", "1 second", "0:24": how much was left on the clock. */
+const clockLeft = (lg: League, sec: number) => (lg === 'nfl' ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : `${Number(sec.toFixed(1))} second${sec === 1 ? '' : 's'}`);
+
+/**
+ * A loss's facts, each its own alert type: a walk-off or a last-second loss, a blown lead, losing as the
+ * favorite, a shutout, a sweep, losing to a worse team, falling below .500, a losing streak. They share
+ * the loss's moment and go out after it: a device that gets the loss gets each fact it wants as a line on
+ * it ("Walk-off in the 10th. Lost as 78% favorites. Final Score: 4 to 3"), and one that has the loss off
+ * gets the first fact it wants instead, saying the loss too ("Successful Hate Watch! Yankees lost to the
+ * Rays as 78% favorites"), with the others on it. `lostId` makes each count as the loss (isLossAlert).
+ * Playoff losses skip the regular-season facts (records, sweeps: a playoff sweep is in the loss's title).
+ */
+export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, lost: Detected, final: { home: number; away: number },
+  facts: { plays?: NPlay[]; pre?: Pregame; overtime?: 'ot' | 'so' | null; postseason?: boolean }): Detected[] {
+  const lg = g.league;
+  const loserSide: 'home' | 'away' = lost.targetKey === teamKey(lg, g.homeId) ? 'home' : 'away';
+  const winnerSide = loserSide === 'home' ? 'away' : 'home';
+  const loserId = loserSide === 'home' ? g.homeId : g.awayId, winnerId = loserSide === 'home' ? g.awayId : g.homeId;
+  const team = teamName(lg, loserId), winner = teamName(lg, winnerId);
+  const unit = MARGIN_UNIT[lg] ?? (SOCCER.has(lg) ? 'goal' : 'point');
+  const out: Detected[] = [];
+  const fact = (type: string, title: string, fold: string, meta: Record<string, unknown> = {}, foldOnly?: boolean) => out.push({
+    id: `${g.gameId}:final:${type}:${loserId}`, type, targetKey: lost.targetKey, title: `Successful Hate Watch! ${title}`, body: lost.body, at: lost.at,
+    meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey, ...meta }, moment: lost.moment, fold, ...(foldOnly ? { foldOnly } : {}),
+  });
+
+  // How it ended: the winner's go-ahead in the last seconds, a walk-off, overtime, a stoppage-time winner.
+  const story = facts.plays?.length ? leadStory(facts.plays, winnerSide) : null;
+  const ga = story?.goAhead;
+  if (lg === 'mlb' && winnerSide === 'home' && ga?.period?.type === 'Bottom' && ga.period.number >= 9) {
+    fact('team.last_second_loss', `${winner} walked off ${the(lg, team)}${ga.period.number > 9 ? ` in the ${ordinal(ga.period.number)}` : ''}`, `Walk-off loss in the ${ordinal(ga.period.number)}.`);
+  } else if (BASKETBALL.has(lg) && ga && (ga.periodNum ?? 0) >= 4 && ga.clockSec != null && ga.clockSec <= LAST_SECONDS[lg]!) {
+    const left = ga.clockSec === 0 ? 'at the buzzer' : `with ${clockLeft(lg, ga.clockSec)} left`;
+    fact('team.last_second_loss', `${winner} beat ${the(lg, team)} ${left}`, `Beaten ${left}.`);
+  } else if (lg === 'nfl' && ga && ((ga.periodNum ?? 0) >= 5 || ((ga.periodNum ?? 0) === 4 && ga.clockSec != null && ga.clockSec <= LAST_SECONDS.nfl!))) {
+    const ot = (ga.periodNum ?? 0) >= 5, left = ga.clockSec === 0 ? 'as time expired' : `with ${clockLeft(lg, ga.clockSec!)} left`;
+    fact('team.last_second_loss', ot ? `${team} lost to ${the(lg, winner)} in overtime` : `${winner} beat ${the(lg, team)} ${left}`, ot ? 'Lost in overtime.' : `Beaten ${left}.`);
+  } else if (lg === 'nhl' && facts.overtime) {
+    const so = facts.overtime === 'so';
+    fact('team.last_second_loss', `${team} lost to ${the(lg, winner)} in ${so ? 'a shootout' : 'overtime'}`, `Lost in ${so ? 'a shootout' : 'overtime'}.`);
+  } else if (SOCCER.has(lg) && ga?.clock && /^9\d'\s*\+/.test(ga.clock)) {
+    fact('team.last_second_loss', `${team} conceded a stoppage-time winner to ${winner}`, `Conceded a stoppage-time winner (${ga.clock}).`);
+  }
+
+  // A blown lead: the loser was ahead by this much. Only a line on the loss: its switch is the live alert's
+  // too, and with the loss off, a blown lead isn't a reason to hear about the loss.
+  const led = story?.led[loserSide] ?? 0;
+  if (led >= BLEW_LEAD[lg]!) fact('team.blew_lead', `${team} blew ${aOrAn(led)} ${led}-${unit} lead and lost to ${the(lg, winner)}`, `Blew ${aOrAn(led)} ${led}-${unit} lead.`, { led }, true);
+
+  // Losing as the favorite, from the line before the game.
+  const chance = facts.pre?.chance?.[loserSide];
+  if (chance != null && chance >= FAVORITE_CHANCE[lg]!) fact('team.lost_as_favorite', `${team} lost to ${the(lg, winner)} as ${chance}% favorites`, `Lost as ${chance}% favorites.`, { chance });
+
+  // A shutout (basketball has none, and in soccer half of all losses are one).
+  if (final[loserSide] === 0 && !BASKETBALL.has(lg) && !SOCCER.has(lg)) {
+    const [title, fold] = lg === 'nfl' ? [`${team} were held scoreless by the ${winner}`, 'Held scoreless.'] : [`${team} were shut out by the ${winner}`, 'Shut out.'];
+    fact('team.shut_out', title, fold);
+  }
+
+  if (!facts.postseason) {
+    // A sweep: every game of the series (MLB), or every meeting of the season, lost.
+    const spot = facts.pre?.series?.[loserSide];
+    if (spot?.last && spot.before + 1 >= (SWEEP_GAMES[lg] ?? Infinity) && spot.lostBefore === spot.before) {
+      const n = spot.before + 1;
+      fact('team.swept', `${team} got swept by ${the(lg, winner)}`, spot.kind === 'series' ? `Swept in the series, 0-${n}.` : `Swept in the season series, 0-${n}.`, { games: n });
+    }
+    // Losing to a worse team, and falling below .500, from the records before the game.
+    const mine = parseRecord(facts.pre?.records?.[loserSide]), theirs = parseRecord(facts.pre?.records?.[winnerSide]);
+    const enough = (r: { w: number; l: number; x: number }) => r.w + r.l + r.x >= (MIN_GAMES[lg] ?? Infinity);
+    if (mine && theirs && enough(mine) && enough(theirs) && winPct(lg, mine) - winPct(lg, theirs) >= (WORSE_GAP[lg] ?? Infinity)) {
+      const rec = facts.pre!.records![winnerSide]!;
+      fact('team.lost_to_worse', `${team} lost to ${the(lg, `${rec} ${winner}`)}`, `Lost to ${the(lg, `${rec} ${winner}`)}.`, { winnerRecord: rec });
+    }
+    // Below .500 (W < L: in the NHL an overtime loss doesn't count against it, and in the NFL a tie is half each way).
+    if (mine && !SOCCER.has(lg) && mine.w === mine.l && !(lg === 'nhl' && facts.overtime) && mine.w + mine.l + mine.x + 1 >= (MIN_GAMES[lg] ?? Infinity)) {
+      const now = `${mine.w}-${mine.l + 1}${lg === 'nhl' || (lg === 'nfl' && mine.x) ? `-${mine.x}` : ''}`;
+      fact('team.below_500', `${team} lost to ${the(lg, winner)} and fell below .500`, `Now ${now}, below .500.`, { record: now });
+    }
+  }
+
+  // The losing streak this makes (ESPN's streak before the game, plus this one). The regular season only:
+  // in the playoffs and the preseason, the standings still show the regular season's last streak. And only
+  // if the record has the losses for it (a new season's 0-0 next to last season's "L4" doesn't).
+  const before = facts.pre?.streak?.[loserSide], rec = parseRecord(facts.pre?.records?.[loserSide]);
+  if (before != null && facts.pre?.seasonType === 2 && !facts.postseason) {
+    const n = (/^L(\d+)$/.exec(before) ? Number(/^L(\d+)$/.exec(before)![1]) : 0) + 1;
+    if (n >= 3 && rec && rec.l + rec.x >= n - 1) {
+      out.push({
+        id: `${g.gameId}:final:team.losing_streak:${loserId}`, type: 'team.losing_streak', targetKey: lost.targetKey,
+        title: `Successful Hate Watch! ${team} have lost ${n} straight`, body: lost.body, at: lost.at,
+        meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey, streak: n }, moment: lost.moment, fold: `Lost ${n} straight.`,
       });
     }
   }
   return out;
+}
+
+/**
+ * Where a game stands among a team's meetings with this opponent, from the team's regular-season schedule
+ * (ESPN's teams/{id}/schedule): MLB, the games just before it against them (its series) and whether the
+ * next game is someone else's; everyone else, the season's other meetings and whether any are left.
+ */
+export function seriesSpot(lg: League, schedule: any, gameId: string, teamId: string): SeriesSpot | undefined {
+  const games = [...(schedule?.events ?? [])].sort((a: any, b: any) => Date.parse(a.date) - Date.parse(b.date)).map((e: any) => {
+    const c = e.competitions?.[0];
+    const me = c?.competitors?.find((x: any) => String(x.id ?? x.team?.id) === teamId);
+    const them = c?.competitors?.find((x: any) => String(x.id ?? x.team?.id) !== teamId);
+    return { id: String(e.id), opp: String(them?.id ?? them?.team?.id ?? ''), done: !!c?.status?.type?.completed, won: me?.winner === true };
+  });
+  const at = games.findIndex((x) => x.id === gameId);
+  if (at < 0) return undefined;
+  const opp = games[at].opp;
+  if (lg === 'mlb') {
+    let i = at;
+    while (i > 0 && games[i - 1].opp === opp) i--;
+    const before = games.slice(i, at);
+    return { kind: 'series', before: before.length, lostBefore: before.filter((x) => x.done && !x.won).length, last: games[at + 1]?.opp !== opp };
+  }
+  const meetings = games.filter((x) => x.opp === opp);
+  const before = meetings.slice(0, meetings.findIndex((x) => x.id === gameId));
+  return { kind: 'season', before: before.length, lostBefore: before.filter((x) => x.done && !x.won).length, last: meetings.at(-1)?.id === gameId };
 }

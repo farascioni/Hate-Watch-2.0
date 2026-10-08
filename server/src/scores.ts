@@ -188,14 +188,19 @@ export function lineChances(home: unknown, away: unknown, draw?: unknown): GameP
   return out as GamePreview['chance'];
 }
 
+/** Each side's chance from one of ESPN's odds entries: a scoreboard's `odds[0]`, or a summary's `pickcenter[0]` (kept after the final). */
+export function oddsChance(lg: League, o: any): GamePreview['chance'] | undefined {
+  const ml = (x: any) => x?.close?.odds ?? x?.open?.odds;
+  return lineChances(ml(o?.moneyline?.home) ?? o?.homeTeamOdds?.moneyLine, ml(o?.moneyline?.away) ?? o?.awayTeamOdds?.moneyLine,
+    SOCCER.has(lg) ? o?.drawOdds?.moneyLine ?? ml(o?.moneyline?.draw) : undefined);
+}
+
 /** A game before its start: the line and the chances it gives, records, probable starters, form, series. */
 export function gamePreview(lg: League, c: any, home: any, away: any): GamePreview {
   const p: GamePreview = {};
   const o = c.odds?.[0];
   if (o) {
-    const ml = (x: any) => x?.close?.odds ?? x?.open?.odds;
-    const chance = lineChances(ml(o.moneyline?.home) ?? o.homeTeamOdds?.moneyLine, ml(o.moneyline?.away) ?? o.awayTeamOdds?.moneyLine,
-      SOCCER.has(lg) ? o.drawOdds?.moneyLine ?? ml(o.moneyline?.draw) : undefined);
+    const chance = oddsChance(lg, o);
     if (chance) p.chance = chance;
     if (o.details) p.line = String(o.details);
     if (o.overUnder != null && Number.isFinite(Number(o.overUnder))) p.total = Number(o.overUnder);

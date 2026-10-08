@@ -12,8 +12,15 @@ import { SOCCER } from './leagues.ts';
 const HEAVY_LOSSES = [...SOCCER].map((lg) => `${lg}.team.heavy_loss`);
 export const HATE_WATCH_TYPES = new Set(['team.lost', 'player.team_lost', ...HEAVY_LOSSES, 'f1.team.no_points', 'f1.team.double_dnf']);
 export const isHateWatch = (e: Pick<Detected, 'type' | 'aliases'>) => [e.type, ...(e.aliases ?? [])].some((t) => HATE_WATCH_TYPES.has(t));
+/**
+ * An alert that is a team's loss for whoever gets it: the loss itself, "their team lost", or one of the
+ * loss's facts sent in its place ("lost as 78% favorites", with the loss's id in `lostId`, see lossFacts).
+ */
+export const isLossAlert = (e: { type: string; meta?: Record<string, unknown> | null }) => HATE_WATCH_TYPES.has(e.type) || typeof e.meta?.lostId === 'string';
 /** One team's loss: its own alert (or soccer's 3+ goal one), and "their team lost" for its players. They share a game, a moment and a count. */
 const LOSS_TYPES = ['team.lost', 'player.team_lost', ...HEAVY_LOSSES];
+/** SQL: an `events e` row that is one of a loss's alerts (a loss type, or a fact of the loss sent in its place). */
+const LOSS_ROW = (e: string) => `(${e}.type IN (${LOSS_TYPES.map((t) => `'${t}'`).join(', ')}) OR json_extract(${e}.meta, '$.lostId') IS NOT NULL)`;
 
 const ins = () => db.prepare('INSERT INTO hate_watches (device_id, event_id, target_key, occurred_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
 
@@ -37,9 +44,9 @@ export const recordHateWatch = (deviceId: string, e: Pick<Detected, 'id' | 'type
  * SQL column for a feed query over `events e`: how many devices got that alert (feedItem's `recipients`).
  * A team's loss counts everyone who got any alert about it, the team's or a player's (a device gets one).
  */
-export const RECIPIENTS = `(CASE WHEN e.type IN (${LOSS_TYPES.map((t) => `'${t}'`).join(', ')}) AND e.game_id IS NOT NULL
+export const RECIPIENTS = `(CASE WHEN ${LOSS_ROW('e')} AND e.game_id IS NOT NULL
   THEN (SELECT COUNT(DISTINCT x.device_id) FROM events y JOIN feed x ON x.event_id = y.id
-    WHERE y.game_id = e.game_id AND y.league = e.league AND y.type IN (${LOSS_TYPES.map((t) => `'${t}'`).join(', ')}))
+    WHERE y.game_id = e.game_id AND y.league = e.league AND ${LOSS_ROW('y')})
   ELSE (SELECT COUNT(*) FROM feed x WHERE x.event_id = e.id) END) AS recipients`;
 
 /**
@@ -50,10 +57,20 @@ export function withHateWatch<G extends { id: string; state: string }>(deviceId:
   const ids = games.filter((g) => g.state === 'post').map((g) => g.id);
   if (!ids.length) return games;
   const rows = db.prepare(`SELECT e.game_id, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
-    WHERE f.device_id = ? AND e.type IN (${[...HATE_WATCH_TYPES].map(() => '?').join(',')}) AND e.game_id IN (${ids.map(() => '?').join(',')})`)
+    WHERE f.device_id = ? AND (e.type IN (${[...HATE_WATCH_TYPES].map(() => '?').join(',')}) OR json_extract(e.meta, '$.lostId') IS NOT NULL)
+      AND e.game_id IN (${ids.map(() => '?').join(',')})`)
     .all(deviceId, ...HATE_WATCH_TYPES, ...ids) as { game_id: string; recipients: number }[];
   const others = new Map(rows.map((r) => [r.game_id, Math.max(0, r.recipients - 1)]));
   return games.map((g) => (others.has(g.id) ? { ...g, hateWatch: { alsoGot: others.get(g.id)! } } : g));
+}
+
+/**
+ * A device's Hate Watch streak: of the team's last `n` losses (its losing streak, this one included), how
+ * many it watched. A loss counts for whoever tracked the team or a player on it then (hateWatchOf).
+ */
+export function watchedOfLast(deviceId: string, teamKey: string, n: number): number {
+  return (db.prepare(`SELECT COUNT(*) AS c FROM hate_watches WHERE device_id = ? AND target_key = ? AND event_id IN
+    (SELECT id FROM events WHERE type = 'team.lost' AND target_key = ? ORDER BY occurred_at DESC LIMIT ?)`).get(deviceId, teamKey, teamKey, n) as { c: number }).c;
 }
 
 /** The Settings counter: the total, and each team's count (most first). */
