@@ -8,7 +8,7 @@ import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
 import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
-import { sendToConnected } from './fanout.ts';
+import { getPrefs, sendToConnected } from './fanout.ts';
 
 /** Seam for tests (test/scores.test.ts). Production never changes it. */
 export const scoresDeps = {
@@ -50,6 +50,26 @@ export interface GameCard {
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: who's in net, with saves (from the box score)
   session?: string;       // F1: "Singapore GP · Race"
   order?: Driver[];       // F1: running order / classification
+  /** Before the start: each side's chance from the betting line, the line, records and probable starters. */
+  preview?: GamePreview;
+}
+
+/** What a game that hasn't started looks like, from ESPN's scoreboard (gamePreview). */
+export interface GamePreview {
+  /** Chance to win, in whole percents adding up to 100, from the moneyline with the bookmaker's margin taken out (soccer: and the draw). */
+  chance?: { home: number; away: number; draw?: number };
+  /** The line as ESPN shows it ("CLE -115", "DAL -9.5"), the total (over/under) and whose line it is ("DraftKings"). */
+  line?: string;
+  total?: number;
+  source?: string;
+  /** Season records: overall, plus the home side's record at home and the away side's on the road. All-zero records (before a team's first game) are left out. */
+  records?: { home?: string; away?: string; homeSplit?: string; awaySplit?: string };
+  /** MLB's probable starting pitchers ("0-1, 4.15 ERA"), the NHL's probable goalies. */
+  starters?: { label: string; home?: LivePlayer; away?: LivePlayer };
+  /** Soccer: each side's recent results as ESPN lists them ("LWWWW"). */
+  form?: { home?: string; away?: string };
+  /** Playoffs: "CHW lead series 2-1". */
+  series?: string;
 }
 
 // ─── Building cards from ESPN ─────────────────────────────────────────────────────────────────
@@ -81,6 +101,10 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     detail: state === 'pre' ? '' : String(ev.status?.type?.shortDetail ?? ''),
     home: side(home), away: side(away),
   };
+  if (state === 'pre') {
+    const preview = gamePreview(lg, c, home, away);
+    if (Object.keys(preview).length) card.preview = preview;
+  }
   const doubleheader = (c.notes ?? []).map((n: any) => String(n.headline ?? '')).find((h: string) => /doubleheader/i.test(h));
   const gameNo = doubleheader?.match(/\bgame (\d)\b/i)?.[1];
   if (gameNo) card.note = `Game ${gameNo}`;
@@ -139,6 +163,65 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     }
   }
   return card;
+}
+
+/** American odds ("-115", "+150", "EVEN") as a chance from 0 to 1, the bookmaker's margin still in. */
+function impliedChance(odds: unknown): number | undefined {
+  const n = /^\s*even\s*$/i.test(String(odds ?? '')) ? 100 : Number(odds);
+  if (!Number.isFinite(n) || Math.abs(n) < 100) return undefined;
+  return n < 0 ? -n / (-n + 100) : 100 / (n + 100);
+}
+
+/**
+ * Each side's chance to win, in whole percents adding up to 100, from the moneyline: each price's implied
+ * chance, divided by their total to take the bookmaker's margin out (CLE -115 / CHW -104: 51% / 49%).
+ * Soccer's three-way line has the draw too.
+ */
+export function lineChances(home: unknown, away: unknown, draw?: unknown): GamePreview['chance'] | undefined {
+  const h = impliedChance(home), a = impliedChance(away), d = draw == null ? undefined : impliedChance(draw);
+  if (h == null || a == null || (draw != null && d == null)) return undefined;
+  const sum = h + a + (d ?? 0);
+  const pct = { home: (h / sum) * 100, away: (a / sum) * 100, ...(d != null ? { draw: (d / sum) * 100 } : {}) };
+  const out = Object.fromEntries(Object.entries(pct).map(([k, v]) => [k, Math.round(v)])) as Record<string, number>;
+  const top = Object.keys(out).reduce((x, y) => (pct[x as keyof typeof pct]! >= pct[y as keyof typeof pct]! ? x : y));
+  out[top] += 100 - Object.values(out).reduce((x, y) => x + y, 0); // rounding: the favorite takes the leftover
+  return out as GamePreview['chance'];
+}
+
+/** A game before its start: the line and the chances it gives, records, probable starters, form, series. */
+export function gamePreview(lg: League, c: any, home: any, away: any): GamePreview {
+  const p: GamePreview = {};
+  const o = c.odds?.[0];
+  if (o) {
+    const ml = (x: any) => x?.close?.odds ?? x?.open?.odds;
+    const chance = lineChances(ml(o.moneyline?.home) ?? o.homeTeamOdds?.moneyLine, ml(o.moneyline?.away) ?? o.awayTeamOdds?.moneyLine,
+      SOCCER.has(lg) ? o.drawOdds?.moneyLine ?? ml(o.moneyline?.draw) : undefined);
+    if (chance) p.chance = chance;
+    if (o.details) p.line = String(o.details);
+    if (o.overUnder != null && Number.isFinite(Number(o.overUnder))) p.total = Number(o.overUnder);
+    if ((p.chance || p.line) && o.provider?.name) p.source = String(o.provider.name);
+  }
+  const rec = (x: any, type: string) => {
+    const v = x.records?.find((r: any) => r.type === type)?.summary;
+    return v && /[1-9]/.test(String(v)) ? String(v) : undefined; // "0-0": no games yet
+  };
+  const records = { home: rec(home, 'total'), away: rec(away, 'total'), homeSplit: rec(home, 'home'), awaySplit: rec(away, 'road') };
+  if (Object.values(records).some(Boolean)) p.records = Object.fromEntries(Object.entries(records).filter(([, v]) => v)) as GamePreview['records'];
+  if (lg === 'mlb' || lg === 'nhl') {
+    const starter = (x: any): LivePlayer | undefined => {
+      const pr = x.probables?.find((q: any) => /^probableStarting/.test(String(q.name ?? ''))) ?? x.probables?.[0];
+      const id = pr?.athlete?.id;
+      if (id == null) return undefined;
+      const record = String(pr.record ?? '').replace(/^\((.*)\)$/, '$1').trim(); // "(0-1, 4.15)"
+      const line = lg === 'mlb' ? record.replace(/, ([\d.]+)$/, ', $1 ERA') : record;
+      return { id: String(id), key: playerKey(lg, String(id)), name: pr.athlete.shortName ?? pr.athlete.displayName ?? '?', ...(line ? { line } : {}) };
+    };
+    const h = starter(home), a = starter(away);
+    if (h || a) p.starters = { label: lg === 'mlb' ? 'Probable pitchers' : 'Probable goalies', ...(h ? { home: h } : {}), ...(a ? { away: a } : {}) };
+  }
+  if (SOCCER.has(lg) && (home.form || away.form)) p.form = { ...(home.form ? { home: String(home.form) } : {}), ...(away.form ? { away: String(away.form) } : {}) };
+  if (c.series?.type === 'playoff' && c.series.summary) p.series = String(c.series.summary);
+  return p;
 }
 
 /** One side's leader in a stat from the scoreboard (e.g. NBA points: "N. Alexander-Walker", "10 pts"). */
@@ -319,15 +402,16 @@ export const nextF1Weekend = (now = Date.now()) => f1Weekends.find((w) => w.ends
 interface Mine { teams: Set<string>; f1: boolean }
 const mineCache = new Map<string, { at: number; mine: Mine }>();
 
-/** A device's teams: the ones it tracks, plus the team of every player it tracks. */
+/** A device's teams: the ones it tracks, plus the team of every player it tracks, unless that player's "Show their team's games" is off. */
 export function deviceTeams(deviceId: string): Mine {
   const hit = mineCache.get(deviceId);
   if (hit && Date.now() - hit.at < 5000) return hit.mine;
   const keys = (db.prepare('SELECT target_key FROM follows WHERE device_id = ?').all(deviceId) as { target_key: string }[]).map((r) => r.target_key);
   const teams = new Set<string>();
+  const playerTeams = getPrefs(deviceId).playerTeams ?? {};
   for (const k of keys) {
     if (k.startsWith('team:')) teams.add(k);
-    else { const p = catalog.player(k); if (p) teams.add(p.teamKey); }
+    else if (playerTeams[k]?.scores !== false) { const p = catalog.player(k); if (p) teams.add(p.teamKey); }
   }
   const mine = { teams, f1: keys.some((k) => k.includes(':f1:')) };
   mineCache.set(deviceId, { at: Date.now(), mine });

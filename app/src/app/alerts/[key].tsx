@@ -16,7 +16,7 @@ import { fitsPosition, positionsOf } from '../../lib/positions';
 export default function TargetAlertsScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
-  const { follows, prefs, updatePrefs, eventTypes } = useStore();
+  const { follows, prefs, updatePrefs, eventTypes, refreshScores } = useStore();
   const target = follows.get(targetKey);
 
   // Only the alerts that can actually fire for this kind of target in this league, and for a player, at
@@ -50,6 +50,13 @@ export default function TargetAlertsScreen() {
   const muted = prefs.muted.includes(targetKey);
   const name = target.kind === 'player' ? target.shortName ?? target.name : target.name;
   const customCount = customIds.length;
+  // A player's team: its games on the Scores tab (shown by default), its own alerts (off by default).
+  // Tracking the team itself already gets both.
+  const team = target.kind === 'player' ? { key: target.teamKey, name: target.teamName ?? 'their team' } : null;
+  const teamTracked = !!team && follows.has(team.key);
+  const choice = prefs.playerTeams?.[targetKey] ?? {};
+  const setTeam = (patch: { scores?: boolean | null; alerts?: boolean | null }) =>
+    updatePrefs({ playerTeams: { [targetKey]: patch } }).then(() => { if (patch.scores !== undefined) refreshScores().catch(() => {}); }).catch(() => {});
 
   return (
     <>
@@ -78,6 +85,30 @@ export default function TargetAlertsScreen() {
             onChange={(on) => updatePrefs({ muted: on ? prefs.muted.filter((k) => k !== targetKey) : [...prefs.muted, targetKey] })}
           />
         </View>
+
+        {team ? (
+          <>
+            <SectionHeader>Their team</SectionHeader>
+            <View style={styles.card}>
+              {target.league !== 'f1' ? (
+                <SettingRow
+                  title="Show their team's games"
+                  desc={teamTracked ? `You track the ${team.name} too.` : `${team.name} games in My games and Up next on the Scores tab.`}
+                  value={teamTracked || choice.scores !== false}
+                  disabled={teamTracked}
+                  onChange={(on) => setTeam({ scores: on ? null : false })}
+                />
+              ) : null}
+              <SettingRow
+                title="Get their team's alerts"
+                desc={teamTracked ? `You track the ${team.name} too.` : `${team.name} alerts as if you tracked them, by your Team alerts settings.`}
+                value={teamTracked || choice.alerts === true}
+                disabled={teamTracked}
+                onChange={(on) => setTeam({ alerts: on ? true : null })}
+              />
+            </View>
+          </>
+        ) : null}
 
         <SectionHeader>Alerts for {name}</SectionHeader>
         {hidden && target.kind === 'player' ? (

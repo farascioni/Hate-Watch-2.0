@@ -23,12 +23,19 @@ export interface Prefs {
   pushTypes: Record<string, boolean>;
   /** The 🔔 on one alert type for one player or team (their ⚙️ screen): targetKey → typeId → push. Beats pushTypes. */
   targetPushTypes: Record<string, Record<string, boolean>>;
+  /**
+   * A tracked player's team (their ⚙️ screen): playerKey → `scores` false keeps the team's games off the
+   * Scores tab (shown by default), `alerts` true sends the team's own alerts too, as if the team were tracked
+   * (off by default; it follows the Team alerts settings). Tracking the team itself gets both anyway.
+   */
+  playerTeams: Record<string, { scores?: boolean; alerts?: boolean }>;
 }
 
 /** A PUT /me/prefs patch: like Prefs, but a per-target value of null means "back to the global setting". */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes'>> & {
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
   targetTypes?: Record<string, Record<string, boolean | null>>;
   targetPushTypes?: Record<string, Record<string, boolean | null>>;
+  playerTeams?: Record<string, { scores?: boolean | null; alerts?: boolean | null }>;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -41,6 +48,7 @@ export const DEFAULT_PREFS: Prefs = {
   targetTypes: {},
   pushTypes: {},
   targetPushTypes: {},
+  playerTeams: {},
 };
 
 const prefsCache = new Map<string, Prefs>();
@@ -67,6 +75,7 @@ export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
     targetTypes: mergeTargetTypes(cur.targetTypes, patch.targetTypes),
     pushTypes: { ...cur.pushTypes, ...patch.pushTypes },
     targetPushTypes: mergeTargetTypes(cur.targetPushTypes, patch.targetPushTypes),
+    playerTeams: mergePlayerTeams(cur.playerTeams, patch.playerTeams),
   };
   db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify(next), deviceId);
   prefsCache.set(deviceId, next);
@@ -88,6 +97,22 @@ export function mergeTargetTypes(cur: Prefs['targetTypes'] = {}, patch?: PrefsPa
       else if (typeof v === 'boolean') merged[typeId] = v;
     }
     if (Object.keys(merged).length) out[target] = merged; else delete out[target];
+  }
+  return out;
+}
+
+/** Merge a tracked player's team choices: true/false sets one, null removes it (back to the default). Only players' keys, only those two. */
+export function mergePlayerTeams(cur: Prefs['playerTeams'] = {}, patch?: PrefsPatch['playerTeams']): Prefs['playerTeams'] {
+  if (!patch) return cur;
+  const out: Prefs['playerTeams'] = { ...cur };
+  for (const [player, v] of Object.entries(patch)) {
+    if (!/^player:[a-z0-9]+:[\w-]+$/.test(player) || !v || typeof v !== 'object') continue;
+    const merged = { ...out[player] };
+    for (const k of ['scores', 'alerts'] as const) {
+      if (v[k] === null) delete merged[k];
+      else if (typeof v[k] === 'boolean') merged[k] = v[k] as boolean;
+    }
+    if (Object.keys(merged).length) out[player] = merged; else delete out[player];
   }
   return out;
 }
@@ -235,6 +260,25 @@ const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id
   VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
 const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
 const followers = () => db.prepare('SELECT f.device_id, d.push_token, f.created_at FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
+/** Devices tracking a player on a team, with which player (`via`). */
+const playerFollowers = () => db.prepare(`SELECT f.device_id, d.push_token, f.created_at, f.target_key AS via FROM follows f
+  JOIN devices d ON d.id = f.device_id JOIN players p ON p.key = f.target_key WHERE p.team_key = ?`);
+type Recipient = { device_id: string; push_token: string | null; via?: string };
+/**
+ * Who an alert goes to: everyone tracking its target, and for a team's alert, everyone tracking one of the
+ * team's players with "Get their team's alerts" on (playerTeams). Once per device.
+ */
+function recipients(targetKey: string): Recipient[] {
+  const out = followers().all(targetKey) as Recipient[];
+  if (!targetKey.startsWith('team:')) return out;
+  const have = new Set(out.map((f) => f.device_id));
+  for (const f of playerFollowers().all(targetKey) as Required<Recipient>[]) {
+    if (have.has(f.device_id) || !getPrefs(f.device_id).playerTeams?.[f.via]?.alerts) continue;
+    have.add(f.device_id);
+    out.push(f);
+  }
+  return out;
+}
 
 export type PushMessage = { to: string; title: string; body: string; sound: 'default' | null; priority: 'high'; channelId: string; interruptionLevel: string; threadId: string; data: Record<string, unknown> };
 
@@ -249,7 +293,7 @@ export function publish(events: Detected[], league: League) {
   const got = new Map<string, Set<string>>(); // moment → devices that already have it (see Detected.moment)
   // Who gets what first, then the feed rows, frames and pushes: a Successful Hate Watch says how many
   // others got it, and a team's loss counts everyone who got one of its alerts (the team's or a player's).
-  const planned: { e: Detected; gameId: string | null; deliver: { f: { device_id: string; push_token: string | null }; prefs: Prefs }[]; followers: number }[] = [];
+  const planned: { e: Detected; gameId: string | null; deliver: { f: Recipient; prefs: Prefs }[]; followers: number }[] = [];
   // Of a moment's firstFollowed alerts, each device's is the one about what it followed first (and wants).
   const firstFollowed = new Map<string, Map<string, { key: string; at: number }>>(); // moment → device → target
   for (const e of events) {
@@ -261,7 +305,7 @@ export function publish(events: Detected[], league: League) {
     }
   }
   for (const e of events) {
-    const fols = followers().all(e.targetKey) as { device_id: string; push_token: string | null }[];
+    const fols = recipients(e.targetKey);
     if (!fols.length) continue; // nobody tracks this target: don't even store it
     const gameId = ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null; // F1: the session
     const res = insEvent().run(e.id, e.type, league, gameId, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
@@ -294,7 +338,8 @@ export function publish(events: Detected[], league: League) {
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: null, game_id: gameId, recipients });
     const frame = JSON.stringify({ kind: 'event', item });
     for (const { f, prefs } of deliver) {
-      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && pushWanted(prefs, e, league);
+      // Through a player: that player's 🔕 keeps their team's alerts quiet too.
+      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && pushWanted(prefs, e, league);
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(frame);
       if (willPush) pushes.push({

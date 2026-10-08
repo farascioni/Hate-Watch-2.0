@@ -69,6 +69,18 @@ function mergeTargetTypes(cur: Prefs['targetTypes'] = {}, patch?: PrefsPatch['ta
   return out;
 }
 
+/** A player's team choices, merged like the server's: true/false sets one, null removes it. */
+function mergePlayerTeams(cur: NonNullable<Prefs['playerTeams']> = {}, patch?: PrefsPatch['playerTeams']): Prefs['playerTeams'] {
+  if (!patch) return cur;
+  const out = { ...cur };
+  for (const [player, v] of Object.entries(patch)) {
+    const merged = { ...out[player] };
+    for (const k of ['scores', 'alerts'] as const) { if (v[k] === null) delete merged[k]; else if (v[k] !== undefined) merged[k] = v[k]!; }
+    if (Object.keys(merged).length) out[player] = merged; else delete out[player];
+  }
+  return out;
+}
+
 const mergeFeed = (a: FeedItem[], b: FeedItem[]) => {
   const byId = new Map<string, FeedItem>();
   for (const x of [...a, ...b]) byId.set(x.id, x);
@@ -242,6 +254,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         types: { ...p.types, ...patch.types }, leagues: { ...p.leagues, ...patch.leagues },
         quietHours: { ...p.quietHours, ...patch.quietHours }, targetTypes: mergeTargetTypes(p.targetTypes, patch.targetTypes),
         pushTypes: { ...p.pushTypes, ...patch.pushTypes }, targetPushTypes: mergeTargetTypes(p.targetPushTypes, patch.targetPushTypes),
+        playerTeams: mergePlayerTeams(p.playerTeams, patch.playerTeams),
       } : p));
       setPrefs(await api.setPrefs(patch));
     },

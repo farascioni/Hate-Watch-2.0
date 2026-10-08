@@ -72,6 +72,23 @@ export interface GameCard {
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: in net, line "9 saves on 10"
   session?: string;
   order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
+  /** Before the start (from ESPN's scoreboard). Missing from older servers. */
+  preview?: GamePreview;
+}
+/** A game that hasn't started: chances from the betting line, records, probable starters, form, series. */
+export interface GamePreview {
+  /** Whole percents adding up to 100, from the moneyline with the bookmaker's margin taken out (soccer: and the draw). */
+  chance?: { home: number; away: number; draw?: number };
+  /** "CLE -115", the over/under, and whose line it is ("DraftKings"). */
+  line?: string; total?: number; source?: string;
+  /** Overall records, with the home side's at home and the away side's on the road. */
+  records?: { home?: string; away?: string; homeSplit?: string; awaySplit?: string };
+  /** MLB probable pitchers ("0-1, 4.15 ERA"), NHL probable goalies. */
+  starters?: { label: string; home?: LivePlayer; away?: LivePlayer };
+  /** Soccer: recent results ("LWWWW"). */
+  form?: { home?: string; away?: string };
+  /** Playoffs: "CHW lead series 2-1". */
+  series?: string;
 }
 /** An F1 race weekend from ESPN's calendar (name includes the sponsor, as ESPN has it): from first practice to the race's end. */
 export interface F1Weekend { name: string; startsAt: number; endsAt: number }
@@ -144,10 +161,14 @@ export interface Prefs {
   pushTypes?: Record<string, boolean>;
   /** The 🔔 on an alert for one player or team (⚙️ screen). Beats pushTypes for that target. */
   targetPushTypes?: Record<string, Record<string, boolean>>;
+  /** A tracked player's team (their ⚙️ screen): `scores` false keeps its games off the Scores tab; `alerts` true sends its alerts too. Missing from older servers. */
+  playerTeams?: Record<string, { scores?: boolean; alerts?: boolean }>;
 }
 
 /** A prefs update. In targetTypes and targetPushTypes, null means "back to the global setting" for that alert. */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes'>> & {
+export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
   targetTypes?: Record<string, Record<string, boolean | null>>;
   targetPushTypes?: Record<string, Record<string, boolean | null>>;
+  /** null: back to the default (games shown, alerts off). */
+  playerTeams?: Record<string, { scores?: boolean | null; alerts?: boolean | null }>;
 };

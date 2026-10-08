@@ -312,3 +312,41 @@ test('All games: every game live now, then every one starting within a day, trac
   assert.deepEqual(res.games.map((g: any) => g.key), keys);
   server.close();
 });
+
+test("an upcoming game's preview: each side's chance from the line, records, probable starters, form and the series", () => {
+  // The bookmaker's margin comes out: CLE -115 / CHW -104 is 51% / 49%; DAL -500 / TB +380 is 80% / 20%; a draw is a third outcome.
+  assert.deepEqual(S.lineChances('-104', '-115'), { home: 49, away: 51 });
+  assert.deepEqual(S.lineChances('-500', '+380'), { home: 80, away: 20 });
+  assert.deepEqual(S.lineChances('-260', '+700', 400), { home: 69, away: 12, draw: 19 });
+  assert.deepEqual(S.lineChances('EVEN', 'EVEN'), { home: 50, away: 50 });
+  assert.equal(S.lineChances('-110', ''), undefined, 'no price for one side: no chances');
+  for (const [h, a, d] of [['-133', '+112'], ['+150', '-180'], ['+210', '+130', '+240']] as const) {
+    const c = S.lineChances(h, a, d)!;
+    assert.equal(c.home + c.away + (c.draw ?? 0), 100, 'whole percents adding up to 100');
+  }
+
+  // CLE @ CHW, ALDS Game 4, as ESPN's scoreboard sent it on 2026-10-08.
+  const side = (id: string, homeAway: string, abbr: string, overall: string, split: [string, string], pitcher: [string, string, string]) => ({
+    id, homeAway, score: '0', team: { id, abbreviation: abbr },
+    records: [{ name: 'overall', type: 'total', summary: overall }, { name: split[0], type: split[0].toLowerCase(), summary: split[1] }],
+    probables: [{ name: 'probableStartingPitcher', athlete: { id: pitcher[0], shortName: pitcher[1] }, record: pitcher[2] }],
+  });
+  const ev = {
+    id: '401907993', date: new Date(Date.now() + 3600_000).toISOString(), status: { type: { state: 'pre' } },
+    competitions: [{
+      competitors: [side('4', 'home', 'CHW', '84-78', ['Home', '48-33'], ['5023126', 'H. Smith', '(0-0, 1.42)']), side('5', 'away', 'CLE', '85-77', ['Road', '44-37'], ['4619898', 'P. Messick', '(0-1, 4.15)'])],
+      odds: [{ provider: { name: 'DraftKings' }, details: 'CLE -115', overUnder: 7, moneyline: { home: { close: { odds: '-104' } }, away: { close: { odds: '-115' } } } }],
+      series: { type: 'playoff', summary: 'CHW lead series 2-1' },
+    }],
+  };
+  assert.deepEqual(S.gameCard('mlb', ev)!.preview, {
+    chance: { home: 49, away: 51 }, line: 'CLE -115', total: 7, source: 'DraftKings',
+    records: { home: '84-78', away: '85-77', homeSplit: '48-33', awaySplit: '44-37' },
+    starters: { label: 'Probable pitchers', home: { id: '5023126', key: 'player:mlb:5023126', name: 'H. Smith', line: '0-0, 1.42 ERA' }, away: { id: '4619898', key: 'player:mlb:4619898', name: 'P. Messick', line: '0-1, 4.15 ERA' } },
+    series: 'CHW lead series 2-1',
+  });
+  const started = { ...ev, status: { type: { state: 'in', shortDetail: 'Top 1st' } } };
+  assert.equal(S.gameCard('mlb', started)!.preview, undefined, 'only before the start');
+  const preseason = { ...ev, competitions: [{ ...ev.competitions[0], competitors: ev.competitions[0].competitors.map((c) => ({ ...c, records: [{ type: 'total', summary: '0-0' }], probables: [] })), odds: [], series: undefined }] };
+  assert.equal(S.gameCard('nba', preseason)!.preview, undefined, 'nothing to say: no preview (a 0-0 record is no record)');
+});

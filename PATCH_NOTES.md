@@ -11,6 +11,10 @@ Changes since build 11. Server updates already work on every build.
 
 SCORES
 - All games: a new switch at the top of the Scores tab shows every game live right now, then every game starting in the next 24 hours, whether you track a team in it or not, grouped by league. The league chips filter it, and the switch shows how many games are live. Tap any game to open it.
+- Upcoming games show a preview: each team's chance to win (from the betting line), its record, MLB probable pitchers with their record and ERA, NHL probable goalies, the line and over/under, soccer form and draw chance, and the playoff series. A team you track shows its chance to lose.
+
+PLAYER ALERT SETTINGS
+- Their team: a player's alert settings have two new switches. Show their team's games (on by default) decides whether the team's games appear on the Scores tab, and Get their team's alerts (off by default) sends the team's own alerts too, as if you tracked the team.
 
 FIXES
 - ABS challenge alerts wait until the review is over. ESPN first posts every challenged pitch as confirmed and corrects it if the call is overturned, which sent "lost an ABS challenge" alerts for challenges that were won. A lost challenge now goes out about a minute later, once ESPN has settled it. (Server)

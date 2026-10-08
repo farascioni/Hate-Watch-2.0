@@ -35,9 +35,16 @@ export function hateTag(g: GameCard, side: Side | undefined): { text: string; to
   return diff < 0 ? { text: `Down ${-diff}`, tone: 'good' } : { text: diff > 0 ? `Up ${diff}` : 'Tied', tone: 'neutral' };
 }
 
-/** Chance the side you track doesn't win (ESPN's win probability; NFL and MLB publish it). */
-export const loseChance = (g: GameCard, side: Side | undefined) =>
-  side && g.state === 'in' && g.winProb ? 1 - g.winProb[side] : null;
+/**
+ * Chance the side you track doesn't win: live, ESPN's win probability (NFL and MLB publish it); before the
+ * start, the other side's chance from the betting line (a soccer draw isn't a loss).
+ */
+export function loseChance(g: GameCard, side: Side | undefined) {
+  if (!side) return null;
+  if (g.state === 'in' && g.winProb) return 1 - g.winProb[side];
+  if (g.state === 'pre' && g.preview?.chance) return g.preview.chance[side === 'home' ? 'away' : 'home'] / 100;
+  return null;
+}
 
 /** "8:15 PM" today, "Tue 8:15 PM" otherwise. */
 export function startLabel(ts: number) {

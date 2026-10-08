@@ -26,6 +26,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
 
   const body = game.league === 'f1' ? <F1Body game={game} big={big} /> : (
     <>
+      {game.state === 'pre' && game.preview?.chance ? <Text style={styles.chanceHead} importantForAccessibility="no">Win %</Text> : null}
       {(['away', 'home'] as const).map((k) => <TeamRow key={k} game={game} side={k} tracked={sides.includes(k)} big={big} />)}
       <View style={styles.meta}>
         <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>
@@ -33,7 +34,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
       </View>
       {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
-      <LiveDetails game={game} big={big} />
+      {game.state === 'pre' ? <PreviewDetails game={game} big={big} /> : <LiveDetails game={game} big={big} />}
       {lose != null && side ? (
         <View style={{ gap: 4 }}>
           <View style={styles.meta}>
@@ -66,6 +67,10 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   const s = game[side]!;
   const players = trackedPlayers(game, side, follows);
   const lost = game.state === 'post' && game[side === 'home' ? 'away' : 'home']?.winner;
+  const pv = game.state === 'pre' ? game.preview : undefined;
+  const record = pv?.records?.[side];
+  const split = side === 'home' ? pv?.records?.homeSplit : pv?.records?.awaySplit;
+  const chance = pv?.chance?.[side];
   return (
     <View style={styles.team}>
       <Avatar target={s.team} size={big ? 40 : 30} />
@@ -75,8 +80,11 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
           {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
         </View>
         {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
+        {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
       </View>
-      <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>
+      {chance != null
+        ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={`${chance}% chance to win`}>{chance}%</Text>
+        : <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>}
     </View>
   );
 }
@@ -144,6 +152,33 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
   return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;
 }
 
+/**
+ * Before the start: the probable starters (MLB pitchers with their record and ERA, NHL goalies), the betting
+ * line the win chances come from (soccer: and the chance of a draw), soccer form and the playoff series.
+ * Away first, like the team rows; tracked players in red.
+ */
+function PreviewDetails({ game, big }: { game: GameCard; big?: boolean }) {
+  const { follows } = useStore();
+  const pv = game.preview;
+  if (!pv) return null;
+  const name = (x: { key: string; name: string }) => <Text style={follows.has(x.key) ? styles.mine : styles.who}>{x.name}</Text>;
+  const abbr = (side: Side) => game[side]?.team.abbrev ?? '';
+  const lines: ReactNode[] = [];
+  const line = (key: string, node: ReactNode, rows = 1) => lines.push(<Text key={key} style={styles.atBat} numberOfLines={big ? rows + 1 : rows}>{node}</Text>);
+  const st = pv.starters;
+  if (st && (st.home || st.away)) {
+    const who = (s: Side) => (st[s] ? <>{name(st[s]!)}{st[s]!.line ? ` (${st[s]!.line})` : ''}</> : <Text style={styles.who}>TBD</Text>);
+    line('sp', <>{st.label}: {who('away')} · {who('home')}</>, 2);
+  }
+  if (pv.line || pv.total != null || pv.chance?.draw != null) {
+    const parts = [pv.line, pv.total != null ? `O/U ${pv.total}` : null, pv.chance?.draw != null ? `Draw ${pv.chance.draw}%` : null].filter(Boolean);
+    line('odds', `${pv.source ? `Odds (${pv.source})` : 'Odds'}: ${parts.join(' · ')}`);
+  }
+  if (pv.form && (pv.form.home || pv.form.away)) line('form', `Form: ${abbr('away')} ${pv.form.away ?? '–'} · ${abbr('home')} ${pv.form.home ?? '–'}`);
+  if (pv.series) line('series', pv.series);
+  return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;
+}
+
 /** MLB: who's on base (filled), how many out, and the count. */
 export function Bases({ bases, count }: { bases: NonNullable<GameCard['bases']>; count?: GameCard['count'] }) {
   const base = (on: boolean, pos: object) => <View style={[styles.base, pos, on && styles.baseOn]} />;
@@ -169,6 +204,11 @@ const styles = StyleSheet.create({
   tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' },
   players: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
   score: { color: colors.text, fontSize: 20, fontWeight: '900', minWidth: 28, textAlign: 'right' },
+  // Before the start: the team's record under its name, and its chance to win where the score will be.
+  record: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
+  chance: { color: colors.textDim, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  // "Win %" once, over the column of chances.
+  chanceHead: { color: colors.textFaint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textAlign: 'right', marginBottom: -space(1.5) },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(2) },
   metaText: { color: colors.textDim, fontSize: 12, fontWeight: '600', flexShrink: 1 },
   pill: { borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },

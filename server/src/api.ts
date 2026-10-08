@@ -147,7 +147,11 @@ route('GET', '/me/hate-watches', true, (req) => hateWatchTally(req.deviceId!));
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────
 route('GET', '/me/prefs', true, (req) => prefsDto(getPrefs(req.deviceId!)));
-route('PUT', '/me/prefs', true, (req, _u, _p, body) => prefsDto(setPrefs(req.deviceId!, body ?? {})));
+route('PUT', '/me/prefs', true, (req, _u, _p, body) => {
+  const p = prefsDto(setPrefs(req.deviceId!, body ?? {}));
+  if (body?.playerTeams) forgetDeviceTeams(req.deviceId!); // a player's team on or off the Scores tab, now
+  return p;
+});
 
 // ─── Feed (chronological by when it happened, newest first) ───────────────────────────────────
 route('GET', '/me/feed', true, (req, url) => {
