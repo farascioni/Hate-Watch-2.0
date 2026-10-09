@@ -23,6 +23,8 @@ export interface NPlay {
   clock?: string;          // soccer: the minute, "57'" or "90'+4'"
   periodNum?: number;      // quarter, period or inning number (every league; MLB's half is in `period`)
   clockSec?: number;       // seconds left in the period (NBA, WNBA, NFL, NHL), from ESPN's game clock
+  hits?: { home: number; away: number }; // MLB: each team's hits so far (the core feed only: the summary's plays don't say)
+  strength?: string;       // NHL goals: "Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot"
 }
 
 export interface GameCtx {
@@ -50,6 +52,27 @@ export interface GameCtx {
   lastPitchAbs?: boolean;
   /** Teams that have had their "blew a big lead" alert this game (teamScoreEvents): once each. */
   blewLead?: Set<string>;
+  /** MLB: each batter's strikeouts so far this game (observePlay), for "struck out for the 3rd time". */
+  ks?: Record<string, number>;
+  /** MLB: each team's hits so far, from the core feed's plays (never guessed: unknown until one says). */
+  hits?: { home: number; away: number };
+  /** MLB: teams that have had their "being no-hit" alert this game. */
+  noHit?: Set<string>;
+  /** NBA, WNBA: each player's personal fouls so far (observePlay), for fouling out. */
+  fouls?: Record<string, number>;
+  foulKeys?: Set<string>; // basketball: each personal foul counted once (personalFoul)
+  /** NBA, WNBA: points scored in a row against each side, for "on a 14-0 run" (teamScoreEvents). */
+  run?: { home: number; away: number };
+  /** NHL: each goalie's shots faced and goals allowed so far (observePlay), and the ones pulled. */
+  goalieLine?: Record<string, { sa: number; ga: number }>;
+  pulled?: Set<string>;
+  /** NHL: the shootout has started. */
+  shootout?: boolean;
+  /** NFL: each team's starting QB, their pass attempts, and passes in a row by another QB (for a QB pulled). */
+  qbStart?: Record<string, string>;
+  qbAtt?: Record<string, number>;
+  qbOther?: Record<string, { id: string; n: number }>;
+  qbPulled?: Set<string>;
 }
 
 export interface Detected {
@@ -80,6 +103,11 @@ export interface Detected {
   /** Only ever a line on another alert of its moment, never an alert of its own (a blown lead, at the final). */
   foldOnly?: boolean;
   /**
+   * Alternatives within a moment: a device gets at most one alert or line from each group, the first it
+   * wants. A team blowing a lead, falling behind and being scored on, on one play, are one group.
+   */
+  alt?: string;
+  /**
    * MLB: a lost ABS challenge, held by the game tracker until the review is settled (holdAbs in live.ts):
    * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.
    */
@@ -108,6 +136,7 @@ export function fromSitePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : undefined,
+    ...(p.strength?.text ? { strength: String(p.strength.text) } : {}),
     ...periodFields(p),
   };
 }
@@ -144,6 +173,8 @@ export function fromCorePlay(p: any): NPlay {
     at: p.wallclock ? Date.parse(p.wallclock) : Date.now(),
     shooting: !!p.shootingPlay,
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : p.penalty?.minutes ? Number(p.penalty.minutes) : undefined,
+    ...(p.awayHits != null && p.homeHits != null ? { hits: { home: Number(p.homeHits), away: Number(p.awayHits) } } : {}),
+    ...(p.strength?.text ? { strength: String(p.strength.text) } : {}),
     ...periodFields(p),
     ...(p.clock?.displayValue ? { clock: String(p.clock.displayValue) } : {}),
   };
@@ -231,6 +262,18 @@ export function fromCommentary(summary: any, score: { home: number; away: number
       push(id, 'simulation', 'Simulation', String(c.text), String(c.time?.displayValue ?? ''), lastAt || Date.now(), who);
       continue;
     }
+    // A shot off the woodwork, and a goal ruled out by VAR, as their own plays (soccerCommentaryEvents).
+    const said = String(c.text ?? ''), clock = String(c.time?.displayValue ?? '');
+    const wood = /woodwork/i.test(String(c.play?.type?.text ?? '')) ? said.match(/^(.+?) \((.+?)\) hits the/) : null;
+    const ruledOut = said.match(/^GOAL OVERTURNED BY VAR: (.+?) \((.+?)\) scores but the goal is ruled out/i);
+    if ((wood || ruledOut) && c.play?.id != null) {
+      const [, name, team] = (wood ?? ruledOut)!, who = find(name, team);
+      const id = `${wood ? 'wood' : 'var'}:${c.play.id}`;
+      order.set(id, seq);
+      if (who) out.push({ id, type: wood ? 'Woodwork' : 'VAR No Goal', typeSlug: wood ? 'woodwork' : 'var-no-goal', text: [clock, said].filter(Boolean).join(' '), teamId: who.teamId,
+        participants: [{ id: who.id, role: 'player' }], scoring: false, scoreValue: 0, home: score.home, away: score.away, at: c.play.wallclock ? Date.parse(c.play.wallclock) : lastAt || Date.now(), shooting: false, ...(clock ? { clock } : {}) });
+      continue;
+    }
     const slug = c.play?.type?.type;
     if (c.play?.id == null || (slug !== 'foul' && slug !== 'handball')) continue;
     plays.set(String(c.play.id), [...(plays.get(String(c.play.id)) ?? []), c]);
@@ -293,7 +336,20 @@ export function mergePlays(primary: NPlay[], secondary: NPlay[]): NPlay[] {
 export function observePlay(g: GameCtx, p: NPlay) {
   if (g.league === 'nhl') {
     const [saver] = p.participants.filter((x) => x.role === 'saver').map((x) => x.id);
-    if (saver && p.teamId) g.goalies.set(p.teamId === g.homeId ? g.awayId : g.homeId, saver);
+    const conceding = p.teamId === g.homeId ? g.awayId : g.homeId;
+    // Shots faced and goals allowed by whoever is in net (an empty-net goal is nobody's).
+    const inNet = saver ?? (p.scoring && p.strength !== 'Empty Net' ? g.goalies.get(conceding) : undefined);
+    if (inNet && p.teamId && (saver || p.scoring) && !g.shootout) {
+      const line = ((g.goalieLine ??= {})[inNet] ??= { sa: 0, ga: 0 });
+      line.sa++;
+      if (p.scoring) line.ga++;
+    }
+    if (saver && p.teamId) g.goalies.set(conceding, saver);
+    if (/start of shootout/i.test(p.text)) g.shootout = true;
+  }
+  if (BASKETBALL.has(g.league) && personalFoul(p)) {
+    const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id, key = `${actor}:${personalFoul(p)}`;
+    if (actor && !g.foulKeys?.has(key)) { (g.foulKeys ??= new Set()).add(key); (g.fouls ??= {})[actor] = (g.fouls[actor] ?? 0) + 1; }
   }
   if (SOCCER.has(g.league) && p.teamId) {
     // Keepers start from the line-ups (keepers()); then a keeper comes on, or the one in goal is sent off.
@@ -308,10 +364,19 @@ export function observePlay(g: GameCtx, p: NPlay) {
     // Core plays' team is the offense. A trick-play pass by a non-QB doesn't change who is under center.
     const qb = p.participants.find((x) => x.role === 'passer')?.id;
     const position = qb && catalog.playerByEspn('nfl', qb)?.position;
-    if (qb && (!position || position === 'QB')) (g.qbs ??= {})[p.teamId] = qb;
+    if (qb && (!position || position === 'QB')) {
+      (g.qbs ??= {})[p.teamId] = qb;
+      const start = ((g.qbStart ??= {})[p.teamId] ??= qb);
+      (g.qbAtt ??= {})[qb] = (g.qbAtt[qb] ?? 0) + 1;
+      const other = (g.qbOther ??= {})[p.teamId];
+      g.qbOther[p.teamId] = qb === start ? { id: '', n: 0 } : { id: qb, n: other?.id === qb ? other.n + 1 : 1 };
+    }
   }
   if (g.league === 'mlb') {
     trackHalfInning(g, p);
+    if (p.hits) g.hits = p.hits;
+    const [batter] = role(p, 'batter');
+    if (p.typeSlug === 'play-result' && batter && /struck out/i.test(p.text)) (g.ks ??= {})[batter] = (g.ks[batter] ?? 0) + 1;
     if (p.typeSlug === 'play-result') g.lastResult = p;
     if (PITCH.test(p.text)) g.lastPitchAbs = ABS_PITCH.test(p.type);
     // Pitches and at-bat results list the batter plus every runner: a full snapshot of the bases.
@@ -358,6 +423,26 @@ function mk(g: GameCtx, p: NPlay, type: string, athleteId: string, title: string
     meta: { gameId: g.gameId, playId: p.id, athleteId },
     ...extra,
   };
+}
+
+/** One play's moment for one team: its alerts and its players' alerts are one alert for a device (bundleByPlay). */
+export const playMoment = (gameId: string, playId: string, team: string) => `${gameId}:play:${playId}:${team}`;
+/** An alert's title as a line on another alert: "Aaron Judge struck out swinging." (a closing emoji dropped). */
+export const asLine = (title: string) => `${title.replace(/\s*(?:\p{Extended_Pictographic}\uFE0F?)+\s*$/u, '').replace(/[.!?]$/, '')}.`;
+
+/**
+ * A play's alerts about one team, and about that team's players, are one alert for a device that tracks
+ * more than one of them: "Gerrit Cole gave up a solo homer", with "Rays scored 1 run to take the lead
+ * over the Yankees." as a line, not two pushes. Alerts with a play and no moment of their own get that
+ * play's moment for their team, and their title as the line. (Called on each poll's alerts before publish.)
+ */
+export function bundleByPlay(events: Detected[]): Detected[] {
+  return events.map((e) => {
+    const gameId = e.meta?.gameId, playId = e.meta?.playId;
+    if (e.moment || typeof gameId !== 'string' || typeof playId !== 'string') return e;
+    const team = e.targetKey.startsWith('team:') ? e.targetKey : catalog.player(e.targetKey)?.teamKey;
+    return team ? { ...e, moment: playMoment(gameId, playId, team), fold: e.fold ?? asLine(e.title) } : e;
+  });
 }
 
 export const ordinal = (n: number) => {
@@ -485,7 +570,23 @@ function halfInningEnded(g: GameCtx): Detected[] {
   });
   for (const s of strandedRisp(g)) out.push(noble ? { ...s, unless: 'mlb.team.nobletiger' } : s);
   out.push(...downInOrder(g, r, key));
+  out.push(...noHitWatch(g, r));
   return out;
+}
+
+/**
+ * Team alert: six innings in and no hits (once a game). Only from a hit count the core feed gave (g.hits,
+ * never a guess), and the game tracker checks it against the box score before it goes out (live.ts).
+ */
+function noHitWatch(g: GameCtx, r: NPlay): Detected[] {
+  const n = r.period?.number ?? 0, side = r.teamId === g.homeId ? 'home' : 'away';
+  if (n < 6 || !r.teamId || !g.hits || g.hits[side] !== 0 || g.noHit?.has(r.teamId)) return [];
+  (g.noHit ??= new Set()).add(r.teamId);
+  return [{
+    id: `${g.gameId}:mlb.team.no_hit:${r.teamId}`, type: 'mlb.team.no_hit', targetKey: teamKey('mlb', r.teamId),
+    title: `${teamName('mlb', r.teamId)} are being no-hit through ${n}`, body: `${halfLabel(r)}: ${r.text} — ${scoreLine(g, r)}`,
+    at: r.at, meta: { gameId: g.gameId, playId: r.id, side },
+  }];
 }
 
 /** Team alert: three up, three down, nobody on. "Struck out in order" when all three struck out. */
@@ -559,6 +660,29 @@ function runnerOut(g: GameCtx, p: NPlay): Detected | null {
     at: p.at,
     meta: { gameId: g.gameId, playId: p.id, athleteId: runner },
   };
+}
+
+/** A run that scored on a wild pitch, a passed ball or a balk: "Mitchell scored on Burke wild pitch.", "Outman scored on a balk." */
+const GIFT_RUN = /\bscored on (?:an? )?(?:[A-Z][\p{L}'.-]+ )?(wild pitch|passed ball|balk)\b/iu;
+/** Thrown out on the bases in an at-bat's result: "Contreras out stretching at third.", "Manzardo doubled off first.", "Goodman thrown out at home." */
+const BASE_OUT = new RegExp(`${NAME} (out stretching at (?:second|third|home)|doubled off (?:first|second|third)|(?:thrown )?out at home)`, 'gu');
+
+/**
+ * Player alert: thrown out on the bases (caught stealing and pickoffs are runnerOut's). The batter's own
+ * ("Contreras doubled to left, Contreras out stretching at third") or a runner's, found by last name on the
+ * batting team. Its id comes from the text, like runnerOut's, for ESPN's double posts.
+ */
+function outOnBases(g: GameCtx, p: NPlay): Detected[] {
+  if (p.typeSlug !== 'play-result' || !p.teamId || /caught stealing|picked off/i.test(p.text)) return [];
+  const [batter] = role(p, 'batter');
+  const out: Detected[] = [];
+  for (const [, name, how] of p.text.matchAll(BASE_OUT)) {
+    const who = batter && normalize(catalog.playerByEspn('mlb', batter)?.name ?? '').endsWith(normalize(name)) ? batter : byLastName(g, p.teamId, name);
+    if (!who) continue;
+    const what = how.replace(/^thrown out/, 'out').replace(/^out stretching/, 'thrown out stretching').replace(/^out at home/, 'thrown out at home').replace(/^doubled off/, 'doubled off');
+    out.push({ ...mk(g, p, 'mlb.runner.out_on_bases', who, `${nameOf('mlb', who)} got ${what}`), id: `${g.gameId}:bases:${halfKey(p) ?? ''}:${normalize(p.text).replace(/ /g, '-')}:${who}` });
+  }
+  return out;
 }
 
 // ─── MLB challenges ───────────────────────────────────────────────────────────────────────────
@@ -702,7 +826,9 @@ export function boxPitchers(summary: any): BoxPitcher[] {
   return out;
 }
 
-const PITCHER_ORDER = ['mlb.pitcher.blown_save', 'mlb.pitcher.no_quality_start', 'mlb.pitcher.loss'];
+const PITCHER_ORDER = ['mlb.pitcher.blown_save', 'mlb.pitcher.chased', 'mlb.pitcher.no_quality_start', 'mlb.pitcher.loss'];
+/** A starter out of the game before this many outs (3 innings) got chased: 10.5% of 410 starts in 2026. */
+export const CHASED_OUTS = 9;
 const innings = (p: BoxPitcher) => { const ip = p.ip.replace(/\.0$/, ''); return `${ip} inning${ip === '1' ? '' : 's'}`; };
 
 /**
@@ -722,7 +848,8 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
     const note = (re: RegExp) => p.notes.find((n) => re.test(n));
     const bs = note(/^BS?\b/), loss = o.final ? note(/^L\b/) : undefined;
     const noQs = p.starter && (p.er >= 4 || ((!p.active || o.final) && p.outs < 18));
-    const facts = PITCHER_ORDER.filter((t, i) => [bs, noQs, loss][i] && !done.has(`${t}:${p.id}`));
+    const chased = p.starter && !p.active && !o.final && p.outs < CHASED_OUTS;
+    const facts = PITCHER_ORDER.filter((t, i) => [bs, chased, noQs, loss][i] && !done.has(`${t}:${p.id}`));
     if (!facts.length) continue;
     for (const t of facts) done.add(`${t}:${p.id}`);
     const has = (t: string) => facts.includes(`mlb.pitcher.${t}`);
@@ -732,13 +859,18 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
       : has('no_quality_start') && has('loss') ? `${name} took the loss without a quality start`
       : has('blown_save') ? `${name} blew the save`
       : has('loss') ? `${name} took the loss`
+      : has('chased') ? `${name} got chased after ${innings(p)}${p.er ? ` (${p.er} earned run${p.er === 1 ? '' : 's'})` : ''}`
       : `No quality start for ${name}: ${p.er >= 4 ? `${p.er} earned runs in ${innings(p)}` : `${p.active ? 'went' : 'pulled after'} ${innings(p)}`}`;
     const extra = [
       has('blown_save') && Number(after(bs)) ? `${ordinal(Number(after(bs)))} blown save this season` : '',
       has('loss') && after(loss) ? `now ${after(loss)}` : '',
     ].filter(Boolean);
+    // His start's two facts can come at different times (a 4th earned run, then the hook): one moment, so the
+    // later one is a line on the alert he already had.
+    const start = facts.every((t) => t === 'mlb.pitcher.chased' || t === 'mlb.pitcher.no_quality_start')
+      ? { moment: `${g.gameId}:start:${p.id}`, fold: has('chased') ? `Chased after ${innings(p)}.` : asLine(title) } : {};
     out.push({
-      id: `${g.gameId}:${facts[0]}:${p.id}`, type: facts[0], ...(facts.length > 1 ? { aliases: facts.slice(1) } : {}),
+      id: `${g.gameId}:${facts[0]}:${p.id}`, type: facts[0], ...(facts.length > 1 ? { aliases: facts.slice(1) } : {}), ...start,
       targetKey: playerKey('mlb', p.id), title,
       body: `${p.line}${extra.length ? ` · ${extra.join(' · ')}` : ''} — ${o.final ? 'Final: ' : ''}${scoreLine(g, o.score)}`,
       at: o.at, meta: { gameId: g.gameId, athleteId: p.id },
@@ -758,8 +890,14 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   const isResult = p.typeSlug === 'play-result' || p.scoring;
 
   if (isResult && batter) {
-    if (/struck out/i.test(t)) out.push(mk(g, p, 'mlb.batter.strikeout', batter, `${nameOf('mlb', batter)} struck out ${/looking/i.test(t) ? 'looking 👀' : 'swinging'}`));
-    else if (/\b(double|triple) play\b/i.test(t)) {
+    if (/struck out/i.test(t)) {
+      // The 3rd, 4th, 5th strikeout of a game is its own alert, in place of the strikeout's (and counting as it).
+      const n = (g.ks?.[batter] ?? 0) + 1; // observePlay counts this one after the detectors
+      const how = /looking/i.test(t) ? 'looking 👀' : 'swinging';
+      out.push(n >= 3
+        ? mk(g, p, 'mlb.batter.multi_strikeout', batter, `${nameOf('mlb', batter)} struck out for the ${ordinal(n)} time: ${n === 3 ? 'a hat trick 🎩' : n === 4 ? 'a golden sombrero' : 'a platinum sombrero'}`, { aliases: ['mlb.batter.strikeout'] })
+        : mk(g, p, 'mlb.batter.strikeout', batter, `${nameOf('mlb', batter)} struck out ${how}`));
+    } else if (/\b(double|triple) play\b/i.test(t)) {
       // "Busch grounded into double play, …", "Pham flied into double play, …", a triple play the same way.
       // It's an out too: someone with only "Makes an out" on gets this one (aliases), and nobody gets two.
       const [, how = 'hit', kind] = t.match(/\b(grounded|lined|flied|popped|bunted|fouled|hit) into (?:a )?(double|triple) play\b/i) ?? [, 'hit', /triple play/i.test(t) ? 'triple' : 'double'];
@@ -777,14 +915,35 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   }
   if (pitcher) {
     const runs = p.scoring ? Math.max(p.scoreValue, 1) : 0;
+    const pn = nameOf('mlb', pitcher);
+    // A run handed over: a wild pitch, a balk, a passed ball, or a walk or hit batter with the bases loaded.
+    // ESPN posts a runner's run twice (a "Wild Pitch" play and a "Play Result", same text), so these ids
+    // come from the half-inning and the text: one alert.
+    const gift = p.scoring ? t.match(GIFT_RUN) : null;
+    const pushedIn = p.scoring && isResult && /\b(walked|hit by pitch)\b/i.test(t) && !/\b(singled|doubled|tripled|homered)\b/i.test(t);
+    const textId = (type: string, who: string) => `${g.gameId}:${type}:${halfKey(p) ?? ''}:${normalize(t).replace(/ /g, '-')}:${who}`;
     if (/homered/i.test(t)) {
       const label = runs >= 4 ? 'a grand slam' : runs > 1 ? `a ${runs}-run homer` : 'a solo homer';
-      out.push(mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${nameOf('mlb', pitcher)} gave up ${label}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
+      // The batter before homered off him too, this half-inning: back-to-back, one alert for the second.
+      const before = g.lastResult;
+      const b2b = !!before && /homered/i.test(before.text) && halfKey(before) === halfKey(p) && role(before, 'pitcher')[0] === pitcher;
+      out.push(b2b
+        ? mk(g, p, 'mlb.pitcher.back_to_back', pitcher, `${pn} gave up back-to-back homers`, { aliases: ['mlb.pitcher.home_run_allowed', 'mlb.pitcher.runs_allowed'] })
+        : mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${pn} gave up ${label}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
+    } else if (gift && !/passed ball/i.test(gift[1])) {
+      out.push({ ...mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/balk/i.test(gift[1]) ? 'balked in a run' : 'let a run score on a wild pitch'}`, { aliases: ['mlb.pitcher.runs_allowed'] }), id: textId('mlb.pitcher.gift_run', pitcher) });
+    } else if (pushedIn) {
+      out.push(mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'hit a batter' : 'walked'} in a run`, { aliases: ['mlb.pitcher.runs_allowed', 'mlb.pitcher.walk'] }));
     } else if (runs) {
-      out.push(mk(g, p, 'mlb.pitcher.runs_allowed', pitcher, `${nameOf('mlb', pitcher)} gave up ${runs} run${runs > 1 ? 's' : ''}`));
+      out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', pitcher, `${pn} gave up ${runs} run${runs > 1 ? 's' : ''}`), ...(gift ? { id: textId('mlb.pitcher.runs_allowed', pitcher) } : {}) });
     }
-    if (isResult && /\b(walked|hit by pitch)\b/i.test(t)) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${nameOf('mlb', pitcher)} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
+    if (isResult && /\b(walked|hit by pitch)\b/i.test(t) && !pushedIn) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
+    // A passed ball that scores a run is the catcher's ("…on a passed ball by Langeliers").
+    const catcherName = gift && /passed ball/i.test(gift[1]) ? t.match(/passed ball by ([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/u)?.[1] : undefined;
+    const catcher = catcherName && p.teamId ? byLastName(g, p.teamId === g.homeId ? g.awayId : g.homeId, catcherName) : undefined;
+    if (catcher) out.push({ ...mk(g, p, 'mlb.catcher.passed_ball', catcher, `${nameOf('mlb', catcher)} let a run score on a passed ball`), id: textId('mlb.catcher.passed_ball', catcher) });
   }
+  out.push(...outOnBases(g, p));
   const runner = runnerOut(g, p);
   if (runner) out.push(runner);
   out.push(...opponentRisp(g, p));
@@ -808,7 +967,7 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   for (const f of role(p, 'fumbler')) {
     const lost = /Opponent|Fumble Return/i.test(ty);
     out.push(lost
-      ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf('nfl', f)} lost a fumble`, { aliases: ['nfl.fumble'] })
+      ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf('nfl', f)} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] })
       : mk(g, p, 'nfl.fumble', f, `${nameOf('nfl', f)} fumbled`));
   }
   const kickMiss = /Field Goal Missed|Blocked Field Goal|Blocked PAT|Missed PAT/i.test(ty) || /extra point is no good|kick is blocked/i.test(p.text);
@@ -834,7 +993,42 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (onside) out.push(onside);
   const tossed = disqualified(g, p);
   if (tossed) replace(mk(g, p, 'player.ejected', tossed, `${nameOf('nfl', tossed)} got ejected`), 'nfl.penalty');
+  // A touchdown taken off the board by a penalty: the flagged player's (in place of his penalty alert) and
+  // his team's, the team whose touchdown it was ("TOUCHDOWN NULLIFIED by Penalty. PENALTY on GB-A.Belton, …").
+  if (/TOUCHDOWN NULLIFIED/.test(p.text)) {
+    const flagged = flaggedFor(g, p);
+    const teamId = flagged ? playerTeamId('nfl', flagged) : undefined;
+    if (flagged) replace(mk(g, p, 'nfl.td_wiped_out', flagged, `${nameOf('nfl', flagged)}'s penalty wiped out a touchdown`), 'nfl.penalty');
+    if (teamId) out.push({ id: `${g.gameId}:${p.id}:nfl.td_wiped_out:team-${teamId}`, type: 'nfl.td_wiped_out', targetKey: teamKey('nfl', teamId),
+      title: `${teamName('nfl', teamId)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
+  }
+  out.push(...qbPulled(g, p));
   return out;
+}
+
+/** The player whose flag it was: the first "PENALTY on XXX-F.Last" the play names, among its penalized players. */
+function flaggedFor(g: GameCtx, p: NPlay): string | undefined {
+  const penalized = role(p, 'penalized');
+  if (penalized.length <= 1) return penalized[0];
+  const m = p.text.match(/PENALTY on [A-Z]{2,3}-([A-Z][\w.'-]*\.[\w'-]+)/i);
+  if (!m) return penalized[0];
+  const [initial, last] = [m[1][0].toLowerCase(), normalize(m[1].split('.').slice(1).join('.'))];
+  return penalized.find((id) => { const n = normalize(catalog.playerByEspn('nfl', id)?.name ?? ''); return n.startsWith(initial) && n.endsWith(last); }) ?? penalized[0];
+}
+
+/**
+ * NFL: the starting QB pulled for another one (benched or hurt), once a game per team: in the first three
+ * quarters, after the starter's 5th pass, another QB throws twice in a row (one throw is a package play).
+ * ESPN doesn't say why, so the alert says both.
+ */
+function qbPulled(g: GameCtx, p: NPlay): Detected[] {
+  const [qb] = role(p, 'passer'), team = p.teamId;
+  if (!qb || !team || catalog.playerByEspn('nfl', qb)?.position !== 'QB' || (p.periodNum ?? 0) > 3 || g.qbPulled?.has(team)) return [];
+  const start = g.qbStart?.[team], other = g.qbOther?.[team];
+  if (!start || qb === start || (g.qbAtt?.[start] ?? 0) < 5) return [];
+  if ((other?.id === qb ? other.n : 0) + 1 < 2) return []; // observePlay counts this pass after the detectors
+  (g.qbPulled ??= new Set()).add(team);
+  return [{ ...mk(g, p, 'nfl.qb.pulled', start, `${nameOf('nfl', start)} got pulled: ${nameOf('nfl', qb)} is in at quarterback`), body: `Benched or hurt: ESPN doesn't say. ${p.text} — ${scoreLine(g, p)}` }];
 }
 
 /**
@@ -944,7 +1138,25 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   } else if (/foul/i.test(p.type) && actor) {
     out.push(mk(g, p, `${lg}.foul`, actor, `${nameOf(lg, actor)} committed a foul`));
   }
+  // The 6th personal foul (technicals don't count): fouled out, in place of that foul's alert. First, so that
+  // on an offensive foul's turnover play it's the alert and "turned it over" a line on it (bundleByPlay).
+  const foul = personalFoul(p);
+  if (actor && foul && !g.foulKeys?.has(`${actor}:${foul}`) && (g.fouls?.[actor] ?? 0) + 1 === 6) {
+    const i = out.findIndex((e) => e.type === `${lg}.foul` && e.targetKey === playerKey(lg, actor));
+    if (i >= 0) out.splice(i, 1);
+    out.unshift(mk(g, p, `${lg}.fouled_out`, actor, `${nameOf(lg, actor)} fouled out`, { aliases: [`${lg}.foul`] }));
+  }
   return out;
+}
+
+/**
+ * Basketball: a personal foul (technicals don't count toward fouling out), as a key that's the same for
+ * an offensive foul and the turnover ESPN logs for it at that moment ("Offensive Foul", then "Offensive
+ * Foul Turnover", one foul in the box score). The turnover is sometimes the only play for it.
+ */
+function personalFoul(p: NPlay): string | undefined {
+  if (!/foul/i.test(p.type) || /technical/i.test(p.type)) return undefined;
+  return /offensive/i.test(p.type) ? `offensive:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` : p.id;
 }
 
 function nhl(g: GameCtx, p: NPlay): Detected[] {
@@ -954,9 +1166,24 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   const other = (id?: string) => (id === g.homeId ? g.awayId : g.homeId);
   // g.goalies is kept current by observePlay().
 
+  // A new goalie making a save in regulation: the one before was pulled, if he'd faced shots (the box score's
+  // first goalie at the first read can be the backup: then this is the starter's first save, not a pull).
+  const [saver] = role(p, 'saver'), was = g.goalies.get(other(p.teamId));
+  const line = was ? g.goalieLine?.[was] : undefined;
+  if (saver && was && saver !== was && (p.periodNum ?? 0) <= 3 && line && line.sa > 0 && !g.pulled?.has(was)) {
+    (g.pulled ??= new Set()).add(was);
+    out.push(mk(g, p, 'nhl.goalie.pulled', was, `${nameOf('nhl', was)} got pulled after allowing ${line.ga} goal${line.ga === 1 ? '' : 's'} on ${line.sa} shot${line.sa === 1 ? '' : 's'}`, { body: `${nameOf('nhl', saver)} is in net — ${scoreLine(g, p)}` }));
+  }
+  if (g.shootout && shooter && /^(Missed|Shot)$/.test(p.type)) {
+    // The shootout: a miss or a save is its own alert, in place of the shot's.
+    const kind = p.type === 'Missed' ? 'nhl.shot_missed' : 'nhl.shot_saved';
+    // No score: a shootout play's isn't the game's, and finished games show the shootout's final tally on all of them.
+    out.push(mk(g, p, 'nhl.shootout_miss', shooter, `${nameOf('nhl', shooter)} ${p.type === 'Missed' ? 'missed' : 'got stopped'} in the shootout`, { aliases: [kind], body: `Shootout: ${p.text}` }));
+    return out;
+  }
   if (slug === 'goal' || p.type === 'Goal') {
     const goalie = g.goalies.get(other(p.teamId));
-    if (goalie && !/empty net/i.test(p.text)) out.push(mk(g, p, 'nhl.goalie.goal_allowed', goalie, `${nameOf('nhl', goalie)} let one in 🥅`));
+    if (goalie && !/empty net/i.test(p.text) && p.strength !== 'Empty Net' && !g.shootout) out.push(mk(g, p, 'nhl.goalie.goal_allowed', goalie, `${nameOf('nhl', goalie)} let one in 🥅`));
   } else if (shooter && (slug === 'shot-missed' || p.type === 'Missed')) {
     out.push(mk(g, p, 'nhl.shot_missed', shooter, `${nameOf('nhl', shooter)} shot and missed${/post|crossbar/i.test(p.text) ? ' (rang iron)' : ''}`));
   } else if (shooter && (slug === 'shot-blocked' || p.type === 'Blocked')) {
@@ -972,9 +1199,13 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
     // two plays at the same moment (Olivier, 14:27 of the 3rd): one moment, the ejection a line on the first.
     const ejected = /game misconduct|match penalty|^match$/i.test(p.type);
     const moment = { moment: `${g.gameId}:penalty:${who}:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` };
+    // A fight ("Mathieu Olivier Fighting against Arber Xhekaj"): its own alert, counting as the penalty.
+    const fight = /\bfighting\b/i.test(p.text) ? p.text.match(/fighting against (.+?)$/i)?.[1] ?? '' : null;
     out.push(ejected
       ? mk(g, p, 'player.ejected', who, `${nameOf('nhl', who)} got ejected (${p.type.toLowerCase()})`, { aliases: ['nhl.penalty'], fold: `Ejected (${p.type.toLowerCase()}).`, ...moment })
-      : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${p.type})`, moment));
+      : fight !== null
+        ? mk(g, p, 'nhl.fight', who, `${nameOf('nhl', who)} dropped the gloves${fight ? ` with ${fight}` : ''}`, { aliases: ['nhl.penalty'], fold: 'A fight.', ...moment })
+        : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${p.type})`, { fold: `${p.penaltyMinutes} minutes in the box.`, ...moment }));
   }
   return out;
 }
@@ -1007,6 +1238,8 @@ function soccer(g: GameCtx, p: NPlay): Detected[] {
     out.push(forTeam(type, `${teamName(lg, p.teamId)} ${what} 😬`, moment));
   } else if (who && /^yellow card/i.test(p.type)) {
     out.push(mk(g, p, `${lg}.yellow_card`, who, `${nameOf(lg, who)} was booked 🟨`));
+  } else if (p.typeSlug === 'substitution') {
+    out.push(...earlySub(g, p));
   } else if (who && p.teamId && /^red card/i.test(p.type)) {
     const type = `${lg}.red_card`, moment = `${g.gameId}:${p.id}:red`;
     const left = 11 - ((g.sentOff?.[p.teamId] ?? 0) + 1); // observePlay counts this one after the detectors run
@@ -1242,6 +1475,12 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
  */
 export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay, led?: { home: number; away: number }): Detected[] {
   const out: Detected[] = [];
+  // Basketball: points scored against each side in a row, for "on a 14-0 run".
+  const runBefore = { ...(g.run ?? { home: 0, away: 0 }) };
+  if (BASKETBALL.has(g.league)) {
+    const dh = p.home - prev.home, da = p.away - prev.away;
+    g.run = { home: dh > 0 ? 0 : runBefore.home + Math.max(0, da), away: da > 0 ? 0 : runBefore.away + Math.max(0, dh) };
+  }
   for (const side of ['home', 'away'] as const) {
     const teamId = side === 'home' ? g.homeId : g.awayId;
     const oppId = side === 'home' ? g.awayId : g.homeId;
@@ -1256,25 +1495,51 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     // then `unless` it: each user gets one (the combined one if they want "falls behind").
     const fellBehind = prev[side] - prev[opp] >= 0 && p[side] - p[opp] < 0;
     const unlessBehind = fellBehind ? { unless: 'team.fell_behind' } : {};
-    const moment = { moment: `${g.gameId}:${p.id}:scored-on:${teamId}` };
+    // The play's moment for this team (shared with its players' alerts: bundleByPlay); the three are alternatives.
+    const moment = { moment: playMoment(g.gameId, p.id, teamKey(g.league, teamId)), alt: 'scored-on' };
     const lead = led?.[side] ?? 0;
     if (fellBehind && lead >= (BLEW_LEAD_LIVE[g.league] ?? Infinity) && !g.blewLead?.has(teamId)) {
       (g.blewLead ??= new Set()).add(teamId);
       const unit = MARGIN_UNIT[g.league] ?? (SOCCER.has(g.league) ? 'goal' : 'point');
-      out.push({ id: `${g.gameId}:${p.id}:team.blew_lead:${teamId}`, type: 'team.blew_lead', title: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead to ${the(g.league, oppName)}`, ...base, meta: { ...base.meta, led: lead }, ...moment });
+      out.push({ id: `${g.gameId}:${p.id}:team.blew_lead:${teamId}`, type: 'team.blew_lead', title: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead to ${the(g.league, oppName)}`, ...base, meta: { ...base.meta, led: lead }, ...moment,
+        fold: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead.` });
+    }
+    // Soccer: a goal against in the last minutes that takes away a lead or a draw (late_goal), before "falls behind".
+    const minute = soccerMinute(p.clock);
+    const equalized = prev[side] - prev[opp] > 0 && p[side] === p[opp];
+    if (SOCCER.has(g.league) && delta > 0 && minute >= LATE_MINUTE && (fellBehind || equalized)) {
+      const when = /\+/.test(p.clock ?? '') ? `stoppage time (${p.clock})` : `the ${ordinal(minute)} minute`;
+      out.push({ id: `${g.gameId}:${p.id}:${g.league}.team.late_goal:${teamId}`, type: `${g.league}.team.late_goal`, aliases: [fellBehind ? 'team.fell_behind' : 'team.opponent_scored'],
+        title: fellBehind ? `${oppName} took the lead against ${team} in ${when}` : `${oppName} equalized against ${team} in ${when}`,
+        ...base, ...moment, fold: fellBehind ? `A go-ahead goal in ${when}.` : `An equalizer in ${when}.` });
     }
     if (fellBehind) {
       out.push({
         id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
         title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
-        ...base, ...moment,
+        ...base, ...moment, fold: safety ? `${team} gave up a safety and fell behind.` : `${oppName} took the lead.`,
       });
+    }
+    // NHL: an empty-net goal or a short-handed one against them (they were on the power play), counting as "opponent scores".
+    if (g.league === 'nhl' && delta > 0 && (p.strength === 'Empty Net' || p.strength === 'Shorthanded')) {
+      const en = p.strength === 'Empty Net';
+      out.push({ id: `${g.gameId}:${p.id}:nhl.team.${en ? 'empty_net_goal' : 'shorthanded_goal'}:${teamId}`, type: en ? 'nhl.team.empty_net_goal' : 'nhl.team.shorthanded_goal', aliases: ['team.opponent_scored'],
+        title: en ? `${team} gave up an empty-netter to the ${oppName}` : `${team} gave up a short-handed goal to the ${oppName}`, ...base, ...moment,
+        fold: en ? 'Into an empty net.' : 'A short-handed goal, on their own power play.' });
     }
     if (safety) {
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
-      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment });
+      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind, ...moment });
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind, ...moment,
+        fold: `${oppName} ${what}.` });
+    }
+    // Basketball: the other side's run reached RUN_POINTS on this play (once a run). A line on that play's
+    // alert, not an alternative to it: "Knicks took the lead." and "It's a 14-0 Knicks run."
+    const run = g.run?.[side] ?? 0, need = RUN_POINTS[g.league as 'nba' | 'wnba'];
+    if (BASKETBALL.has(g.league) && need && runBefore[side] < need && run >= need) {
+      out.push({ id: `${g.gameId}:${p.id}:${g.league}.team.opponent_run:${teamId}`, type: `${g.league}.team.opponent_run`, title: `${oppName} are on ${aOrAn(run)} ${run}-0 run against the ${team}`,
+        ...base, moment: moment.moment, fold: `It's ${aOrAn(run)} ${run}-0 ${oppName} run.` });
     }
   }
   return out;
@@ -1303,6 +1568,13 @@ export interface Pregame {
  */
 export interface SeriesSpot { kind: 'series' | 'season'; before: number; lostBefore: number; last: boolean }
 
+/** Basketball: points in a row against a team for "on a run" (NBA 14-0: 10% of team-games; WNBA 12-0: 18%). */
+export const RUN_POINTS = { nba: 14, wnba: 12 };
+/** Soccer: a goal against from this minute on, taking a lead or a draw away, is a late goal. */
+export const LATE_MINUTE = 85;
+/** A soccer clock's minute: "57'" → 57, "90'+4'" → 94. */
+export const soccerMinute = (clock?: string) => { const m = String(clock ?? '').match(/^(\d+)'(?:\s*\+\s*(\d+))?/); return m ? Number(m[1]) + Number(m[2] ?? 0) : 0; };
+
 /*
  * The thresholds, each set so the fact is news, from 1,807 decided regular-season games (2025-26 NBA, NHL,
  * NFL and EPL, 2026 MLB and WNBA) and every team's 2025-26 schedule. Share of losses each one fires on:
@@ -1325,6 +1597,10 @@ export const LAST_SECONDS: Partial<Record<League, number>> = { nba: 10, wnba: 10
 /** "Lost to a worse team": the winner's win percentage at least this far below the loser's, both MIN_GAMES in. */
 export const WORSE_GAP: Partial<Record<League, number>> = { mlb: 0.15, nba: 0.2, wnba: 0.2, nfl: 0.2, nhl: 0.15 };
 export const MIN_GAMES: Partial<Record<League, number>> = { mlb: 20, nba: 10, wnba: 8, nfl: 4, nhl: 10 };
+/** The winner's top scorer, at least, for "their star went off" (NBA, WNBA). */
+export const STAR_POINTS = { nba: 40, wnba: 30 };
+/** A power play with no goal on at least this many chances (NHL). */
+export const PP_FAIL = 4;
 /** A sweep takes this many games: an MLB series of 3+, a season series of 3+ (NFL division rivals meet twice). */
 export const SWEEP_GAMES: Partial<Record<League, number>> = { mlb: 3, nba: 3, wnba: 3, nfl: 2, nhl: 3 };
 
@@ -1368,7 +1644,7 @@ const clockLeft = (lg: League, sec: number) => (lg === 'nfl' ? `${Math.floor(sec
  * Playoff losses skip the regular-season facts (records, sweeps: a playoff sweep is in the loss's title).
  */
 export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, lost: Detected, final: { home: number; away: number },
-  facts: { plays?: NPlay[]; pre?: Pregame; overtime?: 'ot' | 'so' | null; postseason?: boolean }): Detected[] {
+  facts: { plays?: NPlay[]; pre?: Pregame; overtime?: 'ot' | 'so' | null; postseason?: boolean; box?: any }): Detected[] {
   const lg = g.league;
   const loserSide: 'home' | 'away' = lost.targetKey === teamKey(lg, g.homeId) ? 'home' : 'away';
   const winnerSide = loserSide === 'home' ? 'away' : 'home';
@@ -1412,6 +1688,17 @@ export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awa
   if (final[loserSide] === 0 && !BASKETBALL.has(lg) && !SOCCER.has(lg)) {
     const [title, fold] = lg === 'nfl' ? [`${team} were held scoreless by the ${winner}`, 'Held scoreless.'] : [`${team} were shut out by the ${winner}`, 'Shut out.'];
     fact('team.shut_out', title, fold);
+  }
+
+  // From the final box score, each only a line on the loss (with the loss off, they aren't a reason to hear of it):
+  // no-hit (MLB), the winner's star going off (NBA 40, WNBA 30: 10% and 13% of losses), a dead power play (NHL 0-for-4+: 13%).
+  if (facts.box) {
+    const hits = lg === 'mlb' ? boxHits(facts.box) : undefined;
+    if (hits?.[loserId] === 0) fact('mlb.team.no_hit', `${team} were no-hit by the ${winner}`, 'No-hit.', {}, true);
+    const star = BASKETBALL.has(lg) ? boxTopScorer(facts.box, winnerId) : undefined;
+    if (star && star.pts >= STAR_POINTS[lg as 'nba' | 'wnba']) fact(`${lg}.team.star_went_off`, `${nameOf(lg, star.id)} scored ${star.pts} on ${the(lg, team)}`, `${nameOf(lg, star.id)} scored ${star.pts} on them.`, { athleteId: star.id }, true);
+    const pp = lg === 'nhl' ? boxPowerPlay(facts.box, loserId) : undefined;
+    if (pp && pp.goals === 0 && pp.chances >= PP_FAIL) fact('nhl.team.power_play_fail', `${team} went 0-for-${pp.chances} on the power play and lost`, `0-for-${pp.chances} on the power play.`, {}, true);
   }
 
   if (!facts.postseason) {
@@ -1476,4 +1763,175 @@ export function seriesSpot(lg: League, schedule: any, gameId: string, teamId: st
   const meetings = games.filter((x) => x.opp === opp);
   const before = meetings.slice(0, meetings.findIndex((x) => x.id === gameId));
   return { kind: 'season', before: before.length, lostBefore: before.filter((x) => x.done && !x.won).length, last: meetings.at(-1)?.id === gameId };
+}
+
+// ─── Box-score facts at the final ─────────────────────────────────────────────────────────────
+/** Each team's box-score rows (players), by the stat group's labels: { teamId, labels, athletes }. */
+function boxGroups(summary: any) {
+  return (summary?.boxscore?.players ?? []).flatMap((t: any) => (t.statistics ?? []).map((st: any) => ({
+    teamId: String(t.team?.id), kind: String(st.type ?? st.name ?? ''), labels: (st.labels ?? []) as string[], athletes: (st.athletes ?? []) as any[],
+  })));
+}
+const statOf = (labels: string[], a: any) => (l: string) => String(a.stats?.[labels.indexOf(l)] ?? '');
+
+/** MLB: each team's hits, from the box score's batting lines (teamId → hits), when it has them. */
+export function boxHits(summary: any): Record<string, number> | undefined {
+  const out: Record<string, number> = {};
+  for (const gr of boxGroups(summary).filter((x: any) => x.kind === 'batting' && x.labels.includes('H'))) {
+    out[gr.teamId] = (out[gr.teamId] ?? 0) + gr.athletes.reduce((n: number, a: any) => n + (Number(statOf(gr.labels, a)('H')) || 0), 0);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Basketball: a team's top scorer in the box score. */
+export function boxTopScorer(summary: any, teamId: string): { id: string; pts: number } | undefined {
+  let best: { id: string; pts: number } | undefined;
+  for (const gr of boxGroups(summary).filter((x: any) => x.teamId === teamId && x.labels.includes('PTS'))) {
+    for (const a of gr.athletes) { const pts = Number(statOf(gr.labels, a)('PTS')) || 0; if (a.athlete?.id != null && (!best || pts > best.pts)) best = { id: String(a.athlete.id), pts }; }
+  }
+  return best;
+}
+
+/** NHL: a team's power play from the box score's team stats: goals and chances. */
+export function boxPowerPlay(summary: any, teamId: string): { goals: number; chances: number } | undefined {
+  const t = (summary?.boxscore?.teams ?? []).find((x: any) => String(x.team?.id) === teamId);
+  const v = (n: string) => t?.statistics?.find((s: any) => s.name === n)?.displayValue;
+  return v('powerPlayOpportunities') != null ? { goals: Number(v('powerPlayGoals')) || 0, chances: Number(v('powerPlayOpportunities')) || 0 } : undefined;
+}
+
+/*
+ * A player's bad night from the final box score, each its own alert type. Share of player games (2025-26):
+ *   MLB 0-for-4 or worse: 16.6% of starters' games (0-for-5: 1.9%), so on its own it's feed-only by default
+ *   NBA/WNBA a brick night, 30% or worse on 12+ shots or 0-for-6+ from three: 3.8% / 3.3% of 20-minute games
+ *   NHL -3 or worse: 1.9% of skater games
+ */
+export const BRICK = { shots: 12, pct: 0.3, threes: 6 };
+export const NHL_MINUS = -3;
+export interface PlayerFact { athleteId: string; teamId: string; type: string; title: string; line: string }
+
+/** The box score's bad nights (above), for every player in it (only the tracked ones are stored: publish). */
+export function boxPlayerFacts(lg: League, summary: any): PlayerFact[] {
+  const out: PlayerFact[] = [];
+  for (const gr of boxGroups(summary)) {
+    for (const a of gr.athletes) {
+      if (a.athlete?.id == null) continue;
+      const v = statOf(gr.labels, a), id = String(a.athlete.id), name = nameOf(lg, id);
+      if (lg === 'mlb' && gr.kind === 'batting') {
+        const ab = Number(v('AB')) || 0, h = Number(v('H')) || 0, k = Number(v('K')) || 0;
+        if (ab >= 4 && h === 0) out.push({ athleteId: id, teamId: gr.teamId, type: 'mlb.batter.hitless', title: `${name} went 0-for-${ab}${k >= 2 ? ` with ${k} strikeouts` : ''}`, line: `${v('H-AB')}${k ? `, ${k} K` : ''}` });
+      } else if (BASKETBALL.has(lg) && gr.labels.includes('FG')) {
+        const [fgm, fga] = v('FG').split('-').map(Number), [tpm, tpa] = v('3PT').split('-').map(Number);
+        const bricks = fga >= BRICK.shots && fgm / fga <= BRICK.pct, threes = tpa >= BRICK.threes && tpm === 0;
+        if (bricks || threes) {
+          out.push({ athleteId: id, teamId: gr.teamId, type: `${lg}.brick_night`, title: bricks ? `${name} shot ${fgm}-for-${fga}${threes ? `, 0-for-${tpa} from three` : ''}` : `${name} went 0-for-${tpa} from three`,
+            line: `${v('PTS')} PTS, ${v('FG')} FG, ${v('3PT')} 3PT` });
+        }
+      } else if (lg === 'nhl' && gr.labels.includes('+/-') && gr.kind !== 'goalies') {
+        const pm = Number(v('+/-'));
+        if (Number.isFinite(pm) && pm <= NHL_MINUS) out.push({ athleteId: id, teamId: gr.teamId, type: 'nhl.minus', title: `${name} finished ${pm}`, line: `${v('G') || 0} G, ${v('A') || 0} A, ${v('TOI')} TOI` });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The box score's bad nights as alerts at the final. On the losing side they share the loss's moment, so a
+ * device gets them as lines on its loss alert ("Aaron Judge went 0-for-4."); on the winning side each
+ * player's are one alert of their own.
+ */
+export function playerFinalEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, facts: PlayerFact[], final: { home: number; away: number }, at: number, lost?: Detected | null): Detected[] {
+  const loserId = lost?.targetKey.split(':')[2];
+  return facts.map((f) => ({
+    id: `${g.gameId}:final:${f.type}:${f.athleteId}`, type: f.type, targetKey: playerKey(g.league, f.athleteId), title: f.title,
+    body: `${f.line} — Final: ${scoreLine(g as GameCtx, final)}`, at, meta: { gameId: g.gameId, athleteId: f.athleteId },
+    moment: f.teamId === loserId ? lost!.moment : `${g.gameId}:final:player:${f.athleteId}`, fold: asLine(f.title),
+  }));
+}
+
+// ─── NFL drives ───────────────────────────────────────────────────────────────────────────────
+/**
+ * A finished drive's alerts for the offense, from the summary's drives (result, offensive plays, yards, and
+ * each play's yards to the end zone): a three-and-out (a punt after 3 plays or fewer and under 10 yards), a
+ * turnover on downs, and a red-zone trip with no points. They're on the drive's last play, so a device that
+ * tracks the QB whose pick ended it gets one alert (bundleByPlay), and the drive's result can come a poll
+ * after that play (the late-fold rule).
+ */
+export function nflDriveEvents(g: GameCtx, d: any): Detected[] {
+  const team = String(d?.team?.id ?? ''), result = String(d?.result ?? '').toUpperCase(), plays: any[] = d?.plays ?? [], last = plays.at(-1);
+  if ((team !== g.homeId && team !== g.awayId) || !result || !last) return [];
+  const name = teamName('nfl', team);
+  const score = { home: Number(last.homeScore ?? 0), away: Number(last.awayScore ?? 0) };
+  const base = (type: string, title: string, fold: string): Detected => ({
+    id: `${g.gameId}:drive:${d.id}:${type}`, type, targetKey: teamKey('nfl', team), title, fold,
+    body: `${d.description ?? ''}${d.displayResult ? `, ${String(d.displayResult).toLowerCase()}` : ''} — ${scoreLine(g, score)}`,
+    at: last.wallclock ? Date.parse(last.wallclock) : Date.now(), meta: { gameId: g.gameId, playId: String(last.id) },
+  });
+  const out: Detected[] = [];
+  if (result === 'PUNT' && Number(d.offensivePlays) <= 3 && Number(d.yards) < 10) out.push(base('nfl.team.three_and_out', `${name} went three-and-out`, 'Three-and-out.'));
+  if (result === 'DOWNS') out.push(base('nfl.team.turnover_on_downs', `${name} turned it over on downs`, 'Turned it over on downs.'));
+  // A snap inside the other side's 20, from the down and distance ("1st & 10 at NYG 13"): ESPN's yardsToEndzone
+  // is 0 on timeouts and wrong on punts (a punt from your own 36 says 36).
+  const abbr = String(d.team?.abbreviation ?? teamAbbrev('nfl', team));
+  const redZone = plays.some((p: any) => {
+    const at = String(p.start?.downDistanceText ?? '').match(/ at ([A-Z]{2,3}) (\d+)$/);
+    return String(p.start?.team?.id) === team && !!at && at[1] !== abbr && Number(at[2]) <= 20 && !/timeout|punt|kickoff/i.test(String(p.type?.text ?? p.text ?? ''));
+  });
+  if (redZone && !['TD', 'FG', 'END OF GAME'].includes(result)) {
+    const how = String(d.displayResult ?? result).toLowerCase();
+    out.push(base('nfl.team.red_zone_empty', `${name} came away empty from the red zone (${how})`, `No points from the red zone (${how}).`));
+  }
+  return out;
+}
+
+// ─── Soccer: substitutions, the woodwork, VAR ─────────────────────────────────────────────────
+/**
+ * A player taken off by halftime, not for an injury ("Callum Wilson replaces Niclas Füllkrug." at 45',
+ * but not "… because of an injury"). 51 of 513 EPL substitutions in 60 matches came by 46', most injuries.
+ */
+export function earlySub(g: GameCtx, p: NPlay): Detected[] {
+  // The minute before any stoppage time: a sub at 45'+2' is still the first half's.
+  const [off] = role(p, 'off'), minute = parseInt(String(p.clock ?? ''), 10) || 0;
+  if (p.typeSlug !== 'substitution' || !off || !minute || minute > 46 || /injur/i.test(p.text)) return [];
+  return [mk(g, p, `${g.league}.subbed_off_early`, off, `${nameOf(g.league, off)} was taken off ${minute >= 45 ? 'at halftime' : `in the ${ordinal(minute)} minute`}`)];
+}
+
+/**
+ * From the commentary (fromCommentary): a shot off the woodwork ("Antoine Semenyo (Bournemouth) hits the bar
+ * with a left footed shot…"), and a goal ruled out ("GOAL OVERTURNED BY VAR: Niclas Füllkrug (West Ham
+ * United) scores but the goal is ruled out after a VAR review.": only that wording, never "VAR Decision:
+ * Goal", which is a goal given). The VAR one is the scorer's and his team's: one alert for both (bundleByPlay).
+ */
+export function soccerCommentaryEvents(g: GameCtx, p: NPlay): Detected[] {
+  const lg = g.league, [who] = role(p, 'player');
+  if (!who) return [];
+  if (p.typeSlug === 'woodwork') {
+    const what = p.text.match(/hits the (left post|right post|post|bar|crossbar)/i)?.[1]?.replace(/^(left|right) /, '') ?? 'woodwork';
+    return [mk(g, p, `${lg}.hit_woodwork`, who, `${nameOf(lg, who)} hit the ${what === 'crossbar' ? 'bar' : what}`)];
+  }
+  if (p.typeSlug === 'var-no-goal' && p.teamId) {
+    return [
+      mk(g, p, `${lg}.goal_disallowed`, who, `${nameOf(lg, who)} had a goal ruled out by VAR`),
+      { id: `${g.gameId}:${p.id}:${lg}.goal_disallowed:team-${p.teamId}`, type: `${lg}.goal_disallowed`, targetKey: teamKey(lg, p.teamId), title: `${teamName(lg, p.teamId)} had a goal ruled out by VAR`,
+        body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } },
+    ];
+  }
+  return [];
+}
+
+/**
+ * NBA, WNBA: players who played 10 minutes or more of the first half without a point, from the box score at
+ * halftime ("Jayson Tatum is scoreless at the half: 0-for-6").
+ */
+export function scorelessAtHalf(g: GameCtx, summary: any): Detected[] {
+  const out: Detected[] = [];
+  for (const gr of boxGroups(summary).filter((x: any) => x.labels.includes('PTS') && x.labels.includes('MIN'))) {
+    for (const a of gr.athletes) {
+      const v = statOf(gr.labels, a), id = a.athlete?.id != null ? String(a.athlete.id) : '';
+      if (!id || (Number(v('MIN')) || 0) < 10 || v('PTS') !== '0') continue;
+      out.push({ id: `${g.gameId}:half:${g.league}.scoreless_half:${id}`, type: `${g.league}.scoreless_half`, targetKey: playerKey(g.league, id),
+        title: `${nameOf(g.league, id)} is scoreless at the half${v('FG') ? `: ${v('FG')} from the field` : ''}`, body: `${v('MIN')} minutes, ${v('FG')} FG, ${v('3PT')} 3PT`, at: Date.now(), meta: { gameId: g.gameId, athleteId: id } });
+    }
+  }
+  return out;
 }

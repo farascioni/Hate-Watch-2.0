@@ -16,28 +16,29 @@ const screen = (league: string, mine: string[]) => EVENT_TYPES
 
 test('MLB: pitchers get no hitting alerts, hitters no pitching ones, two-way players both', () => {
   const skubal = screen('mlb', ['SP', 'P']), judge = screen('mlb', ['RF']), ohtani = screen('mlb', ['DH', 'P', 'SP']);
-  assert.deepEqual(skubal, ['Commits an error', 'Blows a save', 'Takes the loss', 'Gives up a home run', 'No quality start', 'Gives up runs', 'Issues a walk / HBP', 'Loses a challenge']);
-  assert.deepEqual(judge, ['Strikes out', 'Hits into a double or triple play', 'Gets caught stealing or picked off', 'Makes an out', 'Commits an error', 'Loses a challenge']);
-  assert.equal(ohtani.length, 12, 'every MLB player alert');
-  assert.equal(screen('mlb', []).length, 12, 'no position known: everything');
+  assert.deepEqual(skubal, ['Commits an error', 'Blows a save', 'Takes the loss', 'Gives up a home run', 'Gives up back-to-back homers', 'Gets chased early', 'Hands over a run', 'No quality start', 'Gives up runs', 'Issues a walk / HBP', 'Loses a challenge']);
+  assert.deepEqual(judge, ['Strikes out', 'Strikes out 3+ times', 'Hits into a double or triple play', 'Gets caught stealing or picked off', 'Gets thrown out on the bases', 'Goes hitless', 'Makes an out', 'Commits an error', 'Loses a challenge']);
+  assert.equal(ohtani.length, 18, 'every MLB player alert but the catcher\'s');
+  assert.equal(screen('mlb', []).length, 19, 'no position known: everything');
 });
 
 test('NFL: passing alerts for quarterbacks, kicks for kickers, fumbles for whoever carries the ball, a safety for the offense', () => {
-  assert.deepEqual(screen('nfl', ['QB']), ['Throws an interception', 'Loses a fumble', 'Gives up a safety', 'Delay of game', 'Gets sacked', 'Throws an incompletion', 'Fumbles (any)', 'Commits a penalty']);
-  assert.deepEqual(screen('nfl', ['WR']), ['Loses a fumble', 'Gives up a safety', 'Fumbles (any)', 'Commits a penalty']);
-  assert.deepEqual(screen('nfl', ['PK']), ['Commits a penalty', 'Misses a kick']);
-  assert.deepEqual(screen('nfl', ['DE']), ['Commits a penalty']);
-  assert.deepEqual(screen('nfl', ['CB']), ['Loses a fumble', 'Fumbles (any)', 'Commits a penalty'], 'an interception or a punt return can end in a fumble');
-  assert.deepEqual(screen('nfl', ['G']), ['Gives up a safety', 'Commits a penalty'], 'a guard: held in his own end zone');
+  // Anyone can be flagged, so anyone can wipe out a touchdown.
+  assert.deepEqual(screen('nfl', ['QB']), ['Throws an interception', 'Loses a fumble', 'Gives up a safety', 'Delay of game', 'Gets pulled', 'Gets sacked', 'Throws an incompletion', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty']);
+  assert.deepEqual(screen('nfl', ['WR']), ['Loses a fumble', 'Gives up a safety', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty']);
+  assert.deepEqual(screen('nfl', ['PK']), ['Commits a penalty', 'Touchdown wiped out by a penalty', 'Misses a kick']);
+  assert.deepEqual(screen('nfl', ['DE']), ['Commits a penalty', 'Touchdown wiped out by a penalty']);
+  assert.deepEqual(screen('nfl', ['CB']), ['Loses a fumble', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty'], 'an interception or a punt return can end in a fumble');
+  assert.deepEqual(screen('nfl', ['G']), ['Gives up a safety', 'Commits a penalty', 'Touchdown wiped out by a penalty'], 'a guard: held in his own end zone');
 });
 
 test('NHL and soccer: goalies get the goals against, skaters and outfield players the rest', () => {
-  assert.deepEqual(screen('nhl', ['G']), ['Gives the puck away', 'Takes a penalty', 'Goalie allows a goal']);
-  assert.deepEqual(screen('nhl', ['C']), ['Shoots and misses', 'Gets a shot blocked', 'Shot gets saved', 'Gives the puck away', 'Takes a penalty']);
-  assert.deepEqual(screen('epl', ['G']), ['Gives the ball away', 'Scores an own goal', 'Gives away a penalty', 'Sent off', 'Gets booked', 'Commits a foul', 'Keeper concedes a goal']);
+  assert.deepEqual(screen('nhl', ['G']), ['Gives the puck away', 'Takes a penalty', 'Drops the gloves', 'Goalie allows a goal', 'Gets pulled']);
+  assert.deepEqual(screen('nhl', ['C']), ['Misses in the shootout', 'Shoots and misses', 'Finishes -3 or worse', 'Gets a shot blocked', 'Shot gets saved', 'Gives the puck away', 'Takes a penalty', 'Drops the gloves']);
+  assert.deepEqual(screen('epl', ['G']), ['Gives the ball away', 'Scores an own goal', 'Gives away a penalty', 'Sent off', 'Gets booked', 'Commits a foul', 'Keeper concedes a goal', 'Taken off early']);
   assert.ok(!screen('epl', ['F']).includes('Keeper concedes a goal'));
   assert.ok(screen('epl', ['F']).includes('Misses a penalty'));
-  assert.equal(screen('nba', ['C']).length, 6, 'basketball: everyone gets every alert');
+  assert.equal(screen('nba', ['C']).length, 9, 'basketball: everyone gets every alert');
 });
 
 test("a roster entry's positions: its main one first, then every other it lists", () => {

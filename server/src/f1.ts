@@ -50,6 +50,7 @@ export interface F1Row {
   outLabel: string;    // ESPN status description, e.g. "Retired", "Disqualified"
   lap: number | null;  // lap the status applies to (retirement lap)
   teamKey?: string;
+  lapsDown?: number;   // a classified finisher this many laps behind the winner (ESPN's behindLaps)
 }
 export interface SessionMeta { compId: string; kind: Session; label: string; at: number }
 
@@ -88,6 +89,15 @@ export function doubleDnfEvent(meta: SessionMeta, team: string, rows: F1Row[]): 
   };
 }
 
+/** Lights out with a driver on the last row of the grid (the last two places): "Lance Stroll starts from the back of the grid (P22)". */
+export function backOfGrid(meta: SessionMeta, rows: F1Row[]): Detected[] {
+  const n = rows.length;
+  return rows.filter((r) => r.grid > 0 && n >= 10 && r.grid >= n - 1).map((r) => ({
+    id: `${meta.compId}:f1.driver.back_of_grid:${r.id}`, type: 'f1.driver.back_of_grid', targetKey: playerKey('f1', r.id),
+    title: `${driverName(r.id)} starts from the back of the grid (P${r.grid})`, body: meta.label, at: meta.at, meta: { compId: meta.compId, athleteId: r.id },
+  }));
+}
+
 /** "Hate Watch Starting" for every constructor (only followed ones are stored). No single opponent in F1. */
 export function raceStartEvents(meta: SessionMeta): Detected[] {
   return catalog.allTeams().filter((t) => t.league === 'f1').map((t) => ({
@@ -110,14 +120,19 @@ export function f1SessionResults(meta: SessionMeta, rows: F1Row[]): Detected[] {
   const out: Detected[] = [];
   if (meta.kind === 'qual') {
     // Q3 is the top 10; the rest are split evenly between Q2 and Q1 knockouts (22 cars: P11-16 / P17-22).
+    // Out-qualified by the teammate is part of the same alert (aliases): one per driver.
     const cut = Math.max(0, Math.floor((rows.length - 10) / 2));
     for (const r of rows) {
-      if (r.order <= 10) continue;
+      const mate = rows.find((m) => m.id !== r.id && m.teamKey && m.teamKey === r.teamKey && m.order > 0);
+      const knocked = r.order > 10, behind = !!mate && r.order > 0 && mate.order < r.order;
+      const types = [knocked && 'f1.driver.quali_knockout', behind && 'f1.driver.outqualified'].filter(Boolean) as string[];
+      if (!types.length) continue;
       const stage = r.order > 10 + cut ? 'Q1' : 'Q2';
       out.push({
-        id: `${meta.compId}:f1.quali:${r.id}`, type: 'f1.driver.quali_knockout', targetKey: playerKey('f1', r.id),
-        title: `${driverName(r.id)} was knocked out in ${stage} (P${r.order})`, body: meta.label, at: meta.at,
-        meta: { compId: meta.compId, athleteId: r.id },
+        id: `${meta.compId}:f1.quali:${r.id}`, type: types[0], ...(types.length > 1 ? { aliases: types.slice(1) } : {}), targetKey: playerKey('f1', r.id),
+        title: knocked ? `${driverName(r.id)} was knocked out in ${stage} (P${r.order})${behind ? `, behind teammate ${driverName(mate!.id)} (P${mate!.order})` : ''}`
+          : `${driverName(r.id)} was out-qualified by teammate ${driverName(mate!.id)} (P${r.order} to P${mate!.order})`,
+        body: meta.label, at: meta.at, meta: { compId: meta.compId, athleteId: r.id },
       });
     }
     return out;
@@ -133,9 +148,10 @@ export function f1SessionResults(meta: SessionMeta, rows: F1Row[]): Detected[] {
     const noPoints = r.order > cutoff;
     const lost = r.grid > 0 && r.order - r.grid >= 3;
     const behind = !!mate && mate.order < r.order;
-    const types = [noPoints && 'f1.driver.out_of_points', lost && 'f1.driver.lost_places', behind && 'f1.driver.beaten_by_teammate'].filter(Boolean) as string[];
+    const lapped = (r.lapsDown ?? 0) >= 1;
+    const types = [noPoints && 'f1.driver.out_of_points', lost && 'f1.driver.lost_places', behind && 'f1.driver.beaten_by_teammate', lapped && 'f1.driver.lapped'].filter(Boolean) as string[];
     if (!types.length) continue;
-    const details = [noPoints && 'no points', behind && `behind teammate ${driverName(mate!.id)} (P${mate!.order})`].filter(Boolean);
+    const details = [noPoints && 'no points', lapped && (r.lapsDown === 1 ? 'lapped' : `${r.lapsDown} laps down`), behind && `behind teammate ${driverName(mate!.id)} (P${mate!.order})`].filter(Boolean);
     out.push({
       id: `${meta.compId}:f1.finish:${r.id}`, type: types[0], aliases: types.length > 1 ? types.slice(1) : undefined,
       targetKey: playerKey('f1', r.id),
@@ -168,10 +184,13 @@ export async function fetchSessionRows(eventId: string, compId: string, withStat
   return mapLimit(comps, 8, async (c: any): Promise<F1Row> => {
     const st = withStatus && c.status?.$ref ? await getJson(c.status.$ref, { bust: true }).catch(() => null) : null;
     const name = String(st?.type?.name ?? '');
+    // Laps down, for a classified finisher (a retired car's laps behind aren't news: it's out).
+    const stats = withStatus && !isOut(name) && c.statistics?.$ref ? await getJson(c.statistics.$ref, { bust: true }).catch(() => null) : null;
+    const behind = stats?.splits?.categories?.flatMap((x: any) => x.stats ?? []).find((x: any) => x.name === 'behindLaps')?.value;
     return {
       id: String(c.id), order: Number(c.order ?? 0), grid: Number(c.startOrder ?? 0),
       out: isOut(name), outLabel: String(st?.type?.description ?? ''), lap: st?.period ? Number(st.period) : null,
-      teamKey: teamOf(String(c.id), c.vehicle),
+      teamKey: teamOf(String(c.id), c.vehicle), ...(Number(behind) > 0 ? { lapsDown: Number(behind) } : {}),
     };
   });
 }
@@ -251,7 +270,10 @@ export async function scanF1() {
       upsertGame(raceCard(ev, comp)); // the Scores tab (the running order is on the scoreboard)
       if (kind !== 'qual' && state === 'pre') preSeen.add(meta.compId);
       if (kind !== 'qual' && state === 'in' && !races.has(meta.compId)) {
-        if (preSeen.delete(meta.compId)) publish(raceStartEvents({ ...meta, at: Date.now() }), 'f1');
+        if (preSeen.delete(meta.compId)) {
+          publish(raceStartEvents({ ...meta, at: Date.now() }), 'f1');
+          void fetchSessionRows(String(ev.id), meta.compId, false).then((rows) => { const es = backOfGrid({ ...meta, at: Date.now() }, rows); if (es.length) publish(es, 'f1'); }).catch(() => {});
+        }
         const w = new RaceWatch(String(ev.id), meta);
         races.set(meta.compId, w);
         log(`watching ${meta.label}`);

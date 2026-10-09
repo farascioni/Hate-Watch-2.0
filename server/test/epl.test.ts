@@ -185,11 +185,11 @@ test('a live match end to end: key events from the summary, alerts to whoever tr
   assert.equal(fetched.filter((u) => u.includes('sports.core.api')).length, 1, 'the touch feed (players are tracked here): at most every 10s, not every poll');
   assert.deepEqual(feed('united-hater'), [
     'Fulham scored to take the lead over Man United',
-    'Fulham scored to take the lead over Man United',
+    "Fulham took the lead against Man United in stoppage time (90'+3')", // a late goal: in place of "falls behind" for that play
     'Successful Hate Watch! Man United lost to Fulham',
   ]);
   assert.deepEqual(feed('keeper-hater'), ['Senne Lammens conceded a goal 🥅', 'Senne Lammens conceded a goal 🥅', 'Successful Hate Watch! Senne Lammens and Man United lost to Fulham']);
   assert.ok(!feed('both').includes('Successful Hate Watch! Lisandro Martínez and Man United lost to Fulham'), 'tracks Man United too: their loss once');
   assert.deepEqual(feed('both').filter((t) => /own goal/.test(t)), ['Lisandro Martínez scored an own goal 🤡', 'Lisandro Martínez scored an own goal 🤡']);
-  assert.deepEqual(feed('fulham-hater'), ['Man United scored against Fulham']);
+  assert.deepEqual(feed('fulham-hater'), ['Man United equalized against Fulham in the 89th minute'], 'a late equalizer, in place of "opponent scores"');
 });

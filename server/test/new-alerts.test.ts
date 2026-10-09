@@ -60,15 +60,18 @@ test('blowing an 18-point lead, live: one alert instead of "falls behind", once 
   await tracker.poll();
   state.plays.push(shot(30, 30, 'Jalen Brunson makes driving layup', 3), shot(30, 32, 'Jalen Brunson makes 25-foot three point jumper', 3));
   await tracker.poll();
-  assert.deepEqual(got('celtics-fan'), ['team.blew_lead: Celtics blew an 18-point lead to the Knicks | Jalen Brunson makes 25-foot three point jumper — NY 32, BOS 30']);
-  assert.deepEqual(got('blew-off'), ['team.fell_behind: Knicks scored 2 to take the lead over the Celtics | Jalen Brunson makes 25-foot three point jumper — NY 32, BOS 30'],
+  assert.deepEqual(got('celtics-fan'), [
+    'nba.team.opponent_run: Knicks are on an 18-0 run against the Celtics | Jalen Brunson makes driving layup — NY 30, BOS 30', // feed only
+    'team.blew_lead: Celtics blew an 18-point lead to the Knicks | Jalen Brunson makes 25-foot three point jumper — NY 32, BOS 30',
+  ]);
+  assert.deepEqual(got('blew-off').slice(1), ['team.fell_behind: Knicks scored 2 to take the lead over the Celtics | Jalen Brunson makes 25-foot three point jumper — NY 32, BOS 30'],
     'with it off, the plain "falls behind" for that play');
   assert.equal(pushed('celtics-fan'), 1, 'blowing a big lead pushes');
   // They take the lead back, then lose it again: that's falling behind now, not a second blown lead.
   state.plays.push(shot(35, 32, 'Jaylen Brown makes driving dunk', 4), shot(35, 36, 'OG Anunoby makes 24-foot three point jumper', 4));
   await tracker.poll();
   liveDeps.getJson = prev;
-  assert.deepEqual(got('celtics-fan').map((x) => x.split(':')[0]), ['team.blew_lead', 'team.fell_behind']);
+  assert.deepEqual(got('celtics-fan').map((x) => x.split(':')[0]), ['nba.team.opponent_run', 'team.blew_lead', 'team.fell_behind']);
 });
 
 test('one standings read, one alert: eliminated, a division rival clinched, and the drop in the standings (NL West)', async () => {

@@ -10,31 +10,36 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 Changes since build 11. Server updates already work on every build.
 
 SCORES
-- All games: a new switch at the top of the Scores tab shows every game live right now, then every game starting in the next 24 hours, whether you track a team in it or not, grouped by league. The league chips filter it, and the switch shows how many games are live. Tap any game to open it.
-- Upcoming games show a preview: each team's chance to win (from the betting line), its record, MLB probable pitchers with their record and ERA, NHL probable goalies, the line and over/under, soccer form and draw chance, and the playoff series. A team you track shows its chance to lose.
-- Tap a team's logo or name on a game card, or at the top of a game's screen, to open that team's page, the same one Search opens. Tapping anywhere else on the card still opens the game.
+- All games: a switch at the top of Scores shows every game live now or starting in the next 24 hours, tracked or not, by league. Tap any game to open it.
+- Upcoming games show a preview: each team's chance to win (from the betting line), records, probable pitchers and goalies, the line, soccer form and the playoff series.
+- Tap a team's logo or name on a game card, or at the top of a game's screen, to open its page.
 
 PLAYER AND TEAM PAGES
-- Stats and Recent misery tabs: a player's or team's page opens on their stats (the season line, last five games and next game) right on the page, no separate Stats button. Recent misery lists every alert about them from the last 24 hours, not just the latest. F1 drivers and teams show Recent misery only, as they have no stats yet.
+- Stats and Recent misery tabs: pages open on stats (season line, last five games, next game). Recent misery lists every alert about them from the last 24 hours. F1 shows Recent misery only.
+- A player's alert settings: Show their team's games (on) and Get their team's alerts (off).
 
-PLAYER ALERT SETTINGS
-- Their team: a player's alert settings have two new switches. Show their team's games (on by default) decides whether the team's games appear on the Scores tab, and Get their team's alerts (off by default) sends the team's own alerts too, as if you tracked the team.
+ONE ALERT AT A TIME
+- A team's alert and its players' alerts on one play are one alert: "Gerrit Cole gave up a solo homer", with "Rays took the lead." in it. (Server)
+- A fact that comes a moment later (the inning ending on that strikeout, how the drive ended) is added to the alert you already have, with no second notification. (Server) This build updates the alert on screen right away; older builds show it after a refresh.
 
-NEW ALERTS, STILL ONE ALERT AT A TIME
-- How they lost comes on the loss alert, as lines: a walk-off or last-second loss (a buzzer-beater, overtime or a shootout, a stoppage-time winner), blowing a big lead, losing as the betting favorite, a shutout, a sweep, losing to a much worse team, falling below .500, the losing streak. Each has its own switch under Team alerts. With "Loses a game" off, the first one you have on is the alert (if you'd turned it off before, these start off too). (Server)
-- Blows a big lead: live, when a team falls behind after leading big (NBA 18 points, MLB 5 runs, NFL 17, NHL 3 goals), in place of that play's "Falls behind". Once a game. (Server)
-- Rival clinches the division (feed only to start). Standings news that lands together (eliminated, a rival clinching, a drop, a streak) is one alert. (Server)
-- Gets ejected: an NFL disqualification or an NHL game misconduct, in place of that penalty alert. (Server)
-- Your Hate Watch streak: on a loss, how many in a row you've watched ("Lost 5 straight, every one on your Hate Watch"). (Server)
-- Weekly misery recap, Mondays at 9 am: last week's Successful Hate Watches by team, how many alerts, and the low point. (Server)
-- A team's or player's own alert settings no longer list the streak and recap switches, which are about you, not one team, and a team's Recent misery leaves out the recap.
+HOW THEY LOST (Server)
+- Lines on the loss alert, each with its own switch under Team alerts: a walk-off or last-second loss, blowing a big lead, losing as the favorite, a shutout, a sweep, losing to a much worse team, falling below .500, the losing streak, being no-hit, the other team's star going off (NBA 40 points, WNBA 30), a dead power play (NHL 0-for-4). With "Loses a game" off, the first one you have on is the alert.
+- Blows a big lead, live, in place of "Falls behind". Gets ejected. Rival clinches the division.
+- Your Hate Watch streak on a loss, and a weekly misery recap, Mondays at 9 am.
 
-MLB ALERTS
-- Crew chief reviews count as lost challenges: when the umpires review a call themselves and overturn it, the team the call went for gets "lost a crew chief review", and a batter whose home run is overturned gets "home run was overturned" (Volpe's, for fan interference, Rays @ Yankees on October 7). An upheld review sends nothing, as no team asked for it. (Server)
+NEW ALERTS (Server)
+- MLB: strikes out 3 or 4 times, hands over a run (wild pitch, balk, passed ball, bases-loaded walk), back-to-back homers allowed, thrown out on the bases, a starter chased in under 3 innings, no-hit through 6, 0-for-4 or worse, a position player pitching. Crew chief reviews count as lost challenges, and an overturned home run says so.
+- NFL: the starting QB pulled, a touchdown wiped out by a penalty, a three-and-out, turned over on downs, empty from the red zone.
+- NBA and WNBA: fouls out, scoreless at the half, a brick night, an opponent's 14-0 run (WNBA 12-0).
+- NHL: goalie pulled, a shootout miss, a fight, giving up an empty-netter or a short-handed goal, finishing -3 or worse.
+- Premier League: a late goal against (from the 85th minute), a goal ruled out by VAR, hitting the woodwork, taken off by halftime, dropping into the relegation zone.
+- F1: lapped, starting from the back of the grid, out-qualified by a teammate.
+- Some start in your feed only, with no notification: each alert's bell in Settings changes that.
 
 FIXES
-- ABS challenge alerts wait until the review is over. ESPN first posts every challenged pitch as confirmed and corrects it if the call is overturned, which sent "lost an ABS challenge" alerts for challenges that were won. A lost challenge now goes out about a minute later, once ESPN has settled it. (Server)
+- ABS challenge alerts wait until the review is over: ESPN first posts a challenged pitch as confirmed, which sent "lost an ABS challenge" for challenges that were won. (Server)
 - A called third strike or ball four whose challenge was upheld is labeled an ABS challenge, not a replay challenge. (Server)
+- A team's or player's alert settings no longer list the streak and recap switches, and a team's Recent misery leaves out the recap.
 
 ## Build 11 (October 7, 2026)
 

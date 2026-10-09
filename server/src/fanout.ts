@@ -3,7 +3,7 @@ import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
 import { EVENT_TYPES, EVENT_TYPE_BY_ID, soccerType } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
-import { hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
+import { RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
@@ -321,8 +321,19 @@ export const pushThread = (targetKey: string) => (targetKey.startsWith('team:') 
 let pushSender: (msgs: PushMessage[]) => void = () => {};
 export function setPushSender(fn: typeof pushSender) { pushSender = fn; }
 
-/** One device's copy of an alert: who, their settings, and the other facts of its moment folded into it. */
-type Delivery = { f: Recipient; prefs: Prefs; folded: Detected[] };
+/** One device's copy of an alert: who, their settings, the other facts of its moment folded into it, and the `alt` groups it has used. */
+type Delivery = { f: Recipient; prefs: Prefs; folded: Detected[]; alts: Set<string> };
+
+/**
+ * Moments already delivered in an earlier publish (a fact can come a poll later: an NFL drive's result after
+ * its last play, a game misconduct after the instigator penalty): moment → device → its alert. A late fact
+ * becomes a line on that alert, with no push. Kept in memory for LATE_FOLD_MS, so not across a restart.
+ */
+const LATE_FOLD_MS = 6 * 3600_000;
+const delivered = new Map<string, { at: number; devices: Map<string, { eventId: string; alts: Set<string>; lines: Set<string> }> }>();
+function pruneDelivered(now: number) {
+  for (const [m, d] of delivered) { if (now - d.at < LATE_FOLD_MS) break; delivered.delete(m); } // oldest first
+}
 
 /**
  * Store each new alert once, then send it to every follower who wants it. Alerts that share a moment are
@@ -335,6 +346,8 @@ export function publish(events: Detected[], league: League) {
   const detectedAt = Date.now();
   const pushes: PushMessage[] = [];
   const got = new Map<string, Map<string, Delivery>>(); // moment → device → the alert it gets for it
+  const late: { deviceId: string; eventId: string; line: string }[] = []; // facts for alerts sent in an earlier publish
+  pruneDelivered(detectedAt);
   const waiting = new Map<string, Map<string, Detected[]>>(); // moment → device → fold-only lines before its alert
   // Who gets what first, then the feed rows, frames and pushes: a Successful Hate Watch says how many
   // others got it, and a team's loss counts everyone who got one of its alerts (the team's or a player's).
@@ -367,18 +380,32 @@ export function publish(events: Detected[], league: League) {
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
       if (e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
-      const d: Delivery = { f, prefs, folded: [] };
+      const d: Delivery = { f, prefs, folded: [], alts: new Set(e.alt ? [e.alt] : []) };
       if (e.moment) {
         const mine = got.get(e.moment) ?? got.set(e.moment, new Map()).get(e.moment)!;
         const first = mine.get(f.device_id);
         if (first) {
-          // They already get this moment's alert: a fact it doesn't say goes on it, the same news again doesn't.
-          if (e.fold && !first.folded.some((x) => x.fold === e.fold)) first.folded.push(e);
+          // They already get this moment's alert: a fact it doesn't say goes on it, the same news again doesn't
+          // (no fold, or one of its alternatives already said: `alt`).
+          if (e.fold && !(e.alt && first.alts.has(e.alt)) && !first.folded.some((x) => x.fold === e.fold)) {
+            first.folded.push(e);
+            if (e.alt) first.alts.add(e.alt);
+          }
+          continue;
+        }
+        const before = delivered.get(e.moment)?.devices.get(f.device_id);
+        if (before) {
+          // They got this moment's alert in an earlier publish: the fact goes on it as a line, without a push.
+          if (e.fold && !(e.alt && before.alts.has(e.alt)) && !before.lines.has(e.fold)) {
+            before.lines.add(e.fold);
+            if (e.alt) before.alts.add(e.alt);
+            late.push({ deviceId: f.device_id, eventId: before.eventId, line: e.fold });
+          }
           continue;
         }
         const held = waiting.get(e.moment) ?? waiting.set(e.moment, new Map()).get(e.moment)!;
         if (e.foldOnly) { held.set(f.device_id, [...(held.get(f.device_id) ?? []), e]); continue; } // a line on its alert, once there is one
-        d.folded.push(...(held.get(f.device_id) ?? []));
+        for (const x of held.get(f.device_id) ?? []) if (!(x.alt && d.alts.has(x.alt))) { d.folded.push(x); if (x.alt) d.alts.add(x.alt); }
         mine.set(f.device_id, d);
       }
       deliver.push(d);
@@ -407,8 +434,28 @@ export function publish(events: Detected[], league: League) {
       });
     }
     console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers${deliver.some((d) => d.folded.length) ? ', with folded facts' : ''})`);
+    // Remember who got this moment's alert, for facts that come in a later publish.
+    if (e.moment) {
+      const m = delivered.get(e.moment) ?? (delivered.set(e.moment, { at: detectedAt, devices: new Map() }), delivered.get(e.moment)!);
+      for (const d of deliver) m.devices.set(d.f.device_id, { eventId: e.id, alts: d.alts, lines: new Set(d.folded.map((x) => x.fold!)) });
+    }
   }
   if (pushes.length) pushSender(pushes);
+  for (const l of late) addLateLine(l.deviceId, l.eventId, l.line);
+}
+
+/**
+ * A fact that came after its alert: one more line on the device's feed row (none if it cleared its feed),
+ * sent live as an `eventUpdate` frame. No push: the alert already made a sound.
+ */
+function addLateLine(deviceId: string, eventId: string, line: string) {
+  const row = db.prepare('SELECT extra FROM feed WHERE device_id = ? AND event_id = ?').get(deviceId, eventId) as { extra: string | null } | undefined;
+  if (!row) return;
+  const lines = [...(row.extra ? JSON.parse(row.extra) as string[] : []), line];
+  db.prepare('UPDATE feed SET extra = ? WHERE device_id = ? AND event_id = ?').run(JSON.stringify(lines), deviceId, eventId);
+  const item = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(deviceId, eventId) as Parameters<typeof feedItem>[0];
+  for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(item) }));
+  console.log(`[event] late line on ${eventId} for ${deviceId.slice(0, 6)}…: ${line}`);
 }
 
 /**

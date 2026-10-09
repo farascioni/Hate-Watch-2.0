@@ -164,6 +164,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // Score frames are everyone's copy of the card: keep this device's own Successful Hate Watch count on it.
         if (frame.kind === 'score') { setGames((cur) => { const had = cur.get(frame.game.key)?.hateWatch; return new Map(cur).set(frame.game.key, had ? { ...frame.game, hateWatch: had } : frame.game); }); return; }
         if (frame.kind === 'hateWatches') { setHateWatches(frame.tally); return; }
+        // A fact that came after its alert (an NFL drive's result after its last play): the alert, with one more line. No new alert.
+        if (frame.kind === 'eventUpdate') { setFeed((cur) => mergeFeed(cur, [frame.item])); return; }
         if (frame.kind !== 'event') return;
         // A Successful Hate Watch just landed: its final on the Scores tab says how many others got it too.
         if (frame.item.alsoGot != null && frame.item.gameId) {

@@ -393,11 +393,14 @@ test('F1: session results become one alert per driver, with merged facts and tea
   assert.equal(f1SessionResults(meta('race'), [row('A', 8, 5, 'X')])[0].type, 'f1.driver.lost_places');
   assert.equal(f1SessionResults(meta('race'), [row('A', 7, 5, 'X')]).length, 0);
 
-  // 20-car qualifying: P11-15 out in Q2, P16-20 out in Q1.
-  const q = f1SessionResults(meta('qual'), Array.from({ length: 20 }, (_, i) => row(`Q${i + 1}`, i + 1, 0, 'X')));
-  assert.equal(q.length, 10);
-  assert.match(by(q, 'player:f1:Q15')[0].title, /Q2 \(P15\)/);
-  assert.match(by(q, 'player:f1:Q16')[0].title, /Q1 \(P16\)/);
+  // 20-car qualifying, two cars a team: P11-15 out in Q2, P16-20 out in Q1, and each team's slower car
+  // out-qualified by its teammate (in the same alert as a knockout: one per driver).
+  const q = f1SessionResults(meta('qual'), Array.from({ length: 20 }, (_, i) => row(`Q${i + 1}`, i + 1, 0, `T${Math.floor(i / 2)}`)));
+  assert.equal(q.length, 15, '10 knocked out, and the 5 slower cars of Q3');
+  assert.match(by(q, 'player:f1:Q15')[0].title, /Q2 \(P15\)$/);
+  assert.match(by(q, 'player:f1:Q16')[0].title, /Q1 \(P16\), behind teammate Your tracked driver \(P15\)/);
+  assert.deepEqual(by(q, 'player:f1:Q16').map((e) => [e.type, e.aliases]), [['f1.driver.quali_knockout', ['f1.driver.outqualified']]]);
+  assert.deepEqual(by(q, 'player:f1:Q4').map((e) => [e.type, e.title]), [['f1.driver.outqualified', 'Your tracked driver was out-qualified by teammate Your tracked driver (P4 to P3)']]);
 
   assert.equal(isOut('STATUS_CLASSIFIED'), false);
   assert.equal(isOut('STATUS_RETIRED'), true);

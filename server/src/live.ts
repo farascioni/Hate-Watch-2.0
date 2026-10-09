@@ -8,9 +8,10 @@ import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
-  lossFacts, seriesSpot, type Detected, type GameCtx, type NPlay, type Pregame,
+  bundleByPlay, boxHits, boxPlayerFacts, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
 } from './detectors.ts';
 import { publish } from './fanout.ts';
+import { soccerType } from './event-types.ts';
 import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 import { divisionsOf } from './divisions.ts';
 import { weeklyRecaps } from './recap.ts';
@@ -115,6 +116,10 @@ export class GameTracker {
   private pre: Pregame;
   /** NHL: the game went to overtime or a shootout (the summary's "Final/OT", "Final/SO"). */
   private overtime: 'ot' | 'so' | null = null;
+  /** The last game summary read (its box score: the final's box-score facts, position players pitching). */
+  private box: any = null;
+  /** Once-a-game facts already sent or baselined (position player pitching, scoreless halves, goalies pulled…). */
+  private onceDone = new Set<string>();
   finished = false;
   lastPollMs = 0;
 
@@ -151,6 +156,26 @@ export class GameTracker {
       streak: { home: standings[homeId]?.streak ?? '', away: standings[awayId]?.streak ?? '' },
       seasonType: Number(s.header?.season?.type) || undefined,
     });
+  }
+
+  /**
+   * MLB: a position player on the mound for a team (a blowout's white flag), once a game. A pitcher is one the
+   * catalog lists at P, SP or RP, or with SP among their positions (two-way players). The first read is a baseline.
+   */
+  private positionPlayerPitching(pitchers: ReturnType<typeof boxPitchers>): Detected[] {
+    const out: Detected[] = [];
+    for (const p of pitchers) {
+      const key = `ppp:${p.teamId}`;
+      const pl = catalog.playerByEspn('mlb', p.id);
+      const pitcher = !pl || /^(P|SP|RP)$/.test(pl.position ?? '') || (pl.positions ?? []).includes('SP');
+      if (!p.active || pitcher || this.onceDone.has(key)) continue;
+      this.onceDone.add(key);
+      const team = catalog.teamByEspn('mlb', p.teamId);
+      if (!team) continue;
+      out.push({ id: `${this.ctx.gameId}:mlb.team.position_player_pitching:${p.teamId}`, type: 'mlb.team.position_player_pitching', targetKey: team.key,
+        title: `${team.shortName} have a position player pitching`, body: `${pl.name} (${pl.position}) is on the mound — ${scoreLine(this.ctx, this.score)}`, at: Date.now(), meta: { gameId: this.ctx.gameId, athleteId: p.id } });
+    }
+    return out;
   }
 
   /** Regular season: each side's place among its meetings with the other (sweeps). Read once, at the start. */
@@ -244,6 +269,7 @@ export class GameTracker {
       }
       if (s.header?.season?.type === 3) this.postseason = true;
       this.readPregame(s);
+      this.box = s;
       const comp = s.header?.competitions?.[0];
       const detail = String(comp?.status?.type?.detail ?? '');
       if (league === 'nhl' && /\/(OT|SO)\b/.test(detail)) this.overtime = /SO/.test(detail) ? 'so' : 'ot';
@@ -317,7 +343,7 @@ export class GameTracker {
         const was = this.fouls.get(p.id);
         if (was === p.typeSlug || was === 'penalty-conceded') continue;
         this.fouls.set(p.id, p.typeSlug);
-        if (!(this.first && p.at < cutoff)) events.push(...soccerFoul(this.ctx, p));
+        if (!(this.first && p.at < cutoff)) events.push(...(p.typeSlug === 'woodwork' || p.typeSlug === 'var-no-goal' ? soccerCommentaryEvents(this.ctx, p) : soccerFoul(this.ctx, p)));
       }
       // Passes and dribbles, from the touch-by-touch feed, if anyone tracks a player in the match.
       if (Date.now() - this.touchesAt >= TOUCH_MS && this.tracksPlayers()) {
@@ -327,12 +353,38 @@ export class GameTracker {
     }
     // MLB pitchers' lines: a blown save, no quality start. The loss waits for the final (finalPitching).
     if (league === 'mlb' && summary.status === 'fulfilled') {
-      const es = pitcherEvents(this.ctx, boxPitchers(summary.value), { final: false, score: this.score, at: Date.now() }, this.pitching);
+      const pitchers = boxPitchers(summary.value);
+      const es = [...pitcherEvents(this.ctx, pitchers, { final: false, score: this.score, at: Date.now() }, this.pitching), ...this.positionPlayerPitching(pitchers)];
       if (!this.first) events.push(...es); // attaching mid-game: what already happened is history
+    }
+    // NFL: each finished drive's alerts (three-and-out, on downs, an empty red-zone trip), once; the first read is a baseline.
+    if (league === 'nfl' && summary.status === 'fulfilled') {
+      for (const d of summary.value.drives?.previous ?? []) {
+        if (!d?.result || this.onceDone.has(`drive:${d.id}`)) continue;
+        this.onceDone.add(`drive:${d.id}`);
+        if (!this.first) events.push(...nflDriveEvents(this.ctx, d));
+      }
+    }
+    // NBA, WNBA: scoreless at the half, from the box score once the 3rd quarter's plays start (not if we attached after).
+    if ((league === 'nba' || league === 'wnba') && summary.status === 'fulfilled' && !this.onceDone.has('half') && plays.some((p) => (p.periodNum ?? 0) >= 3)) {
+      this.onceDone.add('half');
+      if (!this.first) events.push(...scorelessAtHalf(this.ctx, summary.value));
+    }
+    // "Being no-hit through 6" comes from the core feed's hit count: the box score has to agree (0), or it waits.
+    if (league === 'mlb') {
+      const hits = summary.status === 'fulfilled' ? boxHits(summary.value) : undefined;
+      for (let i = events.length - 1; i >= 0; i--) {
+        const e = events[i];
+        if (e.type === 'mlb.team.no_hit' && hits?.[e.targetKey.split(':')[2]] !== 0) {
+          events.splice(i, 1);
+          this.ctx.noHit?.delete(e.targetKey.split(':')[2]);
+          log(`[mlb ${gameId}] no-hit watch for ${e.targetKey} held: the box score says ${hits?.[e.targetKey.split(':')[2]] ?? 'nothing'}`);
+        }
+      }
     }
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
-    if (events.length) publish(events, league);
+    if (events.length) publish(bundleByPlay(events), league);
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
     patchGame(`${league}:${gameId}`, {
@@ -398,11 +450,14 @@ export class GameTracker {
     this.finished = true;
     for (const id of [this.ctx.homeId, this.ctx.awayId]) staleUpNext(teamKey(this.ctx.league, id)); // their next game is another one now
     const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
-    if (lastHalf.length) publish(lastHalf, this.ctx.league);
+    if (lastHalf.length) publish(bundleByPlay(lastHalf), this.ctx.league); // on the last out's alert, like any other half-inning
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
     const lost = gameLostEvent(this.ctx, final, Date.now(), ev ? eliminationOf(this.ctx.league, ev) : null);
     db.prepare('DELETE FROM kv WHERE key = ?').run(this.preKey); // the game is over: its pregame is spent (this.pre has it)
-    if (!lost) return; // a tie
+    // Each player's bad night from the box score (not the preseason's): lines on their team's loss, or their own alerts after a win.
+    const seasonType = Number(this.box?.header?.season?.type ?? this.pre.seasonType ?? 2);
+    const players = this.box && seasonType !== 1 ? playerFinalEvents(this.ctx, boxPlayerFacts(this.ctx.league, this.box), final, Date.now(), lost) : [];
+    if (!lost) { if (players.length) publish(players, this.ctx.league); return; } // a tie
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
     // (3+ goals), then the team's loss, then its facts (a walk-off, losing as the favorite…: each a line on
     // the loss, or the alert itself for a device with the loss off), then "their team lost" for its players.
@@ -413,8 +468,8 @@ export class GameTracker {
     const detail = String(ev?.status?.type?.detail ?? '');
     const periods = Math.max(0, ...this.plays.map((p) => p.periodNum ?? 0));
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
-    const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason });
-    publish([...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey))], this.ctx.league);
+    const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
+    publish([...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey)), ...players], this.ctx.league);
     // The standings will say the same streak in a minute (scanStandings): it's been said.
     const streak = facts.find((f) => f.type === 'team.losing_streak');
     if (streak) kvSet(`streak-told:${this.ctx.league}:${lost.targetKey.split(':')[2]}`, `L${streak.meta?.streak}`);
@@ -428,7 +483,7 @@ export class GameTracker {
       const pitchers = s ? boxPitchers(s) : [];
       if (pitchers.some((p) => p.notes.some((n) => /^[WL]\b/.test(n)))) {
         const es = pitcherEvents(this.ctx, pitchers, { final: true, score: final, at: Date.now() }, this.pitching);
-        if (es.length) publish(es, 'mlb');
+        if (es.length) publish(bundleByPlay(es), 'mlb');
         return;
       }
       await new Promise((r) => setTimeout(r, DECISION_RETRY_MS));
@@ -622,6 +677,11 @@ export async function scanStandings(lg: League) {
       if (rivalId === teamId || !div || divisions.get(rivalId)?.name !== div) continue;
       const rival = catalog.teamByEspn(lg, rivalId)?.shortName ?? 'A rival';
       events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched the ${div}`, body: `${team.shortName} won't win the division.`, fold: `The ${rival} clinched the ${div}.`, meta: { teamId, rivalId } });
+    }
+    // Soccer: into the relegation zone (ESPN's table note), before the drop that put them there.
+    const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');
+    if (SOCCER.has(lg) && relegation(cur) && !relegation(was)) {
+      events.push({ ...base, id: `releg:${lg}:${teamId}:${day}`, type: soccerType(lg, 'team.relegation_zone'), title: `${team.shortName} dropped into the relegation zone`, body: dropBody(was, cur), fold: 'Into the relegation zone.' });
     }
     if (cur.group === was.group && cur.rank > was.rank) {
       events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur), fold: `Down to ${ordinal(cur.rank)} in the ${cur.group}.` });
