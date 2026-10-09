@@ -157,7 +157,7 @@ function F1Empty({ next, tracking, now }: { next: F1Weekend | null; tracking: bo
 const styles = StyleSheet.create({
   none: { color: colors.textDim, fontSize: 14, paddingHorizontal: space(4), paddingTop: space(4) },
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  // The same two-way switch as the Feed's Everything / Players / Teams (FilterBar).
+  // The same two-way switch as the Feed's Everything / Teams / Players (FilterBar).
   segment: { flexDirection: 'row', marginHorizontal: space(3), marginBottom: space(2), padding: 3, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   segBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: space(2), borderRadius: radius.sm },
   segOn: { backgroundColor: colors.surfaceHi },

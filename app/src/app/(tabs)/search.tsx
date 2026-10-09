@@ -4,14 +4,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { TargetRow, SectionHeader } from '../../components/ui';
-import { FilterBar, useFilter } from '../../components/FilterBar';
+import { FilterBar, playersWord, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Target, Team } from '../../lib/types';
 
 export default function SearchScreen() {
   const { noteTrackers } = useStore();
   const [q, setQ] = useState('');
-  const { filter, setFilter } = useFilter();
+  // Teams or players, Teams first: no Everything here (FilterBar `everything`).
+  const { filter, setFilter } = useFilter('team');
   const { kind, league } = filter;
   const [results, setResults] = useState<Target[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -50,6 +51,9 @@ export default function SearchScreen() {
   const browsing = !q.trim();
   const showTeams = browsing && kind !== 'player';
   const name = (id: string) => leagueInfo(id)?.name ?? id.toUpperCase();
+  // The search box says what it searches: "Search teams", "Search NBA players", "Search F1 drivers".
+  const players = playersWord(league);
+  const placeholder = `Search ${league ? `${name(league)} ` : ''}${kind === 'player' ? players : kind === 'team' ? 'teams' : `${players} or teams`}`;
   // One section of results, or of teams A-Z; by division, a section each ("AL East"; "MLB · AL East" across every league).
   const sections = useMemo(() => {
     if (!browsing) return results.length ? [{ title: '', data: results }] : [];
@@ -70,7 +74,7 @@ export default function SearchScreen() {
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder="Search players or teams"
+          placeholder={placeholder}
           placeholderTextColor={colors.textFaint}
           style={styles.input}
           onFocus={() => setFocused(true)}
@@ -82,7 +86,7 @@ export default function SearchScreen() {
         />
         {loading ? <ActivityIndicator size="small" color={colors.hate} /> : null}
       </View>
-      <FilterBar filter={filter} onChange={setFilter} />
+      <FilterBar filter={filter} onChange={setFilter} everything={false} />
       {showTeams ? (
         <View style={styles.sortRow} accessibilityRole="tablist" accessibilityLabel="Sort teams">
           <Text style={styles.sortLabel}>Sort teams</Text>
@@ -106,8 +110,8 @@ export default function SearchScreen() {
         ListEmptyComponent={
           loading ? null
             : failed && !browsing ? <Text style={styles.none}>Couldn't search. Check your connection and try again.</Text>
-            : browsing ? <Text style={styles.none}>Type a name to find {league ? `${league.toUpperCase()} ` : ''}players.</Text>
-            : <Text style={styles.none}>No {kind === 'all' ? 'players or teams' : `${kind}s`} match “{q}”.</Text>
+            : browsing ? <Text style={styles.none}>Type a name to find {league ? `${league.toUpperCase()} ` : ''}{players}.</Text>
+            : <Text style={styles.none}>No {kind === 'all' ? `${players} or teams` : kind === 'player' ? players : 'teams'} match “{q}”.</Text>
         }
       />
     </View>

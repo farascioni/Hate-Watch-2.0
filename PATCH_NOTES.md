@@ -12,7 +12,7 @@ Changes since build 11. Server updates already work on every build.
 SCORES
 - All games: a switch at the top of Scores shows every game live now or in the next 24 hours, tracked or not.
 - Upcoming games show a preview: each team's chance to win, records, probable pitchers and goalies, the line and the playoff series.
-- Tap a team's logo or name on a game card, or at the top of a game's screen, to open its page.
+- Tap a team's logo or name on a game card or a game's screen to open its page.
 - Box scores: a game's screen has Box score and Highlights tabs. The box score shows each team's players, live, opening on the team you track: yours highlighted, the ugly numbers in red, a name opens that player.
 - Highlights, in place of the play-by-play: ESPN's video clips, playing right in the app, and the key plays (scores, lead changes, turnovers, cards, ejections, the plays that sent you alerts).
 - Clips on alerts: when ESPN posts a clip of the play, minutes later, it shows on that alert, ready to play, with no second notification. A loss alert gets the winning play's clip. MLB, NBA, WNBA and NHL.
@@ -20,6 +20,7 @@ SCORES
 PLAYER AND TEAM PAGES
 - Stats and Recent misery tabs: pages open on stats (season line, last five games, next game). Recent misery lists every alert about them from the last 24 hours.
 - A player's alert settings: Show their team's games (on) and Get their team's alerts (off).
+- Search opens on Teams (no Everything filter) and its box says what it searches ("Search F1 drivers"). Teams come before Players in every filter.
 
 ONE ALERT AT A TIME
 - A team's alert and its players' alerts on one play are one alert: "Gerrit Cole gave up a solo homer", with "Rays took the lead." in it. (Server)
@@ -40,7 +41,7 @@ NEW ALERTS (Server)
 - Some start in your feed only, with no notification: each alert's bell in Settings changes that.
 
 FIXES
-- ABS challenge alerts wait until the review is over: ESPN first posts a challenged pitch as confirmed, which sent "lost an ABS challenge" for challenges that were won. (Server)
+- ABS challenge alerts wait until the review is over, so a won challenge no longer sends "lost an ABS challenge". (Server)
 - A called third strike or ball four whose challenge was upheld is labeled an ABS challenge, not a replay challenge. (Server)
 - A team's or player's alert settings no longer list the streak and recap switches, and a team's Recent misery leaves out the recap.
 

@@ -20,7 +20,7 @@ export default function FollowingScreen() {
     const all = [...follows.values()].filter((t) => matchesFilter(filter, t)).sort((a, b) => a.name.localeCompare(b.name));
     return [
       { title: 'Teams', data: all.filter((t) => t.kind === 'team') },
-      { title: 'Players', data: all.filter((t) => t.kind === 'player') },
+      { title: filter.league === 'f1' ? 'Drivers' : 'Players', data: all.filter((t) => t.kind === 'player') },
     ].filter((s) => s.data.length);
   }, [follows, filter]);
 
