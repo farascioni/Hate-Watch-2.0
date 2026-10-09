@@ -8,9 +8,12 @@ import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
-  bundleByPlay, boxHits, boxPlayerFacts, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
+  bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
 } from './detectors.ts';
-import { publish } from './fanout.ts';
+import { eventChanged, publish } from './fanout.ts';
+import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
+import { flagOn } from './flags.ts';
+import type { Clip } from './highlights.ts';
 import { soccerType } from './event-types.ts';
 import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 import { divisionsOf } from './divisions.ts';
@@ -19,9 +22,22 @@ import { weeklyRecaps } from './recap.ts';
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
   getJson: getJson as (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => Promise<any>,
+  /** A clip's record from ESPN's clip API, as text: its play ids are too long for JSON numbers (clips.ts). */
+  getText: async (url: string): Promise<string> => {
+    const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`${r.status} ${url}`);
+    return r.text();
+  },
 };
 
 const LIVE_POLL_MS = Number(process.env.HW_LIVE_POLL_MS ?? 2000);      // per live game
+// ESPN's clips (clips.ts): new clips read from the clip API a few per poll; after the final, the summary every
+// minute for an hour, for the last plays' clips (up to ~10 minutes later) and the recap (20 to 50 minutes).
+const CLIP_READS = 4;
+const CLIP_TRIES = 3; // a clip whose record won't load is skipped after this many reads
+const CLIPS_POLL_MS = 60_000;
+const CLIPS_AFTER_FINAL_MS = 60 * 60_000;
+const CLIP_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']); // the leagues ESPN has clips for (none for the NFL or soccer in October 2026)
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
@@ -121,6 +137,14 @@ export class GameTracker {
   /** Once-a-game facts already sent or baselined (position player pitching, scoreless halves, goalies pulled…). */
   private onceDone = new Set<string>();
   finished = false;
+  // ESPN's clips of this game (clips.ts): each play's by play id, the recap, which clips' records were read,
+  // and whether alerts went out since clips were last put on alerts.
+  private clipByPlay = new Map<string, Clip>();
+  private recap: Clip | null = null;
+  private clipsRead = new Set<string>();
+  private clipTries = new Map<string, number>();
+  private newAlerts = false;
+  private clipsBusy = false;
   lastPollMs = 0;
 
   constructor(league: League, gameId: string, homeId: string, awayId: string, info: GameInfo = {}) {
@@ -189,6 +213,46 @@ export class GameTracker {
 
   start() { void this.readSeries(); void this.loop(); }
   stop() { this.stopped = true; }
+
+  /**
+   * The summary's new clips: a play's onto the alerts about it (its record read once from the clip API,
+   * a few per read), the recap kept for the loss. Their feeds get the alert again, with the clip. One read
+   * at a time, and the poll doesn't wait for it: a slow clip API never holds up an alert.
+   */
+  async readClips(summary: any) {
+    if (this.clipsBusy || (!flagOn('clips.feed') && !flagOn('clips.loss'))) return;
+    this.clipsBusy = true;
+    try {
+      const fresh = (summary?.videos ?? []).filter((v: any) => v?.id != null && !this.clipsRead.has(String(v.id))).slice(0, CLIP_READS);
+      for (const v of fresh) {
+        const id = String(v.id), clip = clipFromVideo(v);
+        if (clip && isRecap(clip)) this.recap = clip;
+        else if (clip && v.links?.api?.self?.href) {
+          const raw = await liveDeps.getText(v.links.api.self.href).catch(() => null);
+          if (raw == null) {
+            // Read it again next time, but not forever: a record that won't load mustn't keep newer clips waiting.
+            const tries = (this.clipTries.get(id) ?? 0) + 1;
+            this.clipTries.set(id, tries);
+            if (tries < CLIP_TRIES) continue;
+          } else for (const playId of playIdsIn(raw)) this.clipByPlay.set(playId, clip);
+        }
+        this.clipsRead.add(id);
+      }
+      if (!fresh.length && !this.newAlerts) return;
+      this.newAlerts = false;
+      for (const id of attachClips(this.ctx.gameId, this.clipByPlay, this.recap)) eventChanged(id);
+    } finally { this.clipsBusy = false; }
+  }
+
+  /** Clips of the last plays, and the recap, come after the final: the summary every minute for an hour. */
+  private async clipsAfterFinal() {
+    for (const end = Date.now() + CLIPS_AFTER_FINAL_MS; !this.stopped && Date.now() < end;) {
+      await new Promise((r) => setTimeout(r, CLIPS_POLL_MS).unref());
+      if (!flagOn('clips.feed') && !flagOn('clips.loss')) continue; // switched off: nothing to read for
+      const s = await liveDeps.getJson(urls.summary(this.ctx.league, this.ctx.gameId), { bust: true, timeoutMs: 6000 }).catch(() => null);
+      if (s) await this.readClips(s).catch((e) => log(`[${this.ctx.league} ${this.ctx.gameId}] clips`, String(e)));
+    }
+  }
 
   private async loop() {
     while (!this.stopped && !this.finished) {
@@ -384,7 +448,8 @@ export class GameTracker {
     }
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
-    if (events.length) publish(bundleByPlay(events), league);
+    if (events.length) { publish(bundleByPlay(events), league); this.newAlerts = true; }
+    if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
     patchGame(`${league}:${gameId}`, {
@@ -457,6 +522,7 @@ export class GameTracker {
     // Each player's bad night from the box score (not the preseason's): lines on their team's loss, or their own alerts after a win.
     const seasonType = Number(this.box?.header?.season?.type ?? this.pre.seasonType ?? 2);
     const players = this.box && seasonType !== 1 ? playerFinalEvents(this.ctx, boxPlayerFacts(this.ctx.league, this.box), final, Date.now(), lost) : [];
+    if (CLIP_LEAGUES.has(this.ctx.league)) void this.clipsAfterFinal();
     if (!lost) { if (players.length) publish(players, this.ctx.league); return; } // a tie
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
     // (3+ goals), then the team's loss, then its facts (a walk-off, losing as the favorite…: each a line on
@@ -469,7 +535,13 @@ export class GameTracker {
     const periods = Math.max(0, ...this.plays.map((p) => p.periodNum ?? 0));
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
     const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
-    publish([...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey)), ...players], this.ctx.league);
+    const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey)), ...players];
+    // The loss's alerts get the winning play's clip (the play that put the winner ahead for good), else the recap (clips.ts).
+    const winning = leadStory(this.plays, lost.meta?.winnerId === this.ctx.homeId ? 'home' : 'away').goAhead?.id;
+    for (const e of loss) if (e.moment === lost.moment) e.meta = { ...e.meta, lossClip: true, ...(winning ? { clipPlayId: winning } : {}) };
+    publish(loss, this.ctx.league);
+    this.newAlerts = true;
+    if (CLIP_LEAGUES.has(this.ctx.league)) void this.readClips(this.box).catch(() => {}); // the winning play's clip may be out already
     // The standings will say the same streak in a minute (scanStandings): it's been said.
     const streak = facts.find((f) => f.type === 'team.losing_streak');
     if (streak) kvSet(`streak-told:${this.ctx.league}:${lost.targetKey.split(':')[2]}`, `L${streak.meta?.streak}`);

@@ -11,6 +11,7 @@ import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 import { allGames, deviceTeams, forgetDeviceTeams, gameDetail, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { forDevice } from './highlights.ts';
+import { flagOn } from './flags.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
@@ -135,7 +136,7 @@ route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const mine = new Set(rows.map((r) => JSON.parse(r.meta ?? 'null')?.playId).filter(Boolean).map(String)); // the plays that sent this device alerts
   return {
     game: withHateWatch(req.deviceId!, [game])[0], alerts: rows.map(feedItem), plays: detail?.plays ?? [], box: detail?.box ?? null,
-    clips: detail?.clips ?? [], keyPlays: detail ? forDevice(detail.highlights, mine) : [],
+    clips: flagOn('clips.highlights') ? detail?.clips ?? [] : [], keyPlays: detail ? forDevice(detail.highlights, mine) : [], // clips: a switch (flags.ts)
   };
 });
 

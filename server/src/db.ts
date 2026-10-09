@@ -80,6 +80,10 @@ if (!(db.prepare('PRAGMA table_info(players)').all() as { name: string }[]).some
   db.exec('ALTER TABLE players ADD COLUMN positions TEXT');
 }
 db.exec('CREATE INDEX IF NOT EXISTS events_game ON events(game_id)'); // a loss's alerts, together (RECIPIENTS)
+// ESPN's clip of an alert's play (clips.ts), as JSON, once it's out.
+if (!(db.prepare('PRAGMA table_info(events)').all() as { name: string }[]).some((c) => c.name === 'clip')) {
+  db.exec('ALTER TABLE events ADD COLUMN clip TEXT');
+}
 // One device's lines on a feed alert: other facts of its moment folded into it (Detected.fold), as JSON.
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'extra')) {
   db.exec('ALTER TABLE feed ADD COLUMN extra TEXT');

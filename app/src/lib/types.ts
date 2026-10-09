@@ -39,6 +39,8 @@ export interface FeedItem {
   gameId?: string | null;
   /** A Successful Hate Watch: how many other people got this alert too. */
   alsoGot?: number;
+  /** ESPN's clip of its play (a loss: of the winning play, or the recap), once it's out, while the server's switch is on. */
+  clip?: Clip;
 }
 
 /** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
@@ -126,7 +128,7 @@ export interface BoxGroup { title: string; columns: string[]; rows: BoxRow[]; to
 export interface BoxTeam { key: string; abbrev: string; logo: string | null; groups: BoxGroup[] }
 export interface BoxScore { teams: BoxTeam[] }
 /** A game's video clip from ESPN: HLS for phones, MP4 for the web. */
-export interface Clip { id: string; title: string; seconds: number; thumb: string | null; hls: string | null; mp4: string | null; at: number }
+export interface Clip { id: string; title: string; seconds: number; thumb: string | null; hls: string | null; mp4: string | null; at: number; expires?: number | null }
 /**
  * A key play (a score, a lead change, a turnover, a card), the score after it, and why it's one when the
  * text doesn't say. `alerted`: it sent you an alert (those are key plays too, whatever they were).

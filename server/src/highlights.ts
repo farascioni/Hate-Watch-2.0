@@ -2,9 +2,10 @@
 // matter from the play-by-play (scoring plays, lead changes, turnovers, cards and ejections), newest first.
 import { SOCCER, BASKETBALL, type League } from './leagues.ts';
 import type { GameCard, PlayLine } from './scores.ts';
+import { clipFromVideo } from './clips.ts';
 
-/** A clip: HLS for phones, MP4 for the web (no HLS in most browsers). ESPN takes clips down after about 2 days. */
-export interface Clip { id: string; title: string; seconds: number; thumb: string | null; hls: string | null; mp4: string | null; at: number }
+/** A clip: HLS for phones, MP4 for the web (no HLS in most browsers). ESPN takes clips down after about 2 days (`expires`). */
+export interface Clip { id: string; title: string; seconds: number; thumb: string | null; hls: string | null; mp4: string | null; at: number; expires: number | null }
 /**
  * A key play, with the score after it and why it's one when the text doesn't say ("Lead change").
  * `alerted`: it sent this device an alert (forDevice).
@@ -16,16 +17,7 @@ type Placed = KeyPlay & { seq: number; ids?: string[] };
 export interface Highlights { keyPlays: Placed[]; alerted: Map<string, Placed> }
 
 export function clipsOf(summary: any, now = Date.now()): Clip[] {
-  return (summary?.videos ?? [])
-    .filter((v: any) => {
-      const ends = Date.parse(v.timeRestrictions?.expirationDate ?? '');
-      return !(ends < now) && (v.links?.source?.HLS?.href || v.links?.source?.href);
-    })
-    .map((v: any): Clip => ({
-      id: String(v.id), title: String(v.headline ?? ''), seconds: Number(v.duration) || 0, thumb: v.thumbnail ?? null,
-      hls: v.links?.source?.HLS?.href ?? null, mp4: v.links?.source?.href ?? null, at: Date.parse(v.originalPublishDate ?? '') || 0,
-    }))
-    .sort((a: Clip, b: Clip) => b.at - a.at);
+  return (summary?.videos ?? []).map((v: any) => clipFromVideo(v, now)).filter((c: Clip | null): c is Clip => !!c).sort((a: Clip, b: Clip) => b.at - a.at);
 }
 
 const KEY_MAX = 60;

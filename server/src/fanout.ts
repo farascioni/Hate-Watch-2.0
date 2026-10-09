@@ -5,6 +5,7 @@ import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
 import { RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
+import { clipShown } from './clips.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
 export interface Prefs {
@@ -275,10 +276,12 @@ export const withLines = (body: string, lines: string[] | null | undefined) => (
  * then says how many others got it too (`alsoGot`, the reader not counted). `extra`: the feed row's lines
  * for this device (other facts of the moment, folded in).
  */
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null }) {
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null; clip?: string | null }) {
   const t = EVENT_TYPE_BY_ID.get(row.type);
   const meta = row.meta ? JSON.parse(row.meta) : null;
+  const clip = clipShown(row.clip ? JSON.parse(row.clip) : null, meta); // its play's clip, while ESPN has it up and clips are on
   return {
+    ...(clip ? { clip } : {}),
     ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
@@ -456,6 +459,12 @@ function addLateLine(deviceId: string, eventId: string, line: string) {
   const item = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(deviceId, eventId) as Parameters<typeof feedItem>[0];
   for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(item) }));
   console.log(`[event] late line on ${eventId} for ${deviceId.slice(0, 6)}…: ${line}`);
+}
+
+/** An alert changed after it went out (a clip of its play came): each feed that has it gets it again, live. No push. */
+export function eventChanged(eventId: string) {
+  const rows = db.prepare(`SELECT f.device_id, e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.event_id = ?`).all(eventId) as (Parameters<typeof feedItem>[0] & { device_id: string })[];
+  for (const r of rows) for (const ws of sockets.get(r.device_id) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(r) }));
 }
 
 /**
