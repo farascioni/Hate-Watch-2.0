@@ -31,7 +31,7 @@ HOW THEY LOST (Server)
 - Your Hate Watch streak on a loss, and a weekly misery recap, Mondays at 9 am.
 
 NEW ALERTS (Server)
-- MLB: strikes out 3 or 4 times, hands over a run (wild pitch, balk, passed ball, bases-loaded walk), back-to-back homers allowed, thrown out on the bases, a starter chased in under 3 innings, no-hit through 6, 0-for-4 or worse, a position player pitching. Crew chief reviews count as lost challenges, and an overturned home run says so.
+- MLB: strikes out 3 or 4 times, hands over a run (wild pitch, balk, passed ball, bases-loaded walk), back-to-back homers allowed, thrown out on the bases, a starter chased in under 3 innings, no-hit through 6, 0-for-4 or worse, a position player pitching. Crew chief reviews count as lost challenges, and an overturned home run says so. Runners in scoring position adds "Bases loaded now" when the bases load.
 - NFL: the starting QB pulled, a touchdown wiped out by a penalty, a three-and-out, turned over on downs, empty from the red zone.
 - NBA and WNBA: fouls out, scoreless at the half, a brick night, an opponent's 14-0 run (WNBA 12-0).
 - NHL: goalie pulled, a shootout miss, a fight, giving up an empty-netter or a short-handed goal, finishing -3 or worse.

@@ -42,10 +42,11 @@ export interface GameCtx {
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
   /**
    * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs) and for
-   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half), and
-   * "goes down in order" (`pas`: each plate appearance's result; `reached`: anyone got on or scored).
+   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half, first on
+   * `rispPlay`; `loadedTold`: the bases loading since went on that alert), and "goes down in order" (`pas`:
+   * each plate appearance's result; `reached`: anyone got on or scored).
    */
-  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; pas: { id: string; text: string }[]; reached: boolean };
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; rispPlay?: string; loadedTold?: boolean; pas: { id: string; text: string }[]; reached: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
@@ -495,7 +496,7 @@ function trackHalfInning(g: GameCtx, p: NPlay) {
     const on = (base: string) => p.participants.some((x) => x.role === base);
     if (on('onFirst') && on('onSecond') && on('onThird')) g.half.loadedNoOuts = true;
   }
-  if (inScoringPosition(basesAfter(p))) g.half.risp = true;
+  if (inScoringPosition(basesAfter(p)) && !g.half.risp) { g.half.risp = true; g.half.rispPlay = p.id; }
   // An at-bat result lists the runners after it: anyone on (a hit, a walk, an error, extra innings' runner
   // on second) or a run (a solo homer leaves the bases empty) means it wasn't 1-2-3.
   if (p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter') && !g.half.pas.some((x) => x.id === p.id)) {
@@ -545,6 +546,29 @@ function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
     body: `${halfLabel(p)}${says ? `: ${p.text}` : ''} — ${scoreLine(g, p)}`,
     at: p.at,
     meta: { gameId: g.gameId, playId: p.id },
+  }];
+}
+
+/**
+ * The bases loading after that alert, in the same half-inning (once): a line on it ("Bases loaded now, 1
+ * out."), never an alert of its own. It shares the alert's moment (its play's), so the alert already sent
+ * gets the line, without a push (publish's late lines); it's that alert's type, so only those who want it.
+ * From an at-bat result, the one play that both loads the bases and says how (a walk, a hit, an error).
+ */
+function basesLoadedLater(g: GameCtx, p: NPlay): Detected[] {
+  const key = halfKey(p), h = g.half, b = g.bases;
+  const wasLoaded = !!(b?.onFirst && b.onSecond && b.onThird); // the bases before this play (observePlay updates them after)
+  if (!key || h?.key !== key || !h.rispPlay || h.rispPlay === p.id || h.loadedTold || wasLoaded) return [];
+  if (p.typeSlug !== 'play-result' || basesAfter(p)?.length !== 3) return [];
+  h.loadedTold = true;
+  const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
+  const outs = p.outs ?? 0;
+  return [{
+    id: `${g.gameId}:${key}:mlb.team.opponent_risp:loaded:${fieldingId}`, type: 'mlb.team.opponent_risp', targetKey: teamKey('mlb', fieldingId),
+    title: `${teamName('mlb', battingId)} have the bases loaded against the ${teamName('mlb', fieldingId)}`,
+    body: `${halfLabel(p)}: ${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id },
+    moment: playMoment(g.gameId, h.rispPlay, teamKey('mlb', fieldingId)),
+    fold: `Bases loaded now, ${outs ? outs : 'nobody'} out${outs > 1 ? 's' : ''}.`, foldOnly: true,
   }];
 }
 
@@ -947,6 +971,7 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   const runner = runnerOut(g, p);
   if (runner) out.push(runner);
   out.push(...opponentRisp(g, p));
+  out.push(...basesLoadedLater(g, p));
   out.push(...challengeLost(g, p));
   const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
   if (err && p.teamId) {

@@ -298,7 +298,9 @@ test('MLB: opponent gets a runner in scoring position: the fielding team hears i
   assert.match(stole.body, /^Top 1st: Acuña Jr\. stole second\. — /);
   assert.equal(stole.unless, undefined);
   assert.deepEqual(live(g, runnerPlay('Top 1', 'play-result', 'Acuña Jr. stole second.', ['onSecond'])), [], "ESPN's duplicate of the steal");
-  assert.deepEqual(live(g, ab('Top 1', 'Albies walked, Olson to second, Acuña Jr. to third.', ['onFirst', 'onSecond', 'onThird'])), [], 'once per half-inning');
+  const loaded = live(g, ab('Top 1', 'Albies walked, Olson to second, Acuña Jr. to third.', ['onFirst', 'onSecond', 'onThird']));
+  assert.deepEqual(loaded.map((e) => [e.foldOnly, e.fold, e.moment === `g:play:${stole.meta?.playId}:team:mlb:15`]), [[true, 'Bases loaded now, nobody out.', true]],
+    'once per half-inning: the bases loading since is only a line on that alert (its moment), never a second one');
 
   const [double] = live(g, ab('Bottom 1', 'Rojas doubled to left.', ['onSecond']));
   assert.equal(double.targetKey, 'team:mlb:22', 'bottom of the inning: the away team is fielding');

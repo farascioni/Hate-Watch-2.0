@@ -81,3 +81,34 @@ test('a late fact for an alert they cleared from their feed is dropped', () => {
   assert.deepEqual(got('yankees-and-judge'), []);
   assert.equal(got('yankees-only').at(-1)?.split(' | ')[0], 'Yankees stranded a runner on second');
 });
+
+test('the bases loading after "runners in scoring position": a line on that alert, live, no second push (once a half-inning)', () => {
+  fan('yankees-risp', ['team:mlb:10'], { types: { 'mlb.team.opponent_risp': true } });
+  const riskFrames: any[] = [];
+  addSocket('yankees-risp', { on() {}, send: (f: string) => riskFrames.push(JSON.parse(f)) } as any);
+  const g = ctx();
+  const batter = (id: string, bases: [string, string][]) => [{ id: '32081', role: 'pitcher' }, { id, role: 'batter' }, ...bases.map(([who, role]) => ({ id: who, role }))];
+  poll(g, { ...play('r1', 'Top 4', 'Caminero doubled to left.', { outs: 0 }), teamId: '30', participants: batter('4683371', [['4683371', 'onSecond']]) });
+  poll(g, { ...play('r2', 'Top 4', 'Diaz walked.', { outs: 0 }), teamId: '30', participants: batter('5', [['5', 'onFirst'], ['4683371', 'onSecond']]) });
+  poll(g, { ...play('r3', 'Top 4', 'Arozarena flied out to center.', { outs: 1 }), teamId: '30', participants: batter('6', [['5', 'onFirst'], ['4683371', 'onSecond']]) });
+  const before = pushed('yankees-risp');
+  poll(g, { ...play('r4', 'Top 4', 'Lowe walked, Diaz to second, Caminero to third.', { outs: 1 }), teamId: '30', participants: batter('7', [['7', 'onFirst'], ['5', 'onSecond'], ['4683371', 'onThird']]) });
+  assert.deepEqual(got('yankees-risp'), ['Rays have a runner on second against the Yankees | Bases loaded now, 1 out. Top 4th: Caminero doubled to left. — TB 1, NYY 1']);
+  assert.equal(pushed('yankees-risp'), before, 'no second notification');
+  assert.match(riskFrames.find((f) => f.kind === 'eventUpdate')?.item.body ?? '', /^Bases loaded now, 1 out\./, 'the app gets it live');
+  // Still loaded after the next batter: nothing new, and once a half-inning.
+  poll(g, { ...play('r5', 'Top 4', 'Lowe struck out swinging.', { outs: 2 }), teamId: '30', participants: batter('8', [['7', 'onFirst'], ['5', 'onSecond'], ['4683371', 'onThird']]) });
+  assert.equal(got('yankees-risp').length, 1);
+  assert.equal(got('yankees-risp')[0].match(/Bases loaded/g)?.length, 1);
+});
+
+test('loaded on the play that first puts a runner in scoring position: the alert says so, no line; and nothing for those with the alert off', () => {
+  const g = ctx();
+  poll(g, { ...play('l1', 'Top 6', 'Caminero walked.', { outs: 0 }), teamId: '30', participants: [{ id: '32081', role: 'pitcher' }, { id: '4683371', role: 'batter' }, { id: '4683371', role: 'onFirst' }] });
+  poll(g, { ...play('l2', 'Top 6', 'Diaz singled to left, Caminero to second.', { outs: 0 }), teamId: '30', participants: [{ id: '32081', role: 'pitcher' }, { id: '5', role: 'batter' }, { id: '5', role: 'onFirst' }, { id: '4683371', role: 'onSecond' }] });
+  assert.equal(got('yankees-risp').at(-1), 'Rays have runners on first and second against the Yankees | Top 6th: Diaz singled to left, Caminero to second. — TB 1, NYY 1');
+  const h = ctx();
+  poll(h, { ...play('m1', 'Top 7', 'Lowe walked, Diaz to second, Caminero to third.', { outs: 0 }), teamId: '30', participants: [{ id: '32081', role: 'pitcher' }, { id: '7', role: 'batter' }, { id: '7', role: 'onFirst' }, { id: '5', role: 'onSecond' }, { id: '4683371', role: 'onThird' }] });
+  assert.equal(got('yankees-risp').at(-1), 'Rays have the bases loaded against the Yankees | Top 7th: Lowe walked, Diaz to second, Caminero to third. — TB 1, NYY 1');
+  assert.ok(got('yankees-only').every((x) => !/scoring|loaded/i.test(x)), "the alert's off by default");
+});
