@@ -6,6 +6,7 @@ import type { Detected } from './detectors.ts';
 import { RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
 import { clipShown } from './clips.ts';
+import { frameWithoutImages } from './images.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
 export interface Prefs {
@@ -245,11 +246,15 @@ export function inQuietHours(p: Prefs, now = new Date()) {
 }
 
 // ─── Live sockets ─────────────────────────────────────────────────────────────────────────────
-const sockets = new Map<string, Set<WebSocket>>();
+/** A device's open connection, as the server writes to it (addSocket: each frame through the image switches). */
+type Live = { send: (frame: string) => void; close: (code?: number, reason?: string) => void };
+const sockets = new Map<string, Set<Live>>();
 export function addSocket(deviceId: string, ws: WebSocket) {
   if (!sockets.has(deviceId)) sockets.set(deviceId, new Set());
-  sockets.get(deviceId)!.add(ws);
-  ws.on('close', () => sockets.get(deviceId)?.delete(ws));
+  // Every frame to it goes through the image switches (images.ts) on the way out.
+  const live = { send: (frame: string) => ws.send(frameWithoutImages(frame)), close: (code?: number, reason?: string) => ws.close(code, reason) };
+  sockets.get(deviceId)!.add(live);
+  ws.on('close', () => sockets.get(deviceId)?.delete(live));
 }
 
 /** Send a frame to every connected device that passes `to` (live scores: see scores.ts). */

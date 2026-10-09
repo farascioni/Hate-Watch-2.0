@@ -1,6 +1,7 @@
-// Server-side switches for features that lean on something outside our control (ESPN's video clips), so
-// they can be turned off without an app build: every one is on until turned off. Turning one off works at
-// once (read every few seconds, no restart) from the server's shell:
+// Server-side switches for what leans on something outside our control (ESPN's video clips, and its player
+// photos and team logos, in case of a rights issue), so they can be turned off without an app build: every
+// one is on until turned off. Turning one off works at once (read every few seconds, no restart) from the
+// server's shell:
 //   fly ssh console -a hate-watch-api -C "node /app/src/flag-cli.ts clips.feed off"
 // or for good, surviving a fresh database, with a secret (which restarts the app):
 //   fly secrets set -a hate-watch-api HW_FLAGS_OFF=clips.feed,clips.loss
@@ -12,6 +13,9 @@ export const FLAGS = {
   'clips.highlights': 'Clips on a game\'s Highlights tab (its key plays stay)',
   'clips.feed': 'Clips on alerts in the feed, for the play they\'re about',
   'clips.loss': 'The winning play\'s clip (or the game recap) on loss alerts',
+  images: 'ESPN\'s player photos and team logos, everywhere below',
+  'images.headshots': 'Player photos (a badge in the team\'s colour with its code and the jersey number instead)',
+  'images.logos': 'Team logos (a badge in the team\'s colour with its code instead)',
 } as const;
 export type Flag = keyof typeof FLAGS;
 
