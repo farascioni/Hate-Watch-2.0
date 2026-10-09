@@ -9,6 +9,8 @@ import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
 import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { getPrefs, sendToConnected } from './fanout.ts';
+import { boxScore, type BoxScore } from './boxscore.ts';
+import { clipsOf, highlights, type Clip, type Highlights } from './highlights.ts';
 
 /** Seam for tests (test/scores.test.ts). Production never changes it. */
 export const scoresDeps = {
@@ -468,9 +470,11 @@ function broadcast(g: GameCard) {
   sendToConnected(frame, (deviceId) => involves(g, deviceTeams(deviceId)));
 }
 
-// ─── Play-by-play for the game screen ─────────────────────────────────────────────────────────
+// ─── Play-by-play and box score for the game screen ───────────────────────────────────────────
 export interface PlayLine { id: string; text: string; when: string; scoring: boolean }
-const playCache = new Map<string, { at: number; plays: PlayLine[] }>();
+/** `highlights` is everyone's: the route makes each device's key plays from it (forDevice). */
+type Detail = { plays: PlayLine[]; box: BoxScore | null; clips: Clip[]; highlights: Highlights };
+const detailCache = new Map<string, { at: number } & Detail>();
 
 function when(lg: League, p: any) {
   const n = Number(p.period?.number ?? 0);
@@ -481,11 +485,15 @@ function when(lg: League, p: any) {
   return `${n > 4 ? 'OT' : `Q${n}`}${clock}`;
 }
 
-/** The latest 25 plays, newest first. MLB keeps at-bat results only (not every pitch); soccer is its key events (goals, cards, subs). */
-export async function gamePlays(g: GameCard): Promise<PlayLine[]> {
-  if (g.league === 'f1') return [];
-  const hit = playCache.get(g.key);
-  if (hit && Date.now() - hit.at < (g.state === 'in' ? 8000 : 300_000)) return hit.plays;
+/**
+ * The game screen's box score and highlights (ESPN's clips and the key plays), from one read of ESPN's
+ * summary (8s fresh while live). `plays`, the latest 25 of the play-by-play, is for builds from before
+ * the Highlights tab: MLB keeps at-bat results only (not every pitch); soccer is its key events.
+ */
+export async function gameDetail(g: GameCard): Promise<Detail> {
+  if (g.league === 'f1') return { plays: [], box: null, clips: [], highlights: { keyPlays: [], alerted: new Map() } };
+  const hit = detailCache.get(g.key);
+  if (hit && Date.now() - hit.at < (g.state === 'in' ? 8000 : 300_000)) return hit;
   const s = await scoresDeps.getJson(urls.summary(g.league, g.id), { timeoutMs: 6000, bust: g.state === 'in' });
   let raw: any[] = g.league === 'nfl'
     ? [...(s.drives?.previous ?? []).flatMap((d: any) => d.plays ?? []), ...(s.drives?.current?.plays ?? [])]
@@ -496,7 +504,13 @@ export async function gamePlays(g: GameCard): Promise<PlayLine[]> {
   const plays = raw.filter((p) => p.text && !seen.has(String(p.id)) && seen.add(String(p.id)))
     .slice(-25).reverse()
     .map((p) => ({ id: String(p.id), text: String(p.text), when: when(g.league, p), scoring: !!p.scoringPlay }));
-  playCache.set(g.key, { at: Date.now(), plays });
-  if (playCache.size > 200) playCache.delete(playCache.keys().next().value!);
-  return plays;
+  // The plays anyone got an alert for in this game, so each device's key plays can include its own.
+  const alertIds = new Set((db.prepare(`SELECT DISTINCT json_extract(meta, '$.playId') AS id FROM events WHERE game_id = ? AND json_extract(meta, '$.playId') IS NOT NULL`)
+    .all(g.id) as { id: string }[]).map((r) => String(r.id)));
+  const detail = { at: Date.now(), plays, box: boxScore(g, s), clips: clipsOf(s), highlights: highlights(g, s, when, alertIds) };
+  detailCache.set(g.key, detail);
+  if (detailCache.size > 200) detailCache.delete(detailCache.keys().next().value!);
+  return detail;
 }
+
+export const gamePlays = async (g: GameCard) => (await gameDetail(g)).plays;

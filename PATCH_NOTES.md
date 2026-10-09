@@ -13,6 +13,8 @@ SCORES
 - All games: a switch at the top of Scores shows every game live now or starting in the next 24 hours, tracked or not, by league. Tap any game to open it.
 - Upcoming games show a preview: each team's chance to win (from the betting line), records, probable pitchers and goalies, the line, soccer form and the playoff series.
 - Tap a team's logo or name on a game card, or at the top of a game's screen, to open its page.
+- Box scores: a game's screen has Box score and Highlights tabs. The box score shows each team's players (batting and pitching, passing, rushing and the rest), live as the game goes, opening on the team you track. Players you track are highlighted, the ugly numbers are in red, and tapping a name opens that player.
+- Highlights, in place of the play-by-play: ESPN's video clips of the game, playing right in the app, and the key plays (scores, lead changes, turnovers, cards, ejections, and the plays that sent you alerts) with the score after each.
 
 PLAYER AND TEAM PAGES
 - Stats and Recent misery tabs: pages open on stats (season line, last five games, next game). Recent misery lists every alert about them from the last 24 hours. F1 shows Recent misery only.

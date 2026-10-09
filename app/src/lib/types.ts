@@ -117,7 +117,22 @@ export interface NextGame {
   note?: string;
 }
 export interface PlayLine { id: string; text: string; when: string; scoring: boolean }
-export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[] }
+/**
+ * A game's box score, away team first: a table per stat group, the columns picked by the server. `bad` are
+ * the columns to show in red; `link` means the player has a page.
+ */
+export interface BoxRow { key: string; name: string; detail?: string; sub?: boolean; link: boolean; stats: string[]; bad?: number[] }
+export interface BoxGroup { title: string; columns: string[]; rows: BoxRow[]; totals?: string[]; note?: string }
+export interface BoxTeam { key: string; abbrev: string; logo: string | null; groups: BoxGroup[] }
+export interface BoxScore { teams: BoxTeam[] }
+/** A game's video clip from ESPN: HLS for phones, MP4 for the web. */
+export interface Clip { id: string; title: string; seconds: number; thumb: string | null; hls: string | null; mp4: string | null; at: number }
+/**
+ * A key play (a score, a lead change, a turnover, a card), the score after it, and why it's one when the
+ * text doesn't say. `alerted`: it sent you an alert (those are key plays too, whatever they were).
+ */
+export interface KeyPlay extends PlayLine { score?: string; tag?: string; alerted?: boolean }
+export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[]; box?: BoxScore | null; clips?: Clip[]; keyPlays?: KeyPlay[] }
 
 /** Settings counter: each time a team you track lost (F1: your constructor scored no points), and per team (most first). */
 export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }

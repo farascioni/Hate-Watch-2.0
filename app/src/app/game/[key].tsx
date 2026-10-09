@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { GameCardView } from '../../components/GameCard';
 import { FeedCard } from '../../components/FeedCard';
+import { BoxScoreView } from '../../components/BoxScore';
+import { HighlightsView } from '../../components/Highlights';
 import { Empty, SectionHeader, useNow } from '../../components/ui';
 import { trackedDrivers } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { FeedItem, GameDetail } from '../../lib/types';
 
 /**
- * One game from the Scores tab: the live score card, your alerts from this game, and the play-by-play
- * (F1: the running order). The card stays live over the socket; plays refresh every 15s while live.
+ * One game from the Scores tab: the live score card, your alerts from this game, then the box score and
+ * the highlights (ESPN's clips and the key plays) as tabs (F1: the running order). The card stays live over
+ * the socket; the box score and highlights refresh every 15s while live.
  */
 export default function GameScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
@@ -21,6 +24,7 @@ export default function GameScreen() {
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<'box' | 'highlights'>('box');
   const now = useNow();
   const game = games.get(gameKey) ?? detail?.game;
 
@@ -74,17 +78,20 @@ export default function GameScreen() {
           </>
         ) : (
           <>
-            <SectionHeader>Play by play</SectionHeader>
-            {detail?.plays.length ? (
-              <View style={styles.list}>
-                {detail.plays.map((p) => (
-                  <View key={p.id} style={styles.line}>
-                    <Text style={styles.when}>{p.when}</Text>
-                    <Text style={[styles.text, p.scoring && { color: colors.text, fontWeight: '800' }]}>{p.text}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'Plays show up here once it starts.' : 'No plays yet.') : 'Loading…'}</Text>}
+            <View style={styles.tabs} accessibilityRole="tablist">
+              {([['box', 'Box score'], ['highlights', 'Highlights']] as const).map(([id, label]) => (
+                <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabOn]}
+                  accessibilityRole="tab" accessibilityState={{ selected: tab === id }}>
+                  <Text style={[styles.tabText, tab === id && styles.tabTextOn]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {tab === 'box' ? (
+              detail?.box ? <BoxScoreView box={detail.box} tracked={follows} />
+                : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'The box score shows up here once it starts.' : 'No box score yet.') : 'Loading…'}</Text>
+            ) : detail?.clips?.length || detail?.keyPlays?.length ? (
+              <HighlightsView clips={detail.clips ?? []} plays={detail.keyPlays ?? []} now={now} />
+            ) : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'Highlights show up here once it starts.' : 'No highlights yet.') : 'Loading…'}</Text>}
           </>
         )}
       </ScrollView>
@@ -100,4 +107,10 @@ const styles = StyleSheet.create({
   mine: { backgroundColor: colors.hateDim },
   when: { color: colors.textFaint, fontSize: 12, fontWeight: '700', width: 64 },
   text: { color: colors.textDim, fontSize: 14, lineHeight: 19, flex: 1 },
+  // Box score and play by play: edge-to-edge tabs, the open one underlined in red (as on a player's page).
+  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginTop: space(4), marginBottom: space(3) },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: space(3), borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -StyleSheet.hairlineWidth },
+  tabOn: { borderBottomColor: colors.hate },
+  tabText: { color: colors.textDim, fontSize: 15, fontWeight: '800' },
+  tabTextOn: { color: colors.text },
 });

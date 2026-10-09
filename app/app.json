@@ -60,7 +60,8 @@
           "backgroundColor": "#0B0B0D"
         }
       ],
-      "expo-iap"
+      "expo-iap",
+      "expo-video"
     ],
     "extra": {
       "eas": {

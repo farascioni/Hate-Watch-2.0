@@ -9,7 +9,8 @@ import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publis
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
-import { allGames, deviceTeams, forgetDeviceTeams, gamePlays, gamesFor, getGame, nextF1Weekend } from './scores.ts';
+import { allGames, deviceTeams, forgetDeviceTeams, gameDetail, gamesFor, getGame, nextF1Weekend } from './scores.ts';
+import { forDevice } from './highlights.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
@@ -128,10 +129,14 @@ route('GET', '/me/scores/all', true, (req) => ({ games: withHateWatch(req.device
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');
-  const alerts = (db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
-    WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[]).map(feedItem);
-  const plays = await gamePlays(game).catch(() => []); // the score card still works if ESPN hiccups
-  return { game: withHateWatch(req.deviceId!, [game])[0], alerts, plays };
+  const rows = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
+    WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[];
+  const detail = await gameDetail(game).catch(() => null); // the score card still works if ESPN hiccups
+  const mine = new Set(rows.map((r) => JSON.parse(r.meta ?? 'null')?.playId).filter(Boolean).map(String)); // the plays that sent this device alerts
+  return {
+    game: withHateWatch(req.deviceId!, [game])[0], alerts: rows.map(feedItem), plays: detail?.plays ?? [], box: detail?.box ?? null,
+    clips: detail?.clips ?? [], keyPlays: detail ? forDevice(detail.highlights, mine) : [],
+  };
 });
 
 // ─── Leaderboard: the most hated players and teams (public: it's counts, never who) ────────────
