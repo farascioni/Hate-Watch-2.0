@@ -5,7 +5,11 @@ Each section's text is pasted into TestFlight's "What to Test" as it is, so it s
 characters and uses no emoji. New changes go under "Next build" as they ship; when a build goes to
 TestFlight, that heading becomes its build number and a new "Next build" starts above it.
 
-## Next build (changes since build 11)
+## Next build (changes since build 12)
+
+Changes since build 12. Server updates already work on every build.
+
+## Build 12 (October 9, 2026)
 
 Changes since build 11. Server updates already work on every build.
 
