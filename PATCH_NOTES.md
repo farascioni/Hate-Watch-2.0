@@ -39,7 +39,7 @@ COLLEGE FOOTBALL
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, showing after you reopen the app once or twice.
 - Tracking both teams in a game, its start is one alert, not two. (Server)
-- A drop in the standings after a loss (F1: a race) is a line on that alert, not an alert of its own. (Server)
+- After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert, not its own alert. (Server)
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
 - The Scores tab's switch says what it lists: events, games or fights.
 - The league filters fit on one row again, even on an iPhone SE.

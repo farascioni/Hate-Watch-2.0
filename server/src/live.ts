@@ -753,8 +753,8 @@ const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
  * Standings news, one alert per team per read: being eliminated, a division rival clinching the division,
  * dropping in the standings, a losing streak. They share a moment, in that order, and each one after the
  * first a device wants is a line on it ("Down to 4th in the AL East. Officially out of playoff contention.").
- * A streak the loss alert already gave (lossFacts, `streak-told`) isn't said again. The drop (and soccer's
- * relegation zone) that follows a loss is a line on the device's loss alert instead (`lateOn`), one alert for both:
+ * A streak the loss alert already gave (lossFacts, `streak-told`) isn't said again. Being eliminated, the drop and
+ * soccer's relegation zone that follow a loss are lines on the device's loss alert instead (`lateOn`), one alert:
  * "Successful Hate Watch! Nebraska lost to Indiana", "Down from 2nd to 8th in the Big Ten. Final Score: 20 to 17".
  */
 export async function scanStandings(lg: League) {
@@ -775,7 +775,8 @@ export async function scanStandings(lg: League) {
     if (!was || !team) continue;
     const base = { targetKey: team.key, at, meta: { teamId }, moment: `standings:${lg}:${teamId}:${at}` };
     if (/e/i.test(cur.clincher) && !/e/i.test(was.clincher)) {
-      events.push({ ...base, id: `elim:${lg}:${teamId}:${year}`, type: 'team.eliminated', title: `${team.shortName} ${are(lg)} ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.`, fold: 'Officially out of playoff contention.' });
+      events.push({ ...base, id: `elim:${lg}:${teamId}:${year}`, type: 'team.eliminated', title: `${team.shortName} ${are(lg)} ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.`, fold: 'Officially out of playoff contention.',
+        ...onLoss(team.key, 'Officially out of playoff contention.') });
     }
     for (const [rivalId] of clinched) {
       const div = divisions.get(teamId)?.name;

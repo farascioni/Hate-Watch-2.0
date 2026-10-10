@@ -122,6 +122,25 @@ test('a drop in the standings after a loss: a line on the loss alert, not an ale
   assert.equal(pushes.slice(before).filter((p) => p.to === 'ExponentPushToken[wsh-fan]').length, 0, 'the line makes no sound');
 });
 
+test('eliminated right after a loss: a line on the loss alert too, with the drop (AFC)', async () => {
+  fan('jets-fan', ['team:nfl:20']);
+  fan('jets-elim-off', ['team:nfl:20'], { types: { 'team.eliminated': false } });
+  fan('jets-loss-off', ['team:nfl:20'], { types: { 'team.lost': false } });
+  publish([gameLostEvent({ league: 'nfl', gameId: 'G-NYJ', homeId: '20', awayId: '7' }, { home: 13, away: 20 }, Date.now() - 60_000)!], 'nfl');
+  const before = pushes.filter((p) => p.to === 'ExponentPushToken[jets-fan]').length;
+  kvSet('standings:nfl', { 20: { rank: 9, group: 'AFC', clincher: '', streak: 'W1' } });
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = async () => ({ children: [{ abbreviation: 'AFC', standings: { entries: [
+    { team: { id: '20' }, stats: [{ name: 'playoffSeed', value: 11 }, { name: 'streak', displayValue: 'L1' }, { name: 'clincher', displayValue: 'e' }] }] } }] });
+  try { await scanStandings('nfl'); } finally { liveDeps.getJson = prev; }
+  const loss = 'team.lost: Successful Hate Watch! Jets lost to the Broncos';
+  assert.deepEqual(got('jets-fan'), [`${loss} | Officially out of playoff contention. Down from 9th to 11th in the AFC. Final Score: 20 to 13`], 'one alert');
+  assert.equal(pushes.filter((p) => p.to === 'ExponentPushToken[jets-fan]').length, before, 'no second notification');
+  assert.deepEqual(got('jets-elim-off'), [`${loss} | Down from 9th to 11th in the AFC. Final Score: 20 to 13`]);
+  assert.deepEqual(got('jets-loss-off'), ['team.eliminated: Jets are ELIMINATED ⚰️ | Down to 11th in the AFC. Officially out of playoff contention. See you next year.'],
+    'no loss alert to put it on: its own alert, the drop on it, as before');
+});
+
 test('ejections: an NHL game misconduct, an instigator and game misconduct together, an NFL disqualification', () => {
   fan('malkin-fan', ['player:nhl:3124'], { types: { 'player.ejected': false } }); // only "Takes a penalty" on
   fan('olivier-fan', ['player:nhl:4064781']);
