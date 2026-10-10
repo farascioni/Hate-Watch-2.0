@@ -3,6 +3,7 @@ import { UpNextRow } from './UpNextRow';
 import { Empty, SectionHeader } from './ui';
 import { colors, radius, space } from '../theme';
 import type { GameLine, StatGroup, StatsPage, Target } from '../lib/types';
+import { leagueUi } from '../lib/leagueUi';
 
 /**
  * A player's or team's stats, from ESPN through the server. Players: the season line ESPN picks for their
@@ -13,7 +14,7 @@ import type { GameLine, StatGroup, StatsPage, Target } from '../lib/types';
  * A plain View, so it fits in the stats screen's ScrollView and in a player page's FlatList header.
  */
 export function StatsView({ page, target, now }: { page: StatsPage; target: Target; now: number }) {
-  const game = target.league === 'ufc' ? 'fight' : target.league === 'f1' ? 'race' : 'game';
+  const game = leagueUi(target.league).game; // "game", F1's "race", the UFC's "fight" (the server's)
   const f1 = target.league === 'f1';
   return (
     <View>

@@ -15,13 +15,15 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hate-watch-api.fly.dev"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://hate-watch-api.fly.dev"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

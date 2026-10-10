@@ -24,8 +24,8 @@ UFC
 
 F1
 - Sprints get their alerts (lights out, a car retiring, the result): ESPN marks a sprint "SR", which wasn't read as one. Sessions are named in full, and a driver's teammate is whoever drove the other car that weekend. (Server)
-- Lights out is one alert naming your constructors and drivers in it, with the back of the grid as lines; tracking a driver gets it too (Race starts). A team's double DNF or no points takes in its drivers' alerts that say the same, and alerts that come at once are one notification. (Server)
-- A race or sprint's results come when it ends, not when ESPN makes them final up to 40 minutes later. A penalty after corrects them: changed alerts update, new ones are sent, ones no longer true are withdrawn. A championship drop is a line on that day's alert. (Server)
+- Lights out is one alert naming your constructors and drivers in it, the back of the grid as lines; driver trackers get it too. A team's double DNF or no points takes in its drivers' matching alerts; alerts at once are one notification. (Server)
+- Race and sprint results come when they end, not up to 40 minutes later at ESPN's final; a penalty after corrects them. A championship drop is a line on that day's alert. (Server)
 - Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
 - An F1 driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
@@ -37,6 +37,7 @@ COLLEGE FOOTBALL
 - Alerts: their game starting, falling behind, losing (and to an unranked team as a ranked one), three-and-out, a turnover on downs, an empty red zone trip, a touchdown wiped out, and falling in or out of the AP Top 25. (Server)
 
 EVERYWHERE
+- Fixes and screen changes can now arrive without a new build: they download in the background and show after you reopen the app once or twice.
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
 - The Scores tab's switch says what it lists: My and All events with every league on, games for one league, fights for the UFC.
 - The league filters fit on one row again, even on an iPhone SE.

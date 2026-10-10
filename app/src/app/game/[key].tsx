@@ -14,6 +14,7 @@ import { Empty, SectionHeader, useNow } from '../../components/ui';
 import { trackedDrivers } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { F1Preview, FeedItem, GameDetail } from '../../lib/types';
+import { leagueUi } from '../../lib/leagueUi';
 
 /** Whether "Your alerts from this game" is open, as you last left it (every game screen; kept on the device). */
 const ALERTS_OPEN_KEY = 'game:alertsOpen';
@@ -109,7 +110,7 @@ export default function GameScreen() {
 
         <Pressable onPress={toggleAlerts} style={({ pressed }) => [styles.alertsHead, pressed && { opacity: 0.6 }]} hitSlop={6}
           accessibilityRole="button" aria-expanded={alertsOpen} accessibilityHint={alertsOpen ? 'Minimizes your alerts' : 'Shows your alerts'}>
-          <SectionHeader>Your alerts from this {game.league === 'f1' ? 'race' : 'game'} · {alerts.length}</SectionHeader>
+          <SectionHeader>Your alerts from this {leagueUi(game.league).game} · {alerts.length}</SectionHeader>
           <Ionicons name={alertsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} style={styles.alertsChevron} />
         </Pressable>
         {alertsOpen ? (alerts.length

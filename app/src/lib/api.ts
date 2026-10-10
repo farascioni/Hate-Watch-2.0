@@ -4,7 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
+// Without it, a release build (a TestFlight build, or an over-the-air update published without it) uses production's,
+// never localhost: only a development build falls back to this machine.
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? (__DEV__ ? 'http://localhost:8787' : 'https://hate-watch-api.fly.dev')).replace(/\/$/, '');
 export const WS_URL = API_URL.replace(/^http/, 'ws') + '/ws';
 
 const TOKEN_KEY = 'hatewatch.token';

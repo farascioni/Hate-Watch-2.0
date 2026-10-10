@@ -4,10 +4,8 @@
  * app update; it just has no colour of its own until one is added to theme.ts.
  */
 export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl' | 'ufc' | 'cfb';
-/** Football leagues: the NFL and college football (CFB) share their game card's lines (possession, down and distance). */
-export const FOOTBALL = new Set<string>(['nfl', 'cfb']);
-/** `teamsOnly`: a league with no players (college football): only its teams are offered. */
-export interface LeagueInfo { id: League; name: string; sport?: string; teamsOnly?: boolean }
+/** `ui`: how the app shows it, the server's (lib/leagueUi.ts). `teamsOnly`: a league with no players (college football). */
+export interface LeagueInfo { id: League; name: string; sport?: string; teamsOnly?: boolean; ui?: Partial<import('./leagueUi').LeagueUi> }
 
 export interface Team {
   kind: 'team'; key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string;

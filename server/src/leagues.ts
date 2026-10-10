@@ -20,21 +20,35 @@ export const footballType = (lg: League, key: string) => `${lg === 'cfb' ? 'cfb'
 export const FBS_GROUP = '80';
 
 /**
+ * How the app shows a league (builds from October 2026 on read it; earlier ones have their own): so a league's
+ * look and filters change with a server deploy, not an app build.
+ * `color`: its chip and tag. `kinds`: what its filter offers (teams, players or both). `players`: what its people are
+ * called ("drivers"). `groupPlayers`: lists of its people grouped (the UFC's by weight class). `game`, `events`: what
+ * one of its events is and what the Scores tab's switch says ("race", "fights"). `football`: its cards' down and
+ * distance, possession and timeouts. `divisions`: Search can sort its teams by division.
+ */
+export interface LeagueUi {
+  color?: string; kinds: ('team' | 'player')[]; players: string; groupPlayers?: 'weightClass';
+  game: string; events: string; football?: boolean; divisions: boolean;
+}
+const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', divisions: true, ...x });
+
+/**
  * `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1").
  * `fullName`: ESPN's own name for it, where it splits a player's stats by competition (soccer).
  */
-export const LEAGUES: Record<League, { sport: string; name: string; slug?: string; fullName?: string }> = {
-  nba: { sport: 'basketball', name: 'NBA' },
-  mlb: { sport: 'baseball', name: 'MLB' },
-  nfl: { sport: 'football', name: 'NFL' },
-  nhl: { sport: 'hockey', name: 'NHL' },
-  f1: { sport: 'racing', name: 'F1' },
-  epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League' },
+export const LEAGUES: Record<League, { sport: string; name: string; slug?: string; fullName?: string; ui: LeagueUi }> = {
+  nba: { sport: 'basketball', name: 'NBA', ui: UI({ color: '#C9082A' }) },
+  mlb: { sport: 'baseball', name: 'MLB', ui: UI({ color: '#1D6FD8' }) },
+  nfl: { sport: 'football', name: 'NFL', ui: UI({ color: '#2E7D32', football: true }) },
+  nhl: { sport: 'hockey', name: 'NHL', ui: UI({ color: '#9CA3AF' }) },
+  f1: { sport: 'racing', name: 'F1', ui: UI({ color: '#E10600', players: 'drivers', game: 'race', events: 'races', divisions: false }) },
+  epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League', ui: UI({ color: '#7B2FBE' }) },
   // The app lists leagues in this order (filter chips, Settings): the WNBA farthest right of the first row of
   // chips, then the UFC and college football, added after it, on a second row (eight fit a phone's row), so no chip moves.
-  wnba: { sport: 'basketball', name: 'WNBA' },
-  ufc: { sport: 'mma', name: 'UFC' },
-  cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football' },
+  wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C' }) },
+  ufc: { sport: 'mma', name: 'UFC', ui: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false }) },
+  cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football', ui: UI({ color: '#B45309', kinds: ['team'], football: true }) },
 };
 
 export const LEAGUE_IDS = Object.keys(LEAGUES) as League[];

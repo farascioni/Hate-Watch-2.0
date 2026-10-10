@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { useStore } from '../lib/store';
-import { colors, leagueColors, radius, space } from '../theme';
+import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
+import { leagueColor } from '../lib/leagueUi';
 
 export function Chip({ label, active, onPress, color, style }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle> }) {
   return (
@@ -18,7 +19,7 @@ export function Chip({ label, active, onPress, color, style }: { label: string; 
 export function LeagueTag({ league }: { league: string }) {
   const { leagueInfo } = useStore(); // its short name from the server ("EPL"), for leagues this build doesn't know too
   return (
-    <View style={[styles.tag, { backgroundColor: leagueColors[league] ?? colors.surfaceHi }]}>
+    <View style={[styles.tag, { backgroundColor: leagueColor(league) ?? colors.surfaceHi }]}>
       <Text style={styles.tagText}>{leagueInfo(league)?.name ?? league.toUpperCase()}</Text>
     </View>
   );

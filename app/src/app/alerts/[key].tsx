@@ -5,9 +5,10 @@ import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { LeagueTag, SectionHeader, subtitle } from '../../components/ui';
-import { colors, leagueColors, radius, space } from '../../theme';
+import { colors, radius, space } from '../../theme';
 import { bySection, type EventType } from '../../lib/types';
 import { fitsPosition, positionsOf } from '../../lib/positions';
+import { leagueColor } from '../../lib/leagueUi';
 
 /**
  * Alert choices for ONE tracked player or team. Anything set here beats the global Settings tab for
@@ -117,7 +118,7 @@ export default function TargetAlertsScreen() {
             Showing the alerts that fit {name}'s position{positionsOf(target).length > 1 ? 's' : ''} ({positionsOf(target).join(', ')}). {hidden} that don't {hidden === 1 ? 'is' : 'are'} hidden.
           </Text>
         ) : null}
-        <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: leagueColors[target.league] ?? colors.border }]}>
+        <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: leagueColor(target.league) ?? colors.border }]}>
           {bySection(types).map((s) => (
             <View key={s.section}>
               <SettingSection title={s.section} />

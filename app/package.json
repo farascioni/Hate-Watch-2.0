@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "update": "EXPO_PUBLIC_API_URL=https://hate-watch-api.fly.dev npx eas-cli@latest update --channel production --environment production"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
@@ -29,6 +30,7 @@
     "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.25",
     "expo-video": "~57.0.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",

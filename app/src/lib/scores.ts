@@ -1,4 +1,5 @@
-import { FOOTBALL, type GameCard, type GameSide, type Target } from './types';
+import type { GameCard, GameSide, Target } from './types';
+import { isFootball } from './leagueUi';
 
 // Scores tab helpers: which side of a game you hate, and how it's going for them.
 
@@ -29,7 +30,7 @@ export function hateTag(g: GameCard, side: Side | undefined): { text: string; to
   const me = g[side]!, them = g[side === 'home' ? 'away' : 'home']!;
   const diff = (me.score ?? 0) - (them.score ?? 0);
   if (g.state === 'post') return diff < 0 ? { text: 'Successful Hate Watch!', tone: 'done' } : { text: diff > 0 ? 'They won' : 'Tie', tone: 'neutral' };
-  const threat = (FOOTBALL.has(g.league) && !!g.redZone && g.possession === me.team.key)
+  const threat = (isFootball(g.league) && !!g.redZone && g.possession === me.team.key)
     || (g.league === 'mlb' && g.batting === me.team.key && !!g.bases && (g.bases.second || g.bases.third));
   if (threat) return { text: 'Threatening', tone: 'warn' };
   return diff < 0 ? { text: `Down ${-diff}`, tone: 'good' } : { text: diff > 0 ? `Up ${diff}` : 'Tied', tone: 'neutral' };
@@ -83,7 +84,7 @@ function dayLabel(ts: number, now = Date.now()) {
 export function statusLine(g: GameCard, now = Date.now()) {
   let line: string;
   if (g.state === 'pre') line = startLabel(g.startsAt);
-  else if (FOOTBALL.has(g.league) && g.state === 'in' && g.downDistance) {
+  else if (isFootball(g.league) && g.state === 'in' && g.downDistance) {
     const ball = g.possession === g.home?.team.key ? g.home?.team.abbrev : g.possession === g.away?.team.key ? g.away?.team.abbrev : null;
     line = `${g.detail} · ${ball ? `${ball} ball, ` : ''}${g.downDistance}`;
   } else line = g.state === 'post' ? [g.detail, dayLabel(g.startsAt, now)].filter(Boolean).join(' · ') : g.detail;

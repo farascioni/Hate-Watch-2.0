@@ -55,8 +55,8 @@ function authDevice(header: string | undefined | null): string | undefined {
 // ─── Public ───────────────────────────────────────────────────────────────────────────────────
 route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status() }));
 // Each league's sport too: the app shows any soccer league's matches the soccer way.
-// `teamsOnly`: a league with no players (college football): the app offers only its teams.
-route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));
+// `ui`: how the app shows each league (its color, filter, words: leagues.ts LeagueUi). `teamsOnly`: a league with no players (college football).
+route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ui: LEAGUES[id].ui, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));
 route('GET', '/catalog/report', false, () => kvGet('ingest:report'));
 route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {

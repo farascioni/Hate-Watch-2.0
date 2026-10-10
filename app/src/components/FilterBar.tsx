@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Chip } from './ui';
 import { useStore } from '../lib/store';
-import { colors, leagueColors, radius, space } from '../theme';
+import { colors, radius, space } from '../theme';
+import { leagueColor, leagueUi } from '../lib/leagueUi';
 import type { League, Target } from '../lib/types';
 
 export type Kind = 'all' | 'player' | 'team';
@@ -22,14 +23,15 @@ export function useFilter(kind: Kind = 'all') {
 }
 
 /**
- * The UFC has no teams: its one option is Fighters, grouped by weight class where a screen lists people (Search,
- * Tracking); the Feed and the Leaderboard show them all. The kind picked for other leagues is kept for leaving it.
+ * What a league's filter offers is the server's (leagueUi `kinds`): the UFC has no teams (Fighters alone, grouped
+ * by weight class where a screen lists people: Search, Tracking), college football no players (Teams alone). The
+ * kind picked for other leagues is kept for leaving it.
  */
-export const byWeightClass = (f: Filter) => f.league === 'ufc';
-/** College football has no players (the server's `teamsOnly`): its one option is Teams. */
-export const teamsOnly = (f: Filter) => f.league === 'cfb';
-/** What a filter shows: teams, players or both (the UFC: its fighters; college football: its teams). */
-export const kindOf = (f: Filter): Kind => (byWeightClass(f) ? 'player' : teamsOnly(f) ? 'team' : f.kind);
+export const byWeightClass = (f: Filter) => !!f.league && leagueUi(f.league).groupPlayers === 'weightClass';
+/** A league with one kind (UFC fighters, college football teams): that kind, else none. */
+export const onlyKind = (f: Filter): Kind | undefined => { const k = f.league ? leagueUi(f.league).kinds : []; return k.length === 1 ? k[0] : undefined; };
+/** What a filter shows: teams, players or both (a league with one kind: that one). */
+export const kindOf = (f: Filter): Kind => onlyKind(f) ?? f.kind;
 
 export function matchesFilter(f: Filter, target: { kind: string; league: string }) {
   const kind = kindOf(f);
@@ -53,7 +55,7 @@ export function groupByWeightClass(targets: Target[]): { title: string; data: Ta
  * What a league's players are called: F1's are drivers, the UFC's fighters ("Search UFC fighters"); every
  * league's at once (All), athletes.
  */
-export const playersWord = (league?: string) => (!league ? 'athletes' : league === 'f1' ? 'drivers' : league === 'ufc' ? 'fighters' : 'players');
+export const playersWord = (league?: string) => (!league ? 'athletes' : leagueUi(league).players);
 /** The same as a heading or label: "Athletes", "Players", "Drivers", "Fighters". */
 export const playersTitle = (league?: string) => { const w = playersWord(league); return w[0].toUpperCase() + w.slice(1); };
 
@@ -74,15 +76,15 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
   /** false: Teams / Players only, no Everything (Search, where the two are separate lists) */ everything?: boolean;
 }) {
   const { leagues } = useStore();
-  const ufc = byWeightClass(filter), fixed = ufc || teamsOnly(filter);
-  const options = ufc ? KINDS.filter((k) => k.id === 'player') : teamsOnly(filter) ? KINDS.filter((k) => k.id === 'team') : KINDS.filter((k) => everything || k.id !== 'all');
+  const only = onlyKind(filter);
+  const options = only ? KINDS.filter((k) => k.id === only) : KINDS.filter((k) => everything || k.id !== 'all');
   return (
     <View>
       {kinds ? <View style={styles.segment} accessibilityRole="tablist">
         {options.map(({ id, label }) => {
           const on = kindOf(filter) === id;
           return (
-            <Pressable key={id} onPress={fixed ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+            <Pressable key={id} onPress={only ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
               <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' ? playersTitle(filter.league) : label}</Text>
             </Pressable>
           );
@@ -95,7 +97,7 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
             key={l.id}
             label={l.name}
             active={filter.league === l.id}
-            color={leagueColors[l.id]}
+            color={leagueColor(l.id)}
             onPress={() => onChange({ ...filter, league: filter.league === l.id ? undefined : l.id })}
             style={styles.leagueChip}
           />

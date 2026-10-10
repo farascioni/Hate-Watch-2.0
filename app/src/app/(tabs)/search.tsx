@@ -7,6 +7,7 @@ import { TargetRow, SectionHeader } from '../../components/ui';
 import { FilterBar, byWeightClass, groupByWeightClass, kindOf, playersWord, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Player, Target, Team, WeightClass } from '../../lib/types';
+import { leagueUi } from '../../lib/leagueUi';
 
 export default function SearchScreen() {
   const { noteTrackers } = useStore();
@@ -29,7 +30,7 @@ export default function SearchScreen() {
   // Browsing teams: A-Z, or grouped by league and division. The tab stays mounted, so the choice survives switching tabs.
   const [sortByDivision, setByDivision] = useState(false);
   // F1's constructors have no divisions: always A-Z, with no sort to pick (the choice stays for other leagues).
-  const byDivision = sortByDivision && league !== 'f1';
+  const byDivision = sortByDivision && leagueUi(league).divisions; // F1's constructors have none (the server's leagueUi)
   const { leagueInfo } = useStore();
   const seq = useRef(0);
 
@@ -87,7 +88,9 @@ export default function SearchScreen() {
       return [...byTeam].map(([title, data]) => ({ title, data }));
     }
     if (!showTeams || !teams.length) return [];
-    if (!byDivision || !teams.some((t) => t.division)) return [{ title: `${league ? `All ${name(league)} teams` : 'All teams'} — tap one to see its roster`, data: teams as Target[] }];
+    // A league without players (college football) has no roster to see: its page.
+    const tap = league && !leagueUi(league).kinds.includes('player') ? 'tap one for its page' : 'tap one to see its roster';
+    if (!byDivision || !teams.some((t) => t.division)) return [{ title: `${league ? `All ${name(league)} teams` : 'All teams'} — ${tap}`, data: teams as Target[] }];
     const groups = new Map<string, Target[]>();
     for (const t of teams) {
       const title = league ? (t.division ?? name(t.league)) : `${name(t.league)} · ${t.division ?? name(t.league)}`;

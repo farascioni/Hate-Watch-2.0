@@ -12,6 +12,7 @@ import { FilterBar, useFilter } from '../../components/FilterBar';
 import { SECTION, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard } from '../../lib/types';
+import { leagueUi } from '../../lib/leagueUi';
 
 /** How often "All games" re-reads the server while it's on screen (it reads ESPN's scoreboards every 10s). */
 const ALL_GAMES_MS = 15_000;
@@ -21,7 +22,7 @@ const UFC_MS = 30_000;
 type Mode = 'mine' | 'all';
 const MODES: Mode[] = ['mine', 'all'];
 /** What the tab lists, by the league chip: games; the UFC's fights; every league at once, events (F1's: races, its own switch). */
-const eventsWord = (league?: string) => (!league ? 'events' : league === 'ufc' ? 'fights' : 'games');
+const eventsWord = (league?: string) => (!league ? 'events' : leagueUi(league).events); // the server's word for a league (leagueUi)
 /** F1 (its chip on): every session is everyone's, so the switch is when, not whose. */
 type F1Mode = 'live' | 'upcoming';
 const F1_MODES: { id: F1Mode; label: string }[] = [{ id: 'live', label: 'Live races' }, { id: 'upcoming', label: 'Upcoming races' }];

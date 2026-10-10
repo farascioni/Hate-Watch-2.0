@@ -69,6 +69,14 @@
       },
       "router": {}
     },
-    "owner": "hate-watch"
+    "owner": "hate-watch",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/28903ce8-7d00-47e3-8886-c2044b93ea98",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

@@ -5,6 +5,7 @@ import { api, ensureToken, forgetToken, WS_URL } from './api';
 import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
+import { setLeagueUi } from './leagueUi';
 import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -114,6 +115,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadCore = useCallback(async () => {
     const [cat, f, p] = await Promise.all([api.eventTypes(), api.follows(), api.prefs()]);
     setEventTypes(cat.types);
+    setLeagueUi(cat.leagues); // before the re-render the leagues bring, so it reads the server's look
     setLeagues(cat.leagues);
     setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
     setTrackers(countsFrom(f.follows));

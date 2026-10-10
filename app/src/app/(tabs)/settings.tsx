@@ -9,8 +9,9 @@ import { TipJar } from '../../components/TipJar';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
-import { colors, leagueColors, radius, space } from '../../theme';
+import { colors, radius, space } from '../../theme';
 import { bySection, type EventType, type League } from '../../lib/types';
+import { leagueColor } from '../../lib/leagueUi';
 
 /** A folded alert group shows this many of its emoji (the last place becomes "+N" when there are more). Cutting the line short would split an emoji. */
 const FOLDED_EMOJI = 6;
@@ -58,7 +59,7 @@ export default function SettingsScreen() {
     // League-only alerts live under their league, in the server's order: offense, defense, pitching, then
     // team ones like MLB "strands runners", each under its section heading.
     ...leagues.map((l) => ({
-      title: `${l.name} alerts`, color: leagueColors[l.id], league: l.id,
+      title: `${l.name} alerts`, color: leagueColor(l.id), league: l.id,
       types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id),
     })),
     { title: 'All player alerts', types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
