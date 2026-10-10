@@ -156,13 +156,17 @@ export function fromSitePlay(p: any): NPlay {
 
 /**
  * College football (TEAMS_ONLY): a game's plays from its summary's drives, in order, each once (a finished
- * drive's plays and the one under way, which can be in both as it ends). A drive play's team is under `start`
+ * drive's plays and the one under way, which can be in both as it ends), end-of-period markers last in their drive. A drive play's team is under `start`
  * (the side with the ball as it begins), where it ends under `end`; it names no players.
  */
 export function fromDrivePlays(summary: any): NPlay[] {
   const seen = new Set<string>(), out: NPlay[] = [];
+  // ESPN can list a drive's end-of-period marker first ("End of Game" at the top of the overtime drive that won
+  // it, October 3 2026, South Carolina at Kentucky): it goes last, after the plays it ends.
+  const marker = (p: any) => /^End (of )?(Game|Half|Period|Quarter|Regulation)$|^End of (\d|OT)/i.test(String(p?.type?.text ?? ''));
   for (const d of [...(summary?.drives?.previous ?? []), ...(summary?.drives?.current ? [summary.drives.current] : [])]) {
-    for (const p of d?.plays ?? []) {
+    const plays: any[] = d?.plays ?? [];
+    for (const p of [...plays.filter((x) => !marker(x)), ...plays.filter(marker)]) {
       if (p?.id == null || seen.has(String(p.id))) continue;
       seen.add(String(p.id));
       out.push(fromSitePlay({ ...p, team: p.start?.team ?? p.team, participants: [] }));
@@ -1600,7 +1604,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
       out.push({ id: `${g.gameId}:${p.id}:${footballType(g.league, 'safety')}:team-${teamId}`, type: footballType(g.league, 'safety'), aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind, ...moment,
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on ${the(g.league, team)}`, ...base, ...unlessBehind, ...moment,
         fold: `${oppName} ${what}.` });
     }
     // Basketball: the other side's run reached RUN_POINTS on this play (once a run). A line on that play's

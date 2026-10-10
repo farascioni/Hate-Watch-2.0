@@ -74,6 +74,19 @@ test("a game's plays from its drives: each once (the drive under way is in both 
   assert.deepEqual(plays.map((p) => [p.id, p.teamId, p.home, p.away, p.scoring, p.periodNum, p.clockSec, p.participants.length]), [['1', '61', 0, 0, false, 1, 600, 0], ['2', '61', 7, 0, true, 2, 252, 0]]);
 });
 
+test('an end-of-period marker ESPN lists first in its drive goes last ("End of Game" atop the overtime drive that won it)', () => {
+  const end = play('e', 'End of Game', 'End of OT.', '96', 35, 34);
+  const td = play('t', 'Passing Touchdown', '(00:00) pass for 6 yards, TOUCHDOWN', '96', 35, 34, { scoringPlay: true });
+  const run = play('r', 'Rush', '(00:00) rush for 5 yards', '96', 27, 34);
+  assert.deepEqual(D.fromDrivePlays({ drives: { previous: [{ plays: [end, run, td] }] } }).map((p) => p.type), ['Rush', 'Passing Touchdown', 'End of Game']);
+});
+
+test("an opponent's score on a school: no \"the\" (\"Vanderbilt scored 7 on Georgia\")", () => {
+  const ctx: any = { league: 'cfb', gameId: 'G6', homeId: '61', awayId: '238', goalies: new Map() };
+  const td = D.fromSitePlay({ ...play('s1', 'Passing Touchdown', 'pass for a TD', '238', 7, 0, { scoringPlay: true }), team: { id: '238' } });
+  assert.deepEqual(D.teamScoreEvents(ctx, { home: 0, away: 0 }, td).map((e) => e.title), ['Vanderbilt scored 7 to take the lead over Georgia', 'Vanderbilt scored 7 on Georgia']);
+});
+
 test("a game read from its summary alone: no read of the play-by-play with players; scores by school name; a finished drive's alert as college's own", async () => {
   db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('fan', 's', 'test', JSON.stringify(DEFAULT_PREFS));
   for (const t of ['team:cfb:61', 'team:cfb:238']) db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('fan', t);
