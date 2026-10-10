@@ -17,10 +17,10 @@ const { gameCard } = await import('../src/scores.ts');
 const { divisionsOf } = await import('../src/divisions.ts');
 const P = await import('../src/cfb-poll.ts');
 
-const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, 'x', 500, 500, 0)`);
 for (const [id, name, short, abbr] of [['61', 'Georgia Bulldogs', 'Georgia', 'UGA'], ['238', 'Vanderbilt Commodores', 'Vanderbilt', 'VAN'], ['2005', 'Air Force Falcons', 'Air Force', 'AFA'],
-  ['2426', 'Navy Midshipmen', 'Navy', 'NAVY'], ['25', 'California Golden Bears', 'California', 'CAL'], ['2439', 'UNLV Rebels', 'UNLV', 'UNLV'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC'], ['96', 'Kentucky Wildcats', 'Kentucky', 'UK']])
-  team.run(`team:cfb:${id}`, id, name, short, abbr);
+  ['2426', 'Navy Midshipmen', 'Navy', 'NAVY'], ['25', 'California Golden Bears', 'California', 'CAL'], ['2439', 'UNLV Rebels', 'UNLV', 'UNLV'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC'], ['96', 'Kentucky Wildcats', 'Kentucky', 'UK'],
+  ['333', 'Alabama Crimson Tide', 'Alabama', 'ALA'], ['344', 'Mississippi State Bulldogs', 'Mississippi State', 'MSST']])
+  db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`).run(`team:cfb:${id}`, id, name, short, abbr, short);
 loadCatalog();
 
 test('the league: ESPN\'s college-football, every FBS game on its scoreboard; teams only; after the UFC on the chips', () => {
@@ -115,9 +115,10 @@ test("a game read from its summary alone: no read of the play-by-play with playe
 test("college's wording: a touchdown nullified by its own team's penalty (the play's team, not the penalty's code: \"USC\" is South Carolina), an onside kick kept", () => {
   const ctx: any = { league: 'cfb', gameId: 'G2', homeId: '96', awayId: '2579', goalies: new Map() }; // Kentucky (home), South Carolina
   const nullified = D.fromSitePlay({ ...play('n1', 'Rush', '(13:56) Shotgun #16 L.Sellers rush right for 2 yards gain to the UKY00 TOUCHDOWN nullified by penalty, clock 13:51 PENALTY USC Personal Foul (#83 D.Black) 15 yards from UKY02 to UKY17. NO PLAY.', '2579', 3, 7), team: { id: '2579' } });
-  assert.deepEqual(D.PLAYER_DETECTORS.cfb(ctx, nullified).map((e) => [e.type, e.targetKey, e.title]), [['cfb.td_wiped_out', 'team:cfb:2579', 'South Carolina had a touchdown wiped out by a penalty']]);
+  const wipedOut = (es: any[]) => es.filter((e) => e.type === 'cfb.td_wiped_out');
+  assert.deepEqual(wipedOut(D.PLAYER_DETECTORS.cfb(ctx, nullified)).map((e) => [e.type, e.targetKey, e.title]), [['cfb.td_wiped_out', 'team:cfb:2579', 'South Carolina had a touchdown wiped out by a penalty']]);
   const kickRet = D.fromSitePlay({ ...play('n2', 'Kickoff', '(13:33) kickoff 50 yards to the UK30, return for a TOUCHDOWN nullified by penalty, clock 13:20 PENALTY UK Holding 10 yards. NO PLAY.', '2579', 3, 7), team: { id: '2579' } });
-  assert.deepEqual(D.PLAYER_DETECTORS.cfb(ctx, kickRet).map((e) => e.targetKey), ['team:cfb:96'], 'on a kickoff, the receiving side\'s');
+  assert.deepEqual(wipedOut(D.PLAYER_DETECTORS.cfb(ctx, kickRet)).map((e) => e.targetKey), ['team:cfb:96'], 'on a kickoff, the receiving side\'s');
   const g: any = { league: 'cfb', gameId: 'G3', homeId: '2439', awayId: '25', goalies: new Map() }; // UNLV (home), California
   const onside = D.fromSitePlay({ ...play('o1', 'Kickoff', '(15:00) #33 T.McGough onside kickoff 14 yards to the CAL49, End Of Play', '25', 7, 24), team: { id: '25' }, end: { team: { id: '25' } } });
   assert.deepEqual(D.PLAYER_DETECTORS.cfb(g, onside).map((e) => [e.type, e.targetKey, e.title]), [['cfb.team.onside_recovered', 'team:cfb:2439', 'California recovered an onside kick against UNLV']]);
@@ -178,4 +179,45 @@ test("standings: a conference by its short name (ESPN's abbreviation is a slug, 
     standings: { entries: ids.map((id, i) => ({ team: { id }, stats: [{ name: 'playoffSeed', value: i + 1 }, { name: 'streak', displayValue: 'W1' }] })) } });
   const snap = parseStandings({ children: [conf('big10', 'Big Ten Conference', 'Big Ten', ['158', '84']), conf('sec', 'Southeastern Conference', 'SEC', ['61'])] });
   assert.deepEqual([snap.get('84'), snap.get('61')?.group], [{ rank: 2, group: 'Big Ten', clincher: '', streak: 'W1' }, 'SEC']);
+});
+
+test("the NFL's player alerts as a college team's, from ESPN's wording (October 3 2026)", () => {
+  const g = (home: string, away: string): any => ({ league: 'cfb', gameId: 'G7', homeId: home, awayId: away, goalies: new Map() });
+  const at = (ctx: any, x: any, type?: string) => D.PLAYER_DETECTORS.cfb(ctx, D.fromSitePlay(x)).filter((e) => !type || e.type === type).map((e) => [e.type, e.targetKey, e.title]);
+  const vg = g('61', '238'); // Georgia (home), Vanderbilt
+  const pick = { ...play('i1', 'Pass Interception Return', '(12:26) No Huddle-Shotgun #1 B.Berlowitz pass intercepted by #1 E.Robinson IV at UGA30 #1 E.Robinson IV return 0 yards to the UGA30', '238', 0, 7), team: { id: '238' }, end: { team: { id: '61' } } };
+  assert.deepEqual(at(vg, pick), [['cfb.team.interception', 'team:cfb:238', 'Vanderbilt threw an interception']]);
+  assert.deepEqual(at(vg, { ...pick, type: { text: 'Interception Return Touchdown' } }, 'cfb.team.interception')[0][2], 'Vanderbilt threw an interception — returned for a TD 🙃');
+  assert.deepEqual(at(vg, { ...pick, text: `${pick.text} PENALTY UGA Holding 10 yards. NO PLAY` }, 'cfb.team.interception'), [], 'wiped out: no interception');
+  const sack = { ...play('s1', 'Sack', '(11:03) Shotgun #14 G.Stockton sacked for loss of 7 yards to the UGA01 (#8 C.Heard)', '61', 0, 0), team: { id: '61' } };
+  assert.deepEqual(at(vg, sack), [['cfb.team.sacked', 'team:cfb:61', 'Georgia got sacked (G.Stockton)']]);
+  const blocked = { ...play('k1', 'Blocked Field Goal', '(07:43) #88 B.Taylor field goal attempt from 58 yards NO GOOD blocked by #44 J.Hall', '238', 0, 7), team: { id: '238' } };
+  assert.deepEqual(at(vg, blocked), [['cfb.team.kick_missed', 'team:cfb:238', 'Vanderbilt had a 58-yard field goal blocked']]);
+  assert.deepEqual(at(vg, { ...blocked, type: { text: 'Field Goal Missed' }, text: '(07:49) #19 B.Craig field goal attempt from 50 yards NO GOOD' })[0][2], 'Vanderbilt missed a 50-yard field goal');
+
+  const as = g('333', '344'); // Alabama (home), Mississippi State: ESPN's codes "Bama", "State"
+  const lost = { ...play('f1', 'Fumble Recovery (Opponent)', '(13:20) #1 K.Taylor sacked for loss of 9 yards, fumble by #1 K.Taylor recovered by Bama #90 L.Simmons', '344', 0, 0), team: { id: '344' }, end: { team: { id: '333' } } };
+  assert.deepEqual(at(as, lost, 'cfb.team.fumble_lost'), [['cfb.team.fumble_lost', 'team:cfb:344', 'Mississippi State lost a fumble']]);
+  const muffed = { ...play('f2', 'Fumble Recovery (Opponent)', '(04:10) punt 44 yards, muffed by #2 X, recovered by State', '344', 0, 0), team: { id: '344' }, end: { team: { id: '344' } } };
+  assert.deepEqual(at(as, muffed, 'cfb.team.fumble_lost').map((e) => e[1]), ['team:cfb:333'], "a muffed punt: the receiving side's (whoever didn't end with the ball)");
+  const flags = { ...play('p1', 'Penalty', '(12:08) PENALTY Bama Delay Of Game (#12 K.Russell) 5 yards from State09 to State14. NO PLAY PENALTY State Holding declined', '333', 0, 0), team: { id: '333' } };
+  assert.deepEqual(at(as, flags), [['cfb.team.penalty', 'team:cfb:333', 'Alabama was flagged: Delay Of Game'], ['cfb.team.penalty', 'team:cfb:344', 'Mississippi State was flagged: Holding (declined)']]);
+  assert.deepEqual(at(g('96', '2579'), { ...play('p2', 'Penalty', 'PENALTY USC Personal Foul (#83 D.Black) 15 yards', '2579', 0, 0), team: { id: '2579' } }), [], '"USC" for South Carolina is neither school by its names: not said');
+
+  const cu = g('2439', '25'); // UNLV (home), California
+  const dq = { ...play('d1', 'Kickoff', '(11:30) #33 T.McGough kickoff 64 yards to the UNLV01 #82 P.Zachary return 27 yards to the UNLV28 PENALTY CAL Targeting (#20 C.Sidney) 15 yards from UNLV28 to UNLV43. California #20 C.Sidney has been disqualified', '25', 0, 0), team: { id: '25' } };
+  assert.deepEqual(at(cu, dq), [['cfb.team.ejection', 'team:cfb:25', 'California had a player ejected: C.Sidney (targeting)']], 'the ejection is the alert for its flag');
+});
+
+test("a college team's starting quarterback pulled: after his 5th pass, another throws twice in a row, once", () => {
+  const ctx: any = { league: 'cfb', gameId: 'G8', homeId: '61', awayId: '238', goalies: new Map() };
+  const pass = (id: string, qb: string, period = 2) => D.fromSitePlay({ ...play(id, 'Pass Incompletion', `(10:00) Shotgun #${qb === 'G.Stockton' ? 14 : 7} ${qb} pass incomplete short left`, '61', 0, 0, { period: { number: period } }), team: { id: '61' } });
+  const pulled: string[] = [];
+  const run = (p: any) => { pulled.push(...D.PLAYER_DETECTORS.cfb(ctx, p).filter((e) => e.type === 'cfb.team.qb_pulled').map((e) => e.title)); D.observePlay(ctx, p); };
+  for (let i = 0; i < 5; i++) run(pass(`a${i}`, 'G.Stockton'));
+  run(pass('b1', 'R.Puglisi'));
+  assert.deepEqual(pulled, [], 'one throw by another is a trick play');
+  run(pass('b2', 'R.Puglisi'));
+  run(pass('b3', 'R.Puglisi'));
+  assert.deepEqual(pulled, ['Georgia pulled G.Stockton: R.Puglisi is in at quarterback'], 'once');
 });

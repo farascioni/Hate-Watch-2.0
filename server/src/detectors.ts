@@ -394,6 +394,16 @@ export function observePlay(g: GameCtx, p: NPlay) {
       if (p.participants[0] && g.goalies.get(p.teamId) === p.participants[0].id) g.goalies.delete(p.teamId);
     }
   }
+  // College football names no players: its passer is the play's text's ("#14 G.Stockton pass complete…").
+  if (TEAMS_ONLY.has(g.league) && p.teamId && PASS_PLAY.test(p.type)) {
+    const qb = passerIn(p.text);
+    if (qb) {
+      const start = ((g.qbStart ??= {})[p.teamId] ??= qb);
+      (g.qbAtt ??= {})[qb] = (g.qbAtt[qb] ?? 0) + 1;
+      const other = (g.qbOther ??= {})[p.teamId];
+      g.qbOther[p.teamId] = qb === start ? { id: '', n: 0 } : { id: qb, n: other?.id === qb ? other.n + 1 : 1 };
+    }
+  }
   if (FOOTBALL.has(g.league) && p.teamId) {
     // Core plays' team is the offense. A trick-play pass by a non-QB doesn't change who is under center.
     const qb = p.participants.find((x) => x.role === 'passer')?.id;
@@ -1072,6 +1082,78 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
+// ─── College football: the NFL's player alerts as the team's ─────────────────────────────────
+/** A pass, thrown or not (a sack is one too). */
+const PASS_PLAY = /^(Pass |Passing Touchdown|Sack|Interception|Pass Interception)/i;
+/** The passer a college play's text names: "#14 G.Stockton pass…", "#1 K.Taylor sacked…" ("G.Stockton"). */
+export const passerIn = (text: string) => text.match(/#\d+ ([A-Z][\w'-]*\.[\w.'-]+(?: (?:Jr\.|Sr\.|II|III|IV))?) (?:pass|sacked)\b/)?.[1];
+/**
+ * The team a college penalty's code is ("PENALTY Bama Holding"): ESPN's codes are often not the abbreviation
+ * ("Bama", "State", "USC" for South Carolina), so a code is one of the game's two schools when it matches
+ * just one of them (its abbreviation, either way round, or a word of its name). None: not said.
+ */
+export function cfbCodeTeam(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, code: string): string | undefined {
+  const c = code.toLowerCase();
+  const hits = [g.homeId, g.awayId].filter((id) => {
+    const t = catalog.teamByEspn(g.league, id);
+    if (!t) return false;
+    const abbr = t.abbrev.toLowerCase(), words = `${t.location ?? ''} ${t.name}`.toLowerCase();
+    return abbr === c || abbr.startsWith(c) || c.startsWith(abbr) || (c.length >= 3 && words.includes(c));
+  });
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/**
+ * College football's play alerts for a team (it has no players): an interception thrown, a fumble lost (or any
+ * fumble), a sack, an incompletion, a field goal missed or blocked, a flag, a player disqualified (targeting), the
+ * starting quarterback pulled. The team is the play's: the offense (`start`), and for a lost ball whichever side
+ * didn't end with it (`end`: a muffed punt is the receiving side's). Nothing on a play wiped out ("NO PLAY").
+ */
+function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
+  const sides = [g.homeId, g.awayId];
+  const ours = (id?: string) => (id && sides.includes(id) ? id : undefined);
+  const other = (id: string) => (id === g.homeId ? g.awayId : g.homeId);
+  const out: Detected[] = [];
+  const team = (type: string, teamId: string | undefined, title: (name: string) => string, x: Partial<Detected> = {}) => {
+    if (!teamId) return;
+    out.push({ id: `${g.gameId}:${p.id}:${type}:${teamId}`, type, targetKey: teamKey(g.league, teamId), title: title(teamName(g.league, teamId)),
+      body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id }, ...x });
+  };
+  const ty = p.type, wiped = /\bNO PLAY\b/i.test(p.text);
+  const offense = ours(p.teamId), ended = ours(p.endTeamId);
+  if (!wiped && /Interception/i.test(ty)) team('cfb.team.interception', offense, (n) => `${n} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`);
+  if (!wiped && /Fumble Recovery \(Opponent\)|Fumble Return Touchdown/i.test(ty)) {
+    team('cfb.team.fumble_lost', ended ? other(ended) : offense, (n) => `${n} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['cfb.team.fumble'] });
+  } else if (!wiped && /^Fumble( Recovery \(Own\))?$/i.test(ty)) team('cfb.team.fumble', ended ?? offense, (n) => `${n} fumbled`);
+  if (!wiped && /^Sack$/i.test(ty)) { const qb = passerIn(p.text); team('cfb.team.sacked', offense, (n) => `${n} got sacked${qb ? ` (${qb})` : ''}`); }
+  if (!wiped && /^Pass Incompletion$/i.test(ty)) team('cfb.team.incompletion', offense, (n) => `${n} threw incomplete`);
+  if (!wiped && /^(Field Goal Missed|Blocked Field Goal)$/i.test(ty)) {
+    const yards = p.text.match(/field goal attempt from (\d+) yards/i)?.[1];
+    team('cfb.team.kick_missed', offense, (n) => (/Blocked/i.test(ty) ? `${n} had a ${yards ? `${yards}-yard ` : ''}field goal blocked` : `${n} missed a ${yards ? `${yards}-yard ` : ''}field goal`));
+  }
+  // A player disqualified ("PENALTY CAL Targeting (#20 C.Sidney)… California #20 C.Sidney has been disqualified"): the
+  // team's alert for that flag (it counts as a flag too), first, so it's the alert and not a line on another.
+  const dq = p.text.match(/PENALTY (\S+) ([^(]*?) \((#\d+ [^)]+)\)[^]*?has been disqualified/);
+  if (dq) team('cfb.team.ejection', cfbCodeTeam(g, dq[1]), (n) => `${n} had a player ejected: ${dq[3].replace(/^#\d+ /, '')}${/targeting/i.test(dq[2]) ? ' (targeting)' : ''}`, { aliases: ['cfb.team.penalty'] });
+  // Each other flag the play has: "PENALTY Bama Delay Of Game", "PENALTY VAN Holding declined".
+  for (const m of p.text.matchAll(/PENALTY (\S+) ([A-Za-z][A-Za-z :'/-]*?)(?= \(| \d| declined| offsetting|\.|,|$)( declined)?/g)) {
+    const flagged = cfbCodeTeam(g, m[1]), what = m[2].replace(/^UNS: /, '').trim();
+    if (dq && m[1] === dq[1] && what === dq[2].replace(/^UNS: /, '').trim()) continue; // the ejection's flag: said
+    team('cfb.team.penalty', flagged, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`);
+  }
+  // The starting quarterback pulled, once a game per team (the NFL's rule): in the first three quarters, after
+  // his 5th pass, another passer throws twice in a row (one throw is a trick play). ESPN doesn't say why.
+  const qb = PASS_PLAY.test(ty) ? passerIn(p.text) : undefined;
+  if (qb && offense && (p.periodNum ?? 0) <= 3 && !g.qbPulled?.has(offense)) {
+    const start = g.qbStart?.[offense], prev = g.qbOther?.[offense];
+    if (start && qb !== start && (g.qbAtt?.[start] ?? 0) >= 5 && (prev?.id === qb ? prev.n : 0) + 1 >= 2) {
+      (g.qbPulled ??= new Set()).add(offense);
+      team('cfb.team.qb_pulled', offense, (n) => `${n} pulled ${start}: ${qb} is in at quarterback`, { body: `Benched or hurt: ESPN doesn't say. ${p.text} — ${scoreLine(g, p)}` });
+    }
+  }
+  return out;
+}
+
 /** The player whose flag it was: the first "PENALTY on XXX-F.Last" the play names, among its penalized players. */
 function flaggedFor(g: GameCtx, p: NPlay): string | undefined {
   const penalized = role(p, 'penalized');
@@ -1369,7 +1451,7 @@ export function soccerTouch(g: GameCtx, p: NPlay, next: NPlay): Detected[] {
 
 // F1 has no play-by-play; its alerts come from session results (f1.ts). Every soccer league uses the soccer detectors.
 type Detector = (g: GameCtx, p: NPlay) => Detected[];
-const OTHER_DETECTORS: Partial<Record<League, Detector>> = { mlb, nfl, cfb: nfl, nba, wnba: nba, nhl, f1: () => [] };
+const OTHER_DETECTORS: Partial<Record<League, Detector>> = { mlb, nfl, cfb: (g, p) => [...nfl(g, p), ...cfbTeamPlays(g, p)], nba, wnba: nba, nhl, f1: () => [] };
 export const PLAYER_DETECTORS = Object.fromEntries(LEAGUE_IDS.map((lg) => [lg, SOCCER.has(lg) ? soccer : OTHER_DETECTORS[lg]])) as Record<League, Detector>;
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───

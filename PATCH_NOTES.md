@@ -18,7 +18,7 @@ UFC
 - With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end (KO/TKO R1 2:09).
 - A card's preview, from Scores: one fight in full (yours, else the main event; tap any fight to swap), with the chance your fighter loses and how by the odds, the tale of the tape, and both fighters' last five. Names open their pages.
 - With the UFC chip on, the one filter is Fighters, by weight class: Search lists each class's top five, Tracking groups yours by class.
-- A loss by a finish ends with how and when, like (KO/TKO R1 1:20). A title fight adds a line with its own switch: "Lost the Lightweight title" for the champion, "Lost a Lightweight title fight" for a challenger. (Server)
+- A loss by a finish says how and when (KO/TKO R1 1:20); a title fight adds "Lost the Lightweight title" or "Lost a Lightweight title fight". (Server)
 - A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
 - Women's weight classes are named in full. (Server)
 
@@ -34,7 +34,7 @@ F1
 
 COLLEGE FOOTBALL
 - A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank on cards ("#8 Indiana"). (Server)
-- Alerts: their game starting, falling behind, losing (and to an unranked team as a ranked one), three-and-out, a turnover on downs, an empty red zone trip, a touchdown wiped out, and falling in or out of the AP Top 25. (Server)
+- Alerts: the game starting, an interception, a lost fumble, a missed field goal, a player ejected, the quarterback pulled, falling behind, losing (and as a ranked team to an unranked one), a turnover on downs, the red zone, falling in or out of the AP Top 25; sacks and flags in the feed. (Server)
 
 EVERYWHERE
 - Fixes and screen changes can now arrive without a new build: they download in the background and show after you reopen the app once or twice.
