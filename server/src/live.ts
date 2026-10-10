@@ -9,10 +9,11 @@ import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
-  bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
 } from './detectors.ts';
 import { eventChanged, publish } from './fanout.ts';
+import { PlayLedger, againLine } from './revisions.ts';
 import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
 import { flagOn } from './flags.ts';
 import type { Clip } from './highlights.ts';
@@ -65,6 +66,10 @@ const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120
 const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
 /** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
 const RECAP_MS = Number(process.env.HW_RECAP_MS ?? 15 * 60_000);
+/** Football: after a score is taken back, the same side scoring on that drive within this long is that score (a line on its alert), not another. */
+const RESCORE_MS = 10 * 60_000;
+/** Football: the summary's header ahead of the plays by the same score this long, and the score alert goes out without its play. */
+const HEADER_AHEAD_MS = 60_000;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 /** Each side's biggest lead so far, given the score now. */
@@ -72,6 +77,9 @@ const bump = (led: { home: number; away: number }, s: { home: number; away: numb
   led.home = Math.max(led.home, s.home - s.away);
   led.away = Math.max(led.away, s.away - s.home);
 };
+
+/** Football: the summary header's score while the game is on, and its game clock (period, seconds left). */
+type Header = { home: number; away: number; period: number; clock?: number };
 
 // ─── Which teams does anyone care about? ──────────────────────────────────────────────────────
 let watchedCache = { at: 0, teams: new Set<string>() };
@@ -154,12 +162,22 @@ export class GameTracker {
   private newAlerts = false;
   private clipsBusy = false;
   lastPollMs = 0;
+  // Football: ESPN's changes to plays and drives after it posts them (revisions.ts), and the score's: reads in a row
+  // that had a side's score lower than announced, the score each side had taken back (and where, for 10 minutes: the
+  // same side scoring on that drive is that score again), the header's score ahead of the plays (since when, and the
+  // game clock then), and the header scores not to trust ahead of the plays (taken back, or the plays went past them).
+  private ledger: PlayLedger;
+  private downReads = { home: 0, away: 0 };
+  private takenBack: Partial<Record<'home' | 'away', { drive?: string; period?: number; until: number; alerts: Detected[] }>> = {};
+  private ahead: Partial<Record<'home' | 'away', { value: number; since: number; period: number; clock?: number }>> = {};
+  private noHeader = { home: 0, away: 0 };
 
   constructor(league: League, gameId: string, homeId: string, awayId: string, info: GameInfo = {}) {
     this.ctx = { league, gameId, homeId, awayId, goalies: new Map() };
     this.info = info;
     this.sawPre = !!info.sawPre;
     this.pre = kvGet<Pregame>(this.preKey) ?? {};
+    this.ledger = new PlayLedger(this.ctx, (msg) => log(`[${league} ${gameId}] ${msg}`));
   }
 
   private get preKey() { return `pregame:${this.ctx.league}:${this.ctx.gameId}`; }
@@ -317,6 +335,95 @@ export class GameTracker {
     return send;
   }
 
+  /**
+   * Football: a play's score alerts, less what's been said. A re-posted play's points went out with the play it
+   * re-posts (revisions.ts), and an edit's with the play; an extra point or two-point try (a point or two over what
+   * was said, not a safety) with its touchdown, whichever play ESPN puts it on: nothing again. A side whose score
+   * was taken back scoring on that drive within RESCORE_MS (a touchdown overturned at the 1, scored on the next
+   * snap) is that score: a line on its alerts ("Then Wake Forest scored on the same drive: WAKE 16, NCSU 14."), no
+   * new alert. `said`: the score announced before this play. The rest are this play's.
+   */
+  private footballScore(es: Detected[], p: NPlay, said: { home: number; away: number }, now: number, changed: Detected[]): Detected[] {
+    const before = new Set(this.ledger.get(p.id)?.scores.map((e) => this.ledger.scorer(e)));
+    const quiet = new Set<'home' | 'away'>();
+    for (const s of ['home', 'away'] as const) {
+      if (p[s] <= said[s]) continue;
+      if (before.has(s) || (p[s] - said[s] <= 2 && !isSafety(p))) { quiet.add(s); continue; }
+      const back = this.takenBack[s];
+      if (!back || now > back.until || (back.drive && p.driveId ? back.drive !== p.driveId : back.period !== p.periodNum)) continue;
+      delete this.takenBack[s];
+      quiet.add(s);
+      const line = againLine(this.ctx, s, p);
+      changed.push(...this.ledger.linesOn(back.alerts, line));
+      this.ledger.addScores(p.id, back.alerts); // taken back again, they get another line
+      log(`[${this.ctx.league} ${this.ctx.gameId}] the ${s} side scored on the drive its score was taken back on (play ${p.id}): ${line}`);
+    }
+    const out = es.filter((e) => !quiet.has(this.ledger.scorer(e)));
+    this.ledger.addScores(p.id, out);
+    return out;
+  }
+
+  /**
+   * Football: a side's score is taken back (a touchdown overturned, a scoring play gone) only once ESPN's plays and
+   * header agree, two reads running: the plays' score, the score its latest plays carry (ESPN can take a touchdown out
+   * to re-post it while the plays after it keep its points), and the header's. The plays that had those points get a
+   * line on their alerts (revisions.ts takeBack); the next score is news again, but for one on the same drive (footballScore).
+   */
+  private footballTakeBack(score: { home: number; away: number }, plays: NPlay[], header: Header | undefined, now: number): Detected[] {
+    const out: Detected[] = [], tail = plays.slice(-3);
+    for (const s of ['home', 'away'] as const) {
+      const keep = Math.max(score[s], ...tail.map((p) => p[s]), header?.[s] ?? 0);
+      if (keep >= this.announced[s]) { this.downReads[s] = 0; out.push(...this.ledger.carry(s, this.announced[s])); continue; }
+      if (++this.downReads[s] < 2 || this.ledger.pending(s, keep)) continue; // a play that had them is missing: gone, or re-posted?
+      this.downReads[s] = 0;
+      log(`[${this.ctx.league} ${this.ctx.gameId}] the ${s} side's score was taken back: ${this.announced[s]} to ${keep}`);
+      this.noHeader[s] = Math.max(this.noHeader[s], this.announced[s]);
+      this.announced[s] = keep;
+      const back = this.ledger.takeBack(s, keep);
+      out.push(...back.lines);
+      if (back.alerts.length) this.takenBack[s] = { drive: back.drive, period: back.period, until: now + RESCORE_MS, alerts: back.alerts };
+    }
+    return out;
+  }
+
+  /**
+   * Football: the summary's header ahead of the plays by the same score for HEADER_AHEAD_MS while the plays trail the
+   * game clock it had then (ESPN's drives can be minutes behind: Missouri's last touchdown against Texas A&M, October
+   * 10 2026, never reached them), and that score's alert goes out without its play, once; the play, when it comes,
+   * is said. Not when plays from that time on come without it (a punt return touchdown called back: Ball State at
+   * Northwestern), nor at or under a score taken back (the header can be slow to drop it), nor by a point or two
+   * (an extra point ESPN adds to its touchdown's play later; a safety's play comes). `led`: each side's biggest lead so far.
+   */
+  private headerAhead(score: { home: number; away: number }, plays: NPlay[], header: Header | undefined, led: { home: number; away: number }, now: number): Detected[] {
+    if (!header) { this.ahead = {}; return []; }
+    const out: Detected[] = [];
+    for (const s of ['home', 'away'] as const) {
+      const v = header[s], was = this.ahead[s];
+      if (v - Math.max(this.announced[s], score[s]) < 3 || v <= this.noHeader[s]) { delete this.ahead[s]; continue; }
+      if (was?.value !== v) { this.ahead[s] = { value: v, since: now, period: header.period, clock: header.clock }; continue; }
+      const past = plays.find((p) => p[s] < v && p.clockSec != null && (p.periodNum ?? 0) > 0 && !/^End\b/i.test(p.type)
+        && ((p.periodNum ?? 0) > was.period || (p.periodNum === was.period && was.clock != null && p.clockSec <= was.clock)));
+      if (past) {
+        this.noHeader[s] = Math.max(this.noHeader[s], v);
+        delete this.ahead[s];
+        log(`[${this.ctx.league} ${this.ctx.gameId}] the header's ${s} score (${v}) isn't on play ${past.id}, from after it: not a score`);
+        continue;
+      }
+      if (now - was.since < HEADER_AHEAD_MS) continue;
+      delete this.ahead[s];
+      const from = { ...this.announced }, to = { ...this.announced, [s]: v };
+      const p: NPlay = { id: `header-${s}-${v}`, type: 'Score', typeSlug: '', text: "ESPN's play-by-play doesn't have this play yet", participants: [],
+        scoring: true, scoreValue: v - from[s], home: to.home, away: to.away, at: now, shooting: false };
+      const es = teamScoreEvents(this.ctx, from, p, { ...led });
+      this.announced[s] = v;
+      this.ledger.add(p, [], { history: false, header: true }, now);
+      this.ledger.addScores(p.id, es);
+      log(`[${this.ctx.league} ${this.ctx.gameId}] the header's ${s} score (${v}) has been ahead of the plays (${score[s]}) for ${HEADER_AHEAD_MS / 1000}s: its alert, without the play`);
+      out.push(...es);
+    }
+    return out;
+  }
+
   async poll() {
     const { league, gameId, homeId, awayId } = this.ctx;
     const soccer = SOCCER.has(league), teamsOnly = TEAMS_ONLY.has(league);
@@ -336,6 +443,13 @@ export class GameTracker {
     if (plays.length) this.plays = plays;
 
     const events: Detected[] = [];
+    const now = Date.now();
+    // Football: ESPN's changes to the plays since the last read (revisions.ts), when this read has them all (the
+    // summary's drives for college, the core feed for the NFL). `changed`: lines on alerts already sent, no push.
+    const football = FOOTBALL.has(league) && plays.length > 0 && (teamsOnly ? summary.status === 'fulfilled' : core.status === 'fulfilled');
+    const changed: Detected[] = [];
+    if (football) this.ledger.read(new Set(plays.map((p) => p.id)), now);
+    let header: Header | undefined; // football: the summary header's score while the game is on
     let final: { home: number; away: number } | null = null;
     if (summary.status === 'fulfilled') {
       const s = summary.value;
@@ -359,12 +473,17 @@ export class GameTracker {
         this.started = true;
         events.push(...gameStartEvents(this.ctx, this.info, Date.now()));
       }
-      if (comp?.status?.type?.completed) {
-        const c = (side: string) => Number(comp.competitors.find((x: any) => x.homeAway === side)?.score ?? 0);
-        final = { home: c('home'), away: c('away') };
+      const c = (side: string) => Number(comp.competitors.find((x: any) => x.homeAway === side)?.score ?? 0);
+      if (comp?.status?.type?.completed) final = { home: c('home'), away: c('away') };
+      else if (state === 'in' && FOOTBALL.has(league) && comp?.competitors) {
+        header = { home: c('home'), away: c('away'), period: Number(comp.status?.period ?? 0), clock: clockSeconds({ displayValue: comp.status?.displayClock }) };
       }
     }
-    if (!final && plays.some((p) => /^End (of )?Game$/i.test(p.type))) {
+    // The play-by-play's end of the game, ahead of the summary's final. Football's only after a 4th-quarter play: ESPN
+    // once put "End of Game" ("End of 4th quarter.") after the 3rd quarter's last play, then took it out (Texas A&M
+    // at Missouri, October 10 2026), which would have ended the game there.
+    const end = plays.findIndex((p) => /^End (of )?Game$/i.test(p.type));
+    if (!final && end >= 0 && (!FOOTBALL.has(league) || plays.slice(0, end).some((p) => (p.periodNum ?? 0) >= 4 && !/^End\b/i.test(p.type)))) {
       final = { home: Math.max(...plays.map((p) => p.home)), away: Math.max(...plays.map((p) => p.away)) };
     }
 
@@ -384,8 +503,21 @@ export class GameTracker {
       const fresh = !this.seen.has(p.id);
       if (fresh) {
         this.seen.add(p.id);
-        if (!history) events.push(...PLAYER_DETECTORS[league](this.ctx, p));
-        observePlay(this.ctx, p);
+        // Football: a play ESPN took out and re-posted under a new id is that play again, revised (already counted).
+        const was = football && !history ? this.ledger.repost(p, now) : undefined;
+        if (was) {
+          const r = this.ledger.revise(was, p, now);
+          events.push(...r.fresh);
+          changed.push(...r.lines);
+        } else {
+          const es = history ? [] : PLAYER_DETECTORS[league](this.ctx, p);
+          events.push(...es);
+          observePlay(this.ctx, p);
+          if (football) this.ledger.add(p, es, { history }, now);
+        }
+      } else if (football) {
+        const r = this.ledger.changed(p, now);
+        if (r) { events.push(...r.fresh); changed.push(...r.lines); }
       }
       // A crew chief review can be added to an at-bat's result after it was posted ("Volpe homered…"
       // rewritten as "Volpe doubled, Lombard Jr. scored. Umpire review: HR call on the field was
@@ -401,16 +533,22 @@ export class GameTracker {
         // A side already announced at this score (its goal was counted from a later play first)
         // doesn't move on this play, so it gets no second alert.
         const from = { home: up('home') ? prev.home : score.home, away: up('away') ? prev.away : score.away };
+        const said = this.announced;
         this.announced = { home: Math.max(this.announced.home, score.home), away: Math.max(this.announced.away, score.away) };
         if (history) continue;
-        events.push(...teamScoreEvents(this.ctx, from, p, { ...led }));
+        const es = teamScoreEvents(this.ctx, from, p, { ...led });
+        events.push(...(football ? this.footballScore(es, p, said, now, changed) : es));
         if (!fresh) {
           log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
         }
       }
     }
-    if (score.home < this.announced.home || score.away < this.announced.away) {
+    if (football) {
+      bump(led, score);
+      changed.push(...this.ledger.sweep(now), ...this.footballTakeBack(score, plays, header, now));
+      events.push(...this.headerAhead(score, plays, header, led, now));
+    } else if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
       log(`[${league} ${gameId}] score went down to ${score.away}-${score.home} (a goal taken back?); the next one is news again`);
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
@@ -435,13 +573,12 @@ export class GameTracker {
       const es = [...pitcherEvents(this.ctx, pitchers, { final: false, score: this.score, at: Date.now() }, this.pitching), ...this.positionPlayerPitching(pitchers)];
       if (!this.first) events.push(...es); // attaching mid-game: what already happened is history
     }
-    // NFL: each finished drive's alerts (three-and-out, on downs, an empty red-zone trip), once; the first read is a baseline.
+    // Football: each finished drive's alerts (three-and-out, on downs, an empty red-zone trip); the first read is a
+    // baseline. ESPN can change a drive's result after it ends (a fumble overturned into a turnover on downs): revised.
     if (FOOTBALL.has(league) && summary.status === 'fulfilled') {
-      for (const d of summary.value.drives?.previous ?? []) {
-        if (!d?.result || this.onceDone.has(`drive:${d.id}`)) continue;
-        this.onceDone.add(`drive:${d.id}`);
-        if (!this.first) events.push(...nflDriveEvents(this.ctx, d));
-      }
+      const r = this.ledger.drivesRead(summary.value.drives?.previous ?? [], this.first, now);
+      events.push(...r.fresh);
+      changed.push(...r.lines);
     }
     // NBA, WNBA: scoreless at the half, from the box score once the 3rd quarter's plays start (not if we attached after).
     if ((league === 'nba' || league === 'wnba') && summary.status === 'fulfilled' && !this.onceDone.has('half') && plays.some((p) => (p.periodNum ?? 0) >= 3)) {
@@ -462,6 +599,7 @@ export class GameTracker {
     }
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
+    if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
     if (events.length) { publish(bundleByPlay(events), league); this.newAlerts = true; }
     if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.

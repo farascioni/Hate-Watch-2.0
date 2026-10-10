@@ -14,7 +14,7 @@ SCORES
 - On a game's screen, your alerts from it come after the box score, and you can minimize them.
 
 UFC
-- Track UFC fighters. A loss is a Successful Hate Watch that says how (knocked out, tapped out, the judges' cards), with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
+- Track UFC fighters. A loss is a Successful Hate Watch that says how, with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
 - With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end (KO/TKO R1 2:09).
 - A card's preview, from Scores: one fight in full (yours, else the main event; tap any fight to swap), with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five. Names open their pages.
 - With the UFC chip on, Search lists each weight class's top five fighters.
@@ -30,11 +30,12 @@ F1
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
 - Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship.
-- With the F1 chip on, Scores has Live races and Upcoming races (the weekend's sessions still to come, a race with its full grid once set). An F1 session's screen says "Your alerts from this race".
+- With the F1 chip on, Scores has Live and Upcoming races (the weekend's sessions to come, a race's grid once set). An F1 session's screen says "Your alerts from this race".
 
 COLLEGE FOOTBALL
 - A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank on cards ("#8 Indiana"). (Server)
 - Alerts: the game starting, an interception, a lost fumble, a missed field goal, a player ejected, the quarterback pulled, falling behind, losing (and as a ranked team to an unranked one), a turnover on downs, the red zone, falling in or out of the AP Top 25; sacks and flags in the feed. (Server)
+- A play ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
 
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.

@@ -25,6 +25,7 @@ export interface NPlay {
   clockSec?: number;       // seconds left in the period (NBA, WNBA, NFL, NHL), from ESPN's game clock
   hits?: { home: number; away: number }; // MLB: each team's hits so far (the core feed only: the summary's plays don't say)
   strength?: string;       // NHL goals: "Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot"
+  driveId?: string;        // football: the drive it's in (a score taken back and scored again on that drive is one score: live.ts)
 }
 
 export interface GameCtx {
@@ -170,7 +171,7 @@ export function fromDrivePlays(summary: any): NPlay[] {
     for (const p of [...plays.filter((x) => !marker(x)), ...plays.filter(marker)]) {
       if (p?.id == null || seen.has(String(p.id))) continue;
       seen.add(String(p.id));
-      out.push(fromSitePlay({ ...p, team: p.start?.team ?? p.team, participants: [] }));
+      out.push({ ...fromSitePlay({ ...p, team: p.start?.team ?? p.team, participants: [] }), ...(d?.id != null ? { driveId: String(d.id) } : {}) });
     }
   }
   return out;
@@ -212,8 +213,11 @@ export function fromCorePlay(p: any): NPlay {
     ...(p.strength?.text ? { strength: String(p.strength.text) } : {}),
     ...periodFields(p),
     ...(p.clock?.displayValue ? { clock: String(p.clock.displayValue) } : {}),
+    ...driveOf(p.drive?.$ref),
   };
 }
+/** Football: the drive a core-API play is in, from its ref ("…/drives/40167178901"), when it has one. */
+const driveOf = (ref: unknown) => { const id = String(ref ?? '').match(/\/drives\/(\d+)/)?.[1]; return id ? { driveId: id } : {}; };
 
 /**
  * Soccer: the summary's key events (goals, cards, penalties, substitutions) as plays. ESPN leaves the
@@ -1104,6 +1108,28 @@ export function cfbCodeTeam(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, co
   return hits.length === 1 ? hits[0] : undefined;
 }
 
+/** A college flag in a play's text: its code, what it was, and whether it was declined ("PENALTY VAN Holding declined"). */
+const CFB_FLAG = /PENALTY (\S+) ([A-Za-z][A-Za-z :'/-]*?)(?= \(| \d| declined| offsetting|\.|,|$)( declined)?/g;
+
+/**
+ * The line on an alert whose play a penalty wiped out after it went out: the flag that did it is the play's last one
+ * not declined. College: "… PENALTY IND Roughing The Passer (#95 T.Tucker) 15 yards from NEB16 to NEB31, 1ST DOWN.
+ * NO PLAY" → "Wiped out by a penalty on Indiana: Roughing The Passer." The NFL: "PENALTY on IND-T.Tucker, Roughing
+ * the Passer, 15 yards, enforced at NE 31 - No Play." The team only when the code is one of the game's two.
+ */
+export function wipedOutLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, text: string): string {
+  let teamId: string | undefined, what: string | undefined;
+  if (TEAMS_ONLY.has(g.league)) {
+    const m = [...text.matchAll(CFB_FLAG)].filter((x) => !x[3]).at(-1);
+    if (m) [teamId, what] = [cfbCodeTeam(g, m[1]), m[2].replace(/^(UNS|UNR): /, '').trim()];
+  } else {
+    const m = [...text.matchAll(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, ([^,]+)/g)].filter((x) => !/declined/i.test(x[2])).at(-1);
+    if (m) [teamId, what] = [[g.homeId, g.awayId].find((id) => teamAbbrev(g.league, id) === (NFL_CODE[m[1]] ?? m[1])), m[2].trim()];
+  }
+  if (!what) return 'Wiped out by a penalty.';
+  return teamId ? `Wiped out by a penalty on ${the(g.league, teamName(g.league, teamId))}: ${what}.` : `Wiped out by a penalty: ${what}.`;
+}
+
 /**
  * College football's play alerts for a team (it has no players): an interception thrown, a fumble lost (or any
  * fumble), a sack, an incompletion, a field goal missed or blocked, a flag, a player disqualified (targeting), the
@@ -1137,7 +1163,7 @@ function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
   const dq = p.text.match(/PENALTY (\S+) ([^(]*?) \((#\d+ [^)]+)\)[^]*?has been disqualified/);
   if (dq) team('cfb.team.ejection', cfbCodeTeam(g, dq[1]), (n) => `${n} had a player ejected: ${dq[3].replace(/^#\d+ /, '')}${/targeting/i.test(dq[2]) ? ' (targeting)' : ''}`, { aliases: ['cfb.team.penalty'] });
   // Each other flag the play has: "PENALTY Bama Delay Of Game", "PENALTY VAN Holding declined".
-  for (const m of p.text.matchAll(/PENALTY (\S+) ([A-Za-z][A-Za-z :'/-]*?)(?= \(| \d| declined| offsetting|\.|,|$)( declined)?/g)) {
+  for (const m of p.text.matchAll(CFB_FLAG)) {
     const flagged = cfbCodeTeam(g, m[1]), what = m[2].replace(/^UNS: /, '').trim();
     if (dq && m[1] === dq[1] && what === dq[2].replace(/^UNS: /, '').trim()) continue; // the ejection's flag: said
     team('cfb.team.penalty', flagged, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`);
