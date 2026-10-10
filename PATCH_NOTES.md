@@ -17,7 +17,7 @@ UFC
 - Track UFC fighters. A loss is a Successful Hate Watch that says how (knocked out, tapped out, the judges' cards), with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
 - With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end (KO/TKO R1 2:09).
 - A card's preview, from Scores: one fight in full (yours, else the main event; tap any fight to swap), with the chance your fighter loses and how by the odds, the tale of the tape, and both fighters' last five. Names open their pages.
-- With the UFC chip on, the one filter is Fighters, by weight class: Search lists each class's top five, Tracking groups yours by class.
+- With the UFC chip on, the filter is Fighters, by weight class: Search lists each class's top five.
 - A loss by a finish says how and when (KO/TKO R1 1:20); a title fight adds "Lost the Lightweight title" or "Lost a Lightweight title fight". (Server)
 - A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
 - Women's weight classes are named in full. (Server)
@@ -38,6 +38,7 @@ COLLEGE FOOTBALL
 
 EVERYWHERE
 - Fixes and screen changes can now arrive without a new build: they download in the background and show after you reopen the app once or twice.
+- Tracking both teams in a game, its start is one alert, not two. (Server)
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
 - The Scores tab's switch says what it lists: My and All events with every league on, games for one league, fights for the UFC.
 - The league filters fit on one row again, even on an iPhone SE.

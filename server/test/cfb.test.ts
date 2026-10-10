@@ -221,3 +221,57 @@ test("a college team's starting quarterback pulled: after his 5th pass, another 
   run(pass('b3', 'R.Puglisi'));
   assert.deepEqual(pulled, ['Georgia pulled G.Stockton: R.Puglisi is in at quarterback'], 'once');
 });
+
+test("one notification for a loss with its facts (the user's example: losing as the favorite to a worse team); one start for a device tracking both teams", async () => {
+  // Georgia (home, 5-0, an 83% favorite by the moneyline before kickoff, margin out) loses to Vanderbilt (1-4).
+  const dev = db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)');
+  const follow = db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, ?)');
+  for (const [id, keys] of [['dawgs', ['team:cfb:61']], ['both', ['team:cfb:61', 'team:cfb:238']], ['dores', ['team:cfb:238']]] as const) {
+    dev.run(id, 's', 'ios', `tok-${id}`, JSON.stringify(DEFAULT_PREFS));
+    keys.forEach((k, i) => follow.run(id, k, i));
+  }
+  const pushes: { to: string; title: string; body: string }[] = [];
+  const { setPushSender } = await import('../src/fanout.ts');
+  setPushSender((m) => pushes.push(...m));
+  let state = 'pre';
+  const drives: any = { previous: [], current: null };
+  const side = (id: string, homeAway: string, rec: string, score: number) => ({ id, homeAway, score: String(score), record: [{ type: 'total', summary: rec }] });
+  liveDeps.getJson = async (url: string) => {
+    if (!url.startsWith(urls.summary('cfb', 'G9'))) throw new Error(`unexpected fetch ${url}`);
+    const final = state === 'post';
+    return { header: { id: 'G9', season: { type: 2 }, competitions: [{ status: { type: { state, completed: final, name: final ? 'STATUS_FINAL' : 'STATUS_IN_PROGRESS' } },
+      competitors: [side('61', 'home', final ? '5-1' : '5-0', 10), side('238', 'away', final ? '2-4' : '1-4', 14)] }] },
+      pickcenter: [{ homeTeamOdds: { moneyLine: -700 }, awayTeamOdds: { moneyLine: 475 } }], drives };
+  };
+  const tracker = new GameTracker('cfb', 'G9', '61', '238', { sawPre: true, venue: 'Sanford Stadium', tv: 'SEC Network' });
+  await tracker.poll(); // before kickoff: the line and the records
+  state = 'in';
+  await tracker.poll(); // kickoff
+  drives.current = { id: 'd1', plays: [play('z1', 'Field Goal Good', '(10:00) 30 yard field goal is GOOD', '61', 0, 3, { scoringPlay: true }),
+    play('z2', 'Passing Touchdown', '(5:00) pass for a TD', '238', 7, 3, { scoringPlay: true })] };
+  await tracker.poll();
+  drives.previous = [{ ...drives.current, result: 'TD' }];
+  drives.current = { id: 'd2', plays: [play('z3', 'Passing Touchdown', '(1:00) pass for a TD', '61', 7, 10, { scoringPlay: true }), play('z4', 'Passing Touchdown', '(0:20) pass for a TD', '238', 14, 10, { scoringPlay: true, period: { number: 3 } })] };
+  await tracker.poll();
+  state = 'post';
+  await tracker.poll();
+  const feedOf = (d: string) => (db.prepare(`SELECT e.type, e.title, f.pushed, f.extra FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND e.game_id = 'G9' ORDER BY f.rowid`).all(d) as any[]);
+  const losses = (d: string) => feedOf(d).filter((r) => /Successful Hate Watch/.test(r.title));
+  assert.deepEqual(losses('dawgs').map((r) => [r.title, JSON.parse(r.extra ?? '[]'), r.pushed]),
+    [['Successful Hate Watch! Georgia lost to Vanderbilt', ['Lost as 83% favorites.', 'Lost to 1-4 Vanderbilt.'], 1]], 'one alert, the facts its lines (the line and the records going in)');
+  const toDawgs = pushes.filter((p) => p.to === 'tok-dawgs').map((p) => p.title);
+  assert.deepEqual(toDawgs.filter((t) => /Successful Hate Watch/.test(t)).length, 1, 'one notification for the loss');
+  assert.ok(toDawgs.some((t) => t.includes('Hate Watch Starting: Georgia vs Vanderbilt')));
+  const both = pushes.filter((p) => p.to === 'tok-both').map((p) => p.title);
+  assert.deepEqual(both.filter((t) => /Hate Watch Starting/.test(t)), ['🍿 Hate Watch Starting: Georgia vs Vanderbilt'], 'tracking both: one start, about the team followed first');
+  assert.deepEqual(both.filter((t) => /Successful Hate Watch/.test(t)).length, 1);
+  assert.deepEqual(losses('dores'), [], "the winner's tracker: no loss");
+});
+
+test("a drive's alert is its deciding play's moment, not a timeout's after it: an interception and the red zone are one alert", () => {
+  const ctx: any = { league: 'cfb', gameId: 'G10', homeId: '2426', awayId: '2005', goalies: new Map() };
+  const snap = (id: string, type: string, dd: string) => ({ id, type: { text: type }, start: { team: { id: '2005' }, downDistanceText: dd }, homeScore: 0, awayScore: 0 });
+  const drive = { id: 'dr', team: { id: '2005', abbreviation: 'AFA' }, result: 'INT', displayResult: 'Interception',
+    plays: [snap('a', 'Rush', '1st & 10 at NAVY 15'), snap('b', 'Pass Interception Return', '2nd & 6 at NAVY 11'), snap('c', 'Timeout', '')] };
+  assert.deepEqual(D.nflDriveEvents(ctx, drive).map((e) => [e.type, e.meta?.playId]), [['cfb.team.red_zone_empty', 'b']]);
+});

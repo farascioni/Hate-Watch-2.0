@@ -1472,7 +1472,10 @@ export const are = (lg: League) => (TEAMS_ONLY.has(lg) ? 'is' : 'are');
 /** "the Rays"; a soccer club or a school is just its name ("Arsenal", "Nebraska"). */
 const the = (lg: League, team: string) => (SOCCER.has(lg) || TEAMS_ONLY.has(lg) ? team : `the ${team}`);
 
-/** "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). */
+/**
+ * "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). One game is one
+ * start for a device tracking both teams: they share a moment, and it gets the one about the team it followed first.
+ */
 export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
   const body = [`${START_WORD[g.league]}${info.venue ? ` at ${info.venue}` : ''}`, info.tv].filter(Boolean).join(' · ');
   return [[g.homeId, g.awayId], [g.awayId, g.homeId]].map(([teamId, oppId]) => ({
@@ -1482,6 +1485,8 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
     title: `Hate Watch Starting: ${teamName(g.league, teamId)} vs ${teamName(g.league, oppId)}`,
     body,
     at,
+    moment: `${g.gameId}:start`,
+    firstFollowed: true,
     meta: { gameId: g.gameId },
   }));
 }
@@ -2021,7 +2026,10 @@ export function playerFinalEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId
  * after that play (the late-fold rule).
  */
 export function nflDriveEvents(g: GameCtx, d: any): Detected[] {
-  const team = String(d?.team?.id ?? ''), result = String(d?.result ?? '').toUpperCase(), plays: any[] = d?.plays ?? [], last = plays.at(-1);
+  // The drive's deciding play: its last that isn't a timeout or a period's end (a turnover is often followed by
+  // one in the drive), so its alert is a moment with that play's own (an interception and the red zone: one alert).
+  const team = String(d?.team?.id ?? ''), result = String(d?.result ?? '').toUpperCase(), plays: any[] = d?.plays ?? [];
+  const last = [...plays].reverse().find((p) => !/^(Timeout|End Period|End of\b|End Of\b|Two-Minute Warning)/i.test(String(p?.type?.text ?? ''))) ?? plays.at(-1);
   if ((team !== g.homeId && team !== g.awayId) || !result || !last) return [];
   const name = teamName(g.league, team);
   const score = { home: Number(last.homeScore ?? 0), away: Number(last.awayScore ?? 0) };
