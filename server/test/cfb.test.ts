@@ -23,11 +23,11 @@ for (const [id, name, short, abbr] of [['61', 'Georgia Bulldogs', 'Georgia', 'UG
   db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`).run(`team:cfb:${id}`, id, name, short, abbr, short);
 loadCatalog();
 
-test('the league: ESPN\'s college-football, every FBS game on its scoreboard; teams only; after the UFC on the chips', () => {
+test('the league: ESPN\'s college-football, every FBS game on its scoreboard; teams only; after the UFC on the chips, before the WNBA (always last)', () => {
   assert.equal(urls.scoreboard('cfb'), 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=300');
   assert.equal(urls.scoreboard('cfb', '20261010'), 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261010&groups=80&limit=300');
   assert.equal(urls.scoreboard('nfl', '20261011'), 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20261011', 'others as they were');
-  assert.deepEqual([LEAGUE_IDS.at(-1), TEAMS_ONLY.has('cfb'), TEAMS_ONLY.has('nfl')], ['cfb', true, false]);
+  assert.deepEqual([LEAGUE_IDS.at(-2), LEAGUE_IDS.at(-1), TEAMS_ONLY.has('cfb'), TEAMS_ONLY.has('nfl')], ['cfb', 'wnba', true, false]);
   assert.deepEqual([cfbSeason(new Date('2026-10-10')), cfbSeason(new Date('2027-01-05')), cfbSeason(new Date('2027-07-02'))], [2026, 2026, 2027], 'a season runs August to January');
 });
 

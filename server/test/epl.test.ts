@@ -35,8 +35,8 @@ const LINEUPS = [
 ];
 const ctx = (homeId: string, awayId: string): any => ({ league: 'epl', gameId: 'M', homeId, awayId, goalies: new Map() });
 
-test('the EPL is a league: ESPN files it as soccer/eng.1; the WNBA ends the first row of chips, the UFC and college football after it', () => {
-  assert.deepEqual(LEAGUE_IDS.slice(-4), ['epl', 'wnba', 'ufc', 'cfb']);
+test('the EPL is a league: ESPN files it as soccer/eng.1; the WNBA is always the last league (the app lists them in this order)', () => {
+  assert.deepEqual(LEAGUE_IDS.slice(-4), ['epl', 'ufc', 'cfb', 'wnba']);
   assert.equal(urls.summary('epl', '401879276'), 'https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/summary?event=401879276');
   assert.equal(urls.standings('epl'), 'https://site.api.espn.com/apis/v2/sports/soccer/eng.1/standings');
   assert.equal(urls.headshot('epl', '274632'), 'https://a.espncdn.com/i/headshots/soccer/players/full/274632.png');

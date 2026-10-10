@@ -44,14 +44,18 @@ export const LEAGUES: Record<League, { sport: string; name: string; slug?: strin
   nhl: { sport: 'hockey', name: 'NHL', ui: UI({ color: '#9CA3AF' }) },
   f1: { sport: 'racing', name: 'F1', ui: UI({ color: '#E10600', players: 'drivers', game: 'race', events: 'races', divisions: false }) },
   epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League', ui: UI({ color: '#7B2FBE' }) },
-  // The app lists leagues in this order (filter chips, Settings): the WNBA farthest right of the first row of
-  // chips, then the UFC and college football, added after it, on a second row (eight fit a phone's row), so no chip moves.
-  wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C' }) },
   ufc: { sport: 'mma', name: 'UFC', ui: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false }) },
   cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football', ui: UI({ color: '#B45309', kinds: ['team'], football: true }) },
+  wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C' }) },
 };
 
-export const LEAGUE_IDS = Object.keys(LEAGUES) as League[];
+/** The WNBA goes after every other league, wherever one is added in LEAGUES. */
+const LAST: League = 'wnba';
+/**
+ * Every league, in the order the app lists them (every build: the filter chips, Settings' alert groups, Search
+ * by division, the Scores tab): as in LEAGUES, but the WNBA always last.
+ */
+export const LEAGUE_IDS = (Object.keys(LEAGUES) as League[]).sort((a, b) => Number(a === LAST) - Number(b === LAST));
 /**
  * Leagues made of games with play-by-play, and teams: the Scores tab, standings, Up Next. Not F1 (races and
  * sessions, f1.ts) or the UFC (fight cards between fighters, ufc.ts): a build drawing every game as two teams

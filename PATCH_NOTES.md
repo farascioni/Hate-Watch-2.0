@@ -29,7 +29,7 @@ F1
 - Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
-- Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship. Tap a driver or constructor for their page.
+- Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship.
 - With the F1 chip on, Scores has Live races and Upcoming races (the weekend's sessions still to come, a race with its full grid once set). An F1 session's screen says "Your alerts from this race".
 
 COLLEGE FOOTBALL
@@ -37,10 +37,11 @@ COLLEGE FOOTBALL
 - Alerts: the game starting, an interception, a lost fumble, a missed field goal, a player ejected, the quarterback pulled, falling behind, losing (and as a ranked team to an unranked one), a turnover on downs, the red zone, falling in or out of the AP Top 25; sacks and flags in the feed. (Server)
 
 EVERYWHERE
-- Fixes and screen changes can arrive without a new build, showing after you reopen the app once or twice.
+- Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.
 - Tracking both teams in a game, its start is one alert, not two. (Server)
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert, not its own alert. (Server)
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
+- The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
 - Filters too wide for one row put All on top, the rest evenly below.
 - Clips don't play on their own: open one, then press play.
