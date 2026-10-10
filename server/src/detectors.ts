@@ -1099,7 +1099,10 @@ export const passerIn = (text: string) => text.match(/#\d+ ([A-Z][\w'-]*\.[\w.'-
 /**
  * The team a college penalty's code is ("PENALTY Bama Holding"): ESPN's codes are often not the abbreviation
  * ("Bama", "State", "USC" for South Carolina), so a code is one of the game's two schools when it matches
- * just one of them (its abbreviation, either way round, or a word of its name). A code of more words ("Sac St",
+ * just one of them: its abbreviation, either way round; the start of a word of its location or short name ("Sac",
+ * "Jax", "State"); the end of a word of its full name ("Bama", "Noles" for the Seminoles). Not the middle of a word
+ * ("NTU" isn't Kentucky), the start of a mascot ("MOU" isn't the Mountaineers) or the end of a short name that's an
+ * abbreviation ("TSU" isn't MTSU). A code of more words ("Sac St",
  * "San Jose St", "GA Southern") is a school whose location's or short name's words, from the first, each start with
  * the code's. A code neither school matches that way may be one's initials, with or without a U ("WF" for Wake
  * Forest, "BSU" Ball State, "OSU" Oklahoma State): never one that already matched ("OSU" is Ohio State's
@@ -1111,8 +1114,10 @@ export function cfbCodeTeam(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, co
     const t = catalog.teamByEspn(g.league, id);
     if (!t) return false;
     if (parts) return [t.location, t.shortName].some((n) => { const ws = normalize(n ?? '').split(' '); return parts.length <= ws.length && parts.every((w, i) => ws[i].startsWith(w)); });
-    const abbr = t.abbrev.toLowerCase(), words = `${t.location ?? ''} ${t.name}`.toLowerCase();
-    return abbr === c || abbr.startsWith(c) || c.startsWith(abbr) || (c.length >= 3 && words.includes(c));
+    const abbr = t.abbrev.toLowerCase();
+    if (abbr === c || abbr.startsWith(c) || c.startsWith(abbr)) return true;
+    const w = plainWords(code)[0] ?? '';
+    return w.length >= 3 && (plainWords(`${t.location ?? ''} ${t.shortName}`).some((x) => x.startsWith(w)) || plainWords(t.name).some((x) => x.endsWith(w)));
   });
   if (hits.length || parts) return hits.length === 1 ? hits[0] : undefined;
   const initials = [g.homeId, g.awayId].filter((id) => {
@@ -1121,6 +1126,8 @@ export function cfbCodeTeam(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, co
   });
   return initials.length === 1 ? initials[0] : undefined;
 }
+/** A name's words, lowercase without accents, "&" kept ("Texas A&M" → ["texas", "a&m"], "Miami (OH)" → ["miami", "oh"]). */
+const plainWords = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[\s()/-]+/).filter(Boolean);
 
 /**
  * A college flag in a play's text: its code's first word, the rest (the code's other words, if any, then what it was:

@@ -27,7 +27,9 @@ for (const [id, name, short, abbr, location] of [['16', 'Sacramento State Hornet
   ['23', 'San José State Spartans', 'San José St', 'SJSU', 'San José State'], ['290', 'Georgia Southern Eagles', 'GA Southern', 'GASO', 'Georgia Southern'],
   ['2050', 'Ball State Cardinals', 'Ball State', 'BALL', 'Ball State'], ['77', 'Northwestern Wildcats', 'Northwestern', 'NU', 'Northwestern'], ['154', 'Wake Forest Demon Deacons', 'Wake Forest', 'WAKE', 'Wake Forest'],
   ['152', 'NC State Wolfpack', 'NC State', 'NCSU', 'NC State'], ['194', 'Ohio State Buckeyes', 'Ohio State', 'OSU', 'Ohio State'], ['204', 'Oregon State Beavers', 'Oregon St', 'ORST', 'Oregon State'],
-  ['68', 'Boise State Broncos', 'Boise St', 'BOIS', 'Boise State']])
+  ['68', 'Boise State Broncos', 'Boise St', 'BOIS', 'Boise State'], ['249', 'North Texas Mean Green', 'North Texas', 'UNT', 'North Texas'],
+  ['193', 'Miami (OH) RedHawks', 'Miami OH', 'M-OH', 'Miami (OH)'], ['2026', 'App State Mountaineers', 'App State', 'APP', 'App State'],
+  ['326', 'Texas State Bobcats', 'Texas St', 'TXST', 'Texas State'], ['2393', 'Middle Tennessee Blue Raiders', 'MTSU', 'MTSU', 'Middle Tennessee']])
   db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`).run(`team:cfb:${id}`, id, name, short, abbr, location);
 loadCatalog();
 
@@ -257,6 +259,10 @@ test('a college flag\'s code that\'s a school\'s initials, with or without a U (
   // Not seen on October 10: a school's abbreviation comes first ("OSU" is Ohio State's, not Oregon State's initials),
   // and initials both schools share are neither's (Ball State and Boise State are both "BSU").
   assert.deepEqual([D.cfbCodeTeam(g('194', '204'), 'OSU'), D.cfbCodeTeam(g('2050', '68'), 'BSU'), D.cfbCodeTeam(g('2050', '68'), 'BALL')], ['194', undefined, '2050']);
+  // Nor is a code inside a word that school's: "NTU" is in "Kentucky", "MOU" begins the Mountaineers (a mascot), "TSU"
+  // ends MTSU (a short name that's an abbreviation). "Bama" ends "Alabama", "Cats" the Wildcats.
+  assert.deepEqual([D.cfbCodeTeam(g('249', '96'), 'NTU'), D.cfbCodeTeam(g('193', '2026'), 'MOU'), D.cfbCodeTeam(g('326', '2393'), 'TSU'), D.cfbCodeTeam(g('333', '344'), 'Bama'), D.cfbCodeTeam(g('96', '61'), 'Cats')],
+    ['249', '193', '326', '333', '96'], 'North Texas, Miami (OH) and Texas State by their initials; Alabama; Kentucky');
 });
 
 test("a college team's starting quarterback pulled: after his 5th pass, another throws twice in a row, once", () => {
