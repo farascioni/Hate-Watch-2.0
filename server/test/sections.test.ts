@@ -24,6 +24,7 @@ test("each Settings group's sections, in order, each in one piece", () => {
     'nhl alerts': ['Offense', 'Penalties', 'Goaltending', 'Team'],
     'f1 alerts': ['Race', 'Qualifying', 'Championship', 'Team'],
     'epl alerts': ['Attack', 'Defense', 'Cards & fouls', 'Goalkeeping', 'Lineup', 'Team'],
+    'ufc alerts': ['Fight'],
     'All player alerts': ['Game', 'Injuries & news'],
     'Team alerts': ['Game', 'Season', 'Injuries & news', 'Your Hate Watch'],
   });

@@ -2,7 +2,9 @@
 // alert keeps (meta.playId), so a clip goes on exactly the alerts about its play, 4 to 9 minutes after them.
 // A loss's alerts get the winning play's clip (meta.clipPlayId, the play that put the winner ahead for good),
 // else the game's recap. Stored on the alert (events.clip), sent to the feeds that have it (an eventUpdate,
-// no push), and shown while ESPN has it up and its switch is on (flags.ts).
+// no push), and shown while ESPN has it up and its switch is on (flags.ts): an alert can name its own
+// (meta.clipFlag: a UFC loss's, "clips.loss.ufc"), else the feed's or the loss's.
+import type { Flag } from './flags.ts';
 import { db } from './db.ts';
 import { flagOn } from './flags.ts';
 import type { Clip } from './highlights.ts';
@@ -32,10 +34,13 @@ export function playIdsIn(raw: string): string[] {
   return [...raw.matchAll(/"plays"\s*:\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/"id"\s*:\s*"?(\d+)"?/g)].map((x) => x[1]));
 }
 
+/** An alert's clip switch: its own, or the loss's or the feed's. */
+const clipFlag = (meta: { lossClip?: boolean; clipFlag?: string } | null): Flag => (meta?.clipFlag as Flag | undefined) ?? (meta?.lossClip ? 'clips.loss' : 'clips.feed');
+
 /** Whether a stored clip shows on its alert: still up at ESPN and its switch on. */
-export function clipShown(clip: Clip | null, meta: { lossClip?: boolean } | null, now = Date.now()): Clip | null {
+export function clipShown(clip: Clip | null, meta: { lossClip?: boolean; clipFlag?: string } | null, now = Date.now()): Clip | null {
   if (!clip || (clip.expires && clip.expires < now)) return null;
-  return flagOn(meta?.lossClip ? 'clips.loss' : 'clips.feed') ? clip : null;
+  return flagOn(clipFlag(meta)) ? clip : null;
 }
 
 /**
@@ -51,7 +56,7 @@ export function attachClips(gameId: string, byPlay: Map<string, Clip>, recap: Cl
   for (const r of rows) {
     const meta = r.meta ? JSON.parse(r.meta) : null;
     const clip = meta?.lossClip
-      ? (flagOn('clips.loss') ? byPlay.get(String(meta.clipPlayId ?? '')) ?? recap : undefined)
+      ? (flagOn(clipFlag(meta)) ? byPlay.get(String(meta.clipPlayId ?? '')) ?? recap : undefined)
       : meta?.playId != null && flagOn('clips.feed') ? byPlay.get(String(meta.playId)) : undefined;
     if (clip && set.run(JSON.stringify(clip), r.id).changes) got.push(r.id);
   }

@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { Empty, PrimaryButton, SectionHeader, TargetRow } from '../../components/ui';
-import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
+import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Target } from '../../lib/types';
 
@@ -18,9 +18,10 @@ export default function FollowingScreen() {
 
   const sections = useMemo((): { title: string; data: Target[] }[] => {
     const all = [...follows.values()].filter((t) => matchesFilter(filter, t)).sort((a, b) => a.name.localeCompare(b.name));
+    if (byWeightClass(filter)) return groupByWeightClass(all);
     return [
       { title: 'Teams', data: all.filter((t) => t.kind === 'team') },
-      { title: filter.league === 'f1' ? 'Drivers' : 'Players', data: all.filter((t) => t.kind === 'player') },
+      { title: playersTitle(filter.league), data: all.filter((t) => t.kind === 'player') },
     ].filter((s) => s.data.length);
   }, [follows, filter]);
 

@@ -2,7 +2,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { db, kvGet } from './db.ts';
-import { catalog, search, teamDto, playerDto, targetDto } from './catalog.ts';
+import { catalog, search, teamDto, playerDto, targetDto, listed, type Player } from './catalog.ts';
+import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
 import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
@@ -17,6 +18,8 @@ import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
 import { statsFor } from './stats.ts';
+import { f1Preview } from './f1-preview.ts';
+import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
 import { divisionsOf } from './divisions.ts';
 
@@ -65,7 +68,7 @@ route('GET', '/search', false, (_r, url) => ({
 // the list comes by league (the app's order), then division, then name. Otherwise A-Z.
 route('GET', '/teams', false, async (_r, url) => {
   const lg = url.searchParams.get('league');
-  const teams = catalog.allTeams().filter((t) => !lg || t.league === lg);
+  const teams = catalog.allTeams().filter((t) => listed(t) && (!lg || t.league === lg)); // not the UFC's placeholder
   if (url.searchParams.get('by') !== 'division') return { teams: withHaters(teams.sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)) };
   const leagues = [...new Set(teams.map((t) => t.league))];
   const div = new Map(await Promise.all(leagues.map(async (l) => [l, await divisionsOf(l)] as const)));
@@ -73,7 +76,32 @@ route('GET', '/teams', false, async (_r, url) => {
   rows.sort((a, b) => LEAGUE_IDS.indexOf(a.league) - LEAGUE_IDS.indexOf(b.league) || a.divisionOrder - b.divisionOrder || a.name.localeCompare(b.name));
   return { teams: withHaters(rows) };
 });
-// A player's or team's stats page (not F1 yet).
+// The UFC's weight classes, heaviest first, each with its champion and top fighters (ufc-classes.ts): the UFC's
+// "Weight classes" on Search. Not in /teams: the UFC has none, and every build lists /teams as teams.
+route('GET', '/ufc/weight-classes', false, () => ({
+  classes: (kvGet<WeightClass[]>('ufc:weight-classes') ?? [])
+    .map((c) => ({ name: c.name, fighters: withHaters(c.keys.map((k) => catalog.player(k)).filter((p): p is Player => !!p).map(playerDto)) }))
+    .filter((c) => c.fighters.length),
+}));
+// Every F1 driver, by constructor (A-Z), each team's A-Z: Search's Drivers with nothing typed.
+route('GET', '/f1/drivers', false, () => ({
+  drivers: withHaters(catalog.allTeams().filter((t) => t.league === 'f1').sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((t) => [...catalog.roster(t.key)].sort((a, b) => a.name.localeCompare(b.name)).map(playerDto))),
+}));
+// An F1 weekend's preview: where, when, the grid once it's set, the championship (f1-preview.ts).
+route('GET', '/f1/events/:id/preview', false, async (_r, _u, [id]) => {
+  const preview = await f1Preview(decodeURIComponent(id));
+  if (!preview) throw new HttpError(404, 'no such F1 weekend');
+  return preview;
+});
+// The UFC's next card and the one after, and one card: every fight, its odds and tape, results once in (ufc-preview.ts).
+route('GET', '/ufc/cards', false, async () => ({ cards: await ufcCards() }));
+route('GET', '/ufc/cards/:id', false, async (_r, _u, [id]) => {
+  const card = await ufcCard(decodeURIComponent(id));
+  if (!card) throw new HttpError(404, 'no such UFC card');
+  return card;
+});
+// A player's or team's stats page.
 route('GET', '/targets/:key/stats', false, async (_r, _u, [key]) => {
   const page = await statsFor(decodeURIComponent(key));
   if (!page) throw new HttpError(404, 'no stats for this one');

@@ -49,8 +49,7 @@ export default function TargetScreen() {
   if (!target) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   const accent = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.hate;
   const roster = (position && groups.find((g) => g.label === position)?.players) || target.roster || [];
-  const hasStats = target.league !== 'f1';
-  const view = hasStats ? tab : 'misery';
+  const view = tab;
 
   const header = (
     <View>
@@ -59,23 +58,22 @@ export default function TargetScreen() {
         <Text style={styles.name}>{target.name}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
           <LeagueTag league={target.league} />
-          <Text style={styles.sub}>{target.kind === 'player' ? `${target.teamName ?? ''} · ${subtitle(target)}` : subtitle(target)}</Text>
+          {/* F1's subtitle already starts with the constructor's name */}
+          <Text style={styles.sub}>{target.kind === 'player' && target.league !== 'f1' ? `${target.teamName ?? ''} · ${subtitle(target)}` : subtitle(target)}</Text>
         </View>
         <HaterCount target={target} size={14} />
         <View style={styles.actions}>
           <FollowButton target={target} />
         </View>
       </View>
-      {hasStats ? (
-        <View style={styles.tabs} accessibilityRole="tablist">
-          {([['stats', 'Stats'], ['misery', 'Recent misery']] as const).map(([id, label]) => (
-            <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, view === id && styles.tabOn]}
-              accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
-              <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {([['stats', 'Stats'], ['misery', 'Recent misery']] as const).map(([id, label]) => (
+          <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, view === id && styles.tabOn]}
+            accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
+            <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
       {view === 'stats' ? (
         stats ? <StatsView page={stats} target={target} now={now} />
         : statsFailed ? (

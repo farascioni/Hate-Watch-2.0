@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -28,16 +28,14 @@ export function ClipThumb({ clip, open, width }: { clip: Clip; open: boolean; wi
   );
 }
 
-/** The clip, playing as soon as it's open, with the system's controls (full screen among them). */
+/** The clip, open with the system's controls (full screen among them): it plays when you press play, never on its own. */
 export function ClipPlayer({ clip }: { clip: Clip }) {
   // Browsers mostly can't play HLS; phones get the stream that adapts to the connection.
   const uri = Platform.OS === 'web' ? clip.mp4 ?? clip.hls : clip.hls ?? clip.mp4;
-  const player = useVideoPlayer(uri, (p) => { p.play(); });
-  // On the web the setup's play() comes before the video is on the page: start it once it is.
-  useEffect(() => { player.play(); }, [player]);
+  const player = useVideoPlayer(uri);
   // If the stream won't play, the MP4 of the same clip.
   useEventListener(player, 'statusChange', ({ status }) => {
-    if (status === 'error' && clip.mp4 && uri !== clip.mp4) player.replaceAsync(clip.mp4).then(() => player.play()).catch(() => {});
+    if (status === 'error' && clip.mp4 && uri !== clip.mp4) player.replaceAsync(clip.mp4).catch(() => {});
   });
   return <VideoView player={player} style={styles.video} nativeControls contentFit="contain" fullscreenOptions={{ enable: true }} />;
 }

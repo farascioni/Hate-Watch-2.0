@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Tex
 import { router, useFocusEffect } from 'expo-router';
 import { Avatar } from '../components/Avatar';
 import { Empty, LeagueTag, PrimaryButton, subtitle } from '../components/ui';
-import { FilterBar, describeFilter, useFilter } from '../components/FilterBar';
+import { FilterBar, describeFilter, kindOf, useFilter } from '../components/FilterBar';
 import { useStore } from '../lib/store';
 import { api } from '../lib/api';
 import { colors, radius, space } from '../theme';
@@ -27,7 +27,8 @@ export default function LeaderboardScreen() {
   const load = useCallback(async () => {
     const mine = ++latest.current;
     try {
-      const r = await api.leaderboard({ kind: filter.kind === 'all' ? undefined : filter.kind, league: filter.league });
+      const kind = kindOf(filter);
+      const r = await api.leaderboard({ kind: kind === 'all' ? undefined : kind, league: filter.league });
       if (mine !== latest.current) return;
       setBoard(r);
       setFailed(false);

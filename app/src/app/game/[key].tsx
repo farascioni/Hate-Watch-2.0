@@ -1,21 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { GameCardView } from '../../components/GameCard';
 import { FeedCard } from '../../components/FeedCard';
 import { BoxScoreView } from '../../components/BoxScore';
 import { HighlightsView } from '../../components/Highlights';
+import { F1PreviewView } from '../../components/F1Preview';
 import { Empty, SectionHeader, useNow } from '../../components/ui';
 import { trackedDrivers } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
-import type { FeedItem, GameDetail } from '../../lib/types';
+import type { F1Preview, FeedItem, GameDetail } from '../../lib/types';
+
+/** Whether "Your alerts from this game" is open, as you last left it (every game screen; kept on the device). */
+const ALERTS_OPEN_KEY = 'game:alertsOpen';
 
 /**
- * One game from the Scores tab: the live score card, your alerts from this game, then the box score and
- * the highlights (ESPN's clips and the key plays) as tabs (F1: the running order). The card stays live over
- * the socket; the box score and highlights refresh every 15s while live.
+ * One game from the Scores tab: the live score card, the box score and the highlights (ESPN's clips and the
+ * key plays) as tabs (F1: the running order; before the session starts, the weekend's preview), then your
+ * alerts from this game, which you can minimize. The card stays live over the socket; the box score and
+ * highlights refresh every 15s while live.
  */
 export default function GameScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
@@ -25,8 +32,16 @@ export default function GameScreen() {
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'box' | 'highlights'>('box');
+  const [alertsOpen, setAlertsOpen] = useState(true);
+  useEffect(() => { AsyncStorage.getItem(ALERTS_OPEN_KEY).then((v) => { if (v === '0') setAlertsOpen(false); }).catch(() => {}); }, []);
+  const toggleAlerts = () => setAlertsOpen((open) => { AsyncStorage.setItem(ALERTS_OPEN_KEY, open ? '0' : '1').catch(() => {}); return !open; });
   const now = useNow();
   const game = games.get(gameKey) ?? detail?.game;
+  // F1 before the start: the weekend's preview (a server from before it has none: the running order instead).
+  const [preview, setPreview] = useState<F1Preview | null>(null);
+  const previewOf = game?.league === 'f1' && game.state === 'pre' ? game.eventId : undefined;
+  const loadPreview = useCallback(() => (previewOf ? api.f1Preview(previewOf).then(setPreview, () => setPreview(null)) : Promise.resolve()), [previewOf]);
+  useEffect(() => { loadPreview(); }, [loadPreview]);
 
   const load = useCallback(() => api.game(gameKey).then((d) => { setDetail(d); setFailed(false); }, () => setFailed(true)), [gameKey]);
   useEffect(() => { load(); }, [load]);
@@ -56,15 +71,12 @@ export default function GameScreen() {
     <>
       <Stack.Screen options={{ title }} />
       <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: space(12) }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.hate} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadPreview()]); setRefreshing(false); }} tintColor={colors.hate} />}>
         <GameCardView game={game} now={now} big />
 
-        <SectionHeader>Your alerts from this game · {alerts.length}</SectionHeader>
-        {alerts.length
-          ? alerts.map((a) => <FeedCard key={a.id} item={a} now={now} />)
-          : <Text style={styles.none}>Nothing yet. When something goes wrong for them, it lands here.</Text>}
-
-        {game.league === 'f1' ? (
+        {game.league === 'f1' && game.state === 'pre' && preview ? (
+          <F1PreviewView preview={preview} current={game.key} />
+        ) : game.league === 'f1' ? (
           <>
             <SectionHeader>Running order</SectionHeader>
             <View style={styles.list}>
@@ -94,6 +106,15 @@ export default function GameScreen() {
             ) : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'Highlights show up here once it starts.' : 'No highlights yet.') : 'Loading…'}</Text>}
           </>
         )}
+
+        <Pressable onPress={toggleAlerts} style={({ pressed }) => [styles.alertsHead, pressed && { opacity: 0.6 }]} hitSlop={6}
+          accessibilityRole="button" aria-expanded={alertsOpen} accessibilityHint={alertsOpen ? 'Minimizes your alerts' : 'Shows your alerts'}>
+          <SectionHeader>Your alerts from this {game.league === 'f1' ? 'race' : 'game'} · {alerts.length}</SectionHeader>
+          <Ionicons name={alertsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} style={styles.alertsChevron} />
+        </Pressable>
+        {alertsOpen ? (alerts.length
+          ? alerts.map((a) => <FeedCard key={a.id} item={a} now={now} />)
+          : <Text style={styles.none}>Nothing yet. When something goes wrong for them, it lands here.</Text>) : null}
       </ScrollView>
     </>
   );
@@ -102,6 +123,9 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   none: { color: colors.textFaint, fontSize: 14, paddingHorizontal: space(4), paddingVertical: space(2) },
+  // Your alerts: the section's title and a chevron, the whole row a button that minimizes it.
+  alertsHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: space(2) },
+  alertsChevron: { paddingRight: space(4), paddingBottom: space(2) },
   list: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   line: { flexDirection: 'row', gap: space(3), paddingHorizontal: space(3), paddingVertical: space(2.5), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   mine: { backgroundColor: colors.hateDim },

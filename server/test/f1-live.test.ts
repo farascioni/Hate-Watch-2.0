@@ -46,7 +46,7 @@ const fetched: string[] = [];
 f1Deps.getJson = async (url: string) => {
   fetched.push(url);
   if (url === urls.scoreboard('f1')) return { events: [{ id: EV, shortName: 'Test GP', competitions: sessions }] };
-  if (url === urls.f1Competitors(EV, RACE)) return { items: Object.keys(cars).map((id) => ({ $ref: `fake://car/${id}` })) };
+  if (url === urls.f1Competitors(EV, RACE) || url === urls.f1Competitors(EV, 'S1')) return { items: Object.keys(cars).map((id) => ({ $ref: `fake://car/${id}` })) };
   let m = url.match(/^fake:\/\/car\/(\w+)$/);
   if (m) { const c = cars[m[1]]; return { id: m[1], order: c.order, startOrder: c.grid, vehicle: { manufacturer: c.team }, status: { $ref: `fake://status/${m[1]}` } }; }
   m = url.match(/^fake:\/\/status\/(\w+)$/) ?? url.match(new RegExp(`competitors/(\\w+)/status$`));
@@ -94,7 +94,7 @@ test('a simulated race goes through the real F1 engine end to end', async () => 
   // (Step 1 also proved a race found already running gets no late "Hate Watch Starting".)
 });
 
-test('lights out on a race seen beforehand: "Hate Watch Starting" for followed teams only, once', async () => {
+test('lights out on a race seen beforehand: one "Hate Watch Starting" naming the followed team and drivers in it, once', async () => {
   const sprint = { id: 'S1', type: { abbreviation: 'SR' }, date: new Date(Date.now() + 60_000).toISOString(), status: { type: { state: 'pre', completed: false } } };
   sessions.push(sprint);
   const before = feed().length;
@@ -104,8 +104,10 @@ test('lights out on a race seen beforehand: "Hate Watch Starting" for followed t
   sprint.status.type.state = 'in';
   await scanF1();
   await settle();
-  assert.deepEqual(feed().slice(before), ['team.game_start | team:f1:CAD | Hate Watch Starting: Cadillac'],
-    'the user follows Cadillac (not Ferrari, and drivers are not teams)');
+  assert.deepEqual(feed().slice(before), ['team.game_start | team:f1:CAD | Hate Watch Starting: Test GP · Sprint'],
+    'one alert, the team first');
+  const extra = (db.prepare(`SELECT f.extra FROM feed f WHERE f.device_id = 'dev' ORDER BY f.rowid DESC LIMIT 1`).get() as { extra: string }).extra;
+  assert.deepEqual(JSON.parse(extra), ['Yours: Cadillac, Charles Leclerc, Valtteri Bottas.'], 'Cadillac, and the followed drivers in grid order (not Ferrari, Pérez or Hamilton)');
 
   await scanF1();
   assert.equal(feed().length, before + 1, 'announced once');

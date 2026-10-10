@@ -1,9 +1,11 @@
-// Stats pages for players and teams (not F1 yet), from ESPN. Players: the season line ESPN picks for
+// Stats pages for players and teams, from ESPN (F1's: f1-stats.ts; the UFC's: ufc.ts). Players: the season line ESPN picks for
 // their position (a pitcher's innings and earned runs, a receiver's catches and yards), postseason and
 // career, their last five games, and their team's next game. Teams: record and standing, a season stat
 // line, their last five results, and their next game. The numbers a hater wants to see (a batter's
 // strikeouts, a quarterback's interceptions, a team's turnovers) are marked \`bad\` for the app to show in red.
 import { getJson as espnGetJson } from './espn.ts';
+import { fighterPage } from './ufc.ts';
+import { f1Page } from './f1-stats.ts';
 import { catalog } from './catalog.ts';
 import { ordinal } from './detectors.ts';
 import { LEAGUES, SOCCER, urls, type League } from './leagues.ts';
@@ -188,13 +190,18 @@ async function teamPage(lg: League, teamId: string): Promise<Omit<StatsPage, 'ne
 // ─── Cached, so a busy page is one ESPN read every 10 minutes ────────────────────────────────
 const cache = new Map<string, { at: number; page: Promise<StatsPage> }>();
 
-/** A player's or team's stats page (null for F1, or a key we don't know). */
+/**
+ * A player's or team's stats page (null for the UFC's placeholder team, or a key we don't know). A fighter's
+ * is their record (ufc.ts); a driver's or a constructor's, their season (f1-stats.ts).
+ */
 export async function statsFor(key: string): Promise<StatsPage | null> {
   const [kind, lg, id] = key.split(':') as ['team' | 'player', League, string];
-  if (lg === 'f1' || !LEAGUES[lg] || !(kind === 'team' ? catalog.team(key) : catalog.player(key))) return null;
+  if ((lg === 'ufc' && kind === 'team') || !LEAGUES[lg] || !(kind === 'team' ? catalog.team(key) : catalog.player(key))) return null;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.page;
   const page = (async (): Promise<StatsPage> => {
+    if (lg === 'ufc') return fighterPage(id);
+    if (lg === 'f1') return f1Page(kind, id, key);
     if (kind === 'team') return { ...(await teamPage(lg, id)), next: await nextGameOf(key).catch(() => null) };
     const overview = await statsDeps.getJson(urls.athleteOverview(lg, id), { timeoutMs: 10_000 });
     const needsRows = !(overview?.statistics?.splits ?? []).some((s: any) => /regular season/i.test(s.displayName)) && !SOCCER.has(lg);

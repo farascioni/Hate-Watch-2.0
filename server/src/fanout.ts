@@ -332,6 +332,44 @@ export function setPushSender(fn: typeof pushSender) { pushSender = fn; }
 /** One device's copy of an alert: who, their settings, the other facts of its moment folded into it, and the `alt` groups it has used. */
 type Delivery = { f: Recipient; prefs: Prefs; folded: Detected[]; alts: Set<string> };
 
+/** What makes a folded alert the same as another: its sentence, or its name in a list. */
+const foldKey = (e: Detected) => e.fold ?? (e.list ? `${e.list.label}\u0000${e.list.item}` : undefined);
+const LIST_MAX = 5;
+/** A device's `list` alerts of a moment as one line each: "Yours: Alpine, Aston Martin, George Russell." (5 names, then "and N more"). */
+function listLines(es: Detected[]): string[] {
+  const by = new Map<string, string[]>();
+  for (const e of es) if (e.list) by.set(e.list.label, [...(by.get(e.list.label) ?? []), e.list.item]);
+  return [...by].map(([label, items]) => `${label}: ${items.slice(0, LIST_MAX).join(', ')}${items.length > LIST_MAX ? ` and ${items.length - LIST_MAX} more` : ''}.`);
+}
+/** The device's latest alert about a target since a time, of some types (`lateOn`): its id, or null. */
+function latestAbout(deviceId: string, on: NonNullable<Detected['lateOn']>): string | null {
+  const row = db.prepare(`SELECT f.event_id FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND e.target_key = ? AND e.type IN (${on.types.map(() => '?').join(',')})
+    AND f.occurred_at >= ? ORDER BY f.occurred_at DESC LIMIT 1`).get(deviceId, on.targetKey, ...on.types, on.since) as { event_id: string } | undefined;
+  return row?.event_id ?? null;
+}
+type Pending = PushMessage & { bundle?: string; label?: string };
+/**
+ * F1: a device's alerts from one session in one publish (the start and its back-of-grid, the results) are one
+ * notification, "Singapore GP · Sprint: 7 alerts", each alert's title a line of it. Each is still its own feed row.
+ */
+function bundled(pushes: Pending[]): PushMessage[] {
+  const out: PushMessage[] = [], groups = new Map<string, Pending[]>();
+  for (const p of pushes) {
+    if (!p.bundle) { out.push(p); continue; }
+    if (!groups.has(p.bundle)) out.push(p); // its place in the order, filled in below
+    groups.set(p.bundle, [...(groups.get(p.bundle) ?? []), p]);
+  }
+  return out.map((p) => {
+    const { bundle, label, ...msg } = p as Pending;
+    const g = bundle ? groups.get(bundle)! : [];
+    if (g.length < 2) return msg;
+    return {
+      ...msg, title: `🏁 ${label || 'F1'}: ${g.length} alerts`, body: g.map((x) => x.title).join('\n'), sound: g.some((x) => x.sound) ? 'default' : null,
+      threadId: `f1:${bundle!.split('\u0000')[1]}`, data: { ...msg.data, count: g.length },
+    };
+  });
+}
+
 /**
  * Moments already delivered in an earlier publish (a fact can come a poll later: an NFL drive's result after
  * its last play, a game misconduct after the instigator penalty): moment → device → its alert. A late fact
@@ -352,7 +390,7 @@ function pruneDelivered(now: number) {
  */
 export function publish(events: Detected[], league: League) {
   const detectedAt = Date.now();
-  const pushes: PushMessage[] = [];
+  const pushes: Pending[] = [];
   const got = new Map<string, Map<string, Delivery>>(); // moment → device → the alert it gets for it
   const late: { deviceId: string; eventId: string; line: string }[] = []; // facts for alerts sent in an earlier publish
   pruneDelivered(detectedAt);
@@ -387,6 +425,9 @@ export function publish(events: Detected[], league: League) {
       }
       const prefs = getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
+      // A line on the device's alert about it today, when it has one (a championship drop on that day's race alert).
+      const on = e.lateOn ? latestAbout(f.device_id, e.lateOn) : null;
+      if (on) { late.push({ deviceId: f.device_id, eventId: on, line: e.lateOn!.line }); continue; }
       if (e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
       const d: Delivery = { f, prefs, folded: [], alts: new Set(e.alt ? [e.alt] : []) };
       if (e.moment) {
@@ -395,7 +436,8 @@ export function publish(events: Detected[], league: League) {
         if (first) {
           // They already get this moment's alert: a fact it doesn't say goes on it, the same news again doesn't
           // (no fold, or one of its alternatives already said: `alt`).
-          if (e.fold && !(e.alt && first.alts.has(e.alt)) && !first.folded.some((x) => x.fold === e.fold)) {
+          const key = foldKey(e);
+          if (key && !(e.alt && first.alts.has(e.alt)) && !first.folded.some((x) => foldKey(x) === key)) {
             first.folded.push(e);
             if (e.alt) first.alts.add(e.alt);
           }
@@ -429,7 +471,7 @@ export function publish(events: Detected[], league: League) {
     const moment = e.moment ? events.filter((x) => x.moment === e.moment) : [];
     for (const { f, prefs, folded } of deliver) {
       const streak = streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line
-      const lines = [...folded.map((x) => x.fold!), ...streak];
+      const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
       const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null);
@@ -439,6 +481,7 @@ export function publish(events: Detected[], league: League) {
         to: f.push_token!, title: `${item.emoji} ${e.title}`, body, sound: prefs.sound ? 'default' : null,
         priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive', threadId: pushThread(e.targetKey),
         data: { eventId: e.id, targetKey: e.targetKey, type: e.type },
+        ...(league === 'f1' && gameId ? { bundle: `${f.push_token}\u0000${gameId}`, label: String(e.meta?.label ?? '') } : {}),
       });
     }
     console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers${deliver.some((d) => d.folded.length) ? ', with folded facts' : ''})`);
@@ -448,7 +491,7 @@ export function publish(events: Detected[], league: League) {
       for (const d of deliver) m.devices.set(d.f.device_id, { eventId: e.id, alts: d.alts, lines: new Set(d.folded.map((x) => x.fold!)) });
     }
   }
-  if (pushes.length) pushSender(pushes);
+  if (pushes.length) pushSender(bundled(pushes));
   for (const l of late) addLateLine(l.deviceId, l.eventId, l.line);
 }
 
@@ -470,6 +513,29 @@ function addLateLine(deviceId: string, eventId: string, line: string) {
 export function eventChanged(eventId: string) {
   const rows = db.prepare(`SELECT f.device_id, e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.event_id = ?`).all(eventId) as (Parameters<typeof feedItem>[0] & { device_id: string })[];
   for (const r of rows) for (const ws of sockets.get(r.device_id) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(r) }));
+}
+
+/**
+ * An alert whose facts changed after it went out (an F1 result a penalty changed): its type, title, body and
+ * facts become the new ones, sent live to each feed that has it, with no push. One that no longer stands
+ * (`withdrawn`) is no longer a Successful Hate Watch: it comes off each device's tally, and says nothing of
+ * how many others got it. False if there's no such alert.
+ */
+export function reviseEvent(id: string, e: Pick<Detected, 'type' | 'aliases' | 'title' | 'body' | 'meta'> & { withdrawn?: boolean }): boolean {
+  const row = db.prepare('SELECT meta FROM events WHERE id = ?').get(id) as { meta: string | null } | undefined;
+  if (!row) return false;
+  const meta = { ...(row.meta ? JSON.parse(row.meta) : {}), ...e.meta, aliases: e.aliases, withdrawn: e.withdrawn || undefined };
+  db.prepare('UPDATE events SET type = ?, title = ?, body = ?, meta = ? WHERE id = ?').run(e.type, e.title, e.body, JSON.stringify(meta), id);
+  if (e.withdrawn || !isHateWatch(e)) {
+    const devices = db.prepare('SELECT device_id FROM hate_watches WHERE event_id = ?').all(id) as { device_id: string }[];
+    db.prepare('DELETE FROM hate_watches WHERE event_id = ?').run(id);
+    for (const { device_id } of devices) {
+      const tally = JSON.stringify({ kind: 'hateWatches', tally: hateWatchTally(device_id) });
+      for (const ws of sockets.get(device_id) ?? []) ws.send(tally);
+    }
+  }
+  eventChanged(id);
+  return true;
 }
 
 /**

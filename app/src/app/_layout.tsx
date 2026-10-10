@@ -49,6 +49,8 @@ export default function RootLayout() {
         <Stack.Screen name="stats/[key]" options={{ title: 'Stats', headerBackTitle: 'Back' }} />
         <Stack.Screen name="alerts/[key]" options={{ title: 'Alerts', headerBackTitle: 'Back' }} />
         <Stack.Screen name="game/[key]" options={{ title: '', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="f1/[event]" options={{ title: '', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="ufc/[event]" options={{ title: '', headerBackTitle: 'Back' }} />
         <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard', headerBackTitle: 'Back' }} />
         <Stack.Screen name="a/[code]" options={{ title: 'Shared alert', headerBackTitle: 'Back' }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />

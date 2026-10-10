@@ -1,4 +1,5 @@
-import { db, tx, kvSet } from './db.ts';
+import { db, tx, kvGet, kvSet } from './db.ts';
+import { fiveRoundFights, rankFighters, titleOf, type Belts, type WeightClass } from './ufc-classes.ts';
 import { getJson, probePng, mapLimit } from './espn.ts';
 import { LEAGUE_IDS, LEAGUES, urls, playerKey, teamKey, type League } from './leagues.ts';
 
@@ -13,8 +14,8 @@ export interface Player {
   teamKey: string; image: string; imageW: number; imageH: number; imageKind: 'headshot' | 'team_logo';
 }
 
-/** Bump when what ingest() collects changes (2: injured lists, 3: every position played), so the next boot rebuilds the catalog instead of waiting. */
-export const INGEST_VERSION = 3;
+/** Bump when what ingest() collects changes (2: injured lists, 3: every position played, 4: UFC weight classes), so the next boot rebuilds the catalog instead of waiting. */
+export const INGEST_VERSION = 4;
 export const INGEST_EVERY_MS = 6 * 3600_000;
 
 /**
@@ -117,10 +118,24 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
   const report: IngestReport = { at: new Date().toISOString(), version: INGEST_VERSION, leagues: {}, problems: [] };
   const newTeams: Team[] = [];
   const newPlayers: Player[] = [];
+  let ufcClasses: { classes: WeightClass[]; belts: Belts } | undefined; // each weight class's top fighters (Search) and belts (ufc-classes.ts)
 
   for (const lg of LEAGUE_IDS) {
     const stats: IngestReport['leagues'][string] = { teams: 0, players: 0, duplicateIdsRemoved: 0, duplicateNamesRemoved: 0, headshotsVerified: 0, headshotFallbackToLogo: 0, headshotAltMismatch: 0 };
     report.leagues[lg] = stats;
+
+    if (lg === 'ufc') {
+      // Its own step: ESPN's MMA data failing keeps the fighters we have, and never stops the other leagues' refresh.
+      const ufc = await ingestUfc(stats, report).catch((e) => {
+        report.problems.push(`ufc: ${String(e)}; kept the fighters already in the catalog`);
+        return { teams: [UFC_TEAM], players: [...players.values()].filter((p) => p.league === 'ufc') };
+      });
+      newTeams.push(...ufc.teams);
+      newPlayers.push(...ufc.players);
+      if ('classes' in ufc) ufcClasses = { classes: ufc.classes!, belts: ufc.belts! };
+      log(`[ingest] UFC: ${ufc.players.length} fighters (${stats.headshotsVerified} photos checked, ${stats.headshotFallbackToLogo} badges)`);
+      continue;
+    }
 
     if (lg === 'f1') {
       const f1 = await ingestF1(stats, report);
@@ -237,6 +252,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     for (const p of newPlayers) insP.run(p.key, p.league, p.espnId, p.name, p.shortName, p.position, p.positions?.join(',') ?? null, p.jersey, p.teamKey, p.image, p.imageW, p.imageH, p.imageKind, now);
   });
   kvSet('ingest:report', report);
+  if (ufcClasses) { kvSet('ufc:weight-classes', ufcClasses.classes); kvSet('ufc:belts', ufcClasses.belts); }
   loadCatalog();
   return report;
 }
@@ -315,6 +331,73 @@ async function ingestF1(stats: IngestReport['leagues'][string], report: IngestRe
   return { teams, players };
 }
 
+// ─── UFC ──────────────────────────────────────────────────────────────────────────────────────
+/**
+ * Fighters have no team, and a player needs one: they're all on this placeholder, which no list or search
+ * shows (`listed`). Its "logo" is a badge in the UFC's red with "UFC", for a fighter with no ESPN photo; its
+ * full name reads like a team's on a fighter's page ("Ultimate Fighting Championship · UFC · Welterweight").
+ */
+export const UFC_TEAM: Team = {
+  key: teamKey('ufc', 'ufc'), league: 'ufc', espnId: 'ufc', name: 'Ultimate Fighting Championship', shortName: 'UFC', abbrev: 'UFC',
+  location: null, color: '#D20A0A', altColor: null, logo: 'badge://ufc', logoDark: null, logoW: 512, logoH: 512,
+};
+/** Teams anyone can see (and track): not the UFC's placeholder. */
+export const listed = (t: Pick<Team, 'key'>) => t.key !== UFC_TEAM.key;
+// Two years back: a top fighter out a year (injured, between title shots) is still one to hate. Not ESPN's
+// rankings, which are years out of date (in October 2026 they had Figueiredo as flyweight champion).
+const UFC_MONTHS_BACK = 24, UFC_MONTHS_AHEAD = 3;
+
+/**
+ * The fighters on UFC cards from two years back to three months ahead, by ESPN's scoreboard a month at a time,
+ * each with the weight class of their latest fight. Not the Contender Series: its fighters aren't signed.
+ * A fighter already in the catalog keeps their checked photo; only new ones are checked (and those still
+ * without one, in case ESPN has added it).
+ */
+async function ingestUfc(stats: IngestReport['leagues'][string], report: IngestReport): Promise<{ teams: Team[]; players: Player[]; classes?: WeightClass[]; belts?: Belts }> {
+  const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, '');
+  const now = new Date();
+  const months = Array.from({ length: UFC_MONTHS_BACK + UFC_MONTHS_AHEAD + 1 }, (_, i) => {
+    const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - UFC_MONTHS_BACK + i, 1));
+    return `${ymd(first)}-${ymd(new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)))}`;
+  });
+  const boards = await mapLimit(months, 4, (m) => getJson(urls.scoreboard('ufc', m)));
+  // Which fights were for a belt, for each class's champion. Failing, the classes are ranked without them.
+  const titles = await ufcTitles(boards).catch((e) => { report.problems.push(`ufc titles: ${String(e)}; weight classes ranked without champions`); return {}; });
+  const { fighters, classes, belts } = rankFighters(boards, titles, Date.now(), (id) => playerKey('ufc', id));
+  if (!fighters.size) throw new Error('no fighters on any UFC card');
+  const out = await mapLimit([...fighters], 8, async ([id, f]): Promise<Player> => {
+    const key = playerKey('ufc', id), known = players.get(key);
+    const p: Player = {
+      key, league: 'ufc', espnId: id, name: f.name, shortName: f.short, position: f.weight, positions: null, jersey: null, teamKey: UFC_TEAM.key,
+      image: UFC_TEAM.logo, imageW: UFC_TEAM.logoW, imageH: UFC_TEAM.logoH, imageKind: 'team_logo',
+    };
+    if (known?.imageKind === 'headshot') return { ...p, image: known.image, imageW: known.imageW, imageH: known.imageH, imageKind: 'headshot' };
+    const dims = await probePng(urls.headshot('ufc', id));
+    if (dims) { stats.headshotsVerified++; return { ...p, image: urls.headshot('ufc', id), imageW: dims.width, imageH: dims.height, imageKind: 'headshot' }; }
+    stats.headshotFallbackToLogo++;
+    return p;
+  });
+  stats.teams = 1; stats.players = out.length;
+  return { teams: [UFC_TEAM], players: out, classes, belts };
+}
+
+/**
+ * Each five-round fight's title, if it was for one ("UFC Lightweight Title"), by fight id: ESPN's core record
+ * of each. A finished fight's is kept (kv `ufc:titles`), so a refresh reads only new and upcoming ones.
+ */
+async function ufcTitles(boards: any[]): Promise<Record<string, string | null>> {
+  const known = kvGet<Record<string, string | null>>('ufc:titles') ?? {};
+  const fights = fiveRoundFights(boards);
+  const read = await mapLimit(fights.filter((f) => !f.done || !(f.fightId in known)), 8, async (f) => {
+    const c = await getJson(urls.ufcFight(f.eventId, f.fightId)).catch(() => null);
+    return [f, c ? ((c.types ?? []).map((t: any) => String(t.text ?? '')).find((t: string) => titleOf(t)) ?? null) : undefined] as const;
+  });
+  const titles = { ...known };
+  for (const [f, title] of read) if (title !== undefined) titles[f.fightId] = title;
+  kvSet('ufc:titles', Object.fromEntries(fights.filter((f) => f.done && f.fightId in titles).map((f) => [f.fightId, titles[f.fightId]])));
+  return titles;
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────────────────────
 interface Indexed { key: string; kind: 'team' | 'player'; league: League; text: string; tokens: string[]; boost: number }
 let index: Indexed[] = [];
@@ -322,6 +405,7 @@ let index: Indexed[] = [];
 function buildSearchIndex() {
   index = [];
   for (const t of teams.values()) {
+    if (!listed(t)) continue;
     const text = normalize(`${t.name} ${t.abbrev} ${t.shortName}`);
     index.push({ key: t.key, kind: 'team', league: t.league, text, tokens: text.split(' '), boost: 5 });
   }

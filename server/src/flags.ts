@@ -13,6 +13,7 @@ export const FLAGS = {
   'clips.highlights': 'Clips on a game\'s Highlights tab (its key plays stay)',
   'clips.feed': 'Clips on alerts in the feed, for the play they\'re about',
   'clips.loss': 'The winning play\'s clip (or the game recap) on loss alerts',
+  'clips.loss.ufc': 'A lost UFC fight\'s clip on its loss alerts (from the card\'s and the fighter\'s videos)',
   images: 'ESPN\'s player photos and team logos, everywhere below',
   'images.headshots': 'Player photos (a badge in the team\'s colour with its code and the jersey number instead)',
   'images.logos': 'Team logos (a badge in the team\'s colour with its code instead)',

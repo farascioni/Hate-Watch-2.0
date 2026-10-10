@@ -50,7 +50,9 @@ export default function SettingsScreen() {
   const pushOn = (t: EventType) => prefs.pushTypes?.[t.id] ?? t.defaultPush ?? true;
   const setPush = (id: string, v: boolean) => updatePrefs({ pushTypes: { [id]: v } });
   const leagueOn = (l: League) => prefs.leagues[l] !== false;
-  const setAll = (types: EventType[], v: boolean) => updatePrefs({ types: Object.fromEntries(types.map((t) => [t.id, v])) });
+  // A league switched off (from when Settings had a Leagues section) comes back on with its group's "All on".
+  const setAll = (types: EventType[], v: boolean, league?: League) =>
+    updatePrefs({ types: Object.fromEntries(types.map((t) => [t.id, v])), ...(v && league && !leagueOn(league) ? { leagues: { [league]: true } } : {}) });
 
   const groups: { title: string; color?: string; league?: League; types: EventType[] }[] = [
     // League-only alerts live under their league, in the server's order: offense, defense, pitching, then
@@ -83,19 +85,15 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      <SectionHeader>Leagues</SectionHeader>
-      <View style={styles.card}>
-        {leagues.map((l) => <SettingRow key={l.id} title={l.name} desc={leagueOn(l.id) ? undefined : 'All alerts from this league are off'} value={leagueOn(l.id)} onChange={(v) => updatePrefs({ leagues: { [l.id]: v } })} />)}
-      </View>
       <Text style={styles.hint}>
         These are your defaults for everyone. Tap a group to see its alerts. The switch turns an alert on or off; its 🔔 decides whether it also sends a notification or just lands in your feed. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.
       </Text>
 
       {groups.filter((g) => g.types.length).map((g) => {
         const off = g.league ? !leagueOn(g.league) : false;
-        const allOn = g.types.every(on);
+        const allOn = !off && g.types.every(on);
         const isOpen = !!openGroups[g.title];
-        const summary = off ? 'League off' : `${g.types.filter(on).length} of ${g.types.length} on`;
+        const summary = off ? 'League off · All on turns it back on' : `${g.types.filter(on).length} of ${g.types.length} on`;
         return (
           <View key={g.title}>
             <View style={styles.groupHead}>
@@ -104,7 +102,7 @@ export default function SettingsScreen() {
                 <Text style={styles.groupTitle}>{g.title}</Text>
                 <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textFaint} />
               </Pressable>
-              <Pressable onPress={() => setAll(g.types, !allOn)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
+              <Pressable onPress={() => setAll(g.types, !allOn, g.league)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
             </View>
             <View style={[styles.card, g.color ? { borderLeftColor: g.color, borderLeftWidth: 3 } : null]}>
               {isOpen ? bySection(g.types).map((s) => (

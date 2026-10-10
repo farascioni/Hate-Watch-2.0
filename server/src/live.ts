@@ -6,6 +6,7 @@ import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
+import { startUfc, ufcStatus } from './ufc.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
@@ -581,6 +582,7 @@ class LiveEngine {
       every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
+    this.kickers.ufc = startUfc(every); // fight cards, not games: see ufc.ts
     every(RECAP_MS, async () => weeklyRecaps());
     for (const lg of LEAGUE_IDS) every(NEWS_MS, () => scanNews(lg));
     this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
@@ -595,6 +597,7 @@ class LiveEngine {
     return [
       ...[...this.trackers.values()].map((t) => ({ league: t.ctx.league, gameId: t.ctx.gameId, finished: t.finished, lastPollMs: t.lastPollMs })),
       ...f1Status(),
+      ...ufcStatus(),
     ];
   }
 

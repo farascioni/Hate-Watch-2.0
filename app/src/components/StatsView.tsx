@@ -5,13 +5,16 @@ import { colors, radius, space } from '../theme';
 import type { GameLine, StatGroup, StatsPage, Target } from '../lib/types';
 
 /**
- * A player's or team's stats, from ESPN through the server (not F1 yet). Players: the season line ESPN
- * picks for their position, postseason and career, their last five games, and their team's next game.
- * Teams: record and standing, the season line, their last five results, and the next game. What a hater
+ * A player's or team's stats, from ESPN through the server. Players: the season line ESPN picks for their
+ * position, postseason and career, their last five games, and their team's next game. Teams: record and
+ * standing, the season line, their last five results, and the next game. F1 drivers and constructors: the
+ * championship, their season (wins to DNFs), their last five races. A fighter: their record and last fights. What a hater
  * wants to see (a hitter's strikeouts, a team's turnovers) is in red, and their losses are the good news.
  * A plain View, so it fits in the stats screen's ScrollView and in a player page's FlatList header.
  */
 export function StatsView({ page, target, now }: { page: StatsPage; target: Target; now: number }) {
+  const game = target.league === 'ufc' ? 'fight' : target.league === 'f1' ? 'race' : 'game';
+  const f1 = target.league === 'f1';
   return (
     <View>
       {page.record ? (
@@ -26,15 +29,15 @@ export function StatsView({ page, target, now }: { page: StatsPage; target: Targ
 
       {page.recent.length ? (
         <>
-          <SectionHeader>Last {page.recent.length} {page.recent.length === 1 ? 'game' : 'games'}</SectionHeader>
-          {target.kind === 'team' ? <Form games={page.recent} /> : null}
-          <View style={styles.list}>{page.recent.map((g, i) => <GameRow key={g.id} game={g} last={i === page.recent.length - 1} />)}</View>
+          <SectionHeader>Last {page.recent.length} {game}{page.recent.length === 1 ? '' : 's'}</SectionHeader>
+          {target.kind === 'team' && !f1 ? <Form games={page.recent} /> : null}
+          <View style={styles.list}>{page.recent.map((g, i) => <GameRow key={g.id} game={g} last={i === page.recent.length - 1} f1={f1} />)}</View>
         </>
       ) : null}
 
       {page.next ? (
         <>
-          <SectionHeader>Next game</SectionHeader>
+          <SectionHeader>Next {game}</SectionHeader>
           <View style={styles.list}><UpNextRow game={page.next} now={now} /></View>
         </>
       ) : null}
@@ -77,17 +80,17 @@ function Form({ games }: { games: GameLine[] }) {
   );
 }
 
-/** "Oct 6 · @ TB · L 2-5", and a player's line in that game. */
-function GameRow({ game, last }: { game: GameLine; last: boolean }) {
+/** "Oct 6 · @ TB · L 2-5", and a player's line in that game. F1: "Oct 4 · Monaco GP · DNF", a DNF or no points shown like a loss. */
+function GameRow({ game, last, f1 }: { game: GameLine; last: boolean; f1: boolean }) {
   const day = new Date(game.date).toLocaleDateString([], { month: 'short', day: 'numeric' });
   return (
     <View style={[styles.gameRow, !last && styles.rowLine]}>
       <View style={styles.inline}>
         <Text style={styles.gameDay}>{day}</Text>
-        <Text style={styles.gameVs}>{game.home ? 'vs' : '@'}</Text>
+        {f1 ? null : <Text style={styles.gameVs}>{game.home ? 'vs' : '@'}</Text>}
         {game.opponentLogo ? <Image source={{ uri: game.opponentLogo }} style={styles.logo} /> : null}
-        <Text style={styles.gameOpp}>{game.opponent}</Text>
-        <Text style={[styles.result, game.result === 'L' && { color: colors.live }, game.result === 'W' && { color: colors.textDim }]}>{game.result} {game.score}</Text>
+        <Text style={styles.gameOpp} numberOfLines={1}>{game.opponent}</Text>
+        <Text style={[styles.result, game.result === 'L' && { color: colors.live }, game.result === 'W' && { color: colors.textDim }]}>{f1 ? game.score : `${game.result} ${game.score}`}</Text>
       </View>
       {game.line ? <Text style={styles.line} numberOfLines={2}>{game.line}</Text> : null}
     </View>

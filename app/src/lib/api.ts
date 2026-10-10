@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage } from './types';
+import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -59,6 +59,8 @@ export const api = {
     const q = [league && `league=${league}`, byDivision && 'by=division'].filter(Boolean).join('&');
     return request<{ teams: Team[] }>('GET', `/teams${q ? `?${q}` : ''}`, undefined, false);
   },
+  /** The UFC's weight classes, heaviest first, each its champion and top five fighters. */
+  weightClasses: () => request<{ classes: WeightClass[] }>('GET', '/ufc/weight-classes', undefined, false),
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
   /** A player's or team's stats page (not F1). */
   stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
@@ -86,6 +88,13 @@ export const api = {
   allScores: () => request<{ games: GameCard[] }>('GET', '/me/scores/all'),
   hateWatches: () => request<HateWatchTally>('GET', '/me/hate-watches'),
   game: (key: string) => request<GameDetail>('GET', `/me/games/${enc(key)}`),
+  /** Every F1 driver, by constructor (a server from before it answers 404). */
+  f1Drivers: () => request<{ drivers: Player[] }>('GET', '/f1/drivers', undefined, false),
+  /** An F1 weekend's preview (a server from before it answers 404). */
+  f1Preview: (eventId: string) => request<F1Preview>('GET', `/f1/events/${enc(eventId)}/preview`, undefined, false),
+  /** The UFC's next card (tonight's until the night's over) and the one after. */
+  ufcCards: () => request<{ cards: UfcCard[] }>('GET', '/ufc/cards', undefined, false),
+  ufcCard: (eventId: string) => request<UfcCard>('GET', `/ufc/cards/${enc(eventId)}`, undefined, false),
   deleteMe: () => request('DELETE', '/me'),
   simulate: () => request('POST', '/dev/simulate', {}),
 };

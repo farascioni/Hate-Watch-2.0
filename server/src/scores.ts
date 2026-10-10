@@ -51,6 +51,7 @@ export interface GameCard {
   redCards?: { home: number; away: number };          // soccer, once anyone's been sent off
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: who's in net, with saves (from the box score)
   session?: string;       // F1: "Singapore GP · Race"
+  eventId?: string;       // F1: the race weekend (its preview: /f1/events/:id/preview)
   order?: Driver[];       // F1: running order / classification
   /** Before the start: each side's chance from the betting line, the line, records and probable starters. */
   preview?: GamePreview;
@@ -329,7 +330,7 @@ export function raceCard(ev: any, comp: any): GameCard {
     return { athleteId: id, key: playerKey('f1', id), name: p?.name ?? x.athlete?.displayName ?? '?', position: Number(x.order) || null, ...(p ? { teamKey: p.teamKey } : {}) };
   }).sort((a: Driver, b: Driver) => (a.position ?? 99) - (b.position ?? 99));
   return {
-    key: `f1:${comp.id}`, league: 'f1', id: String(comp.id), state, startsAt: Date.parse(comp.date),
+    key: `f1:${comp.id}`, league: 'f1', id: String(comp.id), eventId: String(ev.id), state, startsAt: Date.parse(comp.date),
     detail: state === 'in' ? (lap ? `Lap ${lap}` : 'Live') : state === 'post' ? 'Final' : '',
     session: `${ev.shortName ?? ev.name} · ${sessionName(comp)}`,
     order,
@@ -405,11 +406,15 @@ export function pruneGames(league: League, seen: Set<string>, now = Date.now()) 
 }
 
 /** F1's race weekends, from the scoreboard's calendar: when no session is on, the Scores tab says when the next one is. */
-export interface F1Weekend { name: string; startsAt: number; endsAt: number }
+/** `eventId`: ESPN's, for the weekend's preview (f1-preview.ts). */
+export interface F1Weekend { name: string; startsAt: number; endsAt: number; eventId?: string }
 let f1Weekends: F1Weekend[] = [];
 export function setF1Calendar(cal: any) {
   if (!Array.isArray(cal)) return;
-  f1Weekends = cal.map((c: any) => ({ name: String(c.label ?? ''), startsAt: Date.parse(c.startDate), endsAt: Date.parse(c.endDate) }))
+  f1Weekends = cal.map((c: any) => {
+    const eventId = String(c.event?.$ref ?? '').match(/events\/(\d+)/)?.[1];
+    return { name: String(c.label ?? ''), startsAt: Date.parse(c.startDate), endsAt: Date.parse(c.endDate), ...(eventId ? { eventId } : {}) };
+  })
     .filter((w) => w.name && Number.isFinite(w.startsAt) && Number.isFinite(w.endsAt)).sort((a, b) => a.startsAt - b.startsAt);
 }
 /** The weekend under way, or else the next one (none after the season's last race). */

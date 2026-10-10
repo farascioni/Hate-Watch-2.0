@@ -57,7 +57,7 @@ test("a team's page: its season line, the EPL's table, and its last results", ()
   assert.deepEqual(recentFromSchedule('10', schedule).map((r) => `${r.home ? 'vs' : '@'} ${r.opponent} ${r.result} ${r.score}`), ['@ TB L 2-5', '@ TB L 0-1', 'vs TB W 9-0'], 'newest first; not tonight\'s');
 });
 
-test('served at /targets/:key/stats, read from ESPN once per 10 minutes; nothing for F1', async () => {
+test("served at /targets/:key/stats, read from ESPN once per 10 minutes; nothing for one we don't know", async () => {
   let reads = 0;
   statsDeps.getJson = async (url: string) => {
     reads++;
@@ -73,6 +73,6 @@ test('served at /targets/:key/stats, read from ESPN once per 10 minutes; nothing
   assert.deepEqual([page.kind, page.groups.map((g: any) => g.title), page.recent.length, page.next], ['player', ['2026 season', 'Career'], 2, null]);
   await statsFor('player:mlb:33192');
   assert.equal(reads, 2, 'the overview and the stats rows, once');
-  assert.equal((await fetch(`${base}/targets/${encodeURIComponent('player:f1:4665')}/stats`)).status, 404);
+  assert.equal((await fetch(`${base}/targets/${encodeURIComponent('player:f1:1')}/stats`)).status, 404, 'not in the catalog (F1 drivers have pages: f1-stats.test.ts)');
   server.close();
 });

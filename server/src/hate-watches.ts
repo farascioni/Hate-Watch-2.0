@@ -5,20 +5,21 @@ import { SOCCER } from './leagues.ts';
 
 /**
  * A Successful Hate Watch: a team you track loses, or the team of a player you track (F1: your
- * constructor finishes outside the points, a double DNF included). It counts whatever your alert
+ * constructor finishes outside the points, a double DNF included; the UFC: a fighter you track loses). It counts whatever your alert
  * settings are, and clearing the feed doesn't reset it; "Delete all my data" does (the device row cascades).
  */
 /** Soccer: a loss by 3+ goals, sent instead of the plain loss to those who want it. */
 const HEAVY_LOSSES = [...SOCCER].map((lg) => `${lg}.team.heavy_loss`);
-export const HATE_WATCH_TYPES = new Set(['team.lost', 'player.team_lost', ...HEAVY_LOSSES, 'f1.team.no_points', 'f1.team.double_dnf']);
+export const HATE_WATCH_TYPES = new Set(['team.lost', 'player.team_lost', ...HEAVY_LOSSES, 'f1.team.no_points', 'f1.team.double_dnf', 'ufc.lost']);
 export const isHateWatch = (e: Pick<Detected, 'type' | 'aliases'>) => [e.type, ...(e.aliases ?? [])].some((t) => HATE_WATCH_TYPES.has(t));
 /**
  * An alert that is a team's loss for whoever gets it: the loss itself, "their team lost", or one of the
- * loss's facts sent in its place ("lost as 78% favorites", with the loss's id in `lostId`, see lossFacts).
+ * loss's facts sent in its place ("lost as 78% favorites", with the loss's id in `lostId`, see lossFacts). Not one
+ * withdrawn after it went out (an F1 result a penalty changed: reviseEvent).
  */
-export const isLossAlert = (e: { type: string; meta?: Record<string, unknown> | null }) => HATE_WATCH_TYPES.has(e.type) || typeof e.meta?.lostId === 'string';
-/** One team's loss: its own alert (or soccer's 3+ goal one), and "their team lost" for its players. They share a game, a moment and a count. */
-const LOSS_TYPES = ['team.lost', 'player.team_lost', ...HEAVY_LOSSES];
+export const isLossAlert = (e: { type: string; meta?: Record<string, unknown> | null }) => !e.meta?.withdrawn && (HATE_WATCH_TYPES.has(e.type) || typeof e.meta?.lostId === 'string');
+/** One team's loss: its own alert (or soccer's 3+ goal one), and "their team lost" for its players. They share a game, a moment and a count. A fighter's loss (the UFC) too. */
+const LOSS_TYPES = ['team.lost', 'player.team_lost', ...HEAVY_LOSSES, 'ufc.lost'];
 /** SQL: an `events e` row that is one of a loss's alerts (a loss type, or a fact of the loss sent in its place). */
 const LOSS_ROW = (e: string) => `(${e}.type IN (${LOSS_TYPES.map((t) => `'${t}'`).join(', ')}) OR json_extract(${e}.meta, '$.lostId') IS NOT NULL)`;
 

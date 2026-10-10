@@ -241,11 +241,12 @@ test("F1 between weekends: the next race weekend from ESPN's calendar, the curre
   S.setF1Calendar([
     { label: 'Gulf Air Bahrain Grand Prix in Malaysia', startDate: '2026-10-02T07:30Z', endDate: '2026-10-04T10:00Z' },
     { label: 'Singapore Airlines Singapore Grand Prix', startDate: '2026-10-09T11:30Z', endDate: '2026-10-11T15:00Z' },
-    { label: 'MSC Cruises United States Grand Prix', startDate: '2026-10-23T20:30Z', endDate: '2026-10-25T23:00Z' },
+    { label: 'MSC Cruises United States Grand Prix', startDate: '2026-10-23T20:30Z', endDate: '2026-10-25T23:00Z', event: { $ref: 'http://sports.core.api.espn.pvt/v2/sports/racing/leagues/f1/events/600057446?lang=en&region=us' } },
   ]);
   assert.equal(S.nextF1Weekend(Date.parse('2026-10-06T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix');
   assert.equal(S.nextF1Weekend(Date.parse('2026-10-10T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix', 'under way: still this one');
-  assert.deepEqual(S.nextF1Weekend(Date.parse('2026-10-12T00:00Z')), { name: 'MSC Cruises United States Grand Prix', startsAt: Date.parse('2026-10-23T20:30Z'), endsAt: Date.parse('2026-10-25T23:00Z') });
+  assert.deepEqual(S.nextF1Weekend(Date.parse('2026-10-12T00:00Z')), { name: 'MSC Cruises United States Grand Prix', startsAt: Date.parse('2026-10-23T20:30Z'), endsAt: Date.parse('2026-10-25T23:00Z'), eventId: '600057446' },
+    'with its event, for its preview');
   assert.equal(S.nextF1Weekend(Date.parse('2026-12-31T00:00Z')), undefined, 'the season is over');
   S.setF1Calendar(undefined); // a scoreboard read without a calendar keeps the last one
   assert.equal(S.nextF1Weekend(Date.parse('2026-10-06T00:00Z'))?.name, 'Singapore Airlines Singapore Grand Prix');

@@ -109,6 +109,18 @@ export interface Detected {
    */
   alt?: string;
   /**
+   * A name for one line of a moment's alert, with the others of its kind: a device's alerts of the moment
+   * marked this way (the one it gets, and those folded into it) are one line, "Yours: Alpine, George Russell."
+   * (F1's start: one per constructor and driver in the session, one alert for a device.)
+   */
+  list?: { label: string; item: string };
+  /**
+   * A line on the device's latest alert about `targetKey` since `since` (of one of `types`)
+   * instead of an alert of its own, when it has one; no push ("Down to 6th in the championship." on that
+   * day's race alert). Without one, it's an alert as usual.
+   */
+  lateOn?: { targetKey: string; since: number; types: string[]; line: string };
+  /**
    * MLB: a lost ABS challenge, held by the game tracker until the review is settled (holdAbs in live.ts):
    * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.
    */

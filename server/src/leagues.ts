@@ -1,4 +1,4 @@
-export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl';
+export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl' | 'ufc';
 /** Basketball leagues share detectors (the WNBA's play-by-play is the NBA's shape). */
 export const BASKETBALL = new Set<League>(['nba', 'wnba']);
 /**
@@ -19,13 +19,19 @@ export const LEAGUES: Record<League, { sport: string; name: string; slug?: strin
   nhl: { sport: 'hockey', name: 'NHL' },
   f1: { sport: 'racing', name: 'F1' },
   epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League' },
-  // Last: the app lists leagues in this order (filter chips, Settings), and the WNBA goes farthest right.
+  // The app lists leagues in this order (filter chips, Settings): the WNBA farthest right of the first row of
+  // chips, and the UFC, added after it, on a second row of its own (eight fit a phone's row), so no chip moves.
   wnba: { sport: 'basketball', name: 'WNBA' },
+  ufc: { sport: 'mma', name: 'UFC' },
 };
 
 export const LEAGUE_IDS = Object.keys(LEAGUES) as League[];
-/** Leagues made of games with play-by-play (F1 is races/sessions; see f1.ts). */
-export const GAME_LEAGUES = LEAGUE_IDS.filter((lg) => lg !== 'f1');
+/**
+ * Leagues made of games with play-by-play, and teams: the Scores tab, standings, Up Next. Not F1 (races and
+ * sessions, f1.ts) or the UFC (fight cards between fighters, ufc.ts): a build drawing every game as two teams
+ * must never get one of theirs.
+ */
+export const GAME_LEAGUES = LEAGUE_IDS.filter((lg) => lg !== 'f1' && lg !== 'ufc');
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
 const CORE = 'https://sports.core.api.espn.com/v2/sports';
@@ -61,7 +67,14 @@ export const urls = {
   f1Status: (eventId: string, compId: string, athleteId: string) =>
     `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/competitors/${athleteId}/status`,
   // Soccer's are all in one folder, whatever the league.
-  headshot: (lg: League, athleteId: string) => `https://a.espncdn.com/i/headshots/${SOCCER.has(lg) ? 'soccer' : lg}/players/full/${athleteId}.png`,
+  headshot: (lg: League, athleteId: string) => `https://a.espncdn.com/i/headshots/${SOCCER.has(lg) ? 'soccer' : lg === 'ufc' ? 'mma' : lg}/players/full/${athleteId}.png`,
+  /** The UFC (ESPN's MMA): a fight's record on the core API (status and result, fighters' stats, odds), a fighter's (record, fight log), and the rankings. */
+  ufcFight: (eventId: string, fightId: string) => `${CORE}/mma/leagues/ufc/events/${eventId}/competitions/${fightId}`,
+  mmaAthlete: (athleteId: string) => `${CORE}/mma/athletes/${athleteId}`,
+  ufcRankings: () => `${CORE}/mma/leagues/ufc/rankings`,
+  /** A UFC card's fight center, and a fighter's page: ESPN's latest MMA videos, each tagged with the fighters in it. */
+  ufcFightCenter: (eventId: string) => `https://site.api.espn.com/apis/common/v3/sports/mma/ufc/fightcenter/${eventId}`,
+  mmaAthletePage: (athleteId: string) => `https://site.api.espn.com/apis/common/v3/sports/mma/ufc/athletes/${athleteId}`,
 };
 
 export const playerKey = (lg: League, id: string) => `player:${lg}:${id}`;

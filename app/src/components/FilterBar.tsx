@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Chip } from './ui';
 import { useStore } from '../lib/store';
 import { colors, leagueColors, radius, space } from '../theme';
-import type { League } from '../lib/types';
+import type { League, Target } from '../lib/types';
 
 export type Kind = 'all' | 'player' | 'team';
 const KINDS: { id: Kind; label: string }[] = [
@@ -21,21 +21,49 @@ export function useFilter(kind: Kind = 'all') {
   return { filter, setFilter, active, reset: () => setFilter({ kind }) };
 }
 
+/**
+ * The UFC has no teams: its one option is Fighters, grouped by weight class where a screen lists people (Search,
+ * Tracking); the Feed and the Leaderboard show them all. The kind picked for other leagues is kept for leaving it.
+ */
+export const byWeightClass = (f: Filter) => f.league === 'ufc';
+/** What a filter shows: teams, players or both (the UFC: its fighters). */
+export const kindOf = (f: Filter): Kind => (byWeightClass(f) ? 'player' : f.kind);
+
 export function matchesFilter(f: Filter, target: { kind: string; league: string }) {
-  return (f.kind === 'all' || target.kind === f.kind) && (!f.league || target.league === f.league);
+  const kind = kindOf(f);
+  return (kind === 'all' || target.kind === kind) && (!f.league || target.league === f.league);
 }
 
-/** What a league's players are called: F1's are drivers ("Search F1 drivers"). */
-export const playersWord = (league?: string) => (league === 'f1' ? 'drivers' : 'players');
+/** The UFC's weight classes, heaviest first, men's then women's (the server's order, ufc-classes.ts). */
+const WEIGHT_CLASSES = [
+  'Heavyweight', 'Light Heavyweight', 'Middleweight', 'Welterweight', 'Lightweight', 'Featherweight', 'Bantamweight', 'Flyweight',
+  "Women's Featherweight", "Women's Bantamweight", "Women's Flyweight", "Women's Strawweight",
+];
+/** Fighters in a section per weight class, in the UFC's order; anyone without one (only catch weight bouts) last. */
+export function groupByWeightClass(targets: Target[]): { title: string; data: Target[] }[] {
+  const groups = new Map<string, Target[]>();
+  for (const t of targets) { const w = (t.kind === 'player' && t.position) || 'Other'; groups.set(w, [...(groups.get(w) ?? []), t]); }
+  const order = (w: string) => { const i = WEIGHT_CLASSES.indexOf(w); return w === 'Other' ? WEIGHT_CLASSES.length + 1 : i < 0 ? WEIGHT_CLASSES.length : i; };
+  return [...groups].sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b)).map(([title, data]) => ({ title, data }));
+}
 
-/** Human description of the active filter, e.g. "NBA players", "F1 drivers", for empty states. */
-export function describeFilter(f: Filter, noun = 'players and teams') {
-  const what = f.kind === 'player' ? playersWord(f.league) : f.kind === 'team' ? 'teams' : noun;
+/**
+ * What a league's players are called: F1's are drivers, the UFC's fighters ("Search UFC fighters"); every
+ * league's at once (All), athletes.
+ */
+export const playersWord = (league?: string) => (!league ? 'athletes' : league === 'f1' ? 'drivers' : league === 'ufc' ? 'fighters' : 'players');
+/** The same as a heading or label: "Athletes", "Players", "Drivers", "Fighters". */
+export const playersTitle = (league?: string) => { const w = playersWord(league); return w[0].toUpperCase() + w.slice(1); };
+
+/** Human description of the active filter, e.g. "NBA players", "F1 drivers", "athletes and teams", for empty states. */
+export function describeFilter(f: Filter) {
+  const players = playersWord(f.league), kind = kindOf(f);
+  const what = kind === 'team' ? 'teams' : kind === 'player' ? players : `${players} and teams`;
   return f.league ? `${f.league.toUpperCase()} ${what}` : what;
 }
 
 /**
- * Everything / Teams / Players, plus All and each league (NBA … EPL, WNBA). Two fixed rows rather than a
+ * Everything / Teams / Players (the UFC: Fighters alone), plus All and each league (NBA … WNBA, UFC). Two fixed rows rather than a
  * horizontal scroller, so every option is always visible (same on iOS, Android and web).
  */
 export function FilterBar({ filter, onChange, kinds = true, everything = true }: {
@@ -44,14 +72,16 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
   /** false: Teams / Players only, no Everything (Search, where the two are separate lists) */ everything?: boolean;
 }) {
   const { leagues } = useStore();
+  const ufc = byWeightClass(filter);
+  const options = ufc ? KINDS.filter((k) => k.id === 'player') : KINDS.filter((k) => everything || k.id !== 'all');
   return (
     <View>
       {kinds ? <View style={styles.segment} accessibilityRole="tablist">
-        {KINDS.filter((k) => everything || k.id !== 'all').map(({ id, label }) => {
-          const on = filter.kind === id;
+        {options.map(({ id, label }) => {
+          const on = kindOf(filter) === id;
           return (
-            <Pressable key={id} onPress={() => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-              <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' && filter.league === 'f1' ? 'Drivers' : label}</Text>
+            <Pressable key={id} onPress={ufc ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+              <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' ? playersTitle(filter.league) : label}</Text>
             </Pressable>
           );
         })}
@@ -80,7 +110,7 @@ const styles = StyleSheet.create({
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: colors.text },
   // Wraps to a second row if the server adds leagues past what fits (each chip stays whole).
-  leagues: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2) },
-  // Sized to their labels, then stretched to fill the row: eight chips fit an iPhone SE without squeezing "WNBA".
-  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(1) },
+  leagues: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1), paddingHorizontal: space(3), paddingBottom: space(2) },
+  // Sized to their labels, then stretched to fill the row: nine chips (All to UFC) fit an iPhone SE without squeezing "WNBA".
+  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 1 },
 });

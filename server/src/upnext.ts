@@ -4,7 +4,7 @@
 // hours, right after the team's game ends, and soon after someone starts tracking it.
 import { getJson as espnGetJson, mapLimit } from './espn.ts';
 import { catalog, teamDto } from './catalog.ts';
-import { SOCCER, teamKey, urls, type League } from './leagues.ts';
+import { SOCCER, teamKey, urls, type League, GAME_LEAGUES } from './leagues.ts';
 
 /** Seam for tests (test/upnext.test.ts). Production never changes it. */
 export const upNextDeps = { getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number }) => Promise<any> };
@@ -88,7 +88,8 @@ export async function refreshUpNext(teamKeys: Iterable<string>, now = Date.now()
   if (running) return;
   running = true;
   try {
-    const due = [...teamKeys].filter((k) => !k.includes(':f1:') && (!known.has(k) || now - known.get(k)!.at >= REFRESH_MS));
+    // Teams in the game leagues only: not F1's constructors or the UFC's placeholder (a tracked fighter's "team").
+    const due = [...teamKeys].filter((k) => (GAME_LEAGUES as string[]).includes(k.split(':')[1]) && (!known.has(k) || now - known.get(k)!.at >= REFRESH_MS));
     await mapLimit(due, 4, async (key) => {
       const [, lg, id] = key.split(':') as [string, League, string];
       try { known.set(key, { at: Date.now(), next: await fetchNext(lg, id, now) }); } catch { /* try again next tick */ }

@@ -3,7 +3,7 @@
  * and screens draw from that, so a league added on the server (another soccer league) works without an
  * app update; it just has no colour of its own until one is added to theme.ts.
  */
-export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl';
+export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl' | 'ufc';
 export interface LeagueInfo { id: League; name: string; sport?: string }
 
 export interface Team {
@@ -29,6 +29,9 @@ export interface Player {
 }
 
 export type Target = Team | Player;
+
+/** A UFC weight class with its champion and top fighters, for Search (GET /ufc/weight-classes). */
+export interface WeightClass { name: string; fighters: Player[] }
 
 export interface FeedItem {
   id: string; type: string; emoji: string; typeLabel: string; league: League;
@@ -73,6 +76,8 @@ export interface GameCard {
   redCards?: { home: number; away: number }; // soccer, once anyone has been sent off
   goalies?: { home?: LivePlayer; away?: LivePlayer }; // NHL: in net, line "9 saves on 10"
   session?: string;
+  /** F1: the race weekend, for its preview (newer servers). */
+  eventId?: string;
   order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
   /** Before the start (from ESPN's scoreboard). Missing from older servers. */
   preview?: GamePreview;
@@ -93,7 +98,53 @@ export interface GamePreview {
   series?: string;
 }
 /** An F1 race weekend from ESPN's calendar (name includes the sponsor, as ESPN has it): from first practice to the race's end. */
-export interface F1Weekend { name: string; startsAt: number; endsAt: number }
+export interface F1Weekend { name: string; startsAt: number; endsAt: number; eventId?: string }
+
+/** An F1 weekend's preview (GET /f1/events/:id/preview): where, when, the next grid once it's set, the championship. */
+export interface F1Preview {
+  event: { id: string; name: string; shortName: string; circuit: string | null; place: string | null; startsAt: number; endsAt: number };
+  sessions: { key: string; name: string; at: number; state: 'pre' | 'in' | 'post' }[];
+  /** `key`: the session it's the grid of (newer servers). */
+  grid: { key?: string; session: string; cars: { key: string; name: string; teamKey: string | null; grid: number }[] } | null;
+  /** The session that sets the next grid, when it isn't set yet ("Qualifying"). */
+  gridAfter?: string;
+  /** Each driver's last races, latest first ("P4", "DNF"). Empty when ESPN's standings didn't load. */
+  drivers: { key: string; name: string; teamKey: string | null; rank: number; points: number; form: string[] }[];
+  constructors: { key: string; name: string; rank: number; points: number }[];
+}
+
+/** A UFC card (server's ufc-preview.ts): the Scores tab's UFC chip and a card's own screen. */
+export interface UfcCorner {
+  key: string; name: string; last: string;
+  /** The catalog has them: their page opens. */
+  linked: boolean;
+  record: string | null;
+  /** Null until the fight's over. */
+  winner: boolean | null;
+  belt?: 'champion' | 'interim';
+  /** DraftKings' American odds: to win, and to win by KO/TKO, by submission, on the cards. */
+  odds?: { win?: string; ko?: string; sub?: string; decision?: string };
+  /** Their chance to win (percent), the moneyline's; both sides' add up to 100. */
+  chance?: number;
+}
+/** A tale-of-the-tape row; `edge`: the side ahead on a more-is-better number. */
+export interface TapeRow { label: string; values: [string | null, string | null]; edge?: 0 | 1 }
+export interface UfcBout {
+  id: string; weight: string | null; rounds: number;
+  /** "Women's Flyweight title". */
+  title: string | null;
+  /** "Main event", "Co-main event". */
+  billing: string | null;
+  state: 'pre' | 'in' | 'post'; canceled: boolean;
+  round?: number;
+  /** "KO/TKO R1 2:09", with "Punches to the head". */
+  result?: { line: string; detail?: string };
+  corners: [UfcCorner, UfcCorner];
+  tape: TapeRow[];
+  oddsBy: string | null;
+}
+export interface UfcSegment { id: string; name: string; startsAt: number; broadcast: string | null; bouts: UfcBout[] }
+export interface UfcCard { event: { id: string; name: string; startsAt: number; venue: string | null; place: string | null }; segments: UfcSegment[] }
 /** A stats page (GET /targets/:key/stats): ESPN's numbers, with the ones a hater wants to see marked `bad`. */
 export interface StatTile { label: string; name: string; value: string; bad?: boolean }
 export interface StatGroup { title: string; tiles: StatTile[] }
