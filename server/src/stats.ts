@@ -113,6 +113,7 @@ const TEAM_STATS: Partial<Record<League, Pick[]>> = {
   nhl: [['offensive', 'goals', 'Goals'], ['defensive', 'goalsAgainst', 'Goals against', true], ['defensive', 'savePct', 'Save %'], ['offensive', 'shootingPct', 'Shooting %'],
     ['offensive', 'powerPlayGoals', 'Power play goals'], ['penalties', 'penaltyMinutes', 'Penalty minutes', true], ['general', 'plusMinus', '+/-']],
 };
+TEAM_STATS.cfb = TEAM_STATS.nfl; // college teams' statistics have the NFL's names
 
 /** The season line from ESPN's team statistics, titled with the part of the season it covers ("2026 Postseason"). */
 export function teamStatGroup(lg: League, res: any): StatGroup | null {

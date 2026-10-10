@@ -7,7 +7,7 @@ import { getJson as espnGetJson } from './espn.ts';
 import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
-import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, urls, type League } from './leagues.ts';
+import { BASKETBALL, FOOTBALL, LEAGUE_IDS, SOCCER, TEAMS_ONLY, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { getPrefs, sendToConnected } from './fanout.ts';
 import { boxScore, type BoxScore } from './boxscore.ts';
 import { clipsOf, highlights, type Clip, type Highlights } from './highlights.ts';
@@ -18,7 +18,8 @@ export const scoresDeps = {
 };
 
 type TeamDto = ReturnType<typeof teamDto>;
-export interface Side { team: TeamDto; score: number | null; winner?: boolean }
+/** `rank`: college football, a team's in the top 25 (ESPN's ranking on the scoreboard; its name on the card says it too, "#8 Indiana"). */
+export interface Side { team: TeamDto; score: number | null; winner?: boolean; rank?: number }
 export interface Driver { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }
 /** MLB: who's pitching and who's up. `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K"; batter "0-2" today). */
 export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
@@ -87,18 +88,26 @@ function sideTeam(lg: League, c: any): TeamDto {
   };
 }
 
-/** One game from a scoreboard event (NBA, MLB, NFL, NHL, EPL). Pure, so it can be tested on real payloads. */
+/** College football: a team's top-25 ranking on a scoreboard competitor (ESPN's 99 is unranked). */
+export const rankOf = (x: any): number | undefined => { const r = Number(x?.curatedRank?.current); return r >= 1 && r <= 25 ? r : undefined; };
+
+/** One game from a scoreboard event (NBA, MLB, NFL, NHL, EPL, college football). Pure, so it can be tested on real payloads. */
 export function gameCard(lg: League, ev: any): GameCard | null {
   const c = ev?.competitions?.[0];
   const home = c?.competitors?.find((x: any) => x.homeAway === 'home');
   const away = c?.competitors?.find((x: any) => x.homeAway === 'away');
   if (!home || !away) return null;
   const state = (['pre', 'in', 'post'].includes(ev.status?.type?.state) ? ev.status.type.state : 'pre') as GameCard['state'];
-  const side = (x: any): Side => ({
-    team: sideTeam(lg, x),
-    score: state === 'pre' || x.score == null || x.score === '' ? null : Number(x.score),
-    ...(x.winner === true ? { winner: true } : {}),
-  });
+  const side = (x: any): Side => {
+    const team = sideTeam(lg, x), rank = rankOf(x);
+    return {
+      // A card's copy of the team: "#8 Indiana" on it (every build shows it), the catalog's own name untouched.
+      team: rank ? { ...team, shortName: `#${rank} ${team.shortName}` } : team,
+      score: state === 'pre' || x.score == null || x.score === '' ? null : Number(x.score),
+      ...(x.winner === true ? { winner: true } : {}),
+      ...(rank ? { rank } : {}),
+    };
+  };
   const card: GameCard = {
     key: `${lg}:${ev.id}`, league: lg, id: String(ev.id), state, startsAt: Date.parse(ev.date),
     detail: state === 'pre' ? '' : String(ev.status?.type?.shortDetail ?? ''),
@@ -113,8 +122,8 @@ export function gameCard(lg: League, ev: any): GameCard | null {
   if (gameNo) card.note = `Game ${gameNo}`;
   const sit = c.situation;
   if (state === 'in' && sit) {
-    if (lg === 'nfl') {
-      if (sit.possession != null) card.possession = teamKey('nfl', String(sit.possession));
+    if (FOOTBALL.has(lg)) {
+      if (sit.possession != null) card.possession = teamKey(lg, String(sit.possession));
       if (sit.downDistanceText ?? sit.shortDownDistanceText) card.downDistance = String(sit.downDistanceText ?? sit.shortDownDistanceText);
       if (sit.isRedZone) card.redZone = true;
     }
@@ -136,7 +145,7 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     if (pr?.homeWinPercentage != null) card.winProb = winProb(pr);
     // MLB already says who's pitching and who's up; the other sports get the latest play.
     if (lg !== 'mlb' && sit.lastPlay?.text && !/^((end|start) of |official timeout)/i.test(sit.lastPlay.text)) card.lastPlay = String(sit.lastPlay.text);
-    if (lg === 'nfl' && sit.homeTimeouts != null && sit.awayTimeouts != null) card.timeouts = { home: Number(sit.homeTimeouts), away: Number(sit.awayTimeouts) };
+    if (FOOTBALL.has(lg) && sit.homeTimeouts != null && sit.awayTimeouts != null) card.timeouts = { home: Number(sit.homeTimeouts), away: Number(sit.awayTimeouts) };
   }
   if (state !== 'pre') {
     // NBA/WNBA: each side's top scorer, from ESPN's leaders on the scoreboard.
@@ -266,7 +275,7 @@ export function boxGoalies(summary: any, inNet?: Map<string, string>): Record<st
 }
 
 /** NFL: each side's passer (the most attempts) with his line ("14/22, 168 YDS, 1 TD, 1 INT"), from a summary's box score. */
-export function boxPassers(summary: any): Record<string, LivePlayer> | undefined {
+export function boxPassers(summary: any, lg: League = 'nfl'): Record<string, LivePlayer> | undefined {
   const out: Record<string, LivePlayer> = {};
   for (const t of summary?.boxscore?.players ?? []) {
     const st = t.statistics?.find((x: any) => x.name === 'passing');
@@ -278,7 +287,7 @@ export function boxPassers(summary: any): Record<string, LivePlayer> | undefined
     if (p?.id == null || at(pick, 'C/ATT') == null) continue;
     const td = Number(at(pick, 'TD')), int = Number(at(pick, 'INT'));
     out[String(t.team?.id)] = {
-      id: String(p.id), key: playerKey('nfl', String(p.id)),
+      id: String(p.id), key: playerKey(lg, String(p.id)),
       name: p.shortName ?? (p.firstName && p.lastName ? `${p.firstName[0]}. ${p.lastName}` : p.displayName ?? '?'), // the box has no shortName
       line: [at(pick, 'C/ATT'), at(pick, 'YDS') != null && `${at(pick, 'YDS')} YDS`, td > 0 && `${td} TD`, int > 0 && `${int} INT`].filter(Boolean).join(', '),
     };
@@ -449,7 +458,7 @@ const involves = (g: GameCard, mine: Mine) =>
 export const KEEP_FINALS_MS = 24 * 3600_000;
 /** A typical game, start to final: when a game was already over the first time we saw it. */
 export const GAME_LENGTH_MS = {
-  mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000,
+  mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, cfb: 3.5 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, f1: 2 * 3600_000,
   ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2 * 3600_000])),
 } as Record<League, number>;
 /** Live now, starting within a day, or finished in the last 24 hours (every game, so both halves of a doubleheader). */
@@ -510,7 +519,7 @@ export async function gameDetail(g: GameCard): Promise<Detail> {
   const hit = detailCache.get(g.key);
   if (hit && Date.now() - hit.at < (g.state === 'in' ? 8000 : 300_000)) return hit;
   const s = await scoresDeps.getJson(urls.summary(g.league, g.id), { timeoutMs: 6000, bust: g.state === 'in' });
-  let raw: any[] = g.league === 'nfl'
+  let raw: any[] = FOOTBALL.has(g.league)
     ? [...(s.drives?.previous ?? []).flatMap((d: any) => d.plays ?? []), ...(s.drives?.current?.plays ?? [])]
     : SOCCER.has(g.league) ? (s.keyEvents ?? []).filter((k: any) => !/delay/.test(k.type?.type ?? ''))
     : (s.plays ?? []);

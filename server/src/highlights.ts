@@ -1,6 +1,6 @@
 // The game screen's Highlights tab: ESPN's video clips for the game, and the key plays, the moments that
 // matter from the play-by-play (scoring plays, lead changes, turnovers, cards and ejections), newest first.
-import { SOCCER, BASKETBALL, type League } from './leagues.ts';
+import { SOCCER, BASKETBALL, FOOTBALL, type League } from './leagues.ts';
 import type { GameCard, PlayLine } from './scores.ts';
 import { clipFromVideo } from './clips.ts';
 
@@ -82,7 +82,7 @@ export function highlights(g: Pick<GameCard, 'league' | 'home' | 'away'>, summar
       else if (type(p) === 'Penalty' && (minutes >= 5 || /fighting|misconduct|match/i.test(p.text ?? ''))) add(line(p, { tag: /fighting/i.test(p.text ?? '') ? 'Fight' : 'Penalty' }));
       else if (/^Period End$/i.test(type(p)) && !shootout) add(line(p));
     }
-  } else if (lg === 'nfl') {
+  } else if (FOOTBALL.has(lg)) {
     // Scores and turnovers: picks, lost fumbles, missed and blocked kicks, safeties.
     const plays = [...(summary?.drives?.previous ?? []).flatMap((d: any) => d.plays ?? []), ...(summary?.drives?.current?.plays ?? [])];
     for (const p of plays) {

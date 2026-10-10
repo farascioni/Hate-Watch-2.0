@@ -20,6 +20,7 @@ export const leagueColors: Record<string, string> = {
   nhl: '#9CA3AF',
   f1: '#E10600',
   epl: '#7B2FBE', // Premier League purple, lifted to read on the dark background
+  cfb: '#B45309', // college football: leather brown
 };
 
 export const space = (n: number) => n * 4;

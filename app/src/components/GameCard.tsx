@@ -6,7 +6,7 @@ import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
 import { hateTag, loseChance, statusLine, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
 import { colors, radius, space } from '../theme';
-import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
+import { FOOTBALL, type FeedItem, type GameCard, type LivePlayer } from '../lib/types';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
   good: { bg: colors.hateDim, fg: '#FF8A8F' },  // they're losing: good news
@@ -148,7 +148,7 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
     if (b) line('b', <>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</>);
   }
   if ((game.league === 'nba' || game.league === 'wnba') && game.leaders) line('lead', <>Top scorers: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
-  if (game.league === 'nfl') {
+  if (FOOTBALL.has(game.league)) {
     if (game.timeouts && game.state === 'in') line('to', `Timeouts left: ${abbr('away')} ${game.timeouts.away} · ${abbr('home')} ${game.timeouts.home}`);
     const withBall: Side | undefined = game.possession === game.home?.team.key ? 'home' : game.possession === game.away?.team.key ? 'away' : undefined;
     if (big && game.leaders) line('pass', <>Passing: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>, 2);

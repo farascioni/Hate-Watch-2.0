@@ -26,8 +26,10 @@ export function useFilter(kind: Kind = 'all') {
  * Tracking); the Feed and the Leaderboard show them all. The kind picked for other leagues is kept for leaving it.
  */
 export const byWeightClass = (f: Filter) => f.league === 'ufc';
-/** What a filter shows: teams, players or both (the UFC: its fighters). */
-export const kindOf = (f: Filter): Kind => (byWeightClass(f) ? 'player' : f.kind);
+/** College football has no players (the server's `teamsOnly`): its one option is Teams. */
+export const teamsOnly = (f: Filter) => f.league === 'cfb';
+/** What a filter shows: teams, players or both (the UFC: its fighters; college football: its teams). */
+export const kindOf = (f: Filter): Kind => (byWeightClass(f) ? 'player' : teamsOnly(f) ? 'team' : f.kind);
 
 export function matchesFilter(f: Filter, target: { kind: string; league: string }) {
   const kind = kindOf(f);
@@ -72,15 +74,15 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
   /** false: Teams / Players only, no Everything (Search, where the two are separate lists) */ everything?: boolean;
 }) {
   const { leagues } = useStore();
-  const ufc = byWeightClass(filter);
-  const options = ufc ? KINDS.filter((k) => k.id === 'player') : KINDS.filter((k) => everything || k.id !== 'all');
+  const ufc = byWeightClass(filter), fixed = ufc || teamsOnly(filter);
+  const options = ufc ? KINDS.filter((k) => k.id === 'player') : teamsOnly(filter) ? KINDS.filter((k) => k.id === 'team') : KINDS.filter((k) => everything || k.id !== 'all');
   return (
     <View>
       {kinds ? <View style={styles.segment} accessibilityRole="tablist">
         {options.map(({ id, label }) => {
           const on = kindOf(filter) === id;
           return (
-            <Pressable key={id} onPress={ufc ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+            <Pressable key={id} onPress={fixed ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
               <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' ? playersTitle(filter.league) : label}</Text>
             </Pressable>
           );

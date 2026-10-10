@@ -1,6 +1,6 @@
 import { athleteIdFromRef, teamIdFromRef } from './espn.ts';
 import { catalog, normalize } from './catalog.ts';
-import { BASKETBALL, LEAGUE_IDS, SOCCER, playerKey, teamKey, type League } from './leagues.ts';
+import { BASKETBALL, FOOTBALL, LEAGUE_IDS, SOCCER, TEAMS_ONLY, footballType, playerKey, teamKey, type League } from './leagues.ts';
 
 /** League-agnostic view of one play. */
 export interface NPlay {
@@ -152,6 +152,23 @@ export function fromSitePlay(p: any): NPlay {
     ...(p.strength?.text ? { strength: String(p.strength.text) } : {}),
     ...periodFields(p),
   };
+}
+
+/**
+ * College football (TEAMS_ONLY): a game's plays from its summary's drives, in order, each once (a finished
+ * drive's plays and the one under way, which can be in both as it ends). A drive play's team is under `start`
+ * (the side with the ball as it begins), where it ends under `end`; it names no players.
+ */
+export function fromDrivePlays(summary: any): NPlay[] {
+  const seen = new Set<string>(), out: NPlay[] = [];
+  for (const d of [...(summary?.drives?.previous ?? []), ...(summary?.drives?.current ? [summary.drives.current] : [])]) {
+    for (const p of d?.plays ?? []) {
+      if (p?.id == null || seen.has(String(p.id))) continue;
+      seen.add(String(p.id));
+      out.push(fromSitePlay({ ...p, team: p.start?.team ?? p.team, participants: [] }));
+    }
+  }
+  return out;
 }
 
 function periodFields(p: any): Pick<NPlay, 'outs' | 'period' | 'periodNum' | 'clockSec'> {
@@ -373,10 +390,10 @@ export function observePlay(g: GameCtx, p: NPlay) {
       if (p.participants[0] && g.goalies.get(p.teamId) === p.participants[0].id) g.goalies.delete(p.teamId);
     }
   }
-  if (g.league === 'nfl' && p.teamId) {
+  if (FOOTBALL.has(g.league) && p.teamId) {
     // Core plays' team is the offense. A trick-play pass by a non-QB doesn't change who is under center.
     const qb = p.participants.find((x) => x.role === 'passer')?.id;
-    const position = qb && catalog.playerByEspn('nfl', qb)?.position;
+    const position = qb && catalog.playerByEspn(g.league, qb)?.position;
     if (qb && (!position || position === 'QB')) {
       (g.qbs ??= {})[p.teamId] = qb;
       const start = ((g.qbStart ??= {})[p.teamId] ??= qb);
@@ -998,19 +1015,19 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
   const [passer] = role(p, 'passer');
   const ty = p.type;
-  if (passer && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf('nfl', passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
-  if (passer && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf('nfl', passer)} got sacked`));
-  if (passer && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf('nfl', passer)} threw incomplete`));
+  if (passer && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
+  if (passer && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
+  if (passer && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
   for (const f of role(p, 'fumbler')) {
     const lost = /Opponent|Fumble Return/i.test(ty);
     out.push(lost
-      ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf('nfl', f)} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] })
-      : mk(g, p, 'nfl.fumble', f, `${nameOf('nfl', f)} fumbled`));
+      ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf(g.league, f)} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] })
+      : mk(g, p, 'nfl.fumble', f, `${nameOf(g.league, f)} fumbled`));
   }
   const kickMiss = /Field Goal Missed|Blocked Field Goal|Blocked PAT|Missed PAT/i.test(ty) || /extra point is no good|kick is blocked/i.test(p.text);
   if (kickMiss) for (const k of [...role(p, 'kicker'), ...role(p, 'patScorer')].slice(0, 1))
-    out.push(mk(g, p, 'nfl.kicker.miss', k, `${nameOf('nfl', k)} ${/blocked/i.test(ty + p.text) ? 'got a kick blocked' : /extra point/i.test(p.text) ? 'missed the extra point' : 'missed a field goal'}`));
-  for (const x of role(p, 'penalized')) out.push(mk(g, p, 'nfl.penalty', x, `${nameOf('nfl', x)} was flagged${/declined/i.test(p.text) ? ' (declined)' : ''}`));
+    out.push(mk(g, p, 'nfl.kicker.miss', k, `${nameOf(g.league, k)} ${/blocked/i.test(ty + p.text) ? 'got a kick blocked' : /extra point/i.test(p.text) ? 'missed the extra point' : 'missed a field goal'}`));
+  for (const x of role(p, 'penalized')) out.push(mk(g, p, 'nfl.penalty', x, `${nameOf(g.league, x)} was flagged${/declined/i.test(p.text) ? ' (declined)' : ''}`));
 
   // A more specific alert replaces the generic one for the same player on the same play, and
   // counts as that generic toggle too (aliases), so nobody gets two notifications for one play.
@@ -1023,21 +1040,29 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
     out.push(e);
   };
   const victim = isSafety(p) ? safetyVictim(p) : undefined;
-  if (victim) replace(mk(g, p, 'nfl.safety', victim.id, `${nameOf('nfl', victim.id)} ${victim.how}`), victim.covers);
+  if (victim) replace(mk(g, p, 'nfl.safety', victim.id, `${nameOf(g.league, victim.id)} ${victim.how}`), victim.covers);
   const dog = delayOfGameQb(g, p);
-  if (dog) replace(mk(g, p, 'nfl.qb.delay_of_game', dog.qb, `${nameOf('nfl', dog.qb)} took a delay of game penalty`), dog.named ? 'nfl.penalty' : undefined);
+  if (dog) replace(mk(g, p, 'nfl.qb.delay_of_game', dog.qb, `${nameOf(g.league, dog.qb)} took a delay of game penalty`), dog.named ? 'nfl.penalty' : undefined);
   const onside = onsideRecovered(g, p);
   if (onside) out.push(onside);
   const tossed = disqualified(g, p);
-  if (tossed) replace(mk(g, p, 'player.ejected', tossed, `${nameOf('nfl', tossed)} got ejected`), 'nfl.penalty');
+  if (tossed) replace(mk(g, p, 'player.ejected', tossed, `${nameOf(g.league, tossed)} got ejected`), 'nfl.penalty');
   // A touchdown taken off the board by a penalty: the flagged player's (in place of his penalty alert) and
   // his team's, the team whose touchdown it was ("TOUCHDOWN NULLIFIED by Penalty. PENALTY on GB-A.Belton, …").
+  // College (no players): "… TOUCHDOWN nullified by penalty, … PENALTY USC Personal Foul … NO PLAY". Its penalty
+  // codes aren't the teams' ("USC" for South Carolina), so whose touchdown it was is the play's: the offense's,
+  // or on a kickoff or punt, the side receiving it.
+  if (TEAMS_ONLY.has(g.league) && /TOUCHDOWN nullified by penalty/i.test(p.text) && /\bNO PLAY\b/i.test(p.text) && p.teamId) {
+    const kick = /kickoff|punt/i.test(p.type), teamId = kick ? (p.teamId === g.homeId ? g.awayId : p.teamId === g.awayId ? g.homeId : undefined) : p.teamId;
+    if (teamId === g.homeId || teamId === g.awayId) out.push({ id: `${g.gameId}:${p.id}:cfb.td_wiped_out:team-${teamId}`, type: footballType(g.league, 'td_wiped_out'), targetKey: teamKey(g.league, teamId!),
+      title: `${teamName(g.league, teamId!)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
+  }
   if (/TOUCHDOWN NULLIFIED/.test(p.text)) {
     const flagged = flaggedFor(g, p);
-    const teamId = flagged ? playerTeamId('nfl', flagged) : undefined;
-    if (flagged) replace(mk(g, p, 'nfl.td_wiped_out', flagged, `${nameOf('nfl', flagged)}'s penalty wiped out a touchdown`), 'nfl.penalty');
-    if (teamId) out.push({ id: `${g.gameId}:${p.id}:nfl.td_wiped_out:team-${teamId}`, type: 'nfl.td_wiped_out', targetKey: teamKey('nfl', teamId),
-      title: `${teamName('nfl', teamId)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
+    const teamId = flagged ? playerTeamId(g.league, flagged) : undefined;
+    if (flagged) replace(mk(g, p, 'nfl.td_wiped_out', flagged, `${nameOf(g.league, flagged)}'s penalty wiped out a touchdown`), 'nfl.penalty');
+    if (teamId) out.push({ id: `${g.gameId}:${p.id}:nfl.td_wiped_out:team-${teamId}`, type: 'nfl.td_wiped_out', targetKey: teamKey(g.league, teamId),
+      title: `${teamName(g.league, teamId)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
   }
   out.push(...qbPulled(g, p));
   return out;
@@ -1050,7 +1075,7 @@ function flaggedFor(g: GameCtx, p: NPlay): string | undefined {
   const m = p.text.match(/PENALTY on [A-Z]{2,3}-([A-Z][\w.'-]*\.[\w'-]+)/i);
   if (!m) return penalized[0];
   const [initial, last] = [m[1][0].toLowerCase(), normalize(m[1].split('.').slice(1).join('.'))];
-  return penalized.find((id) => { const n = normalize(catalog.playerByEspn('nfl', id)?.name ?? ''); return n.startsWith(initial) && n.endsWith(last); }) ?? penalized[0];
+  return penalized.find((id) => { const n = normalize(catalog.playerByEspn(g.league, id)?.name ?? ''); return n.startsWith(initial) && n.endsWith(last); }) ?? penalized[0];
 }
 
 /**
@@ -1060,12 +1085,12 @@ function flaggedFor(g: GameCtx, p: NPlay): string | undefined {
  */
 function qbPulled(g: GameCtx, p: NPlay): Detected[] {
   const [qb] = role(p, 'passer'), team = p.teamId;
-  if (!qb || !team || catalog.playerByEspn('nfl', qb)?.position !== 'QB' || (p.periodNum ?? 0) > 3 || g.qbPulled?.has(team)) return [];
+  if (!qb || !team || catalog.playerByEspn(g.league, qb)?.position !== 'QB' || (p.periodNum ?? 0) > 3 || g.qbPulled?.has(team)) return [];
   const start = g.qbStart?.[team], other = g.qbOther?.[team];
   if (!start || qb === start || (g.qbAtt?.[start] ?? 0) < 5) return [];
   if ((other?.id === qb ? other.n : 0) + 1 < 2) return []; // observePlay counts this pass after the detectors
   (g.qbPulled ??= new Set()).add(team);
-  return [{ ...mk(g, p, 'nfl.qb.pulled', start, `${nameOf('nfl', start)} got pulled: ${nameOf('nfl', qb)} is in at quarterback`), body: `Benched or hurt: ESPN doesn't say. ${p.text} — ${scoreLine(g, p)}` }];
+  return [{ ...mk(g, p, 'nfl.qb.pulled', start, `${nameOf(g.league, start)} got pulled: ${nameOf(g.league, qb)} is in at quarterback`), body: `Benched or hurt: ESPN doesn't say. ${p.text} — ${scoreLine(g, p)}` }];
 }
 
 /**
@@ -1080,11 +1105,11 @@ function disqualified(g: GameCtx, p: NPlay): string | undefined {
   const [initial, last] = [m[2][0].toLowerCase(), normalize(m[2].split('.').slice(1).join('.'))];
   const named = (name: string) => { const n = normalize(name); return n.startsWith(initial) && n.endsWith(last); };
   if (penalized.length === 1) return penalized[0];
-  const hits = penalized.filter((id) => named(catalog.playerByEspn('nfl', id)?.name ?? ''));
+  const hits = penalized.filter((id) => named(catalog.playerByEspn(g.league, id)?.name ?? ''));
   if (hits.length === 1) return hits[0];
   // Offsetting flags can leave ESPN's penalized players out (TEN-M.Brown, 2025): find them on their team.
-  const teamId = [g.homeId, g.awayId].find((id) => teamAbbrev('nfl', id) === (NFL_CODE[m[1]] ?? m[1]));
-  const roster = teamId ? catalog.roster(teamKey('nfl', teamId)).filter((pl) => named(pl.name)) : [];
+  const teamId = [g.homeId, g.awayId].find((id) => teamAbbrev(g.league, id) === (NFL_CODE[m[1]] ?? m[1]));
+  const roster = teamId ? catalog.roster(teamKey(g.league, teamId)).filter((pl) => named(pl.name)) : [];
   return roster.length === 1 ? roster[0].espnId : undefined;
 }
 
@@ -1096,18 +1121,19 @@ function disqualified(g: GameCtx, p: NPlay): string | undefined {
  * ESPN leaves the end team out). A kick wiped out by a penalty ("… - No Play.") doesn't count.
  */
 function onsideRecovered(g: GameCtx, p: NPlay): Detected | null {
-  if (!/\bkicks onside\b/i.test(p.text) || /\bNo Play\b|NULLIFIED/i.test(p.text)) return null;
+  // NFL: "kicks onside"; college: "onside kickoff".
+  if (!/\bkicks onside\b|\bonside kickoff\b/i.test(p.text) || /\bNo Play\b|NULLIFIED/i.test(p.text)) return null;
   const kicking = p.teamId;
   const receiving = kicking === g.homeId ? g.awayId : kicking === g.awayId ? g.homeId : undefined;
   if (!kicking || !receiving) return null;
   const recoveredBy = [...p.text.matchAll(/RECOVERED by ([A-Z]{2,3})-/gi)].at(-1)?.[1].toUpperCase();
-  const kept = p.endTeamId ? p.endTeamId === kicking : !!recoveredBy && (NFL_CODE[recoveredBy] ?? recoveredBy) === teamAbbrev('nfl', kicking);
+  const kept = p.endTeamId ? p.endTeamId === kicking : !!recoveredBy && (NFL_CODE[recoveredBy] ?? recoveredBy) === teamAbbrev(g.league, kicking);
   if (!kept) return null;
   return {
-    id: `${g.gameId}:${p.id}:nfl.team.onside_recovered:${receiving}`,
-    type: 'nfl.team.onside_recovered',
-    targetKey: teamKey('nfl', receiving),
-    title: `${teamName('nfl', kicking)} recovered an onside kick against the ${teamName('nfl', receiving)}`,
+    id: `${g.gameId}:${p.id}:${footballType(g.league, 'team.onside_recovered')}:${receiving}`,
+    type: footballType(g.league, 'team.onside_recovered'),
+    targetKey: teamKey(g.league, receiving),
+    title: `${teamName(g.league, kicking)} recovered an onside kick against ${the(g.league, teamName(g.league, receiving))}`,
     body: `${p.text} — ${scoreLine(g, p)}`,
     at: p.at,
     meta: { gameId: g.gameId, playId: p.id },
@@ -1145,9 +1171,9 @@ const NFL_CODE: Record<string, string> = { ARZ: 'ARI', BLT: 'BAL', CLV: 'CLE', H
 function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | undefined {
   const m = p.text.match(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, Delay of Game/);
   if (!m || /declined|offsetting/i.test(p.text) || /\([^)]*(?:punt|field goal|kick)[^)]*\)/i.test(p.text)) return;
-  const offense = p.teamId ? catalog.teamByEspn('nfl', p.teamId)?.abbrev : undefined;
+  const offense = p.teamId ? catalog.teamByEspn(g.league, p.teamId)?.abbrev : undefined;
   if (!offense || (NFL_CODE[m[1]] ?? m[1]) !== offense) return;
-  const named = role(p, 'penalized').find((id) => catalog.playerByEspn('nfl', id)?.position === 'QB');
+  const named = role(p, 'penalized').find((id) => catalog.playerByEspn(g.league, id)?.position === 'QB');
   const qb = named ?? g.qbs?.[p.teamId!];
   return qb ? { qb, named: !!named } : undefined;
 }
@@ -1339,7 +1365,7 @@ export function soccerTouch(g: GameCtx, p: NPlay, next: NPlay): Detected[] {
 
 // F1 has no play-by-play; its alerts come from session results (f1.ts). Every soccer league uses the soccer detectors.
 type Detector = (g: GameCtx, p: NPlay) => Detected[];
-const OTHER_DETECTORS: Partial<Record<League, Detector>> = { mlb, nfl, nba, wnba: nba, nhl, f1: () => [] };
+const OTHER_DETECTORS: Partial<Record<League, Detector>> = { mlb, nfl, cfb: nfl, nba, wnba: nba, nhl, f1: () => [] };
 export const PLAYER_DETECTORS = Object.fromEntries(LEAGUE_IDS.map((lg) => [lg, SOCCER.has(lg) ? soccer : OTHER_DETECTORS[lg]])) as Record<League, Detector>;
 
 // ─── Team in-game detectors (score-delta based, so they work identically for every league) ───
@@ -1352,9 +1378,13 @@ export function nextScore(prev: { home: number; away: number }, p: NPlay) {
   return { home: Math.max(prev.home, p.home), away: Math.max(prev.away, p.away) };
 }
 
-export const START_WORD = { nfl: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out', ...Object.fromEntries([...SOCCER].map((lg) => [lg, 'Kickoff'])) } as Record<League, string>;
+export const START_WORD = { nfl: 'Kickoff', cfb: 'Kickoff', nba: 'Tip-off', wnba: 'Tip-off', nhl: 'Puck drop', mlb: 'First pitch', f1: 'Lights out', ...Object.fromEntries([...SOCCER].map((lg) => [lg, 'Kickoff'])) } as Record<League, string>;
 /** "the Falcons", but plain "Liverpool": clubs don't take "the". */
-const the = (lg: League, team: string) => (SOCCER.has(lg) ? team : `the ${team}`);
+/** A team's verb: "the Yankees have", but a school's singular ("Nebraska has"). */
+export const have = (lg: League) => (TEAMS_ONLY.has(lg) ? 'has' : 'have');
+export const are = (lg: League) => (TEAMS_ONLY.has(lg) ? 'is' : 'are');
+/** "the Rays"; a soccer club or a school is just its name ("Arsenal", "Nebraska"). */
+const the = (lg: League, team: string) => (SOCCER.has(lg) || TEAMS_ONLY.has(lg) ? team : `the ${team}`);
 
 /** "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). */
 export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
@@ -1405,7 +1435,9 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
     const winner = the(lg, teamName(lg, win.id)), score = `${win.wins}-${lose.wins}`, sweep = lose.wins === 0;
     return { loserId: lose.id, winnerId: win.id, sweep, line: sweep ? `Swept ${score} by ${winner}${round ? ` in the ${round}` : ''}` : `Lost the ${round || 'series'} ${score} to ${winner}` };
   }
-  if (lg !== 'nfl') return null;
+  if (!FOOTBALL.has(lg)) return null;
+  // College: a bowl game isn't an elimination; the College Football Playoff is.
+  if (TEAMS_ONLY.has(lg) && !/playoff/i.test(headline)) return null;
   const loserId = String(gameWinner === String(x.id) ? y.id : x.id), winner = the(lg, teamName(lg, gameWinner));
   return { loserId, winnerId: gameWinner, sweep: false, line: /super bowl/i.test(round) ? `Lost ${round} to ${winner}` : `Lost to ${winner}${round ? ` in the ${round}` : ''}` };
 }
@@ -1419,7 +1451,7 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
 /** "an 8-run", "an 11-point", "an 18-point", "a 15-point". */
 export const aOrAn = (n: number) => (n === 11 || n === 18 || String(n).startsWith('8') ? 'an' : 'a');
 
-export const BLOWOUT_MARGIN: Partial<Record<League, number>> = { mlb: 7, nfl: 21, nba: 25, wnba: 20, nhl: 4, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 3])) };
+export const BLOWOUT_MARGIN: Partial<Record<League, number>> = { mlb: 7, nfl: 21, cfb: 42, nba: 25, wnba: 20, nhl: 4, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 3])) };
 const MARGIN_UNIT: Partial<Record<League, string>> = { mlb: 'run', nhl: 'goal' };
 export const isBlowout = (lg: League, margin: number) => BLOWOUT_MARGIN[lg] != null && margin >= BLOWOUT_MARGIN[lg]!;
 
@@ -1441,7 +1473,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
   // "Final Score: 12 to 2. A 10-run blowout." (soccer's "thrashed" title says it already).
   const by = w - l, an = aOrAn(by) === 'an' ? 'An' : 'A'; // "An 8-run", "An 11-point"
   const score = `Final Score: ${w} to ${l}${blowout && !SOCCER.has(g.league) ? `. ${an} ${by}-${MARGIN_UNIT[g.league] ?? 'point'} blowout.` : ''}`;
-  const what = elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} are ELIMINATED ⚰️`)
+  const what = elim ? (elim.sweep ? `${team} got SWEPT 🧹 and are ELIMINATED ⚰️` : `${team} ${are(g.league)} ELIMINATED ⚰️`)
     : blowout ? (SOCCER.has(g.league) ? `${team} were thrashed ${w}-${l} by ${winner}` : `${team} got BLOWN OUT by ${winner}`)
     : `${team} lost to ${winner}`;
   return {
@@ -1526,7 +1558,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
     const [team, oppName] = [teamName(g.league, teamId), teamName(g.league, oppId)];
     const what = g.league === 'nhl' || SOCCER.has(g.league) ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
-    const safety = delta === 2 && g.league === 'nfl' && isSafety(p);
+    const safety = delta === 2 && FOOTBALL.has(g.league) && isSafety(p);
     // Falling behind can only happen because the opponent just scored, so the two alerts always
     // coincide. The fell-behind alert carries both facts; the scored-on alert for this play is
     // then `unless` it: each user gets one (the combined one if they want "falls behind").
@@ -1566,7 +1598,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     }
     if (safety) {
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
-      out.push({ id: `${g.gameId}:${p.id}:nfl.safety:team-${teamId}`, type: 'nfl.safety', aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
+      out.push({ id: `${g.gameId}:${p.id}:${footballType(g.league, 'safety')}:team-${teamId}`, type: footballType(g.league, 'safety'), aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
       out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on the ${team}`, ...base, ...unlessBehind, ...moment,
         fold: `${oppName} ${what}.` });
@@ -1598,6 +1630,8 @@ export interface Pregame {
   series?: { home?: SeriesSpot; away?: SeriesSpot };
   /** ESPN's season type: 1 preseason, 2 regular season, 3 postseason. Streaks count in the regular season only. */
   seasonType?: number;
+  /** College football: each side's top-25 ranking going in (none: unranked). */
+  ranks?: { home?: number; away?: number };
 }
 /**
  * MLB: the games just before this one against the same opponent (its series), and whether this one ends
@@ -1624,16 +1658,16 @@ export const soccerMinute = (clock?: string) => { const m = String(clock ?? '').
  *   below .500         MLB 3.6%   NBA 1.1%   WNBA 2.7%   NFL 6.3%   NHL 2.7%
  */
 /** The loser's chance to win before the game, at least (percent). */
-export const FAVORITE_CHANCE: Partial<Record<League, number>> = { mlb: 62, nba: 75, wnba: 75, nfl: 75, nhl: 65, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 60])) };
+export const FAVORITE_CHANCE: Partial<Record<League, number>> = { mlb: 62, nba: 75, wnba: 75, nfl: 75, cfb: 80, nhl: 65, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 60])) };
 /** The loser's biggest lead, at least (points, runs or goals), for the line on the loss. */
-export const BLEW_LEAD: Partial<Record<League, number>> = { mlb: 3, nba: 15, wnba: 12, nfl: 14, nhl: 2, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
+export const BLEW_LEAD: Partial<Record<League, number>> = { mlb: 3, nba: 15, wnba: 12, nfl: 14, cfb: 17, nhl: 2, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
 /** The same, live: losing a lead this big is an alert of its own (a push), so it takes more. */
-export const BLEW_LEAD_LIVE: Partial<Record<League, number>> = { mlb: 5, nba: 18, wnba: 15, nfl: 17, nhl: 3, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
+export const BLEW_LEAD_LIVE: Partial<Record<League, number>> = { mlb: 5, nba: 18, wnba: 15, nfl: 17, cfb: 21, nhl: 3, ...Object.fromEntries([...SOCCER].map((lg) => [lg, 2])) };
 /** The winner's go-ahead score with this many seconds left or fewer (NBA and WNBA in the 4th or OT, NFL in the 4th). */
-export const LAST_SECONDS: Partial<Record<League, number>> = { nba: 10, wnba: 10, nfl: 30 };
+export const LAST_SECONDS: Partial<Record<League, number>> = { nba: 10, wnba: 10, nfl: 30, cfb: 30 };
 /** "Lost to a worse team": the winner's win percentage at least this far below the loser's, both MIN_GAMES in. */
-export const WORSE_GAP: Partial<Record<League, number>> = { mlb: 0.15, nba: 0.2, wnba: 0.2, nfl: 0.2, nhl: 0.15 };
-export const MIN_GAMES: Partial<Record<League, number>> = { mlb: 20, nba: 10, wnba: 8, nfl: 4, nhl: 10 };
+export const WORSE_GAP: Partial<Record<League, number>> = { mlb: 0.15, nba: 0.2, wnba: 0.2, nfl: 0.2, cfb: 0.25, nhl: 0.15 };
+export const MIN_GAMES: Partial<Record<League, number>> = { mlb: 20, nba: 10, wnba: 8, nfl: 4, cfb: 4, nhl: 10 };
 /** The winner's top scorer, at least, for "their star went off" (NBA, WNBA). */
 export const STAR_POINTS = { nba: 40, wnba: 30 };
 /** A power play with no goal on at least this many chances (NHL). */
@@ -1650,7 +1684,7 @@ export function parseRecord(rec: string | undefined): { w: number; l: number; x:
 function winPct(lg: League, r: { w: number; l: number; x: number }) {
   const gp = r.w + r.l + r.x;
   if (!gp) return 0;
-  return lg === 'nhl' ? (2 * r.w + r.x) / (2 * gp) : (r.w + (lg === 'nfl' ? r.x / 2 : 0)) / gp;
+  return lg === 'nhl' ? (2 * r.w + r.x) / (2 * gp) : (r.w + (FOOTBALL.has(lg) ? r.x / 2 : 0)) / gp;
 }
 
 /** The play on which the winner went ahead for good, and each side's biggest lead, from every play of the game. */
@@ -1669,7 +1703,7 @@ export function leadStory(plays: NPlay[], winner: 'home' | 'away') {
 }
 
 /** "2.1 seconds", "1 second", "0:24": how much was left on the clock. */
-const clockLeft = (lg: League, sec: number) => (lg === 'nfl' ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : `${Number(sec.toFixed(1))} second${sec === 1 ? '' : 's'}`);
+const clockLeft = (lg: League, sec: number) => (FOOTBALL.has(lg) ? `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}` : `${Number(sec.toFixed(1))} second${sec === 1 ? '' : 's'}`);
 
 /**
  * A loss's facts, each its own alert type: a walk-off or a last-second loss, a blown lead, losing as the
@@ -1702,7 +1736,7 @@ export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awa
   } else if (BASKETBALL.has(lg) && ga && (ga.periodNum ?? 0) >= 4 && ga.clockSec != null && ga.clockSec <= LAST_SECONDS[lg]!) {
     const left = ga.clockSec === 0 ? 'at the buzzer' : `with ${clockLeft(lg, ga.clockSec)} left`;
     fact('team.last_second_loss', `${winner} beat ${the(lg, team)} ${left}`, `Beaten ${left}.`);
-  } else if (lg === 'nfl' && ga && ((ga.periodNum ?? 0) >= 5 || ((ga.periodNum ?? 0) === 4 && ga.clockSec != null && ga.clockSec <= LAST_SECONDS.nfl!))) {
+  } else if (FOOTBALL.has(lg) && ga && ((ga.periodNum ?? 0) >= 5 || ((ga.periodNum ?? 0) === 4 && ga.clockSec != null && ga.clockSec <= LAST_SECONDS[lg]!))) {
     const ot = (ga.periodNum ?? 0) >= 5, left = ga.clockSec === 0 ? 'as time expired' : `with ${clockLeft(lg, ga.clockSec!)} left`;
     fact('team.last_second_loss', ot ? `${team} lost to ${the(lg, winner)} in overtime` : `${winner} beat ${the(lg, team)} ${left}`, ot ? 'Lost in overtime.' : `Beaten ${left}.`);
   } else if (lg === 'nhl' && facts.overtime) {
@@ -1721,9 +1755,15 @@ export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awa
   const chance = facts.pre?.chance?.[loserSide];
   if (chance != null && chance >= FAVORITE_CHANCE[lg]!) fact('team.lost_as_favorite', `${team} lost to ${the(lg, winner)} as ${chance}% favorites`, `Lost as ${chance}% favorites.`, { chance });
 
+  // College: a ranked team beaten by an unranked one (the ranking going in, ESPN's: the AP's, the playoff committee's late in the season).
+  const rank = facts.pre?.ranks?.[loserSide];
+  if (TEAMS_ONLY.has(lg) && rank && facts.pre?.ranks && !facts.pre.ranks[winnerSide]) {
+    fact('cfb.upset_loss', `No. ${rank} ${team} lost to unranked ${winner}`, `Lost to unranked ${winner} as the No. ${rank} team.`, { rank });
+  }
+
   // A shutout (basketball has none, and in soccer half of all losses are one).
   if (final[loserSide] === 0 && !BASKETBALL.has(lg) && !SOCCER.has(lg)) {
-    const [title, fold] = lg === 'nfl' ? [`${team} were held scoreless by the ${winner}`, 'Held scoreless.'] : [`${team} were shut out by the ${winner}`, 'Shut out.'];
+    const [title, fold] = FOOTBALL.has(lg) ? [`${team} ${TEAMS_ONLY.has(lg) ? 'was' : 'were'} held scoreless by ${the(lg, winner)}`, 'Held scoreless.'] : [`${team} were shut out by the ${winner}`, 'Shut out.'];
     fact('team.shut_out', title, fold);
   }
 
@@ -1754,7 +1794,7 @@ export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awa
     }
     // Below .500 (W < L: in the NHL an overtime loss doesn't count against it, and in the NFL a tie is half each way).
     if (mine && !SOCCER.has(lg) && mine.w === mine.l && !(lg === 'nhl' && facts.overtime) && mine.w + mine.l + mine.x + 1 >= (MIN_GAMES[lg] ?? Infinity)) {
-      const now = `${mine.w}-${mine.l + 1}${lg === 'nhl' || (lg === 'nfl' && mine.x) ? `-${mine.x}` : ''}`;
+      const now = `${mine.w}-${mine.l + 1}${lg === 'nhl' || (FOOTBALL.has(lg) && mine.x) ? `-${mine.x}` : ''}`;
       fact('team.below_500', `${team} lost to ${the(lg, winner)} and fell below .500`, `Now ${now}, below .500.`, { record: now });
     }
   }
@@ -1768,7 +1808,7 @@ export function lossFacts(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awa
     if (n >= 3 && rec && rec.l + rec.x >= n - 1) {
       out.push({
         id: `${g.gameId}:final:team.losing_streak:${loserId}`, type: 'team.losing_streak', targetKey: lost.targetKey,
-        title: `Successful Hate Watch! ${team} have lost ${n} straight`, body: lost.body, at: lost.at,
+        title: `Successful Hate Watch! ${team} ${have(lg)} lost ${n} straight`, body: lost.body, at: lost.at,
         meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey, streak: n }, moment: lost.moment, fold: `Lost ${n} straight.`,
       });
     }
@@ -1897,26 +1937,28 @@ export function playerFinalEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId
 export function nflDriveEvents(g: GameCtx, d: any): Detected[] {
   const team = String(d?.team?.id ?? ''), result = String(d?.result ?? '').toUpperCase(), plays: any[] = d?.plays ?? [], last = plays.at(-1);
   if ((team !== g.homeId && team !== g.awayId) || !result || !last) return [];
-  const name = teamName('nfl', team);
+  const name = teamName(g.league, team);
   const score = { home: Number(last.homeScore ?? 0), away: Number(last.awayScore ?? 0) };
   const base = (type: string, title: string, fold: string): Detected => ({
-    id: `${g.gameId}:drive:${d.id}:${type}`, type, targetKey: teamKey('nfl', team), title, fold,
+    id: `${g.gameId}:drive:${d.id}:${type}`, type, targetKey: teamKey(g.league, team), title, fold,
     body: `${d.description ?? ''}${d.displayResult ? `, ${String(d.displayResult).toLowerCase()}` : ''} — ${scoreLine(g, score)}`,
     at: last.wallclock ? Date.parse(last.wallclock) : Date.now(), meta: { gameId: g.gameId, playId: String(last.id) },
   });
   const out: Detected[] = [];
-  if (result === 'PUNT' && Number(d.offensivePlays) <= 3 && Number(d.yards) < 10) out.push(base('nfl.team.three_and_out', `${name} went three-and-out`, 'Three-and-out.'));
-  if (result === 'DOWNS') out.push(base('nfl.team.turnover_on_downs', `${name} turned it over on downs`, 'Turned it over on downs.'));
+  if (result === 'PUNT' && Number(d.offensivePlays) <= 3 && Number(d.yards) < 10) out.push(base(footballType(g.league, 'team.three_and_out'), `${name} went three-and-out`, 'Three-and-out.'));
+  if (result === 'DOWNS') out.push(base(footballType(g.league, 'team.turnover_on_downs'), `${name} turned it over on downs`, 'Turned it over on downs.'));
   // A snap inside the other side's 20, from the down and distance ("1st & 10 at NYG 13"): ESPN's yardsToEndzone
-  // is 0 on timeouts and wrong on punts (a punt from your own 36 says 36).
-  const abbr = String(d.team?.abbreviation ?? teamAbbrev('nfl', team));
+  // is 0 on timeouts and wrong on punts (a punt from your own 36 says 36). A field code is the team's
+  // abbreviation or a shorter or longer one (college: "AF" for Air Force's AFA, "BUF" for Buffalo's BUFF).
+  const abbr = String(d.team?.abbreviation ?? teamAbbrev(g.league, team));
+  const mine = (code: string) => code === abbr || abbr.startsWith(code) || code.startsWith(abbr);
   const redZone = plays.some((p: any) => {
-    const at = String(p.start?.downDistanceText ?? '').match(/ at ([A-Z]{2,3}) (\d+)$/);
-    return String(p.start?.team?.id) === team && !!at && at[1] !== abbr && Number(at[2]) <= 20 && !/timeout|punt|kickoff/i.test(String(p.type?.text ?? p.text ?? ''));
+    const at = String(p.start?.downDistanceText ?? '').match(/ at ([A-Z]{2,5}) (\d+)$/);
+    return String(p.start?.team?.id) === team && !!at && !mine(at[1]) && Number(at[2]) <= 20 && !/timeout|punt|kickoff/i.test(String(p.type?.text ?? p.text ?? ''));
   });
   if (redZone && !['TD', 'FG', 'END OF GAME'].includes(result)) {
     const how = String(d.displayResult ?? result).toLowerCase();
-    out.push(base('nfl.team.red_zone_empty', `${name} came away empty from the red zone (${how})`, `No points from the red zone (${how}).`));
+    out.push(base(footballType(g.league, 'team.red_zone_empty'), `${name} came away empty from the red zone (${how})`, `No points from the red zone (${how}).`));
   }
   return out;
 }

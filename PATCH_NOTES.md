@@ -10,14 +10,14 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 Changes since build 12. Server updates already work on every build.
 
 SCORES
-- Before a game starts, its Box score tab previews it: each side's season leaders, both sides' season stats, their last five games, injuries, ESPN's matchup predictor and the season series. (Server)
+- Before a game starts, its Box score tab previews it: season leaders and stats, the last five games, injuries, ESPN's predictor. (Server)
 - On a game's screen, your alerts from it come after the box score, and you can minimize them.
 
 UFC
-- Track UFC fighters under the UFC chip. A loss is a Successful Hate Watch that says how (knocked out, tapped out, the judges' cards), with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. A fighter's page has their record and last five fights. (Server)
+- Track UFC fighters. A loss is a Successful Hate Watch that says how (knocked out, tapped out, the judges' cards), with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
 - With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end (KO/TKO R1 2:09).
 - A card's preview, from Scores: one fight in full (yours, else the main event; tap any fight to swap), with the chance your fighter loses and how by the odds, the tale of the tape, and both fighters' last five. Names open their pages.
-- With the UFC chip on, the one filter is Fighters, by weight class. Search lists each class's top five before you type, champion first; Tracking groups your fighters by class. A fighter's page lists their last fights.
+- With the UFC chip on, the one filter is Fighters, by weight class: Search lists each class's top five, Tracking groups yours by class.
 - A loss by a finish ends with how and when, like (KO/TKO R1 1:20). A title fight adds a line with its own switch: "Lost the Lightweight title" for the champion, "Lost a Lightweight title fight" for a challenger. (Server)
 - A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
 - Women's weight classes are named in full. (Server)
@@ -26,11 +26,15 @@ F1
 - Sprints get their alerts (lights out, a car retiring, the result): ESPN marks a sprint "SR", which wasn't read as one. Sessions are named in full, and a driver's teammate is whoever drove the other car that weekend. (Server)
 - Lights out is one alert naming your constructors and drivers in it, with the back of the grid as lines; tracking a driver gets it too (Race starts). A team's double DNF or no points takes in its drivers' alerts that say the same, and alerts that come at once are one notification. (Server)
 - A race or sprint's results come when it ends, not when ESPN makes them final up to 40 minutes later. A penalty after corrects them: changed alerts update, new ones are sent, ones no longer true are withdrawn. A championship drop is a line on that day's alert. (Server)
-- Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, average finish, races ahead of the teammate (constructors: one-twos, double DNFs), and the last five races.
+- Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
 - An F1 driver's page no longer names their constructor twice.
-- Search lists F1's constructors A to Z, with no division sort, and with Drivers on, every driver by constructor.
-- Before an F1 session starts, its screen previews the weekend: the circuit, each session's time, the grid once it's set, and the championship with each driver's last three races. Tap any driver or constructor, there or in a grid on Scores, for their page.
+- Search lists F1's constructors A to Z and every driver by constructor.
+- Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship. Tap a driver or constructor for their page.
 - With the F1 chip on, Scores has Live races and Upcoming races (the weekend's sprint, qualifying and race still to come, a sprint or race with its full grid once it's set). An F1 session's screen says "Your alerts from this race".
+
+COLLEGE FOOTBALL
+- A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank on cards ("#8 Indiana"). (Server)
+- Alerts: their game starting, falling behind, losing (and to an unranked team as a ranked one), three-and-out, a turnover on downs, an empty red zone trip, a touchdown wiped out, and falling in or out of the AP Top 25. (Server)
 
 EVERYWHERE
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).

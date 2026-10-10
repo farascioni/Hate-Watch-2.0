@@ -1,4 +1,4 @@
-export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl' | 'ufc';
+export type League = 'nba' | 'wnba' | 'mlb' | 'nfl' | 'nhl' | 'f1' | 'epl' | 'ufc' | 'cfb';
 /** Basketball leagues share detectors (the WNBA's play-by-play is the NBA's shape). */
 export const BASKETBALL = new Set<League>(['nba', 'wnba']);
 /**
@@ -7,6 +7,17 @@ export const BASKETBALL = new Set<League>(['nba', 'wnba']);
  * add it to League and LEAGUES with its slug, and here. Its alerts, detectors, scores and catalog follow.
  */
 export const SOCCER = new Set<League>(['epl']);
+/** Football leagues share detectors, drives and the box score (college games are the NFL's shape). */
+export const FOOTBALL = new Set<League>(['nfl', 'cfb']);
+/**
+ * Leagues of teams only, no players (college football, FBS): no rosters read, so no player alerts, pages or
+ * search; a game is read from its summary alone (plays from its drives), not the play-by-play with players too.
+ */
+export const TEAMS_ONLY = new Set<League>(['cfb']);
+/** A football league's own alert type: the NFL's "nfl.team.three_and_out", college football's "cfb.team.three_and_out". */
+export const footballType = (lg: League, key: string) => `${lg === 'cfb' ? 'cfb' : 'nfl'}.${key}`;
+/** College football: the FBS, ESPN's group 80 (FCS is 81). */
+export const FBS_GROUP = '80';
 
 /**
  * `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1").
@@ -20,9 +31,10 @@ export const LEAGUES: Record<League, { sport: string; name: string; slug?: strin
   f1: { sport: 'racing', name: 'F1' },
   epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League' },
   // The app lists leagues in this order (filter chips, Settings): the WNBA farthest right of the first row of
-  // chips, and the UFC, added after it, on a second row of its own (eight fit a phone's row), so no chip moves.
+  // chips, then the UFC and college football, added after it, on a second row (eight fit a phone's row), so no chip moves.
   wnba: { sport: 'basketball', name: 'WNBA' },
   ufc: { sport: 'mma', name: 'UFC' },
+  cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football' },
 };
 
 export const LEAGUE_IDS = Object.keys(LEAGUES) as League[];
@@ -49,8 +61,9 @@ export const urls = {
   athleteStats: (lg: League, athleteId: string) => `https://site.web.api.espn.com/apis/common/v3/sports/${path(lg)}/athletes/${athleteId}/stats`,
   /** A team's games this season part (preseason / regular / postseason; ?seasontype=N for another; soccer: ?fixture=true for what's to come). */
   teamSchedule: (lg: League, teamId: string) => `${SITE}/${path(lg)}/teams/${teamId}/schedule`,
+  // College football: every FBS game (the default is ESPN's 20 or so featured ones).
   scoreboard: (lg: League, yyyymmdd?: string) =>
-    `${SITE}/${path(lg)}/scoreboard${yyyymmdd ? `?dates=${yyyymmdd}` : ''}`,
+    `${SITE}/${path(lg)}/scoreboard${[yyyymmdd && `dates=${yyyymmdd}`, lg === 'cfb' && `groups=${FBS_GROUP}&limit=300`].filter(Boolean).map((q, i) => `${i ? '&' : '?'}${q}`).join('')}`,
   summary: (lg: League, eventId: string) => `${SITE}/${path(lg)}/summary?event=${eventId}`,
   // NFL site-API plays carry no participants; the core API does (passer, fumbler, kicker...). Soccer's is
   // every touch (1,500 a match), read a page at a time (`page`: 1-based, of `limit`).
@@ -75,6 +88,12 @@ export const urls = {
   /** A UFC card's fight center, and a fighter's page: ESPN's latest MMA videos, each tagged with the fighters in it. */
   ufcFightCenter: (eventId: string) => `https://site.api.espn.com/apis/common/v3/sports/mma/ufc/fightcenter/${eventId}`,
   mmaAthletePage: (athleteId: string) => `https://site.api.espn.com/apis/common/v3/sports/mma/ufc/athletes/${athleteId}`,
+  /** College football: the FBS's conferences (this season's regular season), one conference's teams, every school (one list), the polls. */
+  cfbConferences: (season: number) => `${CORE}/football/leagues/college-football/seasons/${season}/types/2/groups/${FBS_GROUP}/children?limit=50`,
+  cfbGroup: (season: number, groupId: string) => `${CORE}/football/leagues/college-football/seasons/${season}/types/2/groups/${groupId}`,
+  cfbConferenceTeams: (season: number, groupId: string) => `${CORE}/football/leagues/college-football/seasons/${season}/types/2/groups/${groupId}/teams?limit=100`,
+  cfbAllTeams: () => `${SITE}/football/college-football/teams?limit=1000`,
+  cfbRankings: () => `${SITE}/football/college-football/rankings`,
 };
 
 export const playerKey = (lg: League, id: string) => `player:${lg}:${id}`;

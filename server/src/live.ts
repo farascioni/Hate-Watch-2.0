@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { GAME_LEAGUES, LEAGUE_IDS, SOCCER, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
+import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, nflDriveEvents, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
 } from './detectors.ts';
 import { eventChanged, publish } from './fanout.ts';
@@ -32,6 +33,7 @@ export const liveDeps = {
 };
 
 const LIVE_POLL_MS = Number(process.env.HW_LIVE_POLL_MS ?? 2000);      // per live game
+const TEAMS_ONLY_POLL_MS = Number(process.env.HW_TEAMS_ONLY_POLL_MS ?? 5000); // per live college football game
 // ESPN's clips (clips.ts): new clips read from the clip API a few per poll; after the final, the summary every
 // minute for an hour, for the last plays' clips (up to ~10 minutes later) and the recap (20 to 50 minutes).
 const CLIP_READS = 4;
@@ -41,6 +43,9 @@ const CLIPS_AFTER_FINAL_MS = 60 * 60_000;
 const CLIP_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']); // the leagues ESPN has clips for (none for the NFL or soccer in October 2026)
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
+const TEAMS_ONLY_SCOREBOARD_MS = Number(process.env.HW_TEAMS_ONLY_SCOREBOARD_MS ?? 20_000); // college football: every FBS game, a big read
+const TEAMS_ONLY_STANDINGS_MS = 10 * 60_000;
+const TEAMS_ONLY_QUIET_MS = 5 * 60_000; // college football's scoreboard with no game near
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yesterday's finals, for the Scores tab
 const NEWS_MS = Number(process.env.HW_NEWS_MS ?? 3 * 60_000); // off-field trouble, fines and suspensions (news.ts)
@@ -176,10 +181,13 @@ export class GameTracker {
     if (!['pre', 'in'].includes(comp?.status?.type?.state) || this.pre.records) return;
     const rec = (side: string) => comp?.competitors?.find((c: any) => c.homeAway === side)?.record?.find((r: any) => r.type === 'total')?.summary;
     const standings = kvGet<Record<string, { streak?: string }>>(`standings:${league}`) ?? {};
+    // College football: each side's top-25 ranking going in.
+    const rank = (side: string) => { const r = Number(comp?.competitors?.find((c: any) => c.homeAway === side)?.rank); return r >= 1 && r <= 25 ? r : undefined; };
     this.savePre({
       records: { home: rec('home'), away: rec('away') },
       streak: { home: standings[homeId]?.streak ?? '', away: standings[awayId]?.streak ?? '' },
       seasonType: Number(s.header?.season?.type) || undefined,
+      ...(TEAMS_ONLY.has(league) ? { ranks: { home: rank('home'), away: rank('away') } } : {}),
     });
   }
 
@@ -260,8 +268,9 @@ export class GameTracker {
       const t0 = Date.now();
       try { await this.poll(); } catch (e) { log(`[${this.ctx.league} ${this.ctx.gameId}] poll error`, String(e)); }
       this.lastPollMs = Date.now() - t0;
-      // Next poll starts LIVE_POLL_MS after the previous one *started* (never overlapping).
-      await new Promise((r) => setTimeout(r, Math.max(250, LIVE_POLL_MS - this.lastPollMs)));
+      // Next poll starts LIVE_POLL_MS after the previous one *started* (never overlapping); a teams-only league's
+      // (college football: its summary is big, and a Saturday has dozens of games) every TEAMS_ONLY_POLL_MS.
+      await new Promise((r) => setTimeout(r, Math.max(250, (TEAMS_ONLY.has(this.ctx.league) ? TEAMS_ONLY_POLL_MS : LIVE_POLL_MS) - this.lastPollMs)));
     }
   }
 
@@ -308,16 +317,18 @@ export class GameTracker {
 
   async poll() {
     const { league, gameId, homeId, awayId } = this.ctx;
-    const soccer = SOCCER.has(league);
+    const soccer = SOCCER.has(league), teamsOnly = TEAMS_ONLY.has(league);
+    // Soccer's plays are its summary's key events; a teams-only league's (college football) its drives': one read.
     const [core, summary] = await Promise.allSettled([
-      soccer ? Promise.resolve({ items: [] }) : liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
+      soccer || teamsOnly ? Promise.resolve({ items: [] }) : liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
       liveDeps.getJson(urls.summary(league, gameId), { bust: true, timeoutMs: 4000 }),
     ]);
-    if (summary.status === 'rejected' && (soccer || core.status === 'rejected')) throw summary.reason;
+    if (summary.status === 'rejected' && (soccer || teamsOnly || core.status === 'rejected')) throw summary.reason;
 
     const corePlays: NPlay[] = core.status === 'fulfilled' ? (core.value.items ?? []).map(fromCorePlay) : [];
     // NFL summary has no flat plays list (drives only, without participants); core covers it.
     const sitePlays: NPlay[] = summary.status !== 'fulfilled' || league === 'nfl' ? []
+      : teamsOnly ? fromDrivePlays(summary.value)
       : soccer ? fromKeyEvents(summary.value, homeId, awayId) : (summary.value.plays ?? []).map(fromSitePlay);
     const plays = mergePlays(corePlays, sitePlays);
     if (plays.length) this.plays = plays;
@@ -423,7 +434,7 @@ export class GameTracker {
       if (!this.first) events.push(...es); // attaching mid-game: what already happened is history
     }
     // NFL: each finished drive's alerts (three-and-out, on downs, an empty red-zone trip), once; the first read is a baseline.
-    if (league === 'nfl' && summary.status === 'fulfilled') {
+    if (FOOTBALL.has(league) && summary.status === 'fulfilled') {
       for (const d of summary.value.drives?.previous ?? []) {
         if (!d?.result || this.onceDone.has(`drive:${d.id}`)) continue;
         this.onceDone.add(`drive:${d.id}`);
@@ -457,7 +468,7 @@ export class GameTracker {
       home: this.score.home, away: this.score.away, winProb: wp?.homeWinPercentage != null ? winProb(wp) : undefined,
       pitchCounts: league === 'mlb' && summary.status === 'fulfilled' ? boxPitchCounts(summary.value) : undefined,
       goalies: league === 'nhl' && summary.status === 'fulfilled' ? boxGoalies(summary.value, this.ctx.goalies) : undefined,
-      passers: league === 'nfl' && summary.status === 'fulfilled' ? boxPassers(summary.value) : undefined,
+      passers: FOOTBALL.has(league) && summary.status === 'fulfilled' ? boxPassers(summary.value, league) : undefined,
     });
     if (final && this.postseason) {
       // The scoreboard's read (every 10s) finishes it with the series; this is the fallback.
@@ -576,15 +587,19 @@ class LiveEngine {
 
   start() {
     for (const lg of GAME_LEAGUES) {
-      this.kickers[lg] = every(SCOREBOARD_MS, () => this.scanScoreboard(lg));
-      this.standingsKick[lg] = every(STANDINGS_MS, () => scanStandings(lg));
-      every(INJURIES_MS, () => scanInjuries(lg));
+      // A teams-only league (college football): its scoreboard (every FBS game) less often, its standings every
+      // 10 minutes (they move after games), and no injuries or news (player and off-field alerts it doesn't have).
+      const teamsOnly = TEAMS_ONLY.has(lg);
+      this.kickers[lg] = every(teamsOnly ? TEAMS_ONLY_SCOREBOARD_MS : SCOREBOARD_MS, () => this.scanScoreboard(lg));
+      this.standingsKick[lg] = every(teamsOnly ? TEAMS_ONLY_STANDINGS_MS : STANDINGS_MS, () => scanStandings(lg));
+      if (!teamsOnly) every(INJURIES_MS, () => scanInjuries(lg));
       every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
     this.kickers.ufc = startUfc(every); // fight cards, not games: see ufc.ts
+    every(CFB_POLL_MS, () => scanCfbPoll()); // college football's AP Top 25: see cfb-poll.ts
     every(RECAP_MS, async () => weeklyRecaps());
-    for (const lg of LEAGUE_IDS) every(NEWS_MS, () => scanNews(lg));
+    for (const lg of LEAGUE_IDS) if (!TEAMS_ONLY.has(lg)) every(NEWS_MS, () => scanNews(lg));
     this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
   }
 
@@ -601,8 +616,17 @@ class LiveEngine {
     ];
   }
 
+  /** A teams-only league's scoreboard is read every TEAMS_ONLY_SCOREBOARD_MS only around games: else once in TEAMS_ONLY_QUIET_MS. */
+  private quietUntil: Partial<Record<League, number>> = {};
+
   private async scanScoreboard(lg: League) {
+    if (Date.now() < (this.quietUntil[lg] ?? 0)) return;
     const sb = await liveDeps.getJson(urls.scoreboard(lg), { timeoutMs: 6000, bust: true });
+    // College football with no game live or starting within 20 minutes: quiet (a game's tracker reads its own final).
+    if (TEAMS_ONLY.has(lg)) {
+      const near = (sb.events ?? []).some((ev: any) => ev.status?.type?.state === 'in' || (ev.status?.type?.state === 'pre' && Date.parse(ev.date) - Date.now() < 20 * 60_000));
+      this.quietUntil[lg] = near ? 0 : Date.now() + TEAMS_ONLY_QUIET_MS;
+    }
     const watched = watchedTeamKeys();
     // Every game on the board gets a Scores-tab card (they're pushed only to devices that track a side).
     const seen = new Set<string>();
@@ -697,7 +721,8 @@ export function parseStandings(res: any): Map<string, StandingSnap> {
         (seed(a) || 99) - (seed(b) || 99)
         || Number(stat(b, 'winPercent')?.value ?? 0) - Number(stat(a, 'winPercent')?.value ?? 0));
       // The EPL's one group is named for the season ("2026-2027"); the league's own name reads better.
-      const name = node.abbreviation ?? node.name ?? '';
+      // College football's are slugs ("big10", "sec"): its short name ("Big Ten", "SEC") instead.
+      const name = (/^[a-z0-9]+$/.test(String(node.abbreviation ?? '')) ? node.shortName ?? node.name : node.abbreviation ?? node.name) ?? '';
       const group = /^\d{4}-\d{2,4}$/.test(name) && parent ? parent.abbreviation ?? parent.name ?? name : name;
       entries.forEach((e, i) => out.set(String(e.team.id), {
         rank: seed(e) || i + 1,
@@ -745,7 +770,7 @@ export async function scanStandings(lg: League) {
     if (!was || !team) continue;
     const base = { targetKey: team.key, at, meta: { teamId }, moment: `standings:${lg}:${teamId}:${at}` };
     if (/e/i.test(cur.clincher) && !/e/i.test(was.clincher)) {
-      events.push({ ...base, id: `elim:${lg}:${teamId}:${year}`, type: 'team.eliminated', title: `${team.shortName} are ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.`, fold: 'Officially out of playoff contention.' });
+      events.push({ ...base, id: `elim:${lg}:${teamId}:${year}`, type: 'team.eliminated', title: `${team.shortName} ${are(lg)} ELIMINATED ⚰️`, body: `Officially out of playoff contention. See you next year.`, fold: 'Officially out of playoff contention.' });
     }
     for (const [rivalId] of clinched) {
       const div = divisions.get(teamId)?.name;
@@ -763,7 +788,7 @@ export async function scanStandings(lg: League) {
     }
     const m = cur.streak.match(/^L(\d+)$/);
     if (m && Number(m[1]) >= 3 && cur.streak !== was.streak && kvGet(`streak-told:${lg}:${teamId}`) !== cur.streak) {
-      events.push({ ...base, id: `streak:${lg}:${teamId}:${day}:${cur.streak}`, type: 'team.losing_streak', title: `${team.shortName} have lost ${m[1]} straight`, body: `Current streak: ${cur.streak}`, fold: `Lost ${m[1]} straight.` });
+      events.push({ ...base, id: `streak:${lg}:${teamId}:${day}:${cur.streak}`, type: 'team.losing_streak', title: `${team.shortName} ${have(lg)} lost ${m[1]} straight`, body: `Current streak: ${cur.streak}`, fold: `Lost ${m[1]} straight.` });
     }
   }
   if (events.length) publish(events, lg);

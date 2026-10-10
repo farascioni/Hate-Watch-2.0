@@ -15,7 +15,7 @@ export interface Player {
 }
 
 /** Bump when what ingest() collects changes (2: injured lists, 3: every position played, 4: UFC weight classes), so the next boot rebuilds the catalog instead of waiting. */
-export const INGEST_VERSION = 4;
+export const INGEST_VERSION = 5;
 export const INGEST_EVERY_MS = 6 * 3600_000;
 
 /**
@@ -119,6 +119,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
   const newTeams: Team[] = [];
   const newPlayers: Player[] = [];
   let ufcClasses: { classes: WeightClass[]; belts: Belts } | undefined; // each weight class's top fighters (Search) and belts (ufc-classes.ts)
+  let cfbConferences: Record<string, string> | undefined; // each FBS team's conference (standings)
 
   for (const lg of LEAGUE_IDS) {
     const stats: IngestReport['leagues'][string] = { teams: 0, players: 0, duplicateIdsRemoved: 0, duplicateNamesRemoved: 0, headshotsVerified: 0, headshotFallbackToLogo: 0, headshotAltMismatch: 0 };
@@ -134,6 +135,18 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
       newPlayers.push(...ufc.players);
       if ('classes' in ufc) ufcClasses = { classes: ufc.classes!, belts: ufc.belts! };
       log(`[ingest] UFC: ${ufc.players.length} fighters (${stats.headshotsVerified} photos checked, ${stats.headshotFallbackToLogo} badges)`);
+      continue;
+    }
+
+    if (lg === 'cfb') {
+      // College football is teams only (no rosters): ESPN failing keeps the schools we have.
+      const cfb = await ingestCfb(stats).catch((e) => {
+        report.problems.push(`cfb: ${String(e)}; kept the teams already in the catalog`);
+        return { teams: [...teams.values()].filter((t) => t.league === 'cfb'), conferences: undefined };
+      });
+      newTeams.push(...cfb.teams);
+      if (cfb.conferences) cfbConferences = cfb.conferences;
+      log(`[ingest] CFB: ${cfb.teams.length} FBS teams`);
       continue;
     }
 
@@ -253,8 +266,41 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
   });
   kvSet('ingest:report', report);
   if (ufcClasses) { kvSet('ufc:weight-classes', ufcClasses.classes); kvSet('ufc:belts', ufcClasses.belts); }
+  if (cfbConferences) kvSet('cfb:conferences', cfbConferences);
   loadCatalog();
   return report;
+}
+
+// ─── College football: the FBS's teams ─────────────────────────────────────────────────────────
+/** The college season a date is in, by the year it starts: August to January is one season (realignment takes effect July 1). */
+export const cfbSeason = (now = new Date()) => (now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1);
+
+/**
+ * The FBS's teams, no players: each of its conferences (a name and a list of team ids) and ESPN's list of every
+ * school (its name, "Nebraska" for the short one, colors and logos): about 24 reads, no logo checks (ESPN's are
+ * all 500×500). Fewer than 100 teams found is a bad read, not the FBS.
+ */
+export async function ingestCfb(stats: IngestReport['leagues'][string]): Promise<{ teams: Team[]; conferences: Record<string, string> }> {
+  const season = cfbSeason();
+  const groups: string[] = ((await getJson(urls.cfbConferences(season))).items ?? []).map((x: any) => String(x.$ref ?? '').match(/groups\/(\d+)/)?.[1]).filter(Boolean);
+  const conferences: Record<string, string> = {}; // ESPN team id → its conference ("Big Ten")
+  await mapLimit(groups, 4, async (id) => {
+    const [g, list] = await Promise.all([getJson(urls.cfbGroup(season, id)), getJson(urls.cfbConferenceTeams(season, id))]);
+    for (const t of list.items ?? []) {
+      const teamId = String(t.$ref ?? '').match(/teams\/(\d+)/)?.[1];
+      if (teamId) conferences[teamId] = String(g.shortName ?? g.name ?? '');
+    }
+  });
+  if (Object.keys(conferences).length < 100) throw new Error(`only ${Object.keys(conferences).length} FBS teams in ${groups.length} conferences`);
+  const all: any[] = (await getJson(urls.cfbAllTeams())).sports?.[0]?.leagues?.[0]?.teams?.map((x: any) => x.team) ?? [];
+  const teams = all.filter((t) => conferences[String(t.id)]).map((t): Team => ({
+    key: teamKey('cfb', String(t.id)), league: 'cfb', espnId: String(t.id), name: t.displayName, shortName: t.shortDisplayName ?? t.location ?? t.name, abbrev: t.abbreviation,
+    location: t.location ?? null, color: t.color ? `#${t.color}` : null, altColor: t.alternateColor ? `#${t.alternateColor}` : null,
+    logo: pickLogo(t, 'default') ?? `https://a.espncdn.com/i/teamlogos/ncaa/500/${t.id}.png`, logoDark: pickLogo(t, 'dark') ?? null, logoW: 500, logoH: 500,
+  }));
+  if (teams.length < 100) throw new Error(`only ${teams.length} of ${Object.keys(conferences).length} FBS teams in ESPN's list of schools`);
+  stats.teams = teams.length;
+  return { teams, conferences };
 }
 
 // ─── Formula 1 ────────────────────────────────────────────────────────────────────────────────

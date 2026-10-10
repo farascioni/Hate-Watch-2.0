@@ -5,7 +5,7 @@ import { db, kvGet } from './db.ts';
 import { catalog, search, teamDto, playerDto, targetDto, listed, type Player } from './catalog.ts';
 import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
-import { LEAGUES, LEAGUE_IDS, type League } from './leagues.ts';
+import { LEAGUES, LEAGUE_IDS, TEAMS_ONLY, type League } from './leagues.ts';
 import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { privacyPage, supportPage } from './pages.ts';
@@ -55,7 +55,8 @@ function authDevice(header: string | undefined | null): string | undefined {
 // ─── Public ───────────────────────────────────────────────────────────────────────────────────
 route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status() }));
 // Each league's sport too: the app shows any soccer league's matches the soccer way.
-route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport })), types: EVENT_TYPES }));
+// `teamsOnly`: a league with no players (college football): the app offers only its teams.
+route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));
 route('GET', '/catalog/report', false, () => kvGet('ingest:report'));
 route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {

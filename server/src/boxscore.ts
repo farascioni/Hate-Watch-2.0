@@ -58,6 +58,10 @@ const SPECS: Partial<Record<League, Spec[]>> = {
     { group: 'punting', title: 'Punting', cols: ['NO', 'AVG', 'LONG'] },
   ],
 };
+// College football: the NFL's groups, but passing has no sacks (QBR instead) and receiving no targets. No player
+// is in the catalog (teams only), so names don't open pages.
+SPECS.cfb = SPECS.nfl!.map((g) => g.group === 'passing' ? { ...g, cols: ['C/ATT', 'YDS', 'TD', 'INT', 'QBR'], bad: (v) => [n(v('INT')) >= 1 && 'INT'] }
+  : g.group === 'receiving' ? { ...g, cols: ['REC', 'YDS', 'AVG', 'TD', 'LONG'] } : g);
 
 /** Soccer's lines are in the line-ups (rosters), by stat name, not in a box score. */
 const SOCCER_COLS: [string, string][] = [['G', 'totalGoals'], ['A', 'goalAssists'], ['SH', 'totalShots'], ['SOG', 'shotsOnTarget'], ['FC', 'foulsCommitted'], ['YC', 'yellowCards'], ['RC', 'redCards']];
