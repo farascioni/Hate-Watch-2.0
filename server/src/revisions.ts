@@ -182,12 +182,12 @@ export class PlayLedger {
       const sent = x.dropped.get(k);
       if (sent) { x.dropped.delete(k); x.alerts.set(k, sent); again.push(sent); } else { x.alerts.set(k, e); fresh.push(e); }
     }
-    const againLine = back ? 'ESPN has since put this play back.' : p && REVIEW.test(p.text) ? 'Overturned on review: it stands.' : 'ESPN has since changed this play back.';
+    const restoredLine = back ? 'ESPN has since put this play back.' : p && REVIEW.test(p.text) ? 'Overturned on review: it stands.' : 'ESPN has since changed this play back.';
     if (lines.length || fresh.length || again.length) {
       const what = [...lines.map((e) => `took back ${e.type} → ${e.targetKey}`), ...fresh.map((e) => `new ${e.type} → ${e.targetKey}`), ...again.map((e) => `${e.type} → ${e.targetKey} stands again`)].join(', ');
-      this.log(`play ${was.id}${p && p.id !== was.id ? ` (now ${p.id})` : ''} changed: ${what}${lines.length ? ` (${why})` : ''}${again.length ? ` (${againLine})` : ''}`);
+      this.log(`play ${was.id}${p && p.id !== was.id ? ` (now ${p.id})` : ''} changed: ${what}${lines.length ? ` (${why})` : ''}${again.length ? ` (${restoredLine})` : ''}`);
     }
-    lines.push(...this.linesOn(again, againLine));
+    lines.push(...this.linesOn(again, restoredLine));
     return { fresh, lines };
   }
 
