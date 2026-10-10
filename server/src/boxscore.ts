@@ -124,9 +124,99 @@ function fromRosters(lg: League, s: any): BoxTeam[] {
   });
 }
 
-/** The box score once the game has started (soccer's line-ups are out before kickoff, all zeros), and never for F1. */
+// ─── Before the start: a preview, as tables ─────────────────────────────────────────────────────
+// ESPN's summary has no player lines before a game (soccer's line-ups are all zeros), but it has each side's
+// season leaders, season stats, last five games and injuries, the matchup predictor, and the season series.
+// They go out as box-score tables, so every build's Box score tab shows them before the start.
+
+/** A leader category's column: its short label, and the bit of ESPN's value that's its number ("843" of "72/104, 843 YDS, 8 TD"). */
+const LEADER_COLS: Record<string, [string, RegExp?]> = {
+  'Batting Average': ['AVG'], 'Home Runs': ['HR'], 'Runs Batted In': ['RBI'], 'Earned Run Average': ['ERA'], Wins: ['W'], Strikeouts: ['K'],
+  'Passing Yards': ['PASS', /([\d,]+) YDS/], 'Rushing Yards': ['RUSH', /([\d,]+) YDS/], 'Receiving Yards': ['REC', /([\d,]+) YDS/], Sacks: ['SACK'], Tackles: ['TKL'],
+  Points: ['PTS'], Rebounds: ['REB'], Assists: ['AST', /Assists: (\d+)/], Goals: ['G', /Goals: (\d+)/], 'Total Shots': ['SH', /Shots: (\d+)/],
+  'Accurate Passes': ['PASS', /Passes: (\d+)/], Saves: ['SV', /Saves: (\d+)/],
+};
+const leaderCol = (name: string): [string, RegExp?] => LEADER_COLS[name] ?? [name.split(/\s+/).map((w) => w[0]).join('').toUpperCase()];
+/** MLB's season stats come in full tables: the few worth a look, by group and name. Other sports' come as a short list. */
+const MLB_STATS: [string, string, string][] = [
+  ['batting', 'avg', 'Batting average'], ['batting', 'runs', 'Runs'], ['batting', 'homeRuns', 'Home runs'], ['batting', 'OPS', 'OPS'],
+  ['pitching', 'ERA', 'ERA'], ['pitching', 'WHIP', 'WHIP'], ['pitching', 'strikeouts', 'Strikeouts (pitching)'], ['fielding', 'errors', 'Errors'],
+];
+const MAX_STATS = 10;
+
+/** One side's season stats, by label: MLB's few, or the short list ESPN sends for the others. */
+function seasonStats(lg: League, t: any): Map<string, string> {
+  const st: any[] = t?.statistics ?? [];
+  if (lg === 'mlb') {
+    return new Map(MLB_STATS.flatMap(([group, name, label]) => {
+      const v = st.find((g) => g.name === group)?.stats?.find((x: any) => x.name === name)?.displayValue;
+      return v != null ? [[label, String(v)]] : [];
+    }));
+  }
+  return new Map(st.filter((x) => x.displayValue != null && !Array.isArray(x.stats)).slice(0, MAX_STATS).map((x) => [String(x.label ?? x.displayName ?? x.name), String(x.displayValue)]));
+}
+
+/** The preview: each side's season leaders, both sides' season stats, its last five, its injuries; null if ESPN has none of it. */
+export function previewBox(lg: League, s: any): BoxTeam[] {
+  const sides: any[] = s?.header?.competitions?.[0]?.competitors ?? [];
+  const home = sides.find((c) => c.homeAway === 'home'), away = sides.find((c) => c.homeAway === 'away');
+  if (!home || !away) return [];
+  const idOf = (c: any) => String(c.team?.id ?? c.id ?? '');
+  const abbr = (c: any) => String(c.team?.abbreviation ?? '');
+  const statsOf = (c: any) => seasonStats(lg, (s.boxscore?.teams ?? []).find((t: any) => String(t.team?.id) === idOf(c)));
+  const [awayStats, homeStats] = [statsOf(away), statsOf(home)];
+  const labels = [...new Set([...awayStats.keys(), ...homeStats.keys()])];
+  // What both sides share: their season stats side by side, with ESPN's predictor, the season series and the venue.
+  const odds = s.predictor?.homeTeam?.gameProjection != null ? Number(s.predictor.homeTeam.gameProjection) : null;
+  const fav = odds == null ? null : odds >= 50 ? [abbr(home), odds] as const : [abbr(away), 100 - odds] as const;
+  const series = (s.seasonseries ?? []).find((x: any) => x.type === 'season' || x.type === 'head-to-head')?.summary;
+  const venue = s.gameInfo?.venue?.fullName;
+  const note = [fav && `ESPN's matchup predictor: ${fav[0]} ${Math.round(fav[1])}%.`, series && `${/head/.test(String((s.seasonseries ?? []).find((x: any) => x.summary === series)?.type)) ? 'Head to head' : 'Regular season'}: ${series}.`, venue && `At ${venue}.`].filter(Boolean).join(' ');
+  const shared: BoxGroup | null = labels.length ? {
+    title: 'Season stats', columns: [abbr(away), abbr(home)],
+    rows: labels.map((label) => ({ key: `stat:${label}`, name: label, link: false, stats: [awayStats.get(label) ?? '–', homeStats.get(label) ?? '–'] })),
+    ...(note ? { note } : {}),
+  } : null;
+
+  const side = (c: any): BoxTeam => {
+    const id = idOf(c);
+    const groups: BoxGroup[] = [];
+    // Season leaders: a column a category, a row a player (one who leads three is one row).
+    const cats: any[] = (s.leaders ?? []).find((l: any) => String(l.team?.id) === id)?.leaders ?? [];
+    const cols = cats.map((cat) => leaderCol(String(cat.displayName ?? cat.name)));
+    const byPlayer = new Map<string, { a: any; stats: string[] }>();
+    cats.forEach((cat, i) => {
+      const top = cat.leaders?.[0];
+      if (!top?.athlete?.id) return;
+      const raw = String(top.displayValue ?? '');
+      const value = cols[i][1]?.exec(raw)?.[1] ?? raw;
+      const r = byPlayer.get(String(top.athlete.id)) ?? { a: top, stats: cats.map(() => '') };
+      r.stats[i] = value;
+      byPlayer.set(String(top.athlete.id), r);
+    });
+    if (byPlayer.size) groups.push({ title: 'Season leaders', columns: cols.map(([c]) => c), rows: [...byPlayer.values()].map(({ a, stats }) => row(lg, a, stats, [], { detail: a.athlete?.position?.abbreviation })) });
+    if (shared) groups.push(shared);
+    const last: any[] = (s.lastFiveGames ?? []).find((f: any) => String(f.team?.id) === id)?.events ?? [];
+    if (last.length) {
+      groups.push({ title: 'Last 5 games', columns: ['Result'], rows: last.map((e, i) => ({
+        key: `last:${id}:${i}`, name: `${e.atVs === '@' ? '@' : 'vs'} ${e.opponent?.abbreviation ?? '?'}`, link: false,
+        detail: e.gameDate ? new Date(e.gameDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) : undefined,
+        stats: [`${e.gameResult ?? ''} ${e.score ?? ''}`.trim()], ...(e.gameResult === 'L' ? { bad: [0] } : {}),
+      })) });
+    }
+    const hurt: any[] = (s.injuries ?? []).find((x: any) => String(x.team?.id) === id)?.injuries ?? [];
+    if (hurt.length) {
+      groups.push({ title: 'Injuries', columns: ['Status', 'Injury'], rows: hurt.filter((x) => x.athlete?.id).map((x) => row(lg, x, [String(x.status ?? ''), String(x.details?.type ?? '')], [], { detail: x.athlete?.position?.abbreviation })) });
+    }
+    return { ...teamInfo(lg, id), groups };
+  };
+  return [side(away), side(home)].filter((t) => t.groups.some((g) => g.rows.length));
+}
+
+/** The box score once the game has started; before, its preview (previewBox). Never for F1. */
 export function boxScore(g: Pick<GameCard, 'league' | 'state' | 'home' | 'away'>, summary: any): BoxScore | null {
-  if (g.league === 'f1' || g.state === 'pre') return null;
+  if (g.league === 'f1') return null;
+  if (g.state === 'pre') { const teams = previewBox(g.league, summary); return teams.length ? { teams } : null; }
   const teams = (SOCCER.has(g.league) ? fromRosters(g.league, summary) : fromBoxscore(g.league, summary)).filter((t) => t.groups.some((gr) => gr.rows.length));
   if (!teams.length) return null;
   const away = g.away?.team.key;

@@ -73,7 +73,56 @@ test("Soccer: the line-ups' stats (starters, the subs who came on, the keeper); 
     ['Substitutes', ['W. Endo 0 0 0 0 2 0 0']],
     ['Goalkeeping', ['A. Becker 4 3 red:GA']],
   ]);
-  assert.equal(boxScore(game('epl', 'pre'), s), null, 'line-ups come out before kickoff, all zeros');
+  assert.equal(boxScore(game('epl', 'pre'), s), null, 'line-ups come out before kickoff, all zeros: not shown (a preview comes from the rest of the summary)');
   assert.equal(boxScore(game('f1'), s), null);
   assert.equal(boxScore(game('mlb'), { boxscore: { players: [] } }), null, 'no box score yet');
+});
+
+// ALDS Game 5, CHW @ CLE (2026-10-10), as ESPN's summary had it the day before, trimmed.
+const side = (homeAway: string, id: string, abbreviation: string) => ({ homeAway, team: { id, abbreviation } });
+const lead = (displayName: string, id: string, shortName: string, pos: string, displayValue: string) => ({ displayName, leaders: [{ displayValue, athlete: { id, shortName, position: { abbreviation: pos } } }] });
+const PREVIEW = {
+  header: { competitions: [{ competitors: [side('home', '10', 'NYY'), side('away', '9', 'MIN')] }] },
+  leaders: [
+    { team: { id: '9' }, leaders: [lead('Batting Average', '41205', 'T. Larnach', 'LF', '.277'), lead('Earned Run Average', '7', 'S. Burke', 'SP', '3.34'), lead('Wins', '7', 'S. Burke', 'SP', '11'), lead('Strikeouts', '7', 'S. Burke', 'SP', '185')] },
+    { team: { id: '10' }, leaders: [lead('Home Runs', '33192', 'A. Judge', 'RF', '18')] },
+  ],
+  boxscore: { teams: [
+    { team: { id: '9' }, statistics: [{ name: 'batting', stats: [{ name: 'avg', displayValue: '.236' }, { name: 'runs', displayValue: '776' }, { name: 'gamesPlayed', displayValue: '162' }] }, { name: 'pitching', stats: [{ name: 'ERA', displayValue: '4.12' }] }] },
+    { team: { id: '10' }, statistics: [{ name: 'batting', stats: [{ name: 'avg', displayValue: '.239' }, { name: 'runs', displayValue: '678' }] }, { name: 'pitching', stats: [{ name: 'ERA', displayValue: '3.77' }] }] },
+  ], players: [{ team: { id: '9' }, statistics: [{ name: 'batting', labels: BATTING, athletes: [] }] }] },
+  lastFiveGames: [{ team: { id: '9' }, events: [{ atVs: '@', opponent: { abbreviation: 'HOU' }, gameResult: 'W', score: '7-3', gameDate: '2026-09-30T23:00Z' }, { atVs: 'vs', opponent: { abbreviation: 'NYY' }, gameResult: 'L', score: '9-5', gameDate: '2026-10-08T23:00Z' }] }],
+  injuries: [{ team: { id: '10' }, injuries: [{ status: '10-Day-IL', details: { type: 'Back' }, athlete: { id: '35291', shortName: 'R. Hoskins', position: { abbreviation: '1B' } } }] }],
+  predictor: { homeTeam: { id: '10', gameProjection: '57.1' }, awayTeam: { id: '9', gameProjection: '42.9' } },
+  seasonseries: [{ type: 'current', summary: 'Series tied 2-2' }, { type: 'season', summary: 'MIN win series 7-6' }],
+  gameInfo: { venue: { fullName: 'Progressive Field' } },
+};
+const show = (b: any) => b.teams.map((t: any) => [t.abbrev, t.groups.map((g: any) => [g.title, g.columns.join(' '), g.rows.map((r: any) => `${r.name}${r.detail ? ` (${r.detail})` : ''}: ${r.stats.join(' ')}${r.bad ? ' red' : ''}${r.link ? ' link' : ''}`), g.note ?? ''])]);
+
+test("before the start, a preview as tables (every build's Box score tab): each side's leaders, both sides' season stats, its last five, its injuries", () => {
+  const box = boxScore(game('mlb', 'pre'), PREVIEW)!;
+  const stats = ['Season stats', 'MIN NYY', ['Batting average: .236 .239', 'Runs: 776 678', 'ERA: 4.12 3.77'],
+    "ESPN's matchup predictor: NYY 57%. Regular season: MIN win series 7-6. At Progressive Field."];
+  assert.deepEqual(show(box), [
+    ['MIN', [
+      ['Season leaders', 'AVG ERA W K', ['T. Larnach (LF): .277    link', 'S. Burke (SP):  3.34 11 185'], ''],
+      stats,
+      ['Last 5 games', 'Result', ['@ HOU (Sep 30): W 7-3', 'vs NYY (Oct 8): L 9-5 red'], ''],
+    ]],
+    ['NYY', [
+      ['Season leaders', 'HR', ['A. Judge (RF): 18'], ''],
+      stats,
+      ['Injuries', 'Status Injury', ['R. Hoskins (1B): 10-Day-IL Back'], ''],
+    ]],
+  ], 'away first; a pitcher who leads three is one row; the season stats are the same table on both sides, the series and the predictor under them');
+});
+
+test("the preview from other sports' shapes: a short list of season stats as ESPN labels them, a leader's number out of ESPN's line", () => {
+  const nfl = { ...PREVIEW, boxscore: { teams: [{ team: { id: '9' }, statistics: [{ name: 'totalPointsPerGame', label: 'Points Per Game', displayValue: '18.8' }] }] },
+    leaders: [{ team: { id: '10' }, leaders: [lead('Passing Yards', '1', 'J. Hurts', 'QB', '72/104, 843 YDS, 8 TD, 2 INT'), lead('Goals', '2', 'B. Saka', 'F', 'Matches: 5, Goals: 3')] }],
+    lastFiveGames: [], injuries: [], predictor: undefined, seasonseries: [], gameInfo: {} };
+  const box = boxScore(game('nfl', 'pre'), nfl)!;
+  assert.deepEqual(box.teams[1].groups.find((g) => g.title === 'Season leaders')?.rows.map((r) => r.stats), [['843', ''], ['', '3']], 'the home side\'s');
+  assert.deepEqual(box.teams[0].groups.find((g) => g.title === 'Season stats')?.rows.map((r) => [r.name, ...r.stats]), [['Points Per Game', '18.8', '–']], "a side ESPN sent nothing for: a dash");
+  assert.equal(boxScore(game('nfl', 'pre'), { header: { competitions: [{ competitors: [] }] } }), null, 'nothing to preview: no tab of blanks');
 });
