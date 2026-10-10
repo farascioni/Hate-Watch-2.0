@@ -16,6 +16,65 @@ export function Chip({ label, active, onPress, color, style }: { label: string; 
   );
 }
 
+/** One chip in a ChipRows: its label, whether it's picked, and its color when picked. */
+export interface ChipItem { key: string; label: string; active?: boolean; color?: string; onPress: () => void }
+
+/**
+ * The rows a ChipRows lays its chips out in, as indexes: all on one row when they fit (`widths`: each chip's own
+ * width, `width`: the row's), else the first (All) on a row of its own and the rest on as few rows as they fit on,
+ * as even as can be, the longer rows first, so no chip is left alone on a row.
+ */
+export function chipRows(widths: number[], width: number, gap: number): number[][] {
+  const fits = (ix: number[]) => ix.reduce((sum, i) => sum + widths[i], 0) + gap * (ix.length - 1) <= width + 0.5;
+  const all = widths.map((_, i) => i);
+  if (fits(all)) return [all];
+  const rest = all.slice(1);
+  for (let rows = 1; rows < rest.length; rows++) {
+    const split: number[][] = [];
+    for (let r = 0, at = 0; r < rows; r++) { const n = Math.ceil((rest.length - at) / (rows - r)); split.push(rest.slice(at, at + n)); at += n; }
+    if (split.every(fits)) return [[0], ...split];
+  }
+  return [[0], ...rest.map((i) => [i])];
+}
+
+/**
+ * Filter chips that fill the width (the league filter, a roster's positions): on one row when they all fit, each
+ * stretched to share it; when they don't, All across the top and the rest evenly below it (chipRows). Each chip's
+ * own width comes from an unseen copy of them that can't be pressed or read out; until it's in, they wrap as they come.
+ */
+export function ChipRows({ items, gap, chipStyle, style, accessibilityLabel }: {
+  items: ChipItem[]; gap: number; chipStyle?: StyleProp<ViewStyle>; style?: StyleProp<ViewStyle>; accessibilityLabel?: string;
+}) {
+  const [width, setWidth] = useState(0); // the rows', inside `style`'s padding
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const rows = width > 0 && items.every((i) => widths[i.key] > 0) ? chipRows(items.map((i) => widths[i.key]), width, gap) : null;
+  const chip = (i: ChipItem) => <Chip label={i.label} active={i.active} color={i.color} onPress={i.onPress} style={chipStyle} />;
+  return (
+    <View style={style} accessibilityLabel={accessibilityLabel}>
+      {/* A hidden tab can lay out at 0 wide: keep the last real width. */}
+      <View style={[styles.chipRows, { gap }]} onLayout={(e) => { const w = e.nativeEvent.layout.width; if (w > 0 && Math.abs(w - width) > 0.5) setWidth(w); }}>
+        {rows ? rows.map((row, r) => (
+          <View key={r} style={[styles.chipRow, { gap }]}>
+            {row.map((i) => <View key={items[i].key} style={styles.chipCell}>{chip(items[i])}</View>)}
+          </View>
+        )) : (
+          <View style={[styles.chipRow, styles.chipWrap, { gap }]}>
+            {items.map((i) => <View key={i.key} style={styles.chipCell}>{chip(i)}</View>)}
+          </View>
+        )}
+        <View style={styles.chipMeasure} pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {items.map((i) => (
+            <View key={i.key} style={[styles.chip, chipStyle, styles.chipNatural]}
+              onLayout={(e) => { const w = e.nativeEvent.layout.width; if (w > 0) setWidths((m) => (Math.abs((m[i.key] ?? 0) - w) > 0.5 ? { ...m, [i.key]: w } : m)); }}>
+              <Text style={styles.chipText} numberOfLines={1}>{i.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function LeagueTag({ league }: { league: string }) {
   const { leagueInfo } = useStore(); // its short name from the server ("EPL"), for leagues this build doesn't know too
   return (
@@ -155,6 +214,13 @@ const styles = StyleSheet.create({
   liveText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   chip: { paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   chipText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
+  // ChipRows: its rows clip the unseen copy (a long row of every chip, wider than the screen) so it can't scroll the page.
+  chipRows: { overflow: 'hidden' },
+  chipRow: { flexDirection: 'row' },
+  chipWrap: { flexWrap: 'wrap' },
+  chipCell: { flexGrow: 1, flexBasis: 'auto' },
+  chipMeasure: { position: 'absolute', left: 0, top: 0, width: 4000, flexDirection: 'row', alignItems: 'flex-start', opacity: 0 },
+  chipNatural: { flexShrink: 0 },
   tag: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
   tagText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   follow: { paddingHorizontal: space(4), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1.5, minWidth: 92, alignItems: 'center' },

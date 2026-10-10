@@ -42,7 +42,7 @@ EVERYWHERE
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert, not its own alert. (Server)
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
 - The Scores tab's switch says what it lists: events, games or fights.
-- The league filters fit on one row again, even on an iPhone SE.
+- Filters too wide for one row put All on top, the rest evenly below.
 - Clips don't play on their own: open one, then press play.
 - Tapping an alert opens all of it on its own screen; its photo opens their page.
 - Buttons center their labels, and VoiceOver reads them as buttons.

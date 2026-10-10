@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Chip } from './ui';
+import { ChipRows } from './ui';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import { leagueColor, leagueUi } from '../lib/leagueUi';
@@ -90,19 +90,13 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
           );
         })}
       </View> : null}
-      <View style={styles.leagues}>
-        <Chip label="All" active={!filter.league} onPress={() => onChange({ ...filter, league: undefined })} style={styles.leagueChip} />
-        {leagues.map((l) => (
-          <Chip
-            key={l.id}
-            label={l.name}
-            active={filter.league === l.id}
-            color={leagueColor(l.id)}
-            onPress={() => onChange({ ...filter, league: filter.league === l.id ? undefined : l.id })}
-            style={styles.leagueChip}
-          />
-        ))}
-      </View>
+      <ChipRows style={styles.leagues} gap={space(1)} chipStyle={styles.leagueChip} items={[
+        { key: 'all', label: 'All', active: !filter.league, onPress: () => onChange({ ...filter, league: undefined }) },
+        ...leagues.map((l) => ({
+          key: l.id, label: l.name, active: filter.league === l.id, color: leagueColor(l.id),
+          onPress: () => onChange({ ...filter, league: filter.league === l.id ? undefined : l.id }),
+        })),
+      ]} />
     </View>
   );
 }
@@ -113,8 +107,7 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: colors.surfaceHi },
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: colors.text },
-  // Wraps to a second row if the server adds leagues past what fits (each chip stays whole).
-  leagues: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1), paddingHorizontal: space(3), paddingBottom: space(2) },
-  // Sized to their labels, then stretched to fill the row: nine chips (All to UFC) fit an iPhone SE without squeezing "WNBA".
-  leagueChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 1 },
+  // One row while every league fits (an iPhone SE, All to CFB); past that, All across the top and the leagues below (ChipRows).
+  leagues: { paddingHorizontal: space(3), paddingBottom: space(2) },
+  leagueChip: { paddingHorizontal: 1 },
 });

@@ -6,7 +6,7 @@ import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { FeedCard } from '../../components/FeedCard';
 import { StatsView } from '../../components/StatsView';
-import { Chip, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
+import { ChipRows, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
 import type { FeedItem, Player, StatsPage, Target } from '../../lib/types';
 import { ROSTER_GROUPS } from '../../lib/positions';
@@ -91,12 +91,10 @@ export default function TargetScreen() {
       )}
       {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
       {groups.length > 1 ? (
-        <View style={styles.positions} accessibilityLabel="Filter the roster by position">
-          <Chip label={`All ${target.roster!.length}`} active={!position} onPress={() => setPosition(null)} style={styles.positionChip} />
-          {groups.map((g) => (
-            <Chip key={g.label} label={`${g.label} ${g.players.length}`} active={position === g.label} onPress={() => setPosition(position === g.label ? null : g.label)} style={styles.positionChip} />
-          ))}
-        </View>
+        <ChipRows style={styles.positions} gap={space(1.5)} chipStyle={styles.positionChip} accessibilityLabel="Filter the roster by position" items={[
+          { key: 'all', label: `All ${target.roster!.length}`, active: !position, onPress: () => setPosition(null) },
+          ...groups.map((g) => ({ key: g.label, label: `${g.label} ${g.players.length}`, active: position === g.label, onPress: () => setPosition(position === g.label ? null : g.label) })),
+        ]} />
       ) : null}
     </View>
   );
@@ -132,6 +130,6 @@ const styles = StyleSheet.create({
   noteText: { color: colors.textDim, fontSize: 14, textAlign: 'center' },
   retry: { color: colors.text, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   // Wraps like the league chips in Search: every position group in view, each chip whole.
-  positions: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2) },
-  positionChip: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: space(2) },
+  positions: { paddingHorizontal: space(3), paddingBottom: space(2) },
+  positionChip: { paddingHorizontal: space(2) },
 });
