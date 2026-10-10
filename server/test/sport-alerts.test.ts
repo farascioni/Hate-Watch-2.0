@@ -312,6 +312,23 @@ test('Soccer: into the relegation zone, with the drop that put them there as a l
   assert.deepEqual(got('hammers-table'), ['epl.team.relegation_zone: West Ham dropped into the relegation zone | Down to 18th in the Premier League. Down from 17th. Into the relegation zone 🪂']);
 });
 
+test('Soccer: a loss that drops them into the relegation zone is one alert, the table as lines on it', async () => {
+  const { kvSet } = await import('../src/db.ts');
+  const { liveDeps, scanStandings } = await import('../src/live.ts');
+  const { urls } = await import('../src/leagues.ts');
+  fan('chelsea-loss', ['team:epl:363']);
+  publish([gameLostEvent({ league: 'epl', gameId: 'G-CHE', homeId: '363', awayId: '371' }, { home: 1, away: 2 }, Date.now() - 60_000)!], 'epl');
+  kvSet('standings:epl', { 363: { rank: 17, group: 'Premier League', clincher: '', streak: '' }, 371: { rank: 4, group: 'Premier League', clincher: '', streak: '' } });
+  const entry = (id: string, rank: number, note?: string) => ({ team: { id }, stats: [{ name: 'rank', value: rank }], ...(note ? { note: { description: note } } : {}) });
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = async (url: string) => {
+    if (url.startsWith(urls.standings('epl'))) return { name: 'English Premier League', abbreviation: 'Premier League', children: [{ name: '2026-27 English Premier League', abbreviation: '2026-2027', standings: { entries: [entry('363', 18, 'Relegation'), entry('371', 4)] } }] };
+    throw new Error(`unexpected ${url}`);
+  };
+  try { await scanStandings('epl'); } finally { liveDeps.getJson = prev; }
+  assert.deepEqual(got('chelsea-loss'), ['team.lost: Successful Hate Watch! Chelsea lost to West Ham | Into the relegation zone. Down from 17th to 18th in the Premier League. Final Score: 2 to 1']);
+});
+
 // ─── F1 ───────────────────────────────────────────────────────────────────────────────────────
 const f1Meta = (kind: any) => ({ compId: `C-${kind}`, kind, label: 'Test GP', at: 0 });
 const car = (id: string, order: number, grid: number, team: string, x: object = {}) => ({ id, order, grid, out: false, outLabel: '', lap: null, teamKey: `team:f1:${team}`, ...x });

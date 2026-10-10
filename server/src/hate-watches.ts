@@ -22,6 +22,12 @@ export const isLossAlert = (e: { type: string; meta?: Record<string, unknown> | 
 const LOSS_TYPES = ['team.lost', 'player.team_lost', ...HEAVY_LOSSES, 'ufc.lost'];
 /** SQL: an `events e` row that is one of a loss's alerts (a loss type, or a fact of the loss sent in its place). */
 const LOSS_ROW = (e: string) => `(${e}.type IN (${LOSS_TYPES.map((t) => `'${t}'`).join(', ')}) OR json_extract(${e}.meta, '$.lostId') IS NOT NULL)`;
+/**
+ * SQL: an `events e` row that is one of a team's loss alerts, whichever a device got: the loss (soccer's 3+ goal one
+ * too), a fact of it sent in its place, or "their team lost" for a player on it (those two carry the team's
+ * `teamKey`). Takes the team's key twice.
+ */
+export const LOSS_ABOUT = (e: string) => `((${e}.target_key = ? AND ${LOSS_ROW(e)}) OR (json_extract(${e}.meta, '$.teamKey') = ? AND json_extract(${e}.meta, '$.lostId') IS NOT NULL))`;
 
 const ins = () => db.prepare('INSERT INTO hate_watches (device_id, event_id, target_key, occurred_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING');
 

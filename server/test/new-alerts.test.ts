@@ -7,7 +7,7 @@ process.env.HW_DB = ':memory:';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS, publish, setPushSender, feedItem } = await import('../src/fanout.ts');
-const { PLAYER_DETECTORS, fromSitePlay } = await import('../src/detectors.ts');
+const { PLAYER_DETECTORS, fromSitePlay, gameLostEvent, playerTeamLostEvents } = await import('../src/detectors.ts');
 const { GameTracker, liveDeps, scanStandings } = await import('../src/live.ts');
 const { divisionsDeps } = await import('../src/divisions.ts');
 const { weeklyRecaps } = await import('../src/recap.ts');
@@ -90,6 +90,36 @@ test('one standings read, one alert: eliminated, a division rival clinched, and 
   assert.deepEqual(got('padres-fan'), ["team.rival_clinched: The Dodgers clinched the NL West | Padres won't win the division."], 'a rival clinching, on its own');
   assert.equal(pushed('padres-fan'), 0, 'feed only by default');
   assert.equal(pushed('giants-fan'), 1);
+});
+
+test('a drop in the standings after a loss: a line on the loss alert, not an alert of its own (NFC East)', async () => {
+  fan('wsh-fan', ['team:nfl:28']);
+  fan('wsh-drop-off', ['team:nfl:28'], { types: { 'team.standings_drop': false } });
+  fan('wsh-loss-off', ['team:nfl:28'], { types: { 'team.lost': false } });
+  // Tracking a player with "Get their team's alerts" on: the team's loss alert, or with that off, "their team lost".
+  fan('payne-team-alerts', ['player:nfl:3115315'], { playerTeams: { 'player:nfl:3115315': { alerts: true } } });
+  fan('payne-loss-off', ['player:nfl:3115315'], { playerTeams: { 'player:nfl:3115315': { alerts: true } }, types: { 'team.lost': false } });
+  fan('titans-fan', ['team:nfl:10']);
+  const g = { league: 'nfl' as const, gameId: 'G-WSH', homeId: '28', awayId: '20' };
+  const lost = gameLostEvent(g, { home: 17, away: 20 }, Date.now() - 60_000)!;
+  publish([lost, ...playerTeamLostEvents(g, lost, [{ key: 'player:nfl:3115315', espnId: '3115315', name: 'Daron Payne' }])], 'nfl');
+  // The Titans lost 7 hours ago: too long ago for their drop to be about it.
+  publish([gameLostEvent({ league: 'nfl', gameId: 'G-TEN', homeId: '10', awayId: '7' }, { home: 10, away: 24 }, Date.now() - 7 * 3600_000)!], 'nfl');
+  const before = pushes.length;
+  const entry = (id: string, seed: number) => ({ team: { id }, stats: [{ name: 'playoffSeed', value: seed }, { name: 'streak', displayValue: 'L1' }, { name: 'clincher', displayValue: '' }] });
+  kvSet('standings:nfl', { 28: { rank: 2, group: 'NFC East', clincher: '', streak: 'W2' }, 10: { rank: 1, group: 'AFC South', clincher: '', streak: 'W1' } });
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = async () => ({ children: [{ abbreviation: 'NFC East', standings: { entries: [entry('28', 3)] } }, { abbreviation: 'AFC South', standings: { entries: [entry('10', 2)] } }] });
+  try { await scanStandings('nfl'); } finally { liveDeps.getJson = prev; }
+  const loss = 'Successful Hate Watch! Commanders lost to the Jets';
+  assert.deepEqual(got('wsh-fan'), [`team.lost: ${loss} | Down from 2nd to 3rd in the NFC East. Final Score: 20 to 17`], 'one alert');
+  assert.deepEqual(got('payne-team-alerts'), [`team.lost: ${loss} | Down from 2nd to 3rd in the NFC East. Final Score: 20 to 17`]);
+  assert.deepEqual(got('payne-loss-off'), ['player.team_lost: Successful Hate Watch! Daron Payne and the Commanders lost to the Jets | Down from 2nd to 3rd in the NFC East. Final Score: 20 to 17'],
+    'on "their team lost" too');
+  assert.deepEqual(got('wsh-drop-off'), [`team.lost: ${loss} | Final Score: 20 to 17`], 'drops turned off: no line');
+  assert.deepEqual(got('wsh-loss-off'), ['team.standings_drop: Commanders dropped to 3rd in the NFC East | Down from 2nd. Streak: L1'], 'no loss alert to put it on: its own alert, as before');
+  assert.deepEqual(got('titans-fan').map((x) => x.split(' | ')[0]), ['team.lost: Successful Hate Watch! Titans lost to the Broncos', 'team.standings_drop: Titans dropped to 2nd in the AFC South']);
+  assert.equal(pushes.slice(before).filter((p) => p.to === 'ExponentPushToken[wsh-fan]').length, 0, 'the line makes no sound');
 });
 
 test('ejections: an NHL game misconduct, an instigator and game misconduct together, an NFL disqualification', () => {

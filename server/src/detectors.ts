@@ -117,9 +117,10 @@ export interface Detected {
   /**
    * A line on the device's latest alert about `targetKey` since `since` (of one of `types`)
    * instead of an alert of its own, when it has one; no push ("Down to 6th in the championship." on that
-   * day's race alert). Without one, it's an alert as usual.
+   * day's race alert). Without one, it's an alert as usual. `loss`: or the latest of team `targetKey`'s loss
+   * alerts, whichever one the device got (LOSS_ABOUT: a standings drop after a loss is a line on it).
    */
-  lateOn?: { targetKey: string; since: number; types: string[]; line: string };
+  lateOn?: { targetKey: string; since: number; types: string[]; line: string; loss?: boolean };
   /**
    * MLB: a lost ABS challenge, held by the game tracker until the review is settled (holdAbs in live.ts):
    * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.

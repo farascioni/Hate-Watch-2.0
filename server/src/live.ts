@@ -45,6 +45,8 @@ const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discov
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
 const TEAMS_ONLY_SCOREBOARD_MS = Number(process.env.HW_TEAMS_ONLY_SCOREBOARD_MS ?? 20_000); // college football: every FBS game, a big read
 const TEAMS_ONLY_STANDINGS_MS = 10 * 60_000;
+/** How long after a loss a drop in the standings is a line on its alert (scanStandings), not an alert of its own. */
+const DROP_ON_LOSS_MS = 6 * 3600_000;
 const TEAMS_ONLY_QUIET_MS = 5 * 60_000; // college football's scoreboard with no game near
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yesterday's finals, for the Scores tab
@@ -751,7 +753,9 @@ const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
  * Standings news, one alert per team per read: being eliminated, a division rival clinching the division,
  * dropping in the standings, a losing streak. They share a moment, in that order, and each one after the
  * first a device wants is a line on it ("Down to 4th in the AL East. Officially out of playoff contention.").
- * A streak the loss alert already gave (lossFacts, `streak-told`) isn't said again.
+ * A streak the loss alert already gave (lossFacts, `streak-told`) isn't said again. The drop (and soccer's
+ * relegation zone) that follows a loss is a line on the device's loss alert instead (`lateOn`), one alert for both:
+ * "Successful Hate Watch! Nebraska lost to Indiana", "Down from 2nd to 8th in the Big Ten. Final Score: 20 to 17".
  */
 export async function scanStandings(lg: League) {
   const now = parseStandings(await liveDeps.getJson(urls.standings(lg), { timeoutMs: 8000 }));
@@ -760,6 +764,7 @@ export async function scanStandings(lg: League) {
   kvSet(`standings:${lg}`, Object.fromEntries(now));
   if (!prev.size) return; // first snapshot is the baseline
   const day = new Date().toISOString().slice(0, 10), year = new Date().getFullYear(), at = Date.now();
+  const onLoss = (key: string, line: string) => ({ lateOn: { targetKey: key, since: at - DROP_ON_LOSS_MS, types: [], loss: true, line } });
   // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions).
   const clinched = [...now].filter(([id, cur]) => DIVISION_TITLE.has(cur.clincher) && !DIVISION_TITLE.has(prev.get(id)?.clincher ?? ''));
   const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
@@ -781,10 +786,11 @@ export async function scanStandings(lg: League) {
     // Soccer: into the relegation zone (ESPN's table note), before the drop that put them there.
     const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');
     if (SOCCER.has(lg) && relegation(cur) && !relegation(was)) {
-      events.push({ ...base, id: `releg:${lg}:${teamId}:${day}`, type: soccerType(lg, 'team.relegation_zone'), title: `${team.shortName} dropped into the relegation zone`, body: dropBody(was, cur), fold: 'Into the relegation zone.' });
+      events.push({ ...base, id: `releg:${lg}:${teamId}:${day}`, type: soccerType(lg, 'team.relegation_zone'), title: `${team.shortName} dropped into the relegation zone`, body: dropBody(was, cur), fold: 'Into the relegation zone.', ...onLoss(team.key, 'Into the relegation zone.') });
     }
     if (cur.group === was.group && cur.rank > was.rank) {
-      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur), fold: `Down to ${ordinal(cur.rank)} in the ${cur.group}.` });
+      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur), fold: `Down to ${ordinal(cur.rank)} in the ${cur.group}.`,
+        ...onLoss(team.key, `Down from ${ordinal(was.rank)} to ${ordinal(cur.rank)} in the ${cur.group}.`) });
     }
     const m = cur.streak.match(/^L(\d+)$/);
     if (m && Number(m[1]) >= 3 && cur.streak !== was.streak && kvGet(`streak-told:${lg}:${teamId}`) !== cur.streak) {

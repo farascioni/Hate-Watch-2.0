@@ -3,7 +3,7 @@ import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
 import { EVENT_TYPES, EVENT_TYPE_BY_ID, soccerType } from './event-types.ts';
 import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
-import { RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
+import { LOSS_ABOUT, RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
 import { clipShown } from './clips.ts';
 import { frameWithoutImages } from './images.ts';
@@ -341,10 +341,10 @@ function listLines(es: Detected[]): string[] {
   for (const e of es) if (e.list) by.set(e.list.label, [...(by.get(e.list.label) ?? []), e.list.item]);
   return [...by].map(([label, items]) => `${label}: ${items.slice(0, LIST_MAX).join(', ')}${items.length > LIST_MAX ? ` and ${items.length - LIST_MAX} more` : ''}.`);
 }
-/** The device's latest alert about a target since a time, of some types (`lateOn`): its id, or null. */
+/** The device's latest alert about a target since a time, of some types, or one of a team's loss alerts (`lateOn`): its id, or null. */
 function latestAbout(deviceId: string, on: NonNullable<Detected['lateOn']>): string | null {
-  const row = db.prepare(`SELECT f.event_id FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND e.target_key = ? AND e.type IN (${on.types.map(() => '?').join(',')})
-    AND f.occurred_at >= ? ORDER BY f.occurred_at DESC LIMIT 1`).get(deviceId, on.targetKey, ...on.types, on.since) as { event_id: string } | undefined;
+  const row = db.prepare(`SELECT f.event_id FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND ((e.target_key = ? AND e.type IN (${on.types.map(() => '?').join(',')}))${on.loss ? ` OR ${LOSS_ABOUT('e')}` : ''})
+    AND f.occurred_at >= ? ORDER BY f.occurred_at DESC LIMIT 1`).get(deviceId, on.targetKey, ...on.types, ...(on.loss ? [on.targetKey, on.targetKey] : []), on.since) as { event_id: string } | undefined;
   return row?.event_id ?? null;
 }
 type Pending = PushMessage & { bundle?: string; label?: string };

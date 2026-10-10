@@ -24,13 +24,13 @@ UFC
 
 F1
 - Sprints get their alerts (lights out, a car retiring, the result). Sessions are named in full, and a driver's teammate is whoever drove the other car that weekend. (Server)
-- Lights out is one alert naming your constructors and drivers in it, the back of the grid as lines; driver trackers get it too. A team's double DNF or no points takes in its drivers' matching alerts; alerts at once are one notification. (Server)
-- Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. A championship drop is a line on that day's alert. (Server)
+- Lights out is one alert naming your constructors and drivers, the back of the grid as lines; driver trackers get it too. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
+- Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. (Server)
 - Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
 - Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship. Tap a driver or constructor for their page.
-- With the F1 chip on, Scores has Live races and Upcoming races (the weekend's sprint, qualifying and race still to come, a sprint or race with its full grid once it's set). An F1 session's screen says "Your alerts from this race".
+- With the F1 chip on, Scores has Live races and Upcoming races (the weekend's sessions still to come, a race with its full grid once set). An F1 session's screen says "Your alerts from this race".
 
 COLLEGE FOOTBALL
 - A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank on cards ("#8 Indiana"). (Server)
@@ -39,6 +39,7 @@ COLLEGE FOOTBALL
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, showing after you reopen the app once or twice.
 - Tracking both teams in a game, its start is one alert, not two. (Server)
+- A drop in the standings after a loss (F1: a race) is a line on that alert, not an alert of its own. (Server)
 - With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
 - The Scores tab's switch says what it lists: events, games or fights.
 - The league filters fit on one row again, even on an iPhone SE.
