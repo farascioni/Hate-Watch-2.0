@@ -324,6 +324,10 @@ On a device's first launch the app opens a nine-page guide over the Feed (`app/s
 - **Notification permission waits for it:** the store awaits `guideSettled` before `registerForPush()`, so on first launch the system prompt comes right after the guide instead of covering it. The last page warns that the prompt is coming.
 - Each page scrolls vertically if it doesn't fit (small phones, large text sizes). It's checked on iPhone SE (375×667) and 390×844.
 
+## An alert on its own screen
+
+A card in the feed (or on a player's, team's or game's page) shows three lines of an alert. Tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`): all of its text, its clip, how many other hate watchers got it, when it happened and a Share button. Who it's about is a row on top that opens their page, as the card's photo does. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the one tapped (`openAlert` in `app/src/lib/alerts.ts`). An alert that's in neither says it isn't in your feed anymore.
+
 ## Sharing an alert
 
 The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a picture of the alert, so it looks like a screenshot. Tapping it on an iPhone opens Hate Watch on that alert if it's installed, and the App Store if not.

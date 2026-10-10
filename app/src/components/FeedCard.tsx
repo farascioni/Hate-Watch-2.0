@@ -1,11 +1,12 @@
 import { memo, useId, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { shareAlert } from '../lib/share';
+import { openAlert, targetHref } from '../lib/alerts';
 import { colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 
@@ -19,19 +20,20 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
     }
   };
 
-  // The alert opens its player's or team's page; its clip sits below, outside that tap area, so playing the
-  // video (or its controls) never opens the page.
+  // The alert opens on its own screen, all of its text (here, three lines); its photo opens its player's or team's
+  // page. Its clip sits below, outside that tap area, so playing the video (or its controls) never opens anything.
   return (
     <View style={[styles.card, fresh && styles.fresh, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Pressable
-        onPress={() => router.push(`/target/${encodeURIComponent(item.target.key)}`)}
+        onPress={() => openAlert(item)}
         onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)}
         style={styles.row}
       >
-        <View>
+        <Pressable onPress={() => router.push(targetHref(item.target))} hitSlop={4} accessibilityRole="button"
+          accessibilityLabel={'name' in item.target ? `${item.target.name}'s page` : 'Their page'}>
           <Avatar target={item.target} size={52} />
           <Text style={styles.emoji}>{item.emoji}</Text>
-        </View>
+        </Pressable>
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.body} numberOfLines={3}>{item.body}</Text>
@@ -43,7 +45,7 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
             <Text style={styles.metaText}>{ago(item.occurredAt, now)}</Text>
           </View>
         </View>
-        {/* Its own tap target: sharing doesn't open the player/team page behind it. */}
+        {/* Its own tap target: sharing doesn't open the alert behind it. */}
         <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
           <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
           {copied ? <Text style={styles.copied}>Copied</Text> : null}
@@ -54,11 +56,11 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
   );
 });
 
-/** The alert's play on video, playing right here. */
-function AlertClip({ clip }: { clip: Clip }) {
+/** The alert's play on video, playing right here. `style`: its place (in a card, in line with the alert's text). */
+export function AlertClip({ clip, style }: { clip: Clip; style?: StyleProp<ViewStyle> }) {
   const [open, toggle] = useNowPlaying(`alert:${useId()}`);
   return (
-    <View style={styles.clip}>
+    <View style={[styles.clip, style]}>
       {open ? <ClipPlayer clip={clip} /> : null}
       <Pressable onPress={toggle} style={({ pressed }) => [styles.clipRow, pressed && { opacity: 0.7 }]} accessibilityRole="button"
         accessibilityLabel={`${open ? 'Close' : 'Watch'} the clip: ${clip.title}, ${duration(clip.seconds)}`}>
