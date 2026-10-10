@@ -151,7 +151,11 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     }
 
     if (lg === 'f1') {
-      const f1 = await ingestF1(stats, report);
+      // ESPN's F1 data failing keeps the constructors and drivers we have, and never stops the other leagues' refresh.
+      const f1 = await ingestF1(stats, report).catch((e) => {
+        report.problems.push(`f1: ${String(e)}; kept the constructors and drivers already in the catalog`);
+        return { teams: [...teams.values()].filter((t) => t.league === 'f1'), players: [...players.values()].filter((p) => p.league === 'f1') };
+      });
       newTeams.push(...f1.teams);
       newPlayers.push(...f1.players);
       log(`[ingest] F1: ${stats.teams} constructors, ${stats.players} drivers (${stats.headshotsVerified} headshots, ${stats.headshotFallbackToLogo} badge fallbacks)`);
@@ -341,12 +345,15 @@ async function ingestF1(stats: IngestReport['leagues'][string], report: IngestRe
   // team and car number; the athlete record is only the fallback (e.g. a driver replaced mid-season).
   const entered = new Map<string, { team: string; number: string }>();
   const ev = sb.events?.[0];
-  const latest = [...(ev?.competitions ?? [])].reverse().find((c: any) => c.competitors?.length);
-  if (ev && latest) {
-    const list = await getJson(urls.f1Competitors(String(ev.id), String(latest.id)));
-    for (const c of await mapLimit<any, any>(list.items ?? [], 8, (it: any) => getJson(it.$ref))) {
+  // The latest session whose entry list ESPN gives: a race's is a 404 until its grid is out (the evening after
+  // qualifying, October 10 2026), though the scoreboard lists its cars. None: the athlete records alone.
+  for (const comp of [...(ev?.competitions ?? [])].reverse().filter((c: any) => c.competitors?.length)) {
+    const list = await getJson(urls.f1Competitors(String(ev.id), String(comp.id))).catch(() => null);
+    if (!list?.items?.length) continue;
+    for (const c of await mapLimit<any, any>(list.items, 8, (it: any) => getJson(it.$ref))) {
       if (c.vehicle?.manufacturer) entered.set(String(c.id), { team: c.vehicle.manufacturer, number: String(c.vehicle.number ?? '') });
     }
+    break;
   }
 
   const list = await getJson(urls.f1Athletes(season));
