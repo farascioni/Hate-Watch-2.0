@@ -17,6 +17,8 @@ for (const [lg, id, name, short, abbr] of [
   ['nba', '2', 'Boston Celtics', 'Celtics', 'BOS'], ['nba', '18', 'New York Knicks', 'Knicks', 'NY'],
   ['nhl', '5', 'Pittsburgh Penguins', 'Penguins', 'PIT'], ['nhl', '13', 'New York Rangers', 'Rangers', 'NYR'],
   ['nfl', '9', 'Green Bay Packers', 'Packers', 'GB'], ['nfl', '28', 'Washington Commanders', 'Commanders', 'WSH'],
+  ['nfl', '23', 'Pittsburgh Steelers', 'Steelers', 'PIT'], ['nfl', '17', 'New England Patriots', 'Patriots', 'NE'], ['nfl', '10', 'Tennessee Titans', 'Titans', 'TEN'], ['nfl', '20', 'New York Jets', 'Jets', 'NYJ'],
+  ['nfl', '1', 'Atlanta Falcons', 'Falcons', 'ATL'],
   ['epl', '371', 'West Ham United', 'West Ham', 'WHU'], ['epl', '363', 'Chelsea', 'Chelsea', 'CHE'],
   ['f1', 'mclaren', 'McLaren', 'McLaren', 'MCL'], ['f1', 'aston', 'Aston Martin', 'Aston Martin', 'AMR'],
 ]) team.run(`team:${lg}:${id}`, lg, id, name, short, abbr);
@@ -27,6 +29,8 @@ for (const [lg, id, name, pos, t] of [
   ['nba', '4065648', 'Jayson Tatum', 'F', '2'], ['nba', '3934672', 'Jalen Brunson', 'G', '18'],
   ['nhl', '3124', 'Evgeni Malkin', 'C', '5'], ['nhl', '3114', 'Tristan Jarry', 'G', '5'], ['nhl', '5100', 'Alex Nedeljkovic', 'G', '5'], ['nhl', '5200', 'Artemi Panarin', 'LW', '13'],
   ['nfl', '3139477', 'Jordan Love', 'QB', '9'], ['nfl', '4000400', 'Malik Willis', 'QB', '9'], ['nfl', '4362921', 'Josh Jacobs', 'RB', '9'], ['nfl', '3054211', 'Aaron Banks', 'G', '9'],
+  ['nfl', '8439', 'Aaron Rodgers', 'QB', '23'], ['nfl', '4372030', 'Christian Barmore', 'DT', '17'], ['nfl', '4688432', 'Elijah Ponder', 'LB', '17'], ['nfl', '4431268', 'Chimere Dike', 'WR', '10'],
+  ['nfl', '5208977', "Qwan'tez Stiggers", 'CB', '20'], ['nfl', '4045299', 'Marcelino McCrary-Ball', 'LB', '20'], ['nfl', '4430807', 'Bijan Robinson', 'RB', '1'], ['nfl', '4361409', 'Jahan Dotson', 'WR', '1'], ['nfl', '3045373', 'Jalen Ramsey', 'CB', '23'],
   ['epl', '170376', 'Niclas Füllkrug', 'F', '371'], ['epl', '228102', 'Callum Wilson', 'F', '371'],
   ['f1', '5579', 'Lando Norris', '', 'mclaren'], ['f1', '5752', 'Oscar Piastri', '', 'mclaren'], ['f1', '4396', 'Lance Stroll', '', 'aston'], ['f1', '348', 'Fernando Alonso', '', 'aston'],
 ]) player.run(`player:${lg}:${id}`, lg, id, name, pos, `team:${lg}:${t}`);
@@ -244,6 +248,29 @@ test("NFL: a touchdown wiped out by a penalty: the flagged player's (in place of
   ]);
   publish(bundleByPlay(es), 'nfl');
   assert.deepEqual(got('packers-and-banks'), [`nfl.td_wiped_out: Aaron Banks's penalty wiped out a touchdown | Packers had a touchdown wiped out by a penalty. ${text} — WSH 7, GB 0`]);
+});
+
+test('NFL: a fumble is lost when the other team takes the ball ("RECOVERED by"), whatever the type: a strip-sack, a kick return; the sacked QB\'s though ESPN names the defender (2026 games)', () => {
+  const roles = (...rs: [string, string][]) => rs.map(([role, id]) => ({ id, role }));
+  // Steelers at Patriots: "Sack Opp Fumble Recovery", and ESPN's fumbler is Barmore, who forced it. Rodgers lost it,
+  // and it heads his sack: one alert, pushed.
+  fan('rodgers', ['player:nfl:8439']);
+  const g = { ...nflCtx(), gameId: '401872946', homeId: '17', awayId: '23' };
+  const text = '(Shotgun) A.Rodgers sacked at PIT 21 for -9 yards (C.Barmore). FUMBLES (C.Barmore) [C.Barmore], RECOVERED by NE-E.Ponder at PIT 19. E.Ponder for 19 yards, TOUCHDOWN. A.Borregales extra point is GOOD, Center-J.Ashby, Holder-M.Wishnowsky.';
+  const strip = nf(g, snap('4018729463144', 'Sack Opp Fumble Recovery', text, roles(['forcedBy', '4372030'], ['sackedBy', '4372030'], ['fumbler', '4372030'], ['recoverer', '4688432'], ['scorer', '4688432'], ['passer', '8439']),
+    { teamId: '23', scoring: true, home: 20, away: 3 }));
+  assert.deepEqual(strip.map((e) => [e.type, e.title, e.aliases]), [['nfl.fumble_lost', 'Aaron Rodgers lost a fumble — returned for a TD 🙃', ['nfl.fumble']], ['nfl.qb.sacked', 'Aaron Rodgers got sacked', undefined]]);
+  publish(bundleByPlay(strip), 'nfl');
+  assert.deepEqual(got('rodgers'), [`nfl.fumble_lost: Aaron Rodgers lost a fumble — returned for a TD 🙃 | Aaron Rodgers got sacked. ${text} — PIT 3, NE 20`]);
+  assert.equal(pushes.filter((x) => x.to === 'tok-rodgers').length, 1);
+  // Jets at Titans: a kickoff the kicking team recovers is the returner's lost fumble.
+  const kick = snap('4018729241553', 'Kickoff', 'J.Sanders kicks 55 yards from NYJ 35 to TEN 10. C.Dike to TEN 30 for 20 yards (M.McCrary-Ball). FUMBLES (M.McCrary-Ball), RECOVERED by NYJ-Q.Stiggers at TEN 38. ** Injury Update: TEN-C.Dike has returned to the game.',
+    roles(['fumbler', '4431268'], ['returner', '4431268'], ['recoverer', '5208977'], ['forcedBy', '4045299']), { teamId: '20' });
+  assert.deepEqual(nf({ ...nflCtx(), homeId: '10', awayId: '20' }, kick).map((e) => [e.type, e.title]), [['nfl.fumble_lost', 'Chimere Dike lost a fumble']]);
+  // Falcons at Steelers: "recovered by" in lower case is their own: a fumble, not lost.
+  const own = snap('4018726583192', 'Fumble Recovery (Own)', 'C.Rush pass short left to Bi.Robinson to PIT 31 for 24 yards (J.Ramsey). FUMBLES (J.Ramsey), recovered by ATL-J.Dotson at PIT 28.',
+    roles(['receiver', '4430807'], ['fumbler', '4430807'], ['forcedBy', '3045373'], ['recoverer', '4361409']), { teamId: '1' });
+  assert.deepEqual(nf({ ...nflCtx(), homeId: '23', awayId: '1' }, own).map((e) => [e.type, e.title]), [['nfl.fumble', 'Bijan Robinson fumbled']]);
 });
 
 test("NFL drives: three-and-out, on downs, empty in the red zone; the drive's result goes on the QB's alert for that play", () => {

@@ -1054,11 +1054,24 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (passer && !wiped && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
   if (passer && !wiped && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
   if (passer && !wiped && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
-  for (const f of wiped ? [] : role(p, 'fumbler')) {
-    const lost = /Opponent|Fumble Return/i.test(ty);
-    out.push(lost
-      ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf(g.league, f)} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] })
-      : mk(g, p, 'nfl.fumble', f, `${nameOf(g.league, f)} fumbled`));
+  // A fumble is lost when a team not the fumbler's took the ball: "RECOVERED by NE-E.Ponder" (capitals: the ball has
+  // changed hands since the snap; "recovered by" and "and recovers" are the side's own), else when the type says so. A
+  // strip-sack the defense recovers is "Sack Opp Fumble Recovery" (21 in the 2026 season's first five weeks), a kick
+  // returner's fumble the kicking team recovers just "Kickoff" (6): both were "fumbled", off by default. ESPN can name
+  // the defender who forced a strip-sack as its fumbler and leave out the quarterback (Barmore on Rodgers's, Steelers
+  // at Patriots): nobody forces his own fumble, and "… sacked at PIT 21 for -9 yards (C.Barmore). FUMBLES" is the
+  // quarterback's. His lost fumble heads the sack, which is its line.
+  const said = ruled(p.text), recovered = said.search(/RECOVERED by/);
+  const took = [...said.matchAll(/RECOVERED by ([A-Z]{2,3})-/g)].map((m) => NFL_CODE[m[1]] ?? m[1]);
+  const forced = role(p, 'forcedBy'), fumblers = wiped ? [] : role(p, 'fumbler').filter((f) => !forced.includes(f));
+  if (!wiped && passer && !fumblers.includes(passer) && /\bsacked\b[^)]*?(?:\([^)]*\))?\.\s*FUMBLES\b/.test(said)) fumblers.unshift(passer);
+  for (const f of fumblers) {
+    const team = playerTeamId(g.league, f), code = team ? catalog.teamByEspn(g.league, team)?.abbrev : undefined;
+    const lost = code && took.length ? took.some((t) => t !== code) : /Opponent|Opp Fumble|Fumble Return/i.test(ty);
+    const td = /Touchdown/i.test(ty) || (p.scoring && recovered >= 0 && /\bTOUCHDOWN\b/.test(said.slice(recovered)));
+    if (!lost) { out.push(mk(g, p, 'nfl.fumble', f, `${nameOf(g.league, f)} fumbled`)); continue; }
+    const sack = out.findIndex((x) => x.type === 'nfl.qb.sacked' && x.targetKey === playerKey(g.league, f));
+    out.splice(sack >= 0 ? sack : out.length, 0, mk(g, p, 'nfl.fumble_lost', f, `${nameOf(g.league, f)} lost a fumble${td ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] }));
   }
   const kickMiss = !wiped && (/Field Goal Missed|Blocked Field Goal|Blocked PAT|Missed PAT/i.test(ty) || /extra point is no good|kick is blocked/i.test(ruled(p.text)));
   if (kickMiss) for (const k of [...role(p, 'kicker'), ...role(p, 'patScorer')].slice(0, 1))

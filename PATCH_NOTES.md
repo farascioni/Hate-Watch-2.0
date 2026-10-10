@@ -33,17 +33,17 @@ F1
 - With the F1 chip on, Scores has Live and Upcoming races (the weekend's sessions to come, a race's grid once set). An F1 session's screen says "Your alerts from this race".
 
 FOOTBALL
-- A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank on cards ("#8 Indiana"). (Server)
+- A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank ("#8 Indiana"). (Server)
 - Alerts: the game starting, an interception, a lost fumble, a missed field goal, a player ejected, the quarterback pulled, falling behind, losing, a turnover on downs, the red zone, falling in or out of the AP Top 25; sacks and flags in the feed. (Server)
 - A play ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
 - More teams' flags go out, with the team and foul named right. (Server)
-- NFL: a play wiped out alerts only its flag. (Server)
+- NFL: a play wiped out alerts only its flag; a strip-sack lost is a lost fumble. (Server)
 
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.
 - Tracking both teams in a game, its start is one alert, not two. (Server)
 - Back-to-back homers are home run alerts saying so, back-to-back-to-back too. (Server)
-- After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert, not its own alert. (Server)
+- After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert. (Server)
 - Filters say Athletes with All leagues on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
