@@ -29,6 +29,13 @@ team.run('team:cfb:189', 'cfb', '189', 'Bowling Green Falcons', 'Bowling Green',
 team.run('team:nfl:12', 'nfl', '12', 'Kansas City Chiefs', 'Chiefs', 'KC', 'Kansas City');
 team.run('team:nfl:13', 'nfl', '13', 'Las Vegas Raiders', 'Raiders', 'LV', 'Las Vegas');
 db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES ('player:nfl:3139477', 'nfl', '3139477', 'Patrick Mahomes', 'team:nfl:12', 'QB', 'x', 1, 1, 'headshot', 0)`).run();
+for (const [id, name, short, abbr, location] of [['5', 'Cleveland Browns', 'Browns', 'CLE', 'Cleveland'], ['23', 'Pittsburgh Steelers', 'Steelers', 'PIT', 'Pittsburgh'], ['6', 'Dallas Cowboys', 'Cowboys', 'DAL', 'Dallas'],
+  ['28', 'Washington Commanders', 'Commanders', 'WSH', 'Washington'], ['3', 'Chicago Bears', 'Bears', 'CHI', 'Chicago'], ['16', 'Minnesota Vikings', 'Vikings', 'MIN', 'Minnesota'],
+  ['2', 'Buffalo Bills', 'Bills', 'BUF', 'Buffalo'], ['17', 'New England Patriots', 'Patriots', 'NE', 'New England']])
+  team.run(`team:nfl:${id}`, 'nfl', id, name, short, abbr, location);
+const nflPlayer = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES (?, 'nfl', ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
+for (const [id, name, teamId, position] of [['3122840', 'Deshaun Watson', '5', 'QB'], ['4685327', 'Daylen Everette', '23', 'CB'], ['2576980', 'Marcus Mariota', '28', 'QB'], ['4248911', 'DaRon Bland', '6', 'CB'], ['4431611', 'Caleb Williams', '3', 'QB']])
+  nflPlayer.run(`player:nfl:${id}`, id, name, `team:nfl:${teamId}`, position);
 loadCatalog();
 
 const pushes: { to: string; title: string }[] = [];
@@ -317,4 +324,76 @@ test('the same play re-posted: same period, a start within 10 seconds, the same 
   assert.equal(R.changeLine({ league: 'cfb', homeId: '77', awayId: '2050' }, p('(04:32) Shotgun #0 A.Chiles pass incomplete short left to #27 G.Sawchuk thrown to NU00 QB hurried by #7 B.Marsh PENALTY BSU UNR: Unnecessary Roughness (#27 G.Forsha) 15 yards from NU01 to NU16, 1ST DOWN. NO PLAY')),
     'Wiped out by a penalty on Ball State: Unnecessary Roughness.', '"BSU": Ball State\'s initials');
   assert.equal(R.changeLine(g, D.fromSitePlay({ id: 'y', type: { text: 'Pass Reception' }, text: '(08:40) #6 K.Luster pass complete … to the NU01, 1ST DOWN' })), 'ESPN has since changed this play to a pass reception.');
+});
+
+// An NFL core-API play, as ESPN posts it: its teams and players are refs; `clock` in seconds left.
+const nflRef = (kind: string, id: string) => ({ $ref: `http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/${kind}/${id}` });
+const corePlay = (id: string, type: string, text: string, team: string, roles: [string, string][], away: number, home: number, x: { period?: number; clock?: number; endTeam?: string } = {}) => ({
+  id, type: { text: type }, text, team: nflRef('teams', team), start: { team: nflRef('teams', team) }, end: { team: nflRef('teams', x.endTeam ?? team) },
+  participants: roles.map(([role, athlete]) => ({ athlete: nflRef('athletes', athlete), type: role })), awayScore: away, homeScore: home, period: { number: x.period ?? 4 },
+  clock: { value: x.clock ?? 859, displayValue: `${Math.floor((x.clock ?? 859) / 60)}:${String((x.clock ?? 859) % 60).padStart(2, '0')}` }, scoringPlay: false, wallclock: new Date(NOW).toISOString() });
+// Browns at Steelers, 2026: an interception wiped out by pass interference, the flag then overturned on review.
+const PICK = '(Shotgun) D.Watson pass deep middle intended for D.Boston INTERCEPTED by R.Spears-Jennings [J.Sawyer] at PIT 23. R.Spears-Jennings to PIT 23 for no gain (D.Boston).';
+const PICK_FLAG = `${PICK}PENALTY on PIT-D.Everette, Defensive Pass Interference, 42 yards, enforced at CLV 35 - No Play.`;
+const PICK_REVIEWED = `${PICK_FLAG}The Replay Official reviewed the pass was not tipped ruling, and the play was REVERSED.(Shotgun) D.Watson pass deep middle intended for D.Boston INTERCEPTED by R.Spears-Jennings (J.Sawyer) [J.Sawyer] at PIT 23. R.Spears-Jennings to PIT 23 for no gain (D.Boston).`;
+const PICK_ROLES: [string, string][] = [['passer', '3122840'], ['passDefender', '4820584'], ['returner', '4820584'], ['tackler', '4832800']];
+
+test('an NFL play wiped out by a penalty is only its flags, though ESPN often keeps its type (73 of 734 in the 2026 season\'s first five weeks); after a review that reversed it, the call that stands', () => {
+  const alerts = (homeId: string, awayId: string, p: any) => D.PLAYER_DETECTORS.nfl({ league: 'nfl', gameId: String(p.id).slice(0, 9), homeId, awayId, goalies: new Map() }, D.fromCorePlay(p)).map((e) => `${e.type}: ${e.title}`);
+  // Cowboys at Commanders: a sack wiped out by defensive holding, still typed a sack.
+  const sack = corePlay('4018729442910', 'Sack', '(Shotgun) M.Mariota sacked at WAS 28 for -7 yards (D.Winters).PENALTY on DAL-D.Bland, Defensive Holding, 5 yards, enforced at WAS 35 - No Play.', '28',
+    [['passer', '2576980'], ['sackedBy', '4428914'], ['tackler', '4428914'], ['penalized', '4248911']], 27, 13, { period: 3, clock: 387 });
+  assert.deepEqual(alerts('28', '6', sack), ['nfl.penalty: DaRon Bland was flagged']);
+  // Bears at Vikings: offsetting fouls, still an incompletion.
+  const offsetting = corePlay('401872937429', 'Pass Incompletion', 'C.Williams pass incomplete short right [L.Rodriguez].Penalty on CHI-G.Bradbury, Offensive Holding, offsetting, enforced at MIN 35 - No Play.Penalty on MIN-L.Rodriguez, Roughing the Passer, offsetting.', '3',
+    [['passer', '4431611']], 3, 0, { period: 1, clock: 462 });
+  assert.deepEqual(alerts('16', '3', offsetting), []);
+  assert.equal(R.changeLine({ league: 'nfl', homeId: '16', awayId: '3' }, D.fromCorePlay(offsetting)), 'Wiped out by offsetting penalties.');
+  // Browns at Steelers: the flag that wiped out the interception overturned on review. The interception stands.
+  assert.deepEqual(alerts('23', '5', corePlay('4018729643321', 'Pass Interception Return', PICK_REVIEWED, '5', PICK_ROLES, 10, 21, { endTeam: '23' })), ['nfl.qb.interception: Deshaun Watson threw an interception']);
+  assert.deepEqual(alerts('23', '5', corePlay('4018729643321', 'Pass Interception Return', PICK_FLAG, '5', PICK_ROLES, 10, 21, { endTeam: '23' })), [], 'before the review: wiped out');
+  // Patriots at Bills: the flag that wiped it out is the one before "No Play", not one enforced between downs after it.
+  assert.equal(D.wipedOutLine({ league: 'nfl', homeId: '2', awayId: '17' }, '(Shotgun) J.Allen pass incomplete short right to D.Moore (M.Jones) [C.Elliss].PENALTY on NE-M.Jones, Defensive Holding, 5 yards, enforced at NE 16 - No Play.PENALTY on NE, Unsportsmanlike Conduct, 5 yards, enforced between downs.'),
+    'Wiped out by a penalty on the Patriots: Defensive Holding.');
+});
+
+test('an NFL interception wiped out by pass interference (its type kept), then not (the flag overturned on review): a line each time, one push (Browns at Steelers)', async () => {
+  device('watson', 'player:nfl:3122840');
+  device('everette', 'player:nfl:4685327');
+  const T = game('nfl', '401872964', '23', '5', { away: 10, home: 21 });
+  await T.poll();
+  const pick = corePlay('4018729643321', 'Pass Interception Return', PICK, '5', PICK_ROLES, 10, 21, { endTeam: '23' });
+  T.g.core = [T.g.core[0], pick];
+  await T.poll();
+  assert.deepEqual(pushed('watson'), ['Deshaun Watson threw an interception'], 'at once, as ever');
+  T.g.core = [T.g.core[0], { ...pick, text: PICK_FLAG, participants: [...pick.participants, { athlete: nflRef('athletes', '4685327'), type: 'penalized' }] }];
+  await T.poll();
+  assert.deepEqual(feed('watson'), [['nfl.qb.interception', 'Deshaun Watson threw an interception', ['Wiped out by a penalty on the Steelers: Defensive Pass Interference.']]]);
+  assert.deepEqual(feed('everette'), [['nfl.penalty', 'Daylen Everette was flagged', []]]);
+  T.g.core = [T.g.core[0], { ...pick, text: PICK_REVIEWED }];
+  await T.poll();
+  assert.deepEqual(feed('watson'), [['nfl.qb.interception', 'Deshaun Watson threw an interception', ['Wiped out by a penalty on the Steelers: Defensive Pass Interference.', 'Overturned on review: it stands.']]]);
+  assert.deepEqual(feed('everette'), [['nfl.penalty', 'Daylen Everette was flagged', ['Overturned on review.']]]);
+  assert.deepEqual(pushed('watson'), ['Deshaun Watson threw an interception'], 'one push');
+});
+
+test('an NFL play gone from the feed a while, then back as it was or re-posted under a new id: a line on its alert, never the alert again', async () => {
+  device('mahomes', 'player:nfl:3139477');
+  const T = game('nfl', '401771112', '12', '13', { away: 3, home: 7 });
+  await T.poll();
+  const sack = corePlay('40177111230', 'Sack', '(Shotgun) P.Mahomes sacked at KC 25 for -8 yards (M.Crosby).', '12', [['passer', '3139477']], 3, 7, { period: 2, clock: 600 });
+  const pick = corePlay('40177111240', 'Pass Interception Return', '(Shotgun) P.Mahomes pass short left intended for T.Kelce INTERCEPTED by J.Pickett at KC 30. J.Pickett to KC 30 for no gain.', '12',
+    [['passer', '3139477']], 3, 7, { period: 2, clock: 540, endTeam: '13' });
+  T.g.core = [T.g.core[0], sack, pick];
+  await T.poll();
+  assert.deepEqual(pushed('mahomes'), ['Patrick Mahomes threw an interception'], 'the sack is the feed\'s');
+  T.g.core = [T.g.core[0]];
+  await T.poll(7); // 35 seconds: gone
+  const taken = ['ESPN has since taken this play back.'];
+  assert.deepEqual(feed('mahomes'), [['nfl.qb.sacked', 'Patrick Mahomes got sacked', taken], ['nfl.qb.interception', 'Patrick Mahomes threw an interception', taken]]);
+  T.g.core = [T.g.core[0], sack, { ...pick, id: '40177111241' }];
+  await T.poll();
+  const back = [...taken, 'ESPN has since put this play back.'];
+  assert.deepEqual(feed('mahomes'), [['nfl.qb.sacked', 'Patrick Mahomes got sacked', back], ['nfl.qb.interception', 'Patrick Mahomes threw an interception', back]]);
+  assert.deepEqual(pushed('mahomes'), ['Patrick Mahomes threw an interception'], 'one push');
 });

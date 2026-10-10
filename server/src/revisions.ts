@@ -1,6 +1,6 @@
 import { catalog } from './catalog.ts';
 import { TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, scoreLine, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ruled, scoreLine, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -55,7 +55,7 @@ const REVIEW = /\bunder (?:automatic )?review\b|\breplay official\b|\b(?:call )?
 /** Why a play's alert no longer holds, from the play as it is now (none: ESPN took it out). */
 export function changeLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, now: NPlay | null): string {
   if (!now) return 'ESPN has since taken this play back.';
-  if (/\bno play\b/i.test(now.text)) return wipedOutLine(g, now.text);
+  if (/\bno play\b/i.test(ruled(now.text))) return wipedOutLine(g, ruled(now.text));
   if (REVIEW.test(now.text)) return 'Overturned on review.';
   return now.type ? `ESPN has since changed this play to ${/^[aeiou]/i.test(now.type) ? 'an' : 'a'} ${now.type.toLowerCase()}.` : 'ESPN has since changed this play.';
 }
@@ -73,10 +73,12 @@ interface PlayEntry {
   history: boolean;       // seen when the tracker attached: never alerted, never revised
   header?: boolean;       // the header's score before the play was posted (live.ts): no play to read
   alerts: Map<string, Detected>; // its play alerts still standing, by kind
+  dropped: Map<string, Detected>; // its play alerts taken back (a line said so), by kind
   scores: Detected[];     // its score alerts still standing (teamScoreEvents)
   points: Partial<Record<Side, number>>; // each side's score its score alerts announced
   missingSince?: number;
   gone?: boolean;
+  back?: boolean;         // gone, and in the feed again (as it was or re-posted): read again
 }
 
 export interface Revision { fresh: Detected[]; lines: Detected[] }
@@ -107,7 +109,7 @@ export class PlayLedger {
 
   /** A play seen for the first time, and the alerts it sent. */
   add(p: NPlay, alerts: Detected[], o: { history: boolean; header?: boolean }, now: number) {
-    this.plays.set(p.id, { play: p, sig: sigOf(p), firstAt: now, history: o.history, ...(o.header ? { header: true } : {}), alerts: byKind(bundleByPlay(alerts)), scores: [], points: {} });
+    this.plays.set(p.id, { play: p, sig: sigOf(p), firstAt: now, history: o.history, ...(o.header ? { header: true } : {}), alerts: byKind(bundleByPlay(alerts)), dropped: new Map(), scores: [], points: {} });
   }
 
   get(id: string) { return this.plays.get(id); }
@@ -123,11 +125,14 @@ export class PlayLedger {
     }
   }
 
-  /** Before a read's plays are gone through: which of the plays we know it doesn't have. */
+  /** Before a read's plays are gone through: which of the plays we know it doesn't have. One gone that's back is read again. */
   read(ids: Set<string>, now: number) {
     for (const [id, x] of this.plays) {
       if (x.header) continue;
-      if (ids.has(id)) { x.missingSince = undefined; x.gone = false; } else x.missingSince ??= now;
+      if (!ids.has(id)) { x.missingSince ??= now; continue; }
+      if (x.gone) { x.back = true; x.sig = ''; }
+      x.missingSince = undefined;
+      x.gone = false;
     }
   }
 
@@ -145,6 +150,7 @@ export class PlayLedger {
     const [id, x] = best;
     this.plays.delete(id);
     this.plays.set(p.id, x);
+    if (x.gone) x.back = true;
     x.missingSince = undefined;
     x.gone = false;
     if (!x.history) x.firstAt = now; // posted again: its changes are news for REVISE_MS from now
@@ -154,24 +160,34 @@ export class PlayLedger {
 
   /**
    * A play's alerts against a new version of it (null: ESPN took it out): the ones it no longer has get a line
-   * (`lines`), the ones it has now go out (`fresh`). Nothing for history, or once REVISE_MS have passed.
+   * (`lines`), the ones it has now go out (`fresh`). One taken back that it has again gets a line, never a second
+   * alert (an interception wiped out by pass interference, then not: the flag overturned on review, Browns at
+   * Steelers, 2026; a play gone a while, or re-posted). Nothing for history, or once REVISE_MS have passed.
    */
   revise(x: PlayEntry, p: NPlay | null, now: number): Revision {
-    const was = x.play;
+    const was = x.play, back = x.back;
+    x.back = false;
     if (p) { x.play = p; x.sig = sigOf(p); }
     if (x.history || now - x.firstAt > REVISE_MS) return { fresh: [], lines: [] };
     const want = byKind(bundleByPlay(p ? this.detect(p) : []));
-    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [];
+    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [];
     for (const [k, e] of x.alerts) {
       if (want.has(k) || ONCE.test(e.type)) continue;
       x.alerts.delete(k);
+      x.dropped.set(k, e);
       lines.push(...this.linesOn([e], why));
     }
-    for (const [k, e] of want) if (!x.alerts.has(k)) { x.alerts.set(k, e); fresh.push(e); }
-    if (lines.length || fresh.length) {
-      const what = [...lines.map((e) => `took back ${e.type} → ${e.targetKey}`), ...fresh.map((e) => `new ${e.type} → ${e.targetKey}`)].join(', ');
-      this.log(`play ${was.id}${p && p.id !== was.id ? ` (now ${p.id})` : ''} changed: ${what}${lines.length ? ` (${why})` : ''}`);
+    for (const [k, e] of want) {
+      if (x.alerts.has(k)) continue;
+      const sent = x.dropped.get(k);
+      if (sent) { x.dropped.delete(k); x.alerts.set(k, sent); again.push(sent); } else { x.alerts.set(k, e); fresh.push(e); }
     }
+    const againLine = back ? 'ESPN has since put this play back.' : p && REVIEW.test(p.text) ? 'Overturned on review: it stands.' : 'ESPN has since changed this play back.';
+    if (lines.length || fresh.length || again.length) {
+      const what = [...lines.map((e) => `took back ${e.type} → ${e.targetKey}`), ...fresh.map((e) => `new ${e.type} → ${e.targetKey}`), ...again.map((e) => `${e.type} → ${e.targetKey} stands again`)].join(', ');
+      this.log(`play ${was.id}${p && p.id !== was.id ? ` (now ${p.id})` : ''} changed: ${what}${lines.length ? ` (${why})` : ''}${again.length ? ` (${againLine})` : ''}`);
+    }
+    lines.push(...this.linesOn(again, againLine));
     return { fresh, lines };
   }
 

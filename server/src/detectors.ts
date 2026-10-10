@@ -1034,20 +1034,33 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
+/**
+ * What an NFL play's text says stands: after a review that reversed the call, the part after it. ESPN keeps the call
+ * overturned in front: "(Shotgun) D.Watson pass … INTERCEPTED by R.Spears-Jennings … PENALTY on PIT-D.Everette,
+ * Defensive Pass Interference, 42 yards, enforced at CLV 35 - No Play.The Replay Official reviewed the pass was not
+ * tipped ruling, and the play was REVERSED.(Shotgun) D.Watson pass … INTERCEPTED by R.Spears-Jennings …".
+ */
+export const ruled = (text: string) => text.split(/\bthe play was REVERSED\.?/i).at(-1)!;
+
 function nfl(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
   const [passer] = role(p, 'passer');
   const ty = p.type;
-  if (passer && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
-  if (passer && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
-  if (passer && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
-  for (const f of role(p, 'fumbler')) {
+  // A play wiped out by a penalty ("… enforced at WAS 35 - No Play.") is only its flags. ESPN often leaves its type
+  // and players as they were: 73 of 734 in the 2026 season's first five weeks (sacks wiped out by defensive holding,
+  // incompletions by pass interference), and a play it edits live starts out as the play it was. After a review that
+  // reversed it, what stands is the call after "REVERSED." (wiped out, then not: an interception, Browns at Steelers).
+  const wiped = /\bNo Play\b/i.test(ruled(p.text));
+  if (passer && !wiped && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
+  if (passer && !wiped && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
+  if (passer && !wiped && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
+  for (const f of wiped ? [] : role(p, 'fumbler')) {
     const lost = /Opponent|Fumble Return/i.test(ty);
     out.push(lost
       ? mk(g, p, 'nfl.fumble_lost', f, `${nameOf(g.league, f)} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['nfl.fumble'] })
       : mk(g, p, 'nfl.fumble', f, `${nameOf(g.league, f)} fumbled`));
   }
-  const kickMiss = /Field Goal Missed|Blocked Field Goal|Blocked PAT|Missed PAT/i.test(ty) || /extra point is no good|kick is blocked/i.test(p.text);
+  const kickMiss = !wiped && (/Field Goal Missed|Blocked Field Goal|Blocked PAT|Missed PAT/i.test(ty) || /extra point is no good|kick is blocked/i.test(ruled(p.text)));
   if (kickMiss) for (const k of [...role(p, 'kicker'), ...role(p, 'patScorer')].slice(0, 1))
     out.push(mk(g, p, 'nfl.kicker.miss', k, `${nameOf(g.league, k)} ${/blocked/i.test(ty + p.text) ? 'got a kick blocked' : /extra point/i.test(p.text) ? 'missed the extra point' : 'missed a field goal'}`));
   for (const x of role(p, 'penalized')) out.push(mk(g, p, 'nfl.penalty', x, `${nameOf(g.league, x)} was flagged${/declined/i.test(p.text) ? ' (declined)' : ''}`));
@@ -1080,7 +1093,7 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
     if (teamId === g.homeId || teamId === g.awayId) out.push({ id: `${g.gameId}:${p.id}:cfb.td_wiped_out:team-${teamId}`, type: footballType(g.league, 'td_wiped_out'), targetKey: teamKey(g.league, teamId!),
       title: `${teamName(g.league, teamId!)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
   }
-  if (/TOUCHDOWN NULLIFIED/.test(p.text)) {
+  if (/TOUCHDOWN NULLIFIED/.test(ruled(p.text))) {
     const flagged = flaggedFor(g, p);
     const teamId = flagged ? playerTeamId(g.league, flagged) : undefined;
     if (flagged) replace(mk(g, p, 'nfl.td_wiped_out', flagged, `${nameOf(g.league, flagged)}'s penalty wiped out a touchdown`), 'nfl.penalty');
@@ -1158,8 +1171,13 @@ export function wipedOutLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, t
     const m = [...text.matchAll(CFB_FLAG)].filter((x) => !x[3]).at(-1);
     if (m) ({ teamId, what } = cfbFlag(g, m[1], m[2]));
   } else {
-    const m = [...text.matchAll(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, ([^,]+)/g)].filter((x) => !/declined/i.test(x[2])).at(-1);
+    // The flag before "No Play": one enforced between downs can follow it ("… enforced at NE 16 - No Play.PENALTY on
+    // NE, Unsportsmanlike Conduct, 5 yards, enforced between downs."). Offsetting ones are "Penalty on", none taken.
+    const cut = text.search(/\bNo Play\b/i);
+    const flags = [...text.matchAll(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, ([^,]+)/g)].filter((x) => !/declined/i.test(x[2]));
+    const m = flags.filter((x) => cut < 0 || x.index < cut).at(-1) ?? flags.at(-1);
     if (m) [teamId, what] = [[g.homeId, g.awayId].find((id) => teamAbbrev(g.league, id) === (NFL_CODE[m[1]] ?? m[1])), m[2].trim()];
+    else if (/\boffsetting\b/i.test(text)) return 'Wiped out by offsetting penalties.';
   }
   if (!what) return 'Wiped out by a penalty.';
   return teamId ? `Wiped out by a penalty on ${the(g.league, teamName(g.league, teamId))}: ${what}.` : `Wiped out by a penalty: ${what}.`;
