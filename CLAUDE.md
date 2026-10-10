@@ -20,9 +20,6 @@ ESLint isn't set up, so `expo lint` installs it and rewrites `package-lock.json`
 ## Patch notes
 Keep `PATCH_NOTES.md` up to date with every shipped change, server changes too (marked "(Server)"), under "Next build". When a TestFlight build is sent, rename that heading to the build number and date and start a new "Next build" above it; `eas build:list --json` gives each build's git commit. Each build's section is pasted as is into TestFlight's "What to Test", so it must be **under 4,000 characters** and **use no emoji**. Update it in the same change as the code, and check each section's length and that it has no emoji (a `\p{Extended_Pictographic}` regex) before committing.
 
-## Fantasy Sweat
-A sibling app, Fantasy Sweat (live fantasy-football matchup alerts for Sleeper leagues, freemium with a Pro subscription), is a separate git repo next to this one (`projects/fantasy-sweat`). It reuses this stack: an Expo SDK 57 app, a Node and SQLite server on Fly, anonymous device tokens, Expo push and expo-iap. When you change a shared pattern (push, auth, the store, the settings UI), say that the other app may need the same change. Its dev server uses port 8788; Hate Watch's uses 8787. Its placeholder contact emails (`support@example.com`) still need real values before release, and Pro status is reported by the app, so server-side receipt checking is still to do.
-
 ## Two machines (Windows and Mac)
 Both machines work from this repo, and neither needs the other turned on. Production runs on Fly and builds run on EAS.
 - On a new machine, or after a `git pull`: `bash claude-config/install.sh` sets Claude Code's user settings, this file's notes and the two scouts to the repo's copies. Anything it replaces is kept beside it as `<name>.before-<time>`. Then `npm ci` in `app/` and in `server/`.
