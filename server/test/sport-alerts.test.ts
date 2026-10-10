@@ -22,7 +22,7 @@ for (const [lg, id, name, short, abbr] of [
 ]) team.run(`team:${lg}:${id}`, lg, id, name, short, abbr);
 const player = db.prepare(`INSERT INTO players (key, league, espn_id, name, position, team_key, image, image_w, image_h, image_kind, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
 for (const [lg, id, name, pos, t] of [
-  ['mlb', '32081', 'Gerrit Cole', 'SP', '10'], ['mlb', '33192', 'Aaron Judge', 'RF', '10'], ['mlb', '42547', 'Anthony Volpe', 'SS', '10'], ['mlb', '4000', 'Austin Wells', 'C', '10'],
+  ['mlb', '32081', 'Gerrit Cole', 'SP', '10'], ['mlb', '33192', 'Aaron Judge', 'RF', '10'], ['mlb', '42547', 'Anthony Volpe', 'SS', '10'], ['mlb', '4000', 'Austin Wells', 'C', '10'], ['mlb', '40000', 'Tommy Kahnle', 'RP', '10'],
   ['mlb', '4683371', 'Junior Caminero', '3B', '30'], ['mlb', '5000', 'Yandy Diaz', '1B', '30'],
   ['nba', '4065648', 'Jayson Tatum', 'F', '2'], ['nba', '3934672', 'Jalen Brunson', 'G', '18'],
   ['nhl', '3124', 'Evgeni Malkin', 'C', '5'], ['nhl', '3114', 'Tristan Jarry', 'G', '5'], ['nhl', '5100', 'Alex Nedeljkovic', 'G', '5'], ['nhl', '5200', 'Artemi Panarin', 'LW', '13'],
@@ -73,11 +73,17 @@ test("MLB: a run handed over, once, whoever's it is (wild pitch, balk, passed ba
   ]);
 });
 
-test('MLB: back-to-back homers off one pitcher; outs on the bases, the batter\'s and a runner\'s', () => {
+test('MLB: homers in a row off one pitcher, each its own home run alert saying so; outs on the bases, the batter\'s and a runner\'s', () => {
   const g = mlbCtx();
+  const hr = (half: string, text: string, pitcher = '32081', runs = 1) => run(g, ab(half, text, pitcher, '5000', { scoring: true, scoreValue: runs })).map((e) => [e.type, e.title]);
   assert.deepEqual(types(run(g, ab('Top 6', 'Caminero homered to left (402 feet).', '32081', '4683371', { scoring: true, scoreValue: 1 }))), ['mlb.pitcher.home_run_allowed / mlb.pitcher.runs_allowed']);
   const b2b = run(g, ab('Top 6', 'Diaz homered to right (380 feet).', '32081', '5000', { scoring: true, scoreValue: 1 }));
-  assert.deepEqual(b2b.map((e) => [e.title, e.aliases]), [['Gerrit Cole gave up back-to-back homers', ['mlb.pitcher.home_run_allowed', 'mlb.pitcher.runs_allowed']]]);
+  assert.deepEqual(b2b.map((e) => [e.type, e.title, e.aliases]), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back homers', ['mlb.pitcher.runs_allowed']]]);
+  assert.deepEqual(hr('Top 6', 'Lowe homered to center (410 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back homers']]);
+  assert.deepEqual(hr('Top 6', 'Arozarena homered to left (399 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back-to-back homers']]);
+  run(g, ab('Top 6', 'Paredes flied out to center.', '32081', '5001'));
+  assert.deepEqual(hr('Top 6', 'Ramirez homered to right (371 feet), Siri scored.', '32081', 2), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up a 2-run homer']], 'an out ends the run of homers');
+  assert.deepEqual(hr('Top 6', 'Siri homered to left (390 feet).', '40000'), [['mlb.pitcher.home_run_allowed', 'Tommy Kahnle gave up a solo homer']], "a new pitcher's first isn't back-to-back");
   assert.deepEqual(run(g, ab('Bottom 6', 'Judge doubled to left, Judge out stretching at third.', '5000', '33192')).map((e) => [e.type, e.title]),
     [['mlb.runner.out_on_bases', 'Aaron Judge got thrown out stretching at third']]);
   assert.deepEqual(run(g, ab('Bottom 7', 'Wells lined into double play, pitcher to first, Volpe doubled off first.', '5000', '4000')).map((e) => [e.type, e.targetKey, e.title]), [

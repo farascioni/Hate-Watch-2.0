@@ -46,7 +46,7 @@ test('MLB in full, as Settings shows it', () => {
   assert.deepEqual(sectionsOf(mlb).map((s) => `${s}: ${mlb.filter((t) => t.section === s).map((t) => t.label).join(' · ')}`), [
     'Offense: Strikes out · Strikes out 3+ times · Hits into a double or triple play · Gets caught stealing or picked off · Gets thrown out on the bases · Goes down in order · Goes hitless · Makes an out',
     'Defense: Commits an error · Lets a run score on a passed ball',
-    'Pitching: Blows a save · Takes the loss · Gives up a home run · Gives up back-to-back homers · Gets chased early · Hands over a run · No quality start · Gives up runs · Issues a walk / HBP',
+    'Pitching: Blows a save · Takes the loss · Gives up a home run · Gets chased early · Hands over a run · No quality start · Gives up runs · Issues a walk / HBP',
     'Challenges: Loses a challenge',
     'Team: Gets no-hit · NOBLETIGER · Strands runners in scoring position · Has a position player pitching · Opponent has runners in scoring position',
   ]);

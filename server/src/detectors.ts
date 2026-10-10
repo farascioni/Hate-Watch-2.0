@@ -38,6 +38,8 @@ export interface GameCtx {
   sentOff?: Record<string, number>;
   /** MLB: the latest at-bat result. Its onFirst/onSecond/onThird roles are the bases AFTER that play. */
   lastResult?: NPlay;
+  /** MLB: the latest homer's at-bat, and how many in a row one pitcher had given up with it (2: back-to-back). */
+  homerRun?: { id: string; n: number };
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
   /**
@@ -992,12 +994,14 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     const textId = (type: string, who: string) => `${g.gameId}:${type}:${halfKey(p) ?? ''}:${normalize(t).replace(/ /g, '-')}:${who}`;
     if (/homered/i.test(t)) {
       const label = runs >= 4 ? 'a grand slam' : runs > 1 ? `a ${runs}-run homer` : 'a solo homer';
-      // The batter before homered off him too, this half-inning: back-to-back, one alert for the second.
+      // Every homer is its own alert. The batter before homered off him too, this half-inning: it says how many in a
+      // row ("gave up back-to-back homers", the third "back-to-back-to-back").
       const before = g.lastResult;
-      const b2b = !!before && /homered/i.test(before.text) && halfKey(before) === halfKey(p) && role(before, 'pitcher')[0] === pitcher;
-      out.push(b2b
-        ? mk(g, p, 'mlb.pitcher.back_to_back', pitcher, `${pn} gave up back-to-back homers`, { aliases: ['mlb.pitcher.home_run_allowed', 'mlb.pitcher.runs_allowed'] })
-        : mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${pn} gave up ${label}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
+      const after = !!before && /homered/i.test(before.text) && halfKey(before) === halfKey(p) && role(before, 'pitcher')[0] === pitcher;
+      const n = after ? (g.homerRun?.id === before!.id ? g.homerRun.n : 1) + 1 : 1;
+      g.homerRun = { id: p.id, n };
+      const what = n > 1 ? `${Array(n).fill('back').join('-to-')} homers` : label;
+      out.push(mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${pn} gave up ${what}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
     } else if (gift && !/passed ball/i.test(gift[1])) {
       out.push({ ...mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/balk/i.test(gift[1]) ? 'balked in a run' : 'let a run score on a wild pitch'}`, { aliases: ['mlb.pitcher.runs_allowed'] }), id: textId('mlb.pitcher.gift_run', pitcher) });
     } else if (pushedIn) {

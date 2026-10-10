@@ -249,7 +249,7 @@ Settings let users control:
 - reset to defaults
 - clear feed
 
-A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won't hide the runs.
+A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won't hide the runs. Every homer is its own "Gives up a home run" alert; one hit right after another off the same pitcher in a half-inning says so: "Gerrit Cole gave up back-to-back homers", the third "back-to-back-to-back".
 
 ## Scores tab
 
