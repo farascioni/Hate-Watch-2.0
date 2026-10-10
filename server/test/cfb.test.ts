@@ -21,6 +21,14 @@ for (const [id, name, short, abbr] of [['61', 'Georgia Bulldogs', 'Georgia', 'UG
   ['2426', 'Navy Midshipmen', 'Navy', 'NAVY'], ['25', 'California Golden Bears', 'California', 'CAL'], ['2439', 'UNLV Rebels', 'UNLV', 'UNLV'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC'], ['96', 'Kentucky Wildcats', 'Kentucky', 'UK'],
   ['333', 'Alabama Crimson Tide', 'Alabama', 'ALA'], ['344', 'Mississippi State Bulldogs', 'Mississippi State', 'MSST']])
   db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`).run(`team:cfb:${id}`, id, name, short, abbr, short);
+// October 10 2026's, with the catalog's short name and location as they are ("Sacramento St", "Sacramento State").
+for (const [id, name, short, abbr, location] of [['16', 'Sacramento State Hornets', 'Sacramento St', 'SAC', 'Sacramento State'], ['189', 'Bowling Green Falcons', 'Bowling Green', 'BGSU', 'Bowling Green'],
+  ['57', 'Florida Gators', 'Florida', 'FLA', 'Florida'], ['2116', 'UCF Knights', 'UCF', 'UCF', 'UCF'], ['197', 'Oklahoma State Cowboys', 'Oklahoma St', 'OKST', 'Oklahoma State'],
+  ['23', 'San José State Spartans', 'San José St', 'SJSU', 'San José State'], ['290', 'Georgia Southern Eagles', 'GA Southern', 'GASO', 'Georgia Southern'],
+  ['2050', 'Ball State Cardinals', 'Ball State', 'BALL', 'Ball State'], ['77', 'Northwestern Wildcats', 'Northwestern', 'NU', 'Northwestern'], ['154', 'Wake Forest Demon Deacons', 'Wake Forest', 'WAKE', 'Wake Forest'],
+  ['152', 'NC State Wolfpack', 'NC State', 'NCSU', 'NC State'], ['194', 'Ohio State Buckeyes', 'Ohio State', 'OSU', 'Ohio State'], ['204', 'Oregon State Beavers', 'Oregon St', 'ORST', 'Oregon State'],
+  ['68', 'Boise State Broncos', 'Boise St', 'BOIS', 'Boise State']])
+  db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'cfb', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`).run(`team:cfb:${id}`, id, name, short, abbr, location);
 loadCatalog();
 
 test('the league: ESPN\'s college-football, every FBS game on its scoreboard; teams only; after the UFC on the chips, before the WNBA (always last)', () => {
@@ -207,6 +215,48 @@ test("the NFL's player alerts as a college team's, from ESPN's wording (October 
   const cu = g('2439', '25'); // UNLV (home), California
   const dq = { ...play('d1', 'Kickoff', '(11:30) #33 T.McGough kickoff 64 yards to the UNLV01 #82 P.Zachary return 27 yards to the UNLV28 PENALTY CAL Targeting (#20 C.Sidney) 15 yards from UNLV28 to UNLV43. California #20 C.Sidney has been disqualified', '25', 0, 0), team: { id: '25' } };
   assert.deepEqual(at(cu, dq), [['cfb.team.ejection', 'team:cfb:25', 'California had a player ejected: C.Sidney (targeting)']], 'the ejection is the alert for its flag');
+});
+
+test('a college flag\'s code of more than one word ("Sac St") or before two spaces ("SC  "), its foul without "UNS: " or "UNR: " (October 10 2026)', () => {
+  const g = (home: string, away: string): any => ({ league: 'cfb', gameId: 'G9', homeId: home, awayId: away, goalies: new Map() });
+  const at = (ctx: any, text: string) => D.PLAYER_DETECTORS.cfb(ctx, D.fromSitePlay({ ...play('x', 'Rush', text, ctx.homeId, 0, 0), team: { id: ctx.homeId } }))
+    .filter((e) => /penalty|ejection/.test(e.type)).map((e) => [e.type, e.targetKey, e.title]);
+  const sac = g('189', '16'); // Bowling Green (home), Sacramento State: "Sac St"
+  assert.deepEqual(at(sac, '(12:48) Shotgun #1 A.Dendy rush middle for 6 yards gain to the Sac St49 (#12 M.Nichols; #93 M.Kindle) PENALTY Sac St UNS: Unsportsmanlike Conduct (#18 F.Puloka) 15 yards from Sac St49 to Sac St34, 1ST DOWN'),
+    [['cfb.team.penalty', 'team:cfb:16', 'Sacramento St was flagged: Unsportsmanlike Conduct']], 'not "St UNS: Unsportsmanlike Conduct"');
+  assert.deepEqual(at(sac, '(00:37) Shotgun #17 J.Kastantin pass incomplete short to #8 E.Jacon-Duffy thrown to Sac St22 PENALTY Sac St Pass Interference (#29 C.Reese) 15 yards from Sac St41 to Sac St26, 1ST DOWN. NO PLAY'),
+    [['cfb.team.penalty', 'team:cfb:16', 'Sacramento St was flagged: Pass Interference']], 'the foul keeps its first word ("SAC" begins "Sac St Pass" too)');
+  assert.deepEqual(at(sac, '(05:12) PENALTY BGSU Face Mask (#10 A.Hines III) 15 yards'), [['cfb.team.penalty', 'team:cfb:189', 'Bowling Green was flagged: Face Mask']], 'a code of one word as it was');
+  // Not seen on October 10: a player disqualified on a code of two words (in the wording of October 3's CAL play).
+  const tossed = '(02:10) #30 R.Kingston punt 41 yards to the BG20 #3 J.Smith return 12 yards to the BG32 PENALTY Sac St Targeting (#18 F.Puloka) 15 yards from BG32 to BG47. Sacramento State #18 F.Puloka has been disqualified';
+  assert.deepEqual(at(sac, tossed), [['cfb.team.ejection', 'team:cfb:16', 'Sacramento St had a player ejected: F.Puloka (targeting)']], 'the ejection is still the alert for its flag');
+
+  const sc = g('57', '2579'); // Florida (home), South Carolina: "SC" and two spaces, which matched no flag at all
+  assert.deepEqual(at(sc, 'PENALTY SC  Delay Of Game  5 yards from SC 44 to SC 39. NO PLAY'), [['cfb.team.penalty', 'team:cfb:2579', 'South Carolina was flagged: Delay Of Game']]);
+  assert.deepEqual(at(sc, '(01:53) No Huddle-Shotgun #21 E.Pryor rush left for 1 yard loss to the SC 06 (#5 K.Daniels Jr.), out of bounds PENALTY SC  UNR: Unnecessary Roughness (#35 J.Burger) 3 yards from SC 06 to SC 03, 1ST DOWN'),
+    [['cfb.team.penalty', 'team:cfb:2579', 'South Carolina was flagged: Unnecessary Roughness']]);
+  assert.deepEqual(at(g('197', '2116'), '(06:36) No Huddle-Shotgun #10 W.Young rush middle for 4 yards gain to the UCF22 (#99 T.Collins) PENALTY UCF UNR: Unnecessary Roughness (#7 A.Jackson) 11 yard from UCF22 to UCF11, 1ST DOWN'),
+    [['cfb.team.penalty', 'team:cfb:2116', 'UCF was flagged: Unnecessary Roughness']], 'Oklahoma State (home), UCF: not "UNR: Unnecessary Roughness"');
+  // Not seen on October 10 either: schools by ESPN's short names for them, San José State's three words with an accent,
+  // Georgia Southern's "GA" ("Georgia" doesn't start with it; "GASO" starts with "GA", which left "Southern Holding").
+  assert.deepEqual([D.cfbCodeTeam(g('2005', '23'), 'San José St'), D.cfbCodeTeam(g('2005', '23'), 'San Jose St'), D.cfbCodeTeam(sac, 'Sac St Pass')], ['23', '23', undefined]);
+  assert.deepEqual(at(g('2005', '23'), 'PENALTY San José St Holding (#55 A.B) 10 yards'), [['cfb.team.penalty', 'team:cfb:23', 'San José St was flagged: Holding']]);
+  assert.deepEqual(at(g('2005', '290'), 'PENALTY GA Southern Holding (#55 A.B) 10 yards'), [['cfb.team.penalty', 'team:cfb:290', 'GA Southern was flagged: Holding']]);
+});
+
+test('a college flag\'s code that\'s a school\'s initials, with or without a U ("WF", "BSU", "OSU"), when neither school matches it otherwise (October 10 2026)', () => {
+  const g = (home: string, away: string): any => ({ league: 'cfb', gameId: 'G10', homeId: home, awayId: away, goalies: new Map() });
+  const at = (ctx: any, text: string) => D.PLAYER_DETECTORS.cfb(ctx, D.fromSitePlay({ ...play('x', 'Rush', text, ctx.homeId, 0, 0), team: { id: ctx.homeId } }))
+    .filter((e) => /penalty|ejection/.test(e.type)).map((e) => [e.type, e.targetKey, e.title]);
+  assert.deepEqual(at(g('77', '2050'), '(04:59) PENALTY BSU False Start (#45 C.Britton) 5 yards from BSU41 to BSU36. NO PLAY'),
+    [['cfb.team.penalty', 'team:cfb:2050', 'Ball State was flagged: False Start']], 'Northwestern (home), Ball State: "BSU", not its BALL');
+  assert.deepEqual(at(g('152', '154'), '(07:29) #97 C.Carlson kickoff 65 yards to the NCSU00, Touchback PENALTY WF UNS: Unsportsmanlike Conduct (#9 C.Hardy) 15 yards from NCSU25 to NCSU40'),
+    [['cfb.team.penalty', 'team:cfb:154', 'Wake Forest was flagged: Unsportsmanlike Conduct']], 'NC State (home), Wake Forest: "WF", not its WAKE');
+  assert.deepEqual(at(g('197', '2116'), 'PENALTY OSU False Start (#70 S.Torgeson) 5 yards from UCF22 to UCF27. NO PLAY'),
+    [['cfb.team.penalty', 'team:cfb:197', 'Oklahoma St was flagged: False Start']], 'Oklahoma State (home), UCF: "OSU", not its OKST');
+  // Not seen on October 10: a school's abbreviation comes first ("OSU" is Ohio State's, not Oregon State's initials),
+  // and initials both schools share are neither's (Ball State and Boise State are both "BSU").
+  assert.deepEqual([D.cfbCodeTeam(g('194', '204'), 'OSU'), D.cfbCodeTeam(g('2050', '68'), 'BSU'), D.cfbCodeTeam(g('2050', '68'), 'BALL')], ['194', undefined, '2050']);
 });
 
 test("a college team's starting quarterback pulled: after his 5th pass, another throws twice in a row, once", () => {

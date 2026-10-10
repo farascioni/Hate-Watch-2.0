@@ -24,6 +24,8 @@ for (const [id, name, short, abbr] of [['84', 'Indiana Hoosiers', 'Indiana', 'IU
   ['245', 'Texas A&M Aggies', 'Texas A&M', 'TA&M'], ['142', 'Missouri Tigers', 'Missouri', 'MIZ'], ['2050', 'Ball State Cardinals', 'Ball State', 'BALL'], ['77', 'Northwestern Wildcats', 'Northwestern', 'NU'],
   ['151', 'East Carolina Pirates', 'East Carolina', 'ECU'], ['242', 'Rice Owls', 'Rice', 'RICE'], ['57', 'Florida Gators', 'Florida', 'FLA'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC']])
   team.run(`team:cfb:${id}`, 'cfb', id, name, short, abbr, short);
+team.run('team:cfb:16', 'cfb', '16', 'Sacramento State Hornets', 'Sacramento St', 'SAC', 'Sacramento State'); // ESPN's code: "Sac St"
+team.run('team:cfb:189', 'cfb', '189', 'Bowling Green Falcons', 'Bowling Green', 'BGSU', 'Bowling Green');
 team.run('team:nfl:12', 'nfl', '12', 'Kansas City Chiefs', 'Chiefs', 'KC', 'Kansas City');
 team.run('team:nfl:13', 'nfl', '13', 'Las Vegas Raiders', 'Raiders', 'LV', 'Las Vegas');
 db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES ('player:nfl:3139477', 'nfl', '3139477', 'Patrick Mahomes', 'team:nfl:12', 'QB', 'x', 1, 1, 'headshot', 0)`).run();
@@ -304,5 +306,15 @@ test('the same play re-posted: same period, a start within 10 seconds, the same 
   assert.equal(R.changeLine(g, null), 'ESPN has since taken this play back.');
   assert.equal(R.changeLine(g, p('(00:56) #3 M.Hawkins Jr. rush middle … PENALTY ARI Face Mask (#44 P.Williams) 11 yard from ARI22 to ARI11, 1ST DOWN. NO PLAY')), 'Wiped out by a penalty on Arizona: Face Mask.');
   assert.equal(R.changeLine(g, p('(00:37) pass incomplete PENALTY Sac St Offside declined PENALTY ARI UNS: Unsportsmanlike Conduct 15 yards. NO PLAY')), 'Wiped out by a penalty on Arizona: Unsportsmanlike Conduct.');
+  // A code of two words ("Sac St") or before two spaces ("SC  "), the foul without "UNS: ".
+  const sac = { league: 'cfb' as const, homeId: '189', awayId: '16' }, sc = { league: 'cfb' as const, homeId: '57', awayId: '2579' };
+  assert.equal(R.changeLine(sac, p('(00:37) Shotgun #17 J.Kastantin pass incomplete short to #8 E.Jacon-Duffy thrown to Sac St22 PENALTY Sac St Pass Interference (#29 C.Reese) 15 yards from Sac St41 to Sac St26, 1ST DOWN. NO PLAY')),
+    'Wiped out by a penalty on Sacramento St: Pass Interference.');
+  assert.equal(D.wipedOutLine(sac, '(12:48) Shotgun #1 A.Dendy rush middle for 6 yards gain to the Sac St49 (#12 M.Nichols; #93 M.Kindle) PENALTY Sac St UNS: Unsportsmanlike Conduct (#18 F.Puloka) 15 yards from Sac St49 to Sac St34, 1ST DOWN'),
+    'Wiped out by a penalty on Sacramento St: Unsportsmanlike Conduct.');
+  assert.equal(R.changeLine(sc, p('(09:35) No Huddle-Shotgun #9 T.Jones Jr. pass incomplete deep right to #4 T.Abrams thrown to FLA42 PENALTY SC  Offside (#39 C.Herring) 5 yards from FLA22 to FLA27. NO PLAY')),
+    'Wiped out by a penalty on South Carolina: Offside.');
+  assert.equal(R.changeLine({ league: 'cfb', homeId: '77', awayId: '2050' }, p('(04:32) Shotgun #0 A.Chiles pass incomplete short left to #27 G.Sawchuk thrown to NU00 QB hurried by #7 B.Marsh PENALTY BSU UNR: Unnecessary Roughness (#27 G.Forsha) 15 yards from NU01 to NU16, 1ST DOWN. NO PLAY')),
+    'Wiped out by a penalty on Ball State: Unnecessary Roughness.', '"BSU": Ball State\'s initials');
   assert.equal(R.changeLine(g, D.fromSitePlay({ id: 'y', type: { text: 'Pass Reception' }, text: '(08:40) #6 K.Luster pass complete … to the NU01, 1ST DOWN' })), 'ESPN has since changed this play to a pass reception.');
 });

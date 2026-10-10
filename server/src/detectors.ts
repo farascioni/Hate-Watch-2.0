@@ -1099,21 +1099,45 @@ export const passerIn = (text: string) => text.match(/#\d+ ([A-Z][\w'-]*\.[\w.'-
 /**
  * The team a college penalty's code is ("PENALTY Bama Holding"): ESPN's codes are often not the abbreviation
  * ("Bama", "State", "USC" for South Carolina), so a code is one of the game's two schools when it matches
- * just one of them (its abbreviation, either way round, or a word of its name). None: not said.
+ * just one of them (its abbreviation, either way round, or a word of its name). A code of more words ("Sac St",
+ * "San Jose St", "GA Southern") is a school whose location's or short name's words, from the first, each start with
+ * the code's. A code neither school matches that way may be one's initials, with or without a U ("WF" for Wake
+ * Forest, "BSU" Ball State, "OSU" Oklahoma State): never one that already matched ("OSU" is Ohio State's
+ * abbreviation, so not Oregon State's initials against it). None: not said.
  */
 export function cfbCodeTeam(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, code: string): string | undefined {
-  const c = code.toLowerCase();
+  const c = code.toLowerCase(), parts = /\s/.test(code.trim()) ? normalize(code).split(' ') : undefined;
   const hits = [g.homeId, g.awayId].filter((id) => {
     const t = catalog.teamByEspn(g.league, id);
     if (!t) return false;
+    if (parts) return [t.location, t.shortName].some((n) => { const ws = normalize(n ?? '').split(' '); return parts.length <= ws.length && parts.every((w, i) => ws[i].startsWith(w)); });
     const abbr = t.abbrev.toLowerCase(), words = `${t.location ?? ''} ${t.name}`.toLowerCase();
     return abbr === c || abbr.startsWith(c) || c.startsWith(abbr) || (c.length >= 3 && words.includes(c));
   });
-  return hits.length === 1 ? hits[0] : undefined;
+  if (hits.length || parts) return hits.length === 1 ? hits[0] : undefined;
+  const initials = [g.homeId, g.awayId].filter((id) => {
+    const t = catalog.teamByEspn(g.league, id), i = normalize(t?.location ?? t?.shortName ?? '').split(' ').map((w) => w[0]).join('');
+    return i.length >= 2 && (c === i || c === `${i}u`);
+  });
+  return initials.length === 1 ? initials[0] : undefined;
 }
 
-/** A college flag in a play's text: its code, what it was, and whether it was declined ("PENALTY VAN Holding declined"). */
-const CFB_FLAG = /PENALTY (\S+) ([A-Za-z][A-Za-z :'/-]*?)(?= \(| \d| declined| offsetting|\.|,|$)( declined)?/g;
+/**
+ * A college flag in a play's text: its code's first word, the rest (the code's other words, if any, then what it was:
+ * `cfbFlag`), and whether it was declined ("PENALTY VAN Holding declined", "PENALTY SC  Delay Of Game  5 yards").
+ */
+const CFB_FLAG = /PENALTY +(\S+) +(\p{L}[\p{L} :'/&-]*?)(?= \(| \d| declined| offsetting|\.|,|$)( declined)?/gu;
+
+/**
+ * A college flag's team and what it was, from its code's first word and the rest ("Sac", "St UNS: Unsportsmanlike
+ * Conduct"): the code is the longest run of up to three words that's one of the game's two schools ("Sac St"), else
+ * the first, and the foul is what's left, without ESPN's "UNS: " or "UNR: " ("Unsportsmanlike Conduct").
+ */
+function cfbFlag(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, code: string, rest: string): { teamId?: string; what: string } {
+  const words = rest.trim().split(/\s+/), codeOf = (n: number) => [code, ...words.slice(0, n)].join(' ');
+  const n = [2, 1].find((k) => k < words.length && cfbCodeTeam(g, codeOf(k))) ?? 0;
+  return { teamId: cfbCodeTeam(g, codeOf(n)), what: words.slice(n).join(' ').replace(/^(UNS|UNR): /, '') };
+}
 
 /**
  * The line on an alert whose play a penalty wiped out after it went out: the flag that did it is the play's last one
@@ -1125,7 +1149,7 @@ export function wipedOutLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, t
   let teamId: string | undefined, what: string | undefined;
   if (TEAMS_ONLY.has(g.league)) {
     const m = [...text.matchAll(CFB_FLAG)].filter((x) => !x[3]).at(-1);
-    if (m) [teamId, what] = [cfbCodeTeam(g, m[1]), m[2].replace(/^(UNS|UNR): /, '').trim()];
+    if (m) ({ teamId, what } = cfbFlag(g, m[1], m[2]));
   } else {
     const m = [...text.matchAll(/PENALTY on ([A-Z]{2,3})(?:-[^,]+)?, ([^,]+)/g)].filter((x) => !/declined/i.test(x[2])).at(-1);
     if (m) [teamId, what] = [[g.homeId, g.awayId].find((id) => teamAbbrev(g.league, id) === (NFL_CODE[m[1]] ?? m[1])), m[2].trim()];
@@ -1165,12 +1189,12 @@ function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
   // A player disqualified ("PENALTY CAL Targeting (#20 C.Sidney)… California #20 C.Sidney has been disqualified"): the
   // team's alert for that flag (it counts as a flag too), first, so it's the alert and not a line on another.
   const dq = p.text.match(/PENALTY (\S+) ([^(]*?) \((#\d+ [^)]+)\)[^]*?has been disqualified/);
-  if (dq) team('cfb.team.ejection', cfbCodeTeam(g, dq[1]), (n) => `${n} had a player ejected: ${dq[3].replace(/^#\d+ /, '')}${/targeting/i.test(dq[2]) ? ' (targeting)' : ''}`, { aliases: ['cfb.team.penalty'] });
-  // Each other flag the play has: "PENALTY Bama Delay Of Game", "PENALTY VAN Holding declined".
+  if (dq) team('cfb.team.ejection', cfbFlag(g, dq[1], dq[2]).teamId, (n) => `${n} had a player ejected: ${dq[3].replace(/^#\d+ /, '')}${/targeting/i.test(dq[2]) ? ' (targeting)' : ''}`, { aliases: ['cfb.team.penalty'] });
+  // Each other flag the play has: "PENALTY Bama Delay Of Game", "PENALTY VAN Holding declined", "PENALTY Sac St Offside".
   for (const m of p.text.matchAll(CFB_FLAG)) {
-    const flagged = cfbCodeTeam(g, m[1]), what = m[2].replace(/^UNS: /, '').trim();
-    if (dq && m[1] === dq[1] && what === dq[2].replace(/^UNS: /, '').trim()) continue; // the ejection's flag: said
-    team('cfb.team.penalty', flagged, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`);
+    if (dq && m.index === dq.index) continue; // the ejection's flag: said
+    const { teamId, what } = cfbFlag(g, m[1], m[2]);
+    team('cfb.team.penalty', teamId, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`);
   }
   // The starting quarterback pulled, once a game per team (the NFL's rule): in the first three quarters, after
   // his 5th pass, another passer throws twice in a row (one throw is a trick play). ESPN doesn't say why.
