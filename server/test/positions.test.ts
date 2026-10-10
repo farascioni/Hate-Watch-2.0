@@ -16,10 +16,10 @@ const screen = (league: string, mine: string[]) => EVENT_TYPES
 
 test('MLB: pitchers get no hitting alerts, hitters no pitching ones, two-way players both', () => {
   const skubal = screen('mlb', ['SP', 'P']), judge = screen('mlb', ['RF']), ohtani = screen('mlb', ['DH', 'P', 'SP']);
-  assert.deepEqual(skubal, ['Commits an error', 'Blows a save', 'Takes the loss', 'Gives up a home run', 'Gives up back-to-back homers', 'Gets chased early', 'Hands over a run', 'No quality start', 'Gives up runs', 'Issues a walk / HBP', 'Loses a challenge']);
+  assert.deepEqual(skubal, ['Commits an error', 'Blows a save', 'Takes the loss', 'Gives up a home run', 'Gets chased early', 'Hands over a run', 'No quality start', 'Gives up runs', 'Issues a walk / HBP', 'Loses a challenge']);
   assert.deepEqual(judge, ['Strikes out', 'Strikes out 3+ times', 'Hits into a double or triple play', 'Gets caught stealing or picked off', 'Gets thrown out on the bases', 'Goes hitless', 'Makes an out', 'Commits an error', 'Loses a challenge']);
-  assert.equal(ohtani.length, 18, 'every MLB player alert but the catcher\'s');
-  assert.equal(screen('mlb', []).length, 19, 'no position known: everything');
+  assert.equal(ohtani.length, 17, 'every MLB player alert but the catcher\'s');
+  assert.equal(screen('mlb', []).length, 18, 'no position known: everything');
 });
 
 test('NFL: passing alerts for quarterbacks, kicks for kickers, fumbles for whoever carries the ball, a safety for the offense', () => {

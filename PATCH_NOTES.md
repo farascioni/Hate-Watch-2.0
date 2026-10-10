@@ -15,7 +15,7 @@ SCORES
 
 UFC
 - Track UFC fighters. A loss is a Successful Hate Watch that says how, with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
-- With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end (KO/TKO R1 2:09).
+- With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end.
 - A card's preview, from Scores: one fight in full (yours, else the main event; tap any fight to swap), with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five. Names open their pages.
 - With the UFC chip on, Search lists each weight class's top five fighters.
 - A loss by a finish says how and when (KO/TKO R1 1:20); a title fight adds "Lost the Lightweight title" or "Lost a Lightweight title fight". (Server)
@@ -24,7 +24,7 @@ UFC
 
 F1
 - Sprints get their alerts (lights out, a car retiring, the result). Sessions are named in full, and a driver's teammate is whoever drove the other car that weekend. (Server)
-- Lights out is one alert naming your constructors and drivers, the back of the grid as lines; driver trackers get it too. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
+- Lights out is one alert naming your constructors and drivers, the back of the grid as lines. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
 - Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. (Server)
 - Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
 - A driver's page no longer names their constructor twice.
@@ -40,8 +40,9 @@ COLLEGE FOOTBALL
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.
 - Tracking both teams in a game, its start is one alert, not two. (Server)
+- Back-to-back homers are home run alerts saying so, back-to-back-to-back too. (Server)
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert, not its own alert. (Server)
-- With All leagues on, filters say Athletes; pick a league and it's Players (F1: Drivers, UFC: Fighters).
+- Filters say Athletes with All leagues on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
 - Filters too wide for one row put All on top, the rest evenly below.
@@ -49,7 +50,7 @@ EVERYWHERE
 - Tapping an alert opens all of it on its own screen; its photo opens their page.
 - Buttons center their labels, and VoiceOver reads them as buttons.
 - No alert gets the same later line twice. (Server)
-- Settings no longer has a Leagues section; a league turned off there comes back with All on in its alerts group.
+- Settings no longer has a Leagues section; leagues turned off there come back on.
 
 ## Build 12 (October 9, 2026)
 
