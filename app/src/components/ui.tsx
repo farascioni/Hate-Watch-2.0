@@ -109,9 +109,9 @@ export function Empty({ emoji, title, body, action }: { emoji: string; title: st
   );
 }
 
-export function PrimaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function PrimaryButton({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.primary, pressed && { opacity: 0.8 }]}>
+    <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.primary, (pressed || disabled) && { opacity: disabled ? 0.5 : 0.8 }]} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}>
       <Text style={styles.primaryText}>{label}</Text>
     </Pressable>
   );
@@ -169,6 +169,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', justifyContent: 'center', padding: space(10), gap: space(3), flexGrow: 1 },
   emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   emptyBody: { color: colors.textDim, fontSize: 15, textAlign: 'center', lineHeight: 21 },
-  primary: { marginTop: space(3), backgroundColor: colors.hate, paddingHorizontal: space(6), paddingVertical: space(3), borderRadius: radius.pill },
+  primary: { marginTop: space(3), backgroundColor: colors.hate, paddingHorizontal: space(6), paddingVertical: space(3), borderRadius: radius.pill, alignItems: 'center' },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

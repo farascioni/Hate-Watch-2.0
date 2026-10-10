@@ -496,13 +496,15 @@ export function publish(events: Detected[], league: League) {
 }
 
 /**
- * A fact that came after its alert: one more line on the device's feed row (none if it cleared its feed),
- * sent live as an `eventUpdate` frame. No push: the alert already made a sound.
+ * A fact that came after its alert: one more line on the device's feed row (none if it cleared its feed, or
+ * already has that line), sent live as an `eventUpdate` frame. No push: the alert already made a sound.
  */
 function addLateLine(deviceId: string, eventId: string, line: string) {
   const row = db.prepare('SELECT extra FROM feed WHERE device_id = ? AND event_id = ?').get(deviceId, eventId) as { extra: string | null } | undefined;
   if (!row) return;
-  const lines = [...(row.extra ? JSON.parse(row.extra) as string[] : []), line];
+  const had = row.extra ? JSON.parse(row.extra) as string[] : [];
+  if (had.includes(line)) return;
+  const lines = [...had, line];
   db.prepare('UPDATE feed SET extra = ? WHERE device_id = ? AND event_id = ?').run(JSON.stringify(lines), deviceId, eventId);
   const item = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(deviceId, eventId) as Parameters<typeof feedItem>[0];
   for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(item) }));

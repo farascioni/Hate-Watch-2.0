@@ -112,3 +112,14 @@ test('loaded on the play that first puts a runner in scoring position: the alert
   assert.equal(got('yankees-risp').at(-1), 'Rays have the bases loaded against the Yankees | Top 7th: Lowe walked, Diaz to second, Caminero to third. — TB 1, NYY 1');
   assert.ok(got('yankees-only').every((x) => !/scoring|loaded/i.test(x)), "the alert's off by default");
 });
+
+test('the same late fact twice (from two of its sources): one line on the alert', () => {
+  fan('yankees-twice', ['team:mlb:10']);
+  const at = Date.now();
+  const alert = (id: string, x: object = {}) => ({ id, type: 'team.fell_behind', targetKey: 'team:mlb:10', title: 'Rays took the lead over the Yankees', body: 'TB 2, NYY 1', at, ...x });
+  publish([alert('twice-1')], 'mlb');
+  const late = (id: string) => alert(id, { lateOn: { targetKey: 'team:mlb:10', since: at - 1000, types: ['team.fell_behind'], line: 'Third straight game behind.' } });
+  publish([late('twice-2')], 'mlb');
+  publish([late('twice-3')], 'mlb');
+  assert.deepEqual(got('yankees-twice'), ['Rays took the lead over the Yankees | Third straight game behind. TB 2, NYY 1']);
+});
