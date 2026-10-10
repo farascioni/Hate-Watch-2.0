@@ -72,11 +72,14 @@ export default function SearchScreen() {
   }, [allDrivers, noteTrackers]);
 
   const browsing = !q.trim();
-  const showTeams = browsing && kind !== 'player' && !classes;
+  // What the bar shows, not the last pick: Athletes picked, then CFB (teams only), lists CFB's teams.
+  const showTeams = browsing && searchKind !== 'player' && !classes;
   const name = (id: string) => leagueInfo(id)?.name ?? id.toUpperCase();
   // The search box says what it searches: "Search teams", "Search NBA players", "Search F1 drivers", "Search UFC fighters".
   const players = playersWord(league);
-  const placeholder = `Search ${league ? `${name(league)} ` : ''}${searchKind === 'player' ? players : searchKind === 'team' ? 'teams' : `${players} or teams`}`;
+  // What this search finds: "players", "teams", "athletes or teams" (the box's placeholder, and the hint under it).
+  const what = searchKind === 'player' ? players : searchKind === 'team' ? 'teams' : `${players} or teams`;
+  const placeholder = `Search ${league ? `${name(league)} ` : ''}${what}`;
   // One section of results, or of teams A-Z; by division, a section each ("AL East"; "MLB · AL East" across every league).
   // The UFC's weight classes: a section each, for results too.
   const sections = useMemo(() => {
@@ -143,7 +146,7 @@ export default function SearchScreen() {
         ListEmptyComponent={
           loading ? null
             : failed && !browsing ? <Text style={styles.none}>Couldn't search. Check your connection and try again.</Text>
-            : browsing ? <Text style={styles.none}>Type a name to find {league ? `${league.toUpperCase()} ` : ''}{players}.</Text>
+            : browsing ? <Text style={styles.none}>Type a name to find {league ? `${name(league)} ` : ''}{what}.</Text>
             : <Text style={styles.none}>No {searchKind === 'all' ? `${players} or teams` : searchKind === 'player' ? players : 'teams'} match “{q}”.</Text>
         }
       />
