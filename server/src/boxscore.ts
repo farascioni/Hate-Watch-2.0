@@ -143,6 +143,9 @@ const MLB_STATS: [string, string, string][] = [
   ['pitching', 'ERA', 'ERA'], ['pitching', 'WHIP', 'WHIP'], ['pitching', 'strikeouts', 'Strikeouts (pitching)'], ['fielding', 'errors', 'Errors'],
 ];
 const MAX_STATS = 10;
+/** An injury's status, short enough for a column every build draws at most 60 points wide: "10-Day-IL" is "IL-10". */
+export const shortStatus = (s: string) => s.replace(/^(\d+)-Day-IL$/i, 'IL-$1').replace(/^Day-To-Day$/i, 'DTD').replace(/^Questionable$/i, 'Ques.')
+  .replace(/^Probable$/i, 'Prob.').replace(/^Suspension$/i, 'Susp.');
 
 /** One side's season stats, by label: MLB's few, or the short list ESPN sends for the others. */
 function seasonStats(lg: League, t: any): Map<string, string> {
@@ -206,7 +209,10 @@ export function previewBox(lg: League, s: any): BoxTeam[] {
     }
     const hurt: any[] = (s.injuries ?? []).find((x: any) => String(x.team?.id) === id)?.injuries ?? [];
     if (hurt.length) {
-      groups.push({ title: 'Injuries', columns: ['Status', 'Injury'], rows: hurt.filter((x) => x.athlete?.id).map((x) => row(lg, x, [String(x.status ?? ''), String(x.details?.type ?? '')], [], { detail: x.athlete?.position?.abbreviation })) });
+      // The injury beside the position ("1B · Back"), the status in the column, short.
+      groups.push({ title: 'Injuries', columns: ['Status'], rows: hurt.filter((x) => x.athlete?.id).map((x) => row(lg, x, [shortStatus(String(x.status ?? ''))], [], {
+        detail: [x.athlete?.position?.abbreviation, x.details?.type].filter(Boolean).join(' · ') || undefined,
+      })) });
     }
     return { ...teamInfo(lg, id), groups };
   };
