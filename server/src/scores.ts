@@ -309,6 +309,16 @@ export function winProb(p: { homeWinPercentage: number; tiePercentage?: number }
   return { home: r(home), away: r(Math.max(0, 1 - home - Number(p.tiePercentage ?? 0))) };
 }
 
+/**
+ * An F1 session's name for people. ESPN names one by its abbreviation alone ("FP1", "SS", "SR", "Qual",
+ * "Race"); a name of its own, where a feed has one, is the fallback.
+ */
+export function sessionName(comp: any): string {
+  const names: Record<string, string> = { FP1: 'Practice 1', FP2: 'Practice 2', FP3: 'Practice 3', SS: 'Sprint Shootout', SR: 'Sprint', Qual: 'Qualifying', Race: 'Race' };
+  const a = String(comp?.type?.abbreviation ?? '');
+  return names[a] ?? comp?.type?.text ?? (a || 'Session');
+}
+
 /** One F1 session (race, sprint or qualifying) from the F1 scoreboard: the running order is in it. */
 export function raceCard(ev: any, comp: any): GameCard {
   const state = (['pre', 'in', 'post'].includes(comp.status?.type?.state) ? comp.status.type.state : 'pre') as GameCard['state'];
@@ -321,7 +331,7 @@ export function raceCard(ev: any, comp: any): GameCard {
   return {
     key: `f1:${comp.id}`, league: 'f1', id: String(comp.id), state, startsAt: Date.parse(comp.date),
     detail: state === 'in' ? (lap ? `Lap ${lap}` : 'Live') : state === 'post' ? 'Final' : '',
-    session: `${ev.shortName ?? ev.name} · ${comp.type?.text ?? comp.type?.abbreviation ?? 'Session'}`,
+    session: `${ev.shortName ?? ev.name} · ${sessionName(comp)}`,
     order,
   };
 }

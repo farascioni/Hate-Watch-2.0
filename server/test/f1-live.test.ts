@@ -9,7 +9,8 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { urls } = await import('../src/leagues.ts');
-const { f1Deps, scanF1, races } = await import('../src/f1.ts');
+const { f1Deps, scanF1, races, sessionKind } = await import('../src/f1.ts');
+const { sessionName } = await import('../src/scores.ts');
 
 // ── Catalog: Cadillac (Bottas, Pérez) and Ferrari (Leclerc, Hamilton)
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, color, logo, logo_w, logo_h, updated_at) VALUES (?, 'f1', ?, ?, ?, ?, ?, 'badge://f1', 512, 512, 0)`);
@@ -94,7 +95,7 @@ test('a simulated race goes through the real F1 engine end to end', async () => 
 });
 
 test('lights out on a race seen beforehand: "Hate Watch Starting" for followed teams only, once', async () => {
-  const sprint = { id: 'S1', type: { abbreviation: 'Sprint', text: 'Sprint' }, date: new Date(Date.now() + 60_000).toISOString(), status: { type: { state: 'pre', completed: false } } };
+  const sprint = { id: 'S1', type: { abbreviation: 'SR' }, date: new Date(Date.now() + 60_000).toISOString(), status: { type: { state: 'pre', completed: false } } };
   sessions.push(sprint);
   const before = feed().length;
   await scanF1(); // before the start
@@ -108,4 +109,13 @@ test('lights out on a race seen beforehand: "Hate Watch Starting" for followed t
 
   await scanF1();
   assert.equal(feed().length, before + 1, 'announced once');
+});
+
+test("ESPN's sessions as they come (an abbreviation, no name): which have alerts, and what they're called", () => {
+  const as = (abbreviation: string) => ({ type: { abbreviation } });
+  assert.deepEqual(['FP1', 'FP2', 'FP3', 'SS', 'SR', 'Qual', 'Race'].map((a) => [a, sessionKind(as(a)), sessionName(as(a))]), [
+    ['FP1', null, 'Practice 1'], ['FP2', null, 'Practice 2'], ['FP3', null, 'Practice 3'], ['SS', null, 'Sprint Shootout'],
+    ['SR', 'sprint', 'Sprint'], ['Qual', 'qual', 'Qualifying'], ['Race', 'race', 'Race'],
+  ], 'the sprint is "SR": read as nothing before, so a sprint weekend\'s sprint had no alerts');
+  assert.equal(sessionKind({ type: { text: 'Sprint Race' } }), 'sprint', 'a name of its own still counts');
 });

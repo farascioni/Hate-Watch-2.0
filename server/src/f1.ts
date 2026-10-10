@@ -9,7 +9,7 @@ import { catalog } from './catalog.ts';
 import { urls, playerKey, teamKey } from './leagues.ts';
 import { START_WORD, ordinal, type Detected } from './detectors.ts';
 import { publish } from './fanout.ts';
-import { raceCard, setF1Calendar, upsertGame } from './scores.ts';
+import { raceCard, sessionName, setF1Calendar, upsertGame } from './scores.ts';
 
 const F1_SCAN_MS = Number(process.env.HW_F1_SCAN_MS ?? 30_000);     // scoreboard: sessions going live / finishing
 const F1_STATUS_MS = Number(process.env.HW_F1_STATUS_MS ?? 15_000); // followed drivers' race status
@@ -30,11 +30,15 @@ const getJson = (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), '[f1]', ...a);
 
 export type Session = 'race' | 'sprint' | 'qual';
+/**
+ * The sessions with alerts. ESPN names one by its abbreviation alone: "Race", "SR" (the sprint), "Qual";
+ * not "SS" (the sprint shootout) or practice. A name of its own ("Sprint"), where a feed has one, also counts.
+ */
 export function sessionKind(comp: any): Session | null {
-  const t = String(comp?.type?.abbreviation ?? comp?.type?.text ?? '');
-  if (/^race$/i.test(t)) return 'race';
-  if (/sprint/i.test(t) && !/qual|shootout/i.test(t)) return 'sprint';
-  if (/^qual/i.test(t)) return 'qual';
+  const a = String(comp?.type?.abbreviation ?? ''), t = String(comp?.type?.text ?? '');
+  if (/^race$/i.test(a) || /^race$/i.test(t)) return 'race';
+  if (/^(SR|sprint)$/i.test(a) || (/sprint/i.test(t) && !/qual|shootout/i.test(t))) return 'sprint';
+  if (/^qual/i.test(a) || /^qual/i.test(t)) return 'qual';
   return null; // practice sessions don't generate alerts
 }
 const POINTS_CUTOFF: Record<'race' | 'sprint', number> = { race: 10, sprint: 8 };
@@ -174,9 +178,10 @@ export function f1SessionResults(meta: SessionMeta, rows: F1Row[]): Detected[] {
 }
 
 // ─── Reading ESPN ─────────────────────────────────────────────────────────────────────────────
+/** A car's constructor: the one ESPN has it entered for in this session (drivers swap seats mid-season), else the catalog's. */
 const teamOf = (athleteId: string, vehicle?: any) =>
-  catalog.playerByEspn('f1', athleteId)?.teamKey
-  ?? catalog.allTeams().find((t) => t.league === 'f1' && t.name.toLowerCase() === String(vehicle?.manufacturer ?? '').toLowerCase())?.key;
+  catalog.allTeams().find((t) => t.league === 'f1' && t.name.toLowerCase() === String(vehicle?.manufacturer ?? '').toLowerCase())?.key
+  ?? catalog.playerByEspn('f1', athleteId)?.teamKey;
 
 export async function fetchSessionRows(eventId: string, compId: string, withStatus: boolean): Promise<F1Row[]> {
   const list = await getJson(urls.f1Competitors(eventId, compId), { bust: true });
@@ -205,11 +210,13 @@ export function watchedF1Drivers(): Set<string> {
   return ids;
 }
 
-const sessionLabel = (ev: any, comp: any) => `${ev.shortName ?? ev.name} · ${comp.type?.text ?? comp.type?.abbreviation ?? 'Session'}`;
+const sessionLabel = (ev: any, comp: any) => `${ev.shortName ?? ev.name} · ${sessionName(comp)}`;
 
 // ─── Live: one watcher per running race/sprint ────────────────────────────────────────────────
 class RaceWatch {
   private status = new Map<string, F1Row>();
+  /** Each car's constructor in this session (read once): a double DNF is the two cars of a team that day. */
+  private teams?: Map<string, string>;
   private first = true;
   private timer?: unknown;
   readonly eventId: string;
@@ -229,10 +236,13 @@ class RaceWatch {
     const watched = watchedF1Drivers();
     if (!watched.size) return;
     const ids = [...watched];
+    this.teams ??= await getJson(urls.f1Competitors(this.eventId, this.meta.compId), { timeoutMs: 5000 })
+      .then((list) => new Map<string, string>((list.items ?? []).flatMap((c: any) => { const t = teamOf(String(c.id), c.vehicle); return t ? [[String(c.id), t]] : []; })))
+      .catch(() => undefined);
     const fresh = await mapLimit(ids, 6, async (id) => {
       const st = await getJson(urls.f1Status(this.eventId, this.meta.compId, id), { bust: true, timeoutMs: 5000 }).catch(() => null);
       if (!st?.type) return null; // not entered in this session
-      return { id, order: 0, grid: 0, out: isOut(String(st.type.name)), outLabel: String(st.type.description ?? ''), lap: st.period ? Number(st.period) : null, teamKey: teamOf(id) } as F1Row;
+      return { id, order: 0, grid: 0, out: isOut(String(st.type.name)), outLabel: String(st.type.description ?? ''), lap: st.period ? Number(st.period) : null, teamKey: this.teams?.get(id) ?? teamOf(id) } as F1Row;
     });
     const events: Detected[] = [];
     const at = Date.now();

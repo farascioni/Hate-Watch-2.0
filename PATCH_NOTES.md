@@ -9,6 +9,9 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 Changes since build 12. Server updates already work on every build.
 
+F1
+- Sprints get their alerts: lights out, a car retiring, and the result. ESPN marks a sprint "SR", which wasn't read as one, so sprint weekends had alerts for qualifying and the race only. Sessions are named in full (Singapore GP · Sprint, · Qualifying), and a driver's teammate is whoever drove the other car that weekend. (Server)
+
 ## Build 12 (October 9, 2026)
 
 Changes since build 11. Server updates already work on every build.
