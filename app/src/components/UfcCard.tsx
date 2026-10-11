@@ -43,7 +43,7 @@ export function UfcBoutRow({ bout, onPress, selected }: { bout: UfcBout; onPress
         const mine = follows.has(c.key), strong = over ? c.winner === true : c === fav;
         return (
           <View key={c.key} style={[styles.corner, mine && styles.mine]}>
-            <Text style={[styles.name, strong && styles.strong, over && c.winner === false && { color: colors.textFaint }]} numberOfLines={1}>
+            <Text style={[styles.name, strong && styles.strong, over && c.winner === false && { color: colors.textFaint }]}>
               {c.name}{beltWord(c) ? <Text style={styles.tag}>  {beltWord(c)}</Text> : null}
             </Text>
             {c.record ? <Text style={styles.record}>{c.record}</Text> : null}
@@ -103,8 +103,8 @@ export function UfcFightView({ bout, startsAt, segment }: { bout: UfcBout; start
           <Pressable key={c.key} disabled={!c.linked} onPress={() => openPage(c)} accessibilityRole={c.linked ? 'link' : undefined}
             style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={styles.inline}>
-                <Text style={[styles.fighter, over && c.winner === false && { color: colors.textDim }]} numberOfLines={1}>{c.name}</Text>
+              <View style={styles.nameRow}>
+                <Text style={[styles.fighter, over && c.winner === false && { color: colors.textDim }]}>{c.name}</Text>
                 {follows.has(c.key) ? <Text style={styles.tracking}>Tracking</Text> : null}
               </View>
               {[c.record, beltWord(c)].some(Boolean) ? <Text style={styles.record}>{[c.record, beltWord(c)].filter(Boolean).join(' · ')}</Text> : null}
@@ -187,8 +187,10 @@ const styles = StyleSheet.create({
   fighter: { flexShrink: 1, color: colors.text, fontSize: 15, fontWeight: '800' },
   tag: { color: colors.warn, fontSize: 12, fontWeight: '700' },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
+  // A fighter and the Tracking badge: at large text sizes the badge goes under the name rather than squeezing it.
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: space(2), rowGap: 2 },
   // The game cards' pill (GameCard).
-  tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' },
+  tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden', flexShrink: 0 },
   record: { color: colors.textFaint, fontSize: 13, fontVariant: ['tabular-nums'] },
   side: { color: colors.textDim, fontSize: 14, fontWeight: '700', minWidth: 40, textAlign: 'right', fontVariant: ['tabular-nums'] },
   result: { color: colors.textDim, fontSize: 13, fontWeight: '700', paddingHorizontal: space(3), paddingTop: space(1.5) },

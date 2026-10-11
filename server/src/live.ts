@@ -848,11 +848,22 @@ function every(ms: number, fn: () => Promise<void>): () => void {
 
 // ─── Standings: drops, losing streaks, elimination ────────────────────────────────────────────
 /** `note`: the zone a table position is in, where ESPN marks it (EPL: "Champions League", "Relegation"). */
-interface StandingSnap { rank: number; group: string; clincher: string; streak: string; note?: string }
+/** `division`: its place in its division (DIVISION_STANDINGS), when the standings were read by division. */
+interface StandingSnap { rank: number; group: string; clincher: string; streak: string; note?: string; division?: { name: string; rank: number } }
 
-export function parseStandings(res: any): Map<string, StandingSnap> {
+/** Leagues whose divisions decide the playoffs: their standings are read by division, and a drop names it ("2nd in the AL Central"). */
+const DIVISION_STANDINGS = new Set<League>(['mlb', 'nfl', 'nhl']);
+/** A division's name as fans say it: MLB "AL Central" (ESPN's short "AL Cent"), the NFL's "AFC East", the NHL's "Atlantic". */
+const divisionName = (node: any) => String(node.shortName ?? node.name ?? '').replace(/\bCent\b/, 'Central').replace(/ Division$/, '');
+
+/**
+ * Each team's place: its seed (soccer: table position) in its group. `byDivision`: read at ESPN's division level
+ * (?level=3), where a league holds its divisions: the group is the league or conference above ("AL", "AFC", "East"),
+ * the seed still its own across it, and each team also gets its place in its division, by that seed.
+ */
+export function parseStandings(res: any, byDivision = false): Map<string, StandingSnap> {
   const out = new Map<string, StandingSnap>();
-  const walk = (node: any, parent?: any) => {
+  const walk = (node: any, parent?: any, depth = 0) => {
     if (node.standings?.entries?.length) {
       const stat = (e: any, n: string) => e.stats?.find((s: any) => s.name === n || s.type === n);
       // Soccer tables have no playoff seed; their "rank" is the table position.
@@ -863,25 +874,27 @@ export function parseStandings(res: any): Map<string, StandingSnap> {
       // The EPL's one group is named for the season ("2026-2027"); the league's own name reads better.
       // College football's are slugs ("big10", "sec"): its short name ("Big Ten", "SEC") instead.
       const name = (/^[a-z0-9]+$/.test(String(node.abbreviation ?? '')) ? node.shortName ?? node.name : node.abbreviation ?? node.name) ?? '';
-      const group = /^\d{4}-\d{2,4}$/.test(name) && parent ? parent.abbreviation ?? parent.name ?? name : name;
+      const division = byDivision && depth >= 2 && parent ? divisionName(node) : null; // the league, a league or conference, its divisions
+      const group = division ? String(parent.abbreviation ?? parent.name ?? '') : /^\d{4}-\d{2,4}$/.test(name) && parent ? parent.abbreviation ?? parent.name ?? name : name;
       entries.forEach((e, i) => out.set(String(e.team.id), {
         rank: seed(e) || i + 1,
         group,
         clincher: String(stat(e, 'clincher')?.displayValue ?? ''),
         streak: String(stat(e, 'streak')?.displayValue ?? ''),
         ...(e.note?.description ? { note: String(e.note.description) } : {}),
+        ...(division ? { division: { name: division, rank: i + 1 } } : {}),
       }));
     }
-    for (const c of node.children ?? []) walk(c, node);
+    for (const c of node.children ?? []) walk(c, node, depth + 1);
   };
   walk(res);
   return out;
 }
 
-/** "Down from 16th. Into the relegation zone 🪂 Streak: L3" (the parts ESPN has). */
-export function dropBody(was: StandingSnap, cur: StandingSnap) {
+/** "Down from 16th. Into the relegation zone 🪂 Streak: L3" (the parts ESPN has); `from` and `also` for a division's drop ("Down from 1st. 6th in the AL."). */
+export function dropBody(was: StandingSnap, cur: StandingSnap, from = was.rank, also?: string | null) {
   const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');
-  return [`Down from ${ordinal(was.rank)}.`, relegation(cur) && !relegation(was) && 'Into the relegation zone 🪂', cur.streak && `Streak: ${cur.streak}`].filter(Boolean).join(' ');
+  return [`Down from ${ordinal(from)}.`, also && `${also}.`, relegation(cur) && !relegation(was) && 'Into the relegation zone 🪂', cur.streak && `Streak: ${cur.streak}`].filter(Boolean).join(' ');
 }
 
 /** ESPN's clincher marks that mean a division title: y, and the ones that include it (z: the conference or league's best, *: home field, p: Presidents' Trophy). */
@@ -896,7 +909,8 @@ const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
  * "Successful Hate Watch! Nebraska lost to Indiana", "Down from 2nd to 8th in the Big Ten. Final Score: 20 to 17".
  */
 export async function scanStandings(lg: League) {
-  const now = parseStandings(await liveDeps.getJson(urls.standings(lg), { timeoutMs: 8000 }));
+  const byDivision = DIVISION_STANDINGS.has(lg);
+  const now = parseStandings(await liveDeps.getJson(byDivision ? `${urls.standings(lg)}?level=3` : urls.standings(lg), { timeoutMs: 8000 }), byDivision);
   if (!now.size) return;
   const prev = new Map(Object.entries(kvGet<Record<string, StandingSnap>>(`standings:${lg}`) ?? {}));
   kvSet(`standings:${lg}`, Object.fromEntries(now));
@@ -927,9 +941,18 @@ export async function scanStandings(lg: League) {
     if (SOCCER.has(lg) && relegation(cur) && !relegation(was)) {
       events.push({ ...base, id: `releg:${lg}:${teamId}:${day}`, type: soccerType(lg, 'team.relegation_zone'), title: `${team.shortName} dropped into the relegation zone`, body: dropBody(was, cur), fold: 'Into the relegation zone.', ...onLoss(team.key, 'Into the relegation zone.') });
     }
-    if (cur.group === was.group && cur.rank > was.rank) {
-      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${was.rank}->${cur.rank}`, type: 'team.standings_drop', title: `${team.shortName} dropped to ${ordinal(cur.rank)} in the ${cur.group}`, body: dropBody(was, cur), fold: `Down to ${ordinal(cur.rank)} in the ${cur.group}.`,
-        ...onLoss(team.key, `Down from ${ordinal(was.rank)} to ${ordinal(cur.rank)} in the ${cur.group}.`) });
+    // A drop in the division (DIVISION_STANDINGS) names it: "Guardians dropped to 2nd in the AL Central", its seed in
+    // the league too if that dropped; a drop in the seeding alone says where they stand in the division.
+    const div = cur.division, wasDiv = was.division;
+    const divDrop = !!div && !!wasDiv && div.name === wasDiv.name && div.rank > wasDiv.rank;
+    const seedDrop = cur.group === was.group && cur.rank > was.rank;
+    if (divDrop || seedDrop) {
+      const where = divDrop ? `${ordinal(div!.rank)} in the ${div!.name}` : `${ordinal(cur.rank)} in the ${cur.group}`;
+      const from = divDrop ? wasDiv!.rank : was.rank;
+      const also = divDrop ? (seedDrop ? `${ordinal(cur.rank)} in the ${cur.group}` : null) : div ? `${ordinal(div.rank)} in the ${div.name}` : null;
+      events.push({ ...base, id: `standings:${lg}:${teamId}:${day}:${divDrop ? `${div!.name}:${wasDiv!.rank}->${div!.rank}` : `${was.rank}->${cur.rank}`}`, type: 'team.standings_drop',
+        title: `${team.shortName} dropped to ${where}`, body: dropBody(was, cur, from, also), fold: `Down to ${where}.`,
+        ...onLoss(team.key, `Down from ${ordinal(from)} to ${where}${also ? ` (${also})` : ''}.`) });
     }
     const m = cur.streak.match(/^L(\d+)$/);
     if (m && Number(m[1]) >= 3 && cur.streak !== was.streak && kvGet(`streak-told:${lg}:${teamId}`) !== cur.streak) {

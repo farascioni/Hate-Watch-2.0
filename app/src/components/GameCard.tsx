@@ -87,10 +87,10 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
         <Avatar target={s.team} size={big ? 40 : 30} />
       </Pressable>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={styles.inline}>
+        <View style={styles.nameRow}>
           <Pressable onPress={open} hitSlop={{ top: 4, bottom: 4 }} style={({ pressed }) => [styles.nameTap, pressed && { opacity: 0.6 }]}
             accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint="Opens their page">
-            <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]} numberOfLines={1}>{s.team.shortName}</Text>
+            <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]}>{s.team.shortName}</Text>
           </Pressable>
           {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
         </View>
@@ -111,13 +111,14 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
     <>
       <View style={styles.inline}>
         <LeagueTag league="f1" />
-        <Text style={[styles.teamName, big && { fontSize: 18 }]} numberOfLines={1}>{game.session}</Text>
+        {/* Names and titles wrap rather than cut off, for large text sizes ("Singapore Airlines Singapore Grand Prix · Race"). */}
+        <Text style={[styles.teamName, big && { fontSize: 18 }]}>{game.session}</Text>
       </View>
       <Text style={styles.metaText}>{statusLine(game)}</Text>
       {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
       {mine.map((d) => (
         <View key={d.key} style={styles.meta}>
-          <Text style={styles.teamName} numberOfLines={1}>{d.name}</Text>
+          <Text style={styles.teamName}>{d.name}</Text>
           <Text style={styles.score}>{d.position ? `P${d.position}` : '–'}</Text>
         </View>
       ))}
@@ -217,8 +218,10 @@ const styles = StyleSheet.create({
   // Around a team's name: only as wide as the name, so the space after it still opens the game.
   nameTap: { flexShrink: 1, minWidth: 0 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
+  // A name and its Tracking badge: at large text sizes the badge goes under the name rather than squeezing it.
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: space(2), rowGap: 2 },
   teamName: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
-  tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden' },
+  tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden', flexShrink: 0 },
   players: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
   score: { color: colors.text, fontSize: 20, fontWeight: '900', minWidth: 28, textAlign: 'right' },
   // Before the start: the team's record under its name, and its chance to win where the score will be.

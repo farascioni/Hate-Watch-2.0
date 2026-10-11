@@ -8,7 +8,7 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS, publish, setPushSender, feedItem } = await import('../src/fanout.ts');
 const { PLAYER_DETECTORS, fromSitePlay, gameLostEvent, playerTeamLostEvents } = await import('../src/detectors.ts');
-const { GameTracker, liveDeps, scanStandings } = await import('../src/live.ts');
+const { GameTracker, liveDeps, scanStandings, parseStandings } = await import('../src/live.ts');
 const { divisionsDeps } = await import('../src/divisions.ts');
 const { weeklyRecaps } = await import('../src/recap.ts');
 const { urls } = await import('../src/leagues.ts');
@@ -139,6 +139,30 @@ test('eliminated right after a loss: a line on the loss alert too, with the drop
   assert.deepEqual(got('jets-elim-off'), [`${loss} | Down from 9th to 11th in the AFC. Final Score: 20 to 13`]);
   assert.deepEqual(got('jets-loss-off'), ['team.eliminated: Jets are ELIMINATED ⚰️ | Down to 11th in the AFC. Officially out of playoff contention. See you next year.'],
     'no loss alert to put it on: its own alert, the drop on it, as before');
+});
+
+test("MLB, the NFL, the NHL: a drop in the division names it, a drop in the seeding alone says the division too (ESPN's division-level standings)", async () => {
+  const entry = (id: string, seed: number) => ({ team: { id }, stats: [{ name: 'playoffSeed', value: seed }, { name: 'streak', displayValue: 'L1' }, { name: 'clincher', displayValue: '' }] });
+  // ESPN's shape at ?level=3: the league, then the American and National Leagues, then each division with its teams.
+  const res = (dodgers: number, giants: number, padres: number) => ({ name: 'Major League Baseball', abbreviation: 'MLB', children: [{ name: 'National League', abbreviation: 'NL',
+    children: [{ name: 'National League West', abbreviation: 'NLW', shortName: 'NL West', standings: { entries: [entry('25', padres), entry('19', dodgers), entry('26', giants)] } }] }] });
+  const before = parseStandings(res(2, 4, 6), true);
+  assert.deepEqual(before.get('19'), { rank: 2, group: 'NL', clincher: '', streak: 'L1', division: { name: 'NL West', rank: 1 } }, 'its seed in the league, its place in the division by seed');
+  assert.deepEqual([before.get('26')!.division, before.get('25')!.division], [{ name: 'NL West', rank: 2 }, { name: 'NL West', rank: 3 }]);
+  // The NFL's and the NHL's division names.
+  const nhl = parseStandings({ children: [{ abbreviation: 'East', children: [{ name: 'Metropolitan Division', abbreviation: 'MET', standings: { entries: [entry('5', 7)] } }] }] }, true);
+  const nfl = parseStandings({ children: [{ abbreviation: 'NFC', children: [{ name: 'NFC East', abbreviation: 'EAST', standings: { entries: [entry('28', 3)] } }] }] }, true);
+  assert.deepEqual([nhl.get('5'), nfl.get('28')].map((s) => [s!.group, s!.division!.name]), [['East', 'Metropolitan'], ['NFC', 'NFC East']]);
+  fan('dodgers-standings', ['team:mlb:19']);
+  fan('padres-standings', ['team:mlb:25']);
+  kvSet('standings:mlb', Object.fromEntries(before));
+  const prev = liveDeps.getJson, read: string[] = [];
+  // The Giants pass the Dodgers in the NL West (the Dodgers' seed 2 to 5); the Padres stay 3rd in it, their seed 6 to 7.
+  liveDeps.getJson = async (url: string) => { read.push(url); return res(5, 3, 7); };
+  try { await scanStandings('mlb'); } finally { liveDeps.getJson = prev; }
+  assert.ok(read[0].endsWith('/standings?level=3'), 'read by division');
+  assert.deepEqual(got('dodgers-standings'), ['team.standings_drop: Dodgers dropped to 2nd in the NL West | Down from 1st. 5th in the NL. Streak: L1']);
+  assert.deepEqual(got('padres-standings'), ['team.standings_drop: Padres dropped to 7th in the NL | Down from 6th. 3rd in the NL West. Streak: L1']);
 });
 
 test('ejections: an NHL game misconduct, an instigator and game misconduct together, an NFL disqualification', () => {

@@ -28,7 +28,7 @@ export function UpNextRow({ game, now }: { game: NextGame; now: number }) {
       accessibilityRole="button" accessibilityLabel={`${title}, ${when.day} ${when.time}${sub ? `, ${sub}` : ''}`}>
       <Avatar target={mine} size={36} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        <Text style={styles.title}>{title}</Text>
         <View style={styles.inline}>
           <LeagueTag league={game.league} />
           {sub ? <Text style={styles.sub} numberOfLines={1}>{sub}</Text> : null}
