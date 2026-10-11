@@ -150,6 +150,7 @@ Internal testing is Google's TestFlight: up to 100 testers, available within min
    npx eas-cli@latest submit --platform android --profile production
    ```
    (Or build and submit in one go with `eas build --platform android --profile production --auto-submit`.)
+   What the flags mean (`eas submit --help`): `--profile` names the submit profile in `eas.json` (it defaults to `production` when there is one). That profile has no `android` settings until step 6 adds them. `--latest` submits the newest Android build on EAS, `--id <buildId>` a particular one, and `--path` a local `.aab` file.
 2. In Play Console, open **Testing** → **Internal testing** → **Testers**. Create an email list with your Google account and add a short release note.
 3. Use the **opt-in link** on that page. Open it in the emulator's browser while signed in to the same Google account, and install Hate Watch from the Play Store. This is the version that can test the tips, because in-app purchases only work for an app installed from Google Play.
 4. Check the **pre-launch report** a few hours later (under Testing, or in Quality). Google installs every testing-track build on real phones in its test lab, then shows crashes, screenshots and accessibility warnings. It's the closest thing to owning a few Android phones.
