@@ -47,10 +47,10 @@ const poll = (g: any, p: any, prev?: { home: number; away: number }) => {
 test("a homer that gives the Rays the lead: Cole's alert and the Yankees' are one, for someone tracking both", () => {
   poll(ctx(), play('hr1', 'Top 6', 'Caminero homered to left (402 feet).', { scoring: true, scoreValue: 1, home: 1, away: 2 }), { home: 1, away: 1 });
   const line = 'Caminero homered to left (402 feet). — TB 2, NYY 1';
-  assert.deepEqual(got('yankees-and-cole'), [`Gerrit Cole gave up a solo homer | Rays took the lead. ${line}`]);
-  assert.deepEqual(got('yankees-only'), [`Rays scored 1 run to take the lead over the Yankees | ${line}`]);
-  assert.deepEqual(got('cole-only'), [`Gerrit Cole gave up a solo homer | ${line}`]);
-  assert.deepEqual(got('scored-on-only'), [`Gerrit Cole gave up a solo homer | Rays scored 1 run. ${line}`], '"falls behind" off: the scored-on line instead, one of the two');
+  assert.deepEqual(got('yankees-and-cole'), [`Gerrit Cole gave up a 402-foot solo homer | Rays took the lead. ${line}`]);
+  assert.deepEqual(got('yankees-only'), [`Rays took the lead over the Yankees on Caminero's 402-foot solo homer | ${line}`]);
+  assert.deepEqual(got('cole-only'), [`Gerrit Cole gave up a 402-foot solo homer | ${line}`]);
+  assert.deepEqual(got('scored-on-only'), [`Gerrit Cole gave up a 402-foot solo homer | Rays scored 1 run. ${line}`], '"falls behind" off: the scored-on line instead, one of the two');
   assert.equal(pushed('yankees-and-cole'), 1);
 });
 

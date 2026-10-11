@@ -1006,14 +1006,17 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     const pushedIn = p.scoring && isResult && /\b(walked|hit by pitch)\b/i.test(t) && !/\b(singled|doubled|tripled|homered)\b/i.test(t);
     const textId = (type: string, who: string) => `${g.gameId}:${type}:${halfKey(p) ?? ''}:${normalize(t).replace(/ /g, '-')}:${who}`;
     if (/homered/i.test(t)) {
-      const label = runs >= 4 ? 'a grand slam' : runs > 1 ? `a ${runs}-run homer` : 'a solo homer';
+      // How far, when ESPN says ("homered to right (348 feet)"): "a 348-foot 2-run homer".
+      const feet = t.match(/\((\d+) feet\)/)?.[1];
+      const far = feet ? `${feet}-foot ` : '';
+      const label = runs >= 4 ? `a ${far}grand slam` : runs > 1 ? `a ${far}${runs}-run homer` : `a ${far}solo homer`;
       // Every homer is its own alert. The batter before homered off him too, this half-inning: it says how many in a
-      // row ("gave up back-to-back homers", the third "back-to-back-to-back").
+      // row ("gave up back-to-back homers (380 feet)", the third "back-to-back-to-back").
       const before = g.lastResult;
       const after = !!before && /homered/i.test(before.text) && halfKey(before) === halfKey(p) && role(before, 'pitcher')[0] === pitcher;
       const n = after ? (g.homerRun?.id === before!.id ? g.homerRun.n : 1) + 1 : 1;
       g.homerRun = { id: p.id, n };
-      const what = n > 1 ? `${Array(n).fill('back').join('-to-')} homers` : label;
+      const what = n > 1 ? `${Array(n).fill('back').join('-to-')} homers${feet ? ` (${feet} feet)` : ''}` : label;
       out.push(mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${pn} gave up ${what}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
     } else if (gift && !/passed ball/i.test(gift[1])) {
       out.push({ ...mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/balk/i.test(gift[1]) ? 'balked in a run' : 'let a run score on a wild pitch'}`, { aliases: ['mlb.pitcher.runs_allowed'] }), id: textId('mlb.pitcher.gift_run', pitcher) });
@@ -1778,6 +1781,37 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
  * each side's biggest lead before this play, live.ts), falling behind, and being scored on are one alert
  * for a device, the first it wants of those three. A team blows a lead once a game (`g.blewLead`).
  */
+/** MLB play results that bat runs in, by ESPN's words ("Kwan doubled to left, Rocchio scored."), and what each is called. */
+const RBI_PLAYS: [RegExp, string][] = [
+  [/^homered$/, 'homer'], [/^singled$/, 'single'], [/^reached on (?:an? )?(infield |bunt )?single$/, '$1single'], [/^doubled$/, 'double'],
+  [/^hit (?:a )?ground[- ]rule double$/, 'ground-rule double'], [/^tripled$/, 'triple'], [/^hit (?:a )?sacrifice fly$/, 'sacrifice fly'],
+  [/^hit (?:a )?sacrifice bunt$/, 'squeeze bunt'], [/^grounded out$/, 'groundout'], [/^.*fielder'?s choice$/, "fielder's choice"],
+  [/^walked$/, 'walk'], [/^hit by pitch$/, 'hit-by-pitch'],
+];
+const RBI_VERB = /^(.+?) (homered|singled|reached on (?:an? )?(?:infield |bunt )?single|doubled|hit (?:a )?ground[- ]rule double|tripled|hit (?:a )?sacrifice (?:fly|bunt)|grounded out|(?:grounded|hit|lined|popped|flied|bunted|reached) (?:into|on) (?:a )?fielder'?s choice|walked|hit by pitch)\b/i;
+
+/**
+ * MLB: the play that batted the runs in, as a broadcaster says it, for the team scored on: "Ramírez's 348-foot 2-run
+ * homer" (the distance when ESPN gives it), "Kwan's RBI double", "Naylor's 2-run single", "Ramírez's RBI infield
+ * single", "Bell's sacrifice fly", "Ramírez's RBI groundout", "DeLauter's RBI fielder's choice", "a bases-loaded walk
+ * to Kwan". The batter is named as ESPN's play does. Null for runs nobody batted in (a wild pitch, a balk, an error, a
+ * double play): the title says the runs as before.
+ */
+export function rbiPlay(p: NPlay, runs: number): string | null {
+  const m = runs > 0 ? p.text.match(RBI_VERB) : null;
+  if (!m) return null;
+  const who = m[1].trim(), verb = m[2].toLowerCase(), of = /s$/i.test(who) ? `${who}'` : `${who}'s`; // "Pages' 2-run single"
+  const [re, name] = RBI_PLAYS.find(([r]) => r.test(verb))!;
+  const kind = verb.replace(re, name);
+  if (kind === 'walk' || kind === 'hit-by-pitch') return `a bases-loaded ${kind} to ${who}`;
+  if (kind === 'homer') {
+    const feet = p.text.match(/\((\d+) feet\)/)?.[1], far = feet ? `${feet}-foot ` : '';
+    return `${of} ${far}${runs >= 4 ? 'grand slam' : `${runs > 1 ? `${runs}-run` : 'solo'} homer`}`;
+  }
+  if (kind === 'sacrifice fly') return `${of} ${runs > 1 ? `${runs}-run ` : ''}sacrifice fly`;
+  return `${of} ${runs > 1 ? `${runs}-run` : 'RBI'} ${kind}`;
+}
+
 export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }, p: NPlay, led?: { home: number; away: number }): Detected[] {
   const out: Detected[] = [];
   // Basketball: points scored against each side in a row, for "on a 14-0 run".
@@ -1794,6 +1828,8 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
     const [team, oppName] = [teamName(g.league, teamId), teamName(g.league, oppId)];
     const what = g.league === 'nhl' || SOCCER.has(g.league) ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
+    // MLB: the play that batted them in, when one did ("on Ramírez's 348-foot 2-run homer").
+    const rbi = g.league === 'mlb' && delta > 0 ? rbiPlay(p, delta) : null;
     const safety = delta === 2 && FOOTBALL.has(g.league) && isSafety(p);
     // Falling behind can only happen because the opponent just scored, so the two alerts always
     // coincide. The fell-behind alert carries both facts; the scored-on alert for this play is
@@ -1806,7 +1842,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     if (fellBehind && lead >= (BLEW_LEAD_LIVE[g.league] ?? Infinity) && !g.blewLead?.has(teamId)) {
       (g.blewLead ??= new Set()).add(teamId);
       const unit = MARGIN_UNIT[g.league] ?? (SOCCER.has(g.league) ? 'goal' : 'point');
-      out.push({ id: `${g.gameId}:${p.id}:team.blew_lead:${teamId}`, type: 'team.blew_lead', title: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead to ${the(g.league, oppName)}`, ...base, meta: { ...base.meta, led: lead }, ...moment,
+      out.push({ id: `${g.gameId}:${p.id}:team.blew_lead:${teamId}`, type: 'team.blew_lead', title: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead to ${the(g.league, oppName)}${rbi ? ` on ${rbi}` : ''}`, ...base, meta: { ...base.meta, led: lead }, ...moment,
         fold: `${team} blew ${aOrAn(lead)} ${lead}-${unit} lead.` });
     }
     // Soccer: a goal against in the last minutes that takes away a lead or a draw (late_goal), before "falls behind".
@@ -1821,7 +1857,8 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     if (fellBehind) {
       out.push({
         id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
-        title: safety ? `${team} gave up a safety and fell behind the ${oppName}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
+        title: safety ? `${team} gave up a safety and fell behind the ${oppName}`
+          : rbi ? `${oppName} took the lead over ${the(g.league, team)} on ${rbi}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
         ...base, ...moment, fold: safety ? `${team} gave up a safety and fell behind.` : `${oppName} took the lead.`,
       });
     }
@@ -1836,7 +1873,9 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
       out.push({ id: `${g.gameId}:${p.id}:${footballType(g.league, 'safety')}:team-${teamId}`, type: footballType(g.league, 'safety'), aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
-      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : `${oppName} ${what} on ${the(g.league, team)}`, ...base, ...unlessBehind, ...moment,
+      // MLB, batted in: "Guardians tied the White Sox on Kwan's RBI single", "Guardians scored on Naylor's 2-run double against the White Sox".
+      const batted = rbi ? (p[side] === p[opp] ? `${oppName} tied ${the(g.league, team)} on ${rbi}` : `${oppName} scored on ${rbi} against ${the(g.league, team)}`) : null;
+      out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : batted ?? `${oppName} ${what} on ${the(g.league, team)}`, ...base, ...unlessBehind, ...moment,
         fold: `${oppName} ${what}.` });
     }
     // Basketball: the other side's run reached RUN_POINTS on this play (once a run). A line on that play's

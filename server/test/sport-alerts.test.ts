@@ -82,18 +82,55 @@ test('MLB: homers in a row off one pitcher, each its own home run alert saying s
   const hr = (half: string, text: string, pitcher = '32081', runs = 1) => run(g, ab(half, text, pitcher, '5000', { scoring: true, scoreValue: runs })).map((e) => [e.type, e.title]);
   assert.deepEqual(types(run(g, ab('Top 6', 'Caminero homered to left (402 feet).', '32081', '4683371', { scoring: true, scoreValue: 1 }))), ['mlb.pitcher.home_run_allowed / mlb.pitcher.runs_allowed']);
   const b2b = run(g, ab('Top 6', 'Diaz homered to right (380 feet).', '32081', '5000', { scoring: true, scoreValue: 1 }));
-  assert.deepEqual(b2b.map((e) => [e.type, e.title, e.aliases]), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back homers', ['mlb.pitcher.runs_allowed']]]);
-  assert.deepEqual(hr('Top 6', 'Lowe homered to center (410 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back homers']]);
-  assert.deepEqual(hr('Top 6', 'Arozarena homered to left (399 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back-to-back homers']]);
+  assert.deepEqual(b2b.map((e) => [e.type, e.title, e.aliases]), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back homers (380 feet)', ['mlb.pitcher.runs_allowed']]]);
+  assert.deepEqual(hr('Top 6', 'Lowe homered to center (410 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back homers (410 feet)']]);
+  assert.deepEqual(hr('Top 6', 'Arozarena homered to left (399 feet).'), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up back-to-back-to-back-to-back homers (399 feet)']]);
   run(g, ab('Top 6', 'Paredes flied out to center.', '32081', '5001'));
-  assert.deepEqual(hr('Top 6', 'Ramirez homered to right (371 feet), Siri scored.', '32081', 2), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up a 2-run homer']], 'an out ends the run of homers');
-  assert.deepEqual(hr('Top 6', 'Siri homered to left (390 feet).', '40000'), [['mlb.pitcher.home_run_allowed', 'Tommy Kahnle gave up a solo homer']], "a new pitcher's first isn't back-to-back");
+  assert.deepEqual(hr('Top 6', 'Ramirez homered to right (371 feet), Siri scored.', '32081', 2), [['mlb.pitcher.home_run_allowed', 'Gerrit Cole gave up a 371-foot 2-run homer']], 'an out ends the run of homers');
+  assert.deepEqual(hr('Top 6', 'Siri homered to left (390 feet).', '40000'), [['mlb.pitcher.home_run_allowed', 'Tommy Kahnle gave up a 390-foot solo homer']], "a new pitcher's first isn't back-to-back");
+  assert.deepEqual(hr('Top 7', 'Siri homered to left.', '40000'), [['mlb.pitcher.home_run_allowed', 'Tommy Kahnle gave up a solo homer']], 'no distance from ESPN: none said');
+  assert.deepEqual(hr('Top 8', 'Aranda homered to right (412 feet), Siri, Lowe and Diaz scored.', '40000', 4), [['mlb.pitcher.home_run_allowed', 'Tommy Kahnle gave up a 412-foot grand slam']]);
   assert.deepEqual(run(g, ab('Bottom 6', 'Judge doubled to left, Judge out stretching at third.', '5000', '33192')).map((e) => [e.type, e.title]),
     [['mlb.runner.out_on_bases', 'Aaron Judge got thrown out stretching at third']]);
   assert.deepEqual(run(g, ab('Bottom 7', 'Wells lined into double play, pitcher to first, Volpe doubled off first.', '5000', '4000')).map((e) => [e.type, e.targetKey, e.title]), [
     ['mlb.batter.double_play', 'player:mlb:4000', 'Austin Wells lined into a double play'],
     ['mlb.runner.out_on_bases', 'player:mlb:42547', 'Anthony Volpe got doubled off first'],
   ]);
+});
+
+test("MLB: the team scored on hears what batted the runs in (ESPN's words from October 2026 playoff games); runs nobody batted in, as before", () => {
+  const rbi = (text: string, runs: number) => d.rbiPlay({ text } as any, runs);
+  assert.equal(rbi('Ramírez homered to right (348 feet), Kwan scored.', 2), "Ramírez's 348-foot 2-run homer");
+  assert.equal(rbi('Cronenworth homered to left (368 feet).', 1), "Cronenworth's 368-foot solo homer");
+  assert.equal(rbi('Aranda homered to right (412 feet), Siri, Lowe and Diaz scored.', 4), "Aranda's 412-foot grand slam");
+  assert.equal(rbi('Siri homered to left.', 1), "Siri's solo homer", 'no distance from ESPN');
+  assert.equal(rbi('Pages singled to left, Betts and Ohtani scored.', 2), "Pages' 2-run single", 'a name ending in s');
+  assert.equal(rbi('Ramírez reached on infield single to second, Bailey scored, Kwan to second, Rocchio to third.', 1), "Ramírez's RBI infield single");
+  assert.equal(rbi('Teel doubled to left, Vargas scored.', 1), "Teel's RBI double");
+  assert.equal(rbi('Ohtani hit ground rule double to left, Betts scored.', 1), "Ohtani's RBI ground-rule double");
+  assert.equal(rbi('Adell tripled to right, Kwan, Ramírez and Naylor scored.', 3), "Adell's 3-run triple");
+  assert.equal(rbi('Doyle hit sacrifice fly to center, Vargas scored.', 1), "Doyle's sacrifice fly");
+  assert.equal(rbi('Kwan hit sacrifice bunt to pitcher, Rocchio scored.', 1), "Kwan's RBI squeeze bunt");
+  assert.equal(rbi('Tatis Jr. grounded out to second, Bogaerts scored.', 1), "Tatis Jr.'s RBI groundout");
+  assert.equal(rbi("DeLauter grounded into fielder's choice to second, Ramírez scored.", 1), "DeLauter's RBI fielder's choice");
+  assert.equal(rbi('Murakami walked, Vargas scored.', 1), 'a bases-loaded walk to Murakami');
+  assert.equal(rbi('Naylor hit by pitch, Kwan scored.', 1), 'a bases-loaded hit-by-pitch to Naylor');
+  for (const text of ['Harris II scored on Glasnow wild pitch.', 'Ohtani scored on error, Muncy safe at first on fielding error by shortstop Dubón.', 'Kwan scored on balk.'])
+    assert.equal(rbi(text, 1), null, text);
+  // Through the team's alerts: the Rays (away) score on the Yankees (home).
+  const titles = (text: string, prev: { home: number; away: number }, now: { home: number; away: number }, led?: { home: number; away: number }) =>
+    teamScoreEvents(mlbCtx(), prev, { ...ab('Top 6', text, '32081', '5000', { scoring: true, scoreValue: now.away - prev.away }), home: now.home, away: now.away }, led)
+      .filter((e) => e.targetKey === 'team:mlb:10').map((e) => [e.type, e.title]);
+  assert.deepEqual(titles('Diaz homered to right (380 feet), Caminero scored.', { home: 1, away: 0 }, { home: 1, away: 2 }), [
+    ['team.fell_behind', "Rays took the lead over the Yankees on Diaz's 380-foot 2-run homer"],
+    ['team.opponent_scored', "Rays scored on Diaz's 380-foot 2-run homer against the Yankees"],
+  ]);
+  assert.deepEqual(titles('Diaz singled to center, Caminero scored.', { home: 2, away: 1 }, { home: 2, away: 2 }), [['team.opponent_scored', "Rays tied the Yankees on Diaz's RBI single"]]);
+  assert.deepEqual(titles('Diaz doubled to left, Caminero and Lowe scored.', { home: 1, away: 3 }, { home: 1, away: 5 }), [['team.opponent_scored', "Rays scored on Diaz's 2-run double against the Yankees"]]);
+  assert.deepEqual(titles('Caminero scored on Cole wild pitch.', { home: 1, away: 1 }, { home: 1, away: 2 }), [
+    ['team.fell_behind', 'Rays scored 1 run to take the lead over the Yankees'], ['team.opponent_scored', 'Rays scored 1 run on the Yankees']], 'not batted in: as before');
+  assert.deepEqual(titles('Diaz homered to left (402 feet), Caminero and Lowe scored.', { home: 5, away: 3 }, { home: 5, away: 6 }, { home: 5, away: 0 })[0],
+    ['team.blew_lead', "Yankees blew a 5-run lead to the Rays on Diaz's 402-foot 3-run homer"]);
 });
 
 test('MLB: being no-hit through 6, once, only from a hit count ESPN gave', () => {
@@ -130,7 +167,7 @@ test('NBA: a missed shot says what it was and from how far (ESPN plays from Octo
   const espn = (id: string, type: string, text: string, team: string, away: number, home: number, period: number, clock: string, x: number, y: number, pointsAttempted: number) =>
     ({ id, type: { text: type }, text, awayScore: away, homeScore: home, period: { number: period }, clock: { displayValue: clock }, team: { id: team }, participants: [{ athlete: { id: '1' } }], shootingPlay: true, coordinate: { x, y }, pointsAttempted });
   const miss = (homeId: string, awayId: string, p: any, name: string) => d.missedShot(ctx(homeId, awayId), d.fromSitePlay(p), name);
-  // Nuggets (5) host Celtics (2); Rockets (10) at Mavericks (6); Bulls (4) host Grizzlies (29).
+  // Cavaliers (5) host Celtics (2); Rockets (10) at Mavericks (6); Bulls (4) host Grizzlies (29).
   assert.equal(miss('5', '2', espn('40189839211', 'Jump Shot', 'Peyton Watson misses 27-foot three point jumper', '5', 0, 0, 1, '11:38', 8, 21, 3), 'Peyton Watson'), 'Peyton Watson missed a 27-foot three');
   assert.equal(miss('6', '10', espn('401898395291', 'Driving Floating Jump Shot', 'Kevin Durant misses driving floating jump shot', '10', 49, 33, 2, '5:03', 31, 11, 2), 'Kevin Durant'),
     'Kevin Durant missed a 12-foot driving floater', "no distance in ESPN's words: from where he shot it");

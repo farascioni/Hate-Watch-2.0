@@ -80,7 +80,7 @@ test('a homer: the alert goes out, and its clip, out minutes later, goes on that
     await tracker.poll(); // before the game's plays
     state.plays = [atBat(HR, 'Top 1', 'Bailey homered to right (376 feet).', 1, 0, '4345843')];
     await tracker.poll();
-    assert.deepEqual(feed().map((i) => [i.title, i.clip ?? null]), [['Erick Fedde gave up a solo homer', null]]);
+    assert.deepEqual(feed().map((i) => [i.title, i.clip ?? null]), [['Erick Fedde gave up a 376-foot solo homer', null]]);
     const pushed = pushes.length;
     state.videos = [video(50136804, 'Patrick Bailey crushes a solo HR for the Guardians')];
     await tracker.poll();

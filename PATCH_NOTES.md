@@ -29,7 +29,7 @@ F1
 - Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, teammate battle, last five races.
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
-- Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship.
+- Before an F1 session, its screen previews the weekend: circuit, sessions, grid, championship.
 - With the F1 chip on, Scores has Live and Upcoming races (the weekend's sessions to come, a race's grid once set). An F1 session's screen says "Your alerts from this race".
 
 FOOTBALL
@@ -43,9 +43,9 @@ NBA AND WNBA
 - Misses name the shot and distance ("missed a 27-foot three"), heaves aside. (Server)
 
 EVERYWHERE
-- Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.
+- Fixes and screen changes can arrive without a new build (reopen the app once or twice).
 - Tracking both teams in a game, its start is one alert, not two. (Server)
-- Back-to-back homers are home run alerts saying so, back-to-back-to-back too. (Server)
+- MLB: a homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert. (Server)
 - Filters say Athletes with All leagues on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
