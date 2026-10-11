@@ -31,10 +31,12 @@ team.run('team:nfl:13', 'nfl', '13', 'Las Vegas Raiders', 'Raiders', 'LV', 'Las 
 db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES ('player:nfl:3139477', 'nfl', '3139477', 'Patrick Mahomes', 'team:nfl:12', 'QB', 'x', 1, 1, 'headshot', 0)`).run();
 for (const [id, name, short, abbr, location] of [['5', 'Cleveland Browns', 'Browns', 'CLE', 'Cleveland'], ['23', 'Pittsburgh Steelers', 'Steelers', 'PIT', 'Pittsburgh'], ['6', 'Dallas Cowboys', 'Cowboys', 'DAL', 'Dallas'],
   ['28', 'Washington Commanders', 'Commanders', 'WSH', 'Washington'], ['3', 'Chicago Bears', 'Bears', 'CHI', 'Chicago'], ['16', 'Minnesota Vikings', 'Vikings', 'MIN', 'Minnesota'],
-  ['2', 'Buffalo Bills', 'Bills', 'BUF', 'Buffalo'], ['17', 'New England Patriots', 'Patriots', 'NE', 'New England']])
+  ['2', 'Buffalo Bills', 'Bills', 'BUF', 'Buffalo'], ['17', 'New England Patriots', 'Patriots', 'NE', 'New England'], ['30', 'Jacksonville Jaguars', 'Jaguars', 'JAX', 'Jacksonville'],
+  ['21', 'Philadelphia Eagles', 'Eagles', 'PHI', 'Philadelphia']])
   team.run(`team:nfl:${id}`, 'nfl', id, name, short, abbr, location);
 const nflPlayer = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES (?, 'nfl', ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
-for (const [id, name, teamId, position] of [['3122840', 'Deshaun Watson', '5', 'QB'], ['4685327', 'Daylen Everette', '23', 'CB'], ['2576980', 'Marcus Mariota', '28', 'QB'], ['4248911', 'DaRon Bland', '6', 'CB'], ['4431611', 'Caleb Williams', '3', 'QB']])
+for (const [id, name, teamId, position] of [['3122840', 'Deshaun Watson', '5', 'QB'], ['4685327', 'Daylen Everette', '23', 'CB'], ['2576980', 'Marcus Mariota', '28', 'QB'], ['4248911', 'DaRon Bland', '6', 'CB'], ['4431611', 'Caleb Williams', '3', 'QB'],
+  ['4035791', 'Cole Van Lanen', '30', 'OT'], ['4242391', 'Robert Hainsey', '30', 'C'], ['4426448', 'Jarrian Jones', '30', 'CB']])
   nflPlayer.run(`player:nfl:${id}`, id, name, `team:nfl:${teamId}`, position);
 loadCatalog();
 
@@ -396,4 +398,37 @@ test('an NFL play gone from the feed a while, then back as it was or re-posted u
   const back = [...taken, 'ESPN has since put this play back.'];
   assert.deepEqual(feed('mahomes'), [['nfl.qb.sacked', 'Patrick Mahomes got sacked', back], ['nfl.qb.interception', 'Patrick Mahomes threw an interception', back]]);
   assert.deepEqual(pushed('mahomes'), ['Patrick Mahomes threw an interception'], 'one push');
+});
+
+test("an NFL flag ESPN moved to another player says so on the first one's alert, never a second alert to who has it; one replay took off says that (Eagles at Jaguars)", async () => {
+  device('vanlanen', 'player:nfl:4035791');
+  device('linemen', 'player:nfl:4035791', 'player:nfl:4242391');
+  device('hainsey', 'player:nfl:4242391');
+  device('jones', 'player:nfl:4426448');
+  // Installs from before October 11 2026 push flags (keepFlagsPushed); new ones have them in the feed.
+  for (const id of ['vanlanen', 'linemen', 'hainsey', 'jones']) db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify({ ...DEFAULT_PREFS, pushTypes: { 'nfl.penalty': true } }), id);
+  const T = game('nfl', '401872981', '30', '21', { away: 14, home: 10 });
+  await T.poll();
+  // A false start on Van Lanen, charged to Hainsey four minutes later.
+  const fs = corePlay('4018729813888', 'Penalty', '(Shotgun) PENALTY on JAX-C.Van Lanen, False Start, 5 yards, enforced at JAX 34 - No Play.', '30', [['penalized', '4035791']], 14, 10, { clock: 676 });
+  T.g.core = [T.g.core[0], fs];
+  await T.poll();
+  assert.deepEqual([pushed('vanlanen'), pushed('linemen')], [['Cole Van Lanen was flagged'], ['Cole Van Lanen was flagged']]);
+  T.g.core = [T.g.core[0], { ...fs, text: '(Shotgun) PENALTY on JAX-R.Hainsey, False Start, 5 yards, enforced at JAX 34 - No Play.',
+    participants: [{ athlete: nflRef('athletes', '4242391'), type: 'penalized' }, { athlete: nflRef('athletes', '4035791'), type: 'other' }] }];
+  await T.poll();
+  const moved = [['nfl.penalty', 'Cole Van Lanen was flagged', ['ESPN has since charged this flag to Robert Hainsey.']]];
+  assert.deepEqual(feed('vanlanen'), moved, 'not "Wiped out by a penalty"');
+  assert.deepEqual(feed('linemen'), moved, 'one alert, one line: not "Robert Hainsey was flagged." as well');
+  assert.deepEqual(feed('hainsey'), [['nfl.penalty', 'Robert Hainsey was flagged', []]]);
+  assert.deepEqual([pushed('linemen'), pushed('hainsey')], [['Cole Van Lanen was flagged'], ['Robert Hainsey was flagged']]);
+  // A face mask picked up with the replay assist 12 seconds after it was posted.
+  const fm = corePlay('4018729813340', 'Pass Reception', '(Shotgun) J.Hurts pass short left to M.Lemon to PHI 44 for 18 yards (J.Lewis). PENALTY on JAX-Jar.Jones, Face Mask, 15 yards, enforced at PHI 44.', '21',
+    [['penalized', '4426448']], 14, 10, { period: 3, clock: 126 });
+  T.g.core = [...T.g.core, fm];
+  await T.poll();
+  T.g.core = [...T.g.core.slice(0, -1), { ...fm, text: '(Shotgun) J.Hurts pass short left to M.Lemon to PHI 44 for 18 yards (J.Lewis).  The penalty was assisted by replay.',
+    participants: [{ athlete: nflRef('athletes', '4426448'), type: 'other' }] }];
+  await T.poll();
+  assert.deepEqual(feed('jones'), [['nfl.penalty', 'Jarrian Jones was flagged', ['ESPN has since taken the flag off.']]], 'not "changed this play to a pass reception"');
 });

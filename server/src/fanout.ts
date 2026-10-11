@@ -220,6 +220,29 @@ export function lossFactsFollowLoss() {
 lossFactsFollowLoss();
 
 /**
+ * October 11 2026: an NFL player's flag is feed only for new installs (the Jaguars, team and players, got 14 pushes
+ * for flags of 19 in London). A touchdown wiped out, an ejection and the quarterback's delay of game still push. Installs
+ * from before keep flags pushed, once, wherever they hadn't chosen.
+ */
+export const FLAGS_WERE_PUSHED = ['nfl.penalty'];
+export function keepFlagsPushed() {
+  if (kvGet('prefs:nfl-flags-feed')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      p.pushTypes = { ...Object.fromEntries(FLAGS_WERE_PUSHED.map((t) => [t, true])), ...p.pushTypes };
+      save.run(JSON.stringify(p), id);
+    }
+    kvSet('prefs:nfl-flags-feed', { at: Date.now(), devices: rows.length });
+  });
+  prefsCache.clear();
+  if (rows.length) console.log(`[prefs] NFL flags stay pushed for ${rows.length} existing devices`);
+}
+keepFlagsPushed();
+
+/**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
  * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
  * with home runs switched off, it arrives as a run and pushes.

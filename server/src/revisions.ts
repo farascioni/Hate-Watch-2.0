@@ -52,6 +52,8 @@ export function samePlay(a: NPlay, b: NPlay): boolean {
 }
 
 const REVIEW = /\bunder (?:automatic )?review\b|\breplay official\b|\b(?:call )?(?:overturned|reversed)\b/i;
+/** Alerts about a flag (a player's, a college team's): what changes is the flag, not the play. */
+const FLAG = /^(?:nfl\.penalty|cfb\.team\.penalty)$/;
 /** Why a play's alert no longer holds, from the play as it is now (none: ESPN took it out). */
 export function changeLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, now: NPlay | null): string {
   if (!now) return 'ESPN has since taken this play back.';
@@ -102,9 +104,9 @@ export class PlayLedger {
    * moment's), with no push: publish() adds a moment's `foldOnly` fact to the alert each device already has for it.
    * (Every football alert has a moment: bundleByPlay. One without would go out as an alert of its own: none.)
    */
-  linesOn(es: Detected[], line: string): Detected[] {
+  linesOn(es: Detected[], line: string, alt?: string): Detected[] {
     return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${++this.n}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
-      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true }));
+      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}) }));
   }
 
   /** A play seen for the first time, and the alerts it sent. */
@@ -170,17 +172,30 @@ export class PlayLedger {
     if (p) { x.play = p; x.sig = sigOf(p); }
     if (x.history || now - x.firstAt > REVISE_MS) return { fresh: [], lines: [] };
     const want = byKind(bundleByPlay(p ? this.detect(p) : []));
-    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [];
+    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [], gone: Detected[] = [];
     for (const [k, e] of x.alerts) {
       if (want.has(k) || ONCE.test(e.type)) continue;
       x.alerts.delete(k);
       x.dropped.set(k, e);
-      lines.push(...this.linesOn([e], why));
+      gone.push(e);
     }
     for (const [k, e] of want) {
       if (x.alerts.has(k)) continue;
       const sent = x.dropped.get(k);
       if (sent) { x.dropped.delete(k); x.alerts.set(k, sent); again.push(sent); } else { x.alerts.set(k, e); fresh.push(e); }
+    }
+    // A flag's alert taken back while its play stands: the flag moved to another player (a false start charged to
+    // Hainsey 4 minutes after Van Lanen) or came off (a face mask picked up with the replay assist 12 s later: Eagles at
+    // Jaguars, October 11 2026). Not the play's "Wiped out by a penalty" or "changed to a pass reception". A device with
+    // the first player's alert gets the move as its line, not the new flag as a second one (`alt`: publish keeps one).
+    const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty');
+    for (const e of gone) {
+      if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], why)); continue; }
+      const to = e.type === 'nfl.penalty' ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
+      if (!to.length) { lines.push(...this.linesOn([e], REVIEW.test(p.text) ? 'Overturned on review.' : 'ESPN has since taken the flag off.')); continue; }
+      const alt = `flag-moved:${p.id}`;
+      for (const f of to) f.alt = alt;
+      lines.push(...this.linesOn([e], `ESPN has since charged this flag to ${to.map((f) => catalog.player(f.targetKey)?.name ?? 'another player').join(' and ')}.`, alt));
     }
     const restoredLine = back ? 'ESPN has since put this play back.' : p && REVIEW.test(p.text) ? 'Overturned on review: it stands.' : 'ESPN has since changed this play back.';
     if (lines.length || fresh.length || again.length) {

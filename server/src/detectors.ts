@@ -1138,7 +1138,9 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   // reversed it, what stands is the call after "REVERSED." (wiped out, then not: an interception, Browns at Steelers).
   const wiped = /\bNo Play\b/i.test(ruled(p.text));
   if (passer && !wiped && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
-  if (passer && !wiped && /^Sack/i.test(ty)) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
+  // A sack whatever ESPN types the play: one where the offense recovers its own fumble is "Fumble Recovery (Own)"
+  // (Lawrence twice, Eagles at Jaguars, October 11 2026; 12 of 281 sacks in weeks 1 to 5 weren't typed "Sack").
+  if (passer && !wiped && (/^Sack/i.test(ty) || /\bsacked\b/.test(ruled(p.text)))) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
   if (passer && !wiped && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
   // A fumble is lost when a team not the fumbler's took the ball: "RECOVERED by NE-E.Ponder" (capitals: the ball has
   // changed hands since the snap; "recovered by" and "and recovers" are the side's own), else when the type says so. A

@@ -14,7 +14,7 @@ install('before', { pushEnabled: true, sound: true, leagues: {}, types: {}, mute
 install('ancient', {});
 install('chose', { types: { 'nba.missed_shot': false, 'mlb.batter.popout': true }, pushTypes: { 'team.opponent_scored': false, 'nfl.qb.interception': false } });
 const { EVENT_TYPES } = await import('../src/event-types.ts');
-const { DEFAULT_PREFS, getPrefs, keepOldDefaults, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS, getPrefs, keepOldDefaults, keepFlagsPushed, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED, FLAGS_WERE_PUSHED } = await import('../src/fanout.ts');
 const { startApi } = await import('../src/api.ts');
 
 type Prefs = typeof DEFAULT_PREFS;
@@ -33,7 +33,9 @@ const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.c
   // College football (October 2026): the NFL's, as its own.
   'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty',
   // F1's pit stops (October 2026).
-  'f1.driver.pit_stop'];
+  'f1.driver.pit_stop',
+  // An NFL player's flag (October 11 2026): installs from before keep it pushed (FLAGS_WERE_PUSHED).
+  'nfl.penalty'];
 // Alerts added since: nobody had them, so they come with the new defaults for everyone.
 const ADDED = ['mlb.team.down_in_order', 'team.rival_clinched', 'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nba.brick_night', 'nba.scoreless_half',
   'nba.team.opponent_run', 'wnba.brick_night', 'wnba.scoreless_half', 'wnba.team.opponent_run', 'nhl.minus', 'nhl.team.empty_net_goal', 'nhl.team.shorthanded_goal', 'epl.hit_woodwork',
@@ -44,12 +46,12 @@ test('a new install: the result and the rare headline failures push, the in-game
   assert.deepEqual(tiers(DEFAULT_PREFS), NEW);
   for (const id of ['team.lost', 'team.game_start', 'player.team_lost', 'mlb.batter.strikeout', 'nfl.qb.interception', 'nhl.goalie.goal_allowed', 'epl.goal_conceded', 'f1.driver.dnf'])
     assert.equal(NEW[id], 'push', id);
-  assert.deepEqual([...WERE_PUSHED].sort(), FEED.filter((id) => !ADDED.includes(id)).sort(), 'every feed-only alert pushed before');
+  assert.deepEqual([...WERE_PUSHED].sort(), FEED.filter((id) => !ADDED.includes(id) && !FLAGS_WERE_PUSHED.includes(id)).sort(), 'every feed-only alert pushed before');
   assert.deepEqual([...WERE_ON].sort(), ['epl.lost_ball', 'mlb.team.opponent_risp', 'nba.missed_shot', 'wnba.missed_shot'], 'the three that were on');
 });
 
 test('installs from before keep exactly what they had; their own choices stay theirs', () => {
-  const OLD = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, WERE_PUSHED.includes(t.id) || WERE_ON.includes(t.id) ? 'push' : NEW[t.id]]));
+  const OLD = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, WERE_PUSHED.includes(t.id) || WERE_ON.includes(t.id) || FLAGS_WERE_PUSHED.includes(t.id) ? 'push' : NEW[t.id]]));
   assert.deepEqual(tiers(getPrefs('before')), OLD);
   assert.deepEqual(tiers(getPrefs('ancient')), OLD);
   assert.deepEqual(tiers(getPrefs('chose')), { ...OLD, 'nba.missed_shot': 'off', 'mlb.batter.popout': 'push', 'team.opponent_scored': 'feed', 'nfl.qb.interception': 'feed' });
@@ -57,6 +59,7 @@ test('installs from before keep exactly what they had; their own choices stay th
   // Once: an install after the change is a new one, whatever happens at the next boot.
   install('after', DEFAULT_PREFS);
   keepOldDefaults();
+  keepFlagsPushed();
   assert.deepEqual(tiers(getPrefs('after')), NEW);
 });
 

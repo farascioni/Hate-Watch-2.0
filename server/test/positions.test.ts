@@ -24,12 +24,12 @@ test('MLB: pitchers get no hitting alerts, hitters no pitching ones, two-way pla
 
 test('NFL: passing alerts for quarterbacks, kicks for kickers, fumbles for whoever carries the ball, a safety for the offense', () => {
   // Anyone can be flagged, so anyone can wipe out a touchdown.
-  assert.deepEqual(screen('nfl', ['QB']), ['Throws an interception', 'Loses a fumble', 'Gives up a safety', 'Delay of game', 'Gets pulled', 'Gets sacked', 'Throws an incompletion', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty']);
-  assert.deepEqual(screen('nfl', ['WR']), ['Loses a fumble', 'Gives up a safety', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty']);
-  assert.deepEqual(screen('nfl', ['PK']), ['Commits a penalty', 'Touchdown wiped out by a penalty', 'Misses a kick']);
-  assert.deepEqual(screen('nfl', ['DE']), ['Commits a penalty', 'Touchdown wiped out by a penalty']);
-  assert.deepEqual(screen('nfl', ['CB']), ['Loses a fumble', 'Fumbles (any)', 'Commits a penalty', 'Touchdown wiped out by a penalty'], 'an interception or a punt return can end in a fumble');
-  assert.deepEqual(screen('nfl', ['G']), ['Gives up a safety', 'Commits a penalty', 'Touchdown wiped out by a penalty'], 'a guard: held in his own end zone');
+  assert.deepEqual(screen('nfl', ['QB']), ['Throws an interception', 'Loses a fumble', 'Gives up a safety', 'Delay of game', 'Gets pulled', 'Gets sacked', 'Throws an incompletion', 'Fumbles (any)', 'Touchdown wiped out by a penalty', 'Commits a penalty']);
+  assert.deepEqual(screen('nfl', ['WR']), ['Loses a fumble', 'Gives up a safety', 'Fumbles (any)', 'Touchdown wiped out by a penalty', 'Commits a penalty']);
+  assert.deepEqual(screen('nfl', ['PK']), ['Touchdown wiped out by a penalty', 'Commits a penalty', 'Misses a kick']);
+  assert.deepEqual(screen('nfl', ['DE']), ['Touchdown wiped out by a penalty', 'Commits a penalty']);
+  assert.deepEqual(screen('nfl', ['CB']), ['Loses a fumble', 'Fumbles (any)', 'Touchdown wiped out by a penalty', 'Commits a penalty'], 'an interception or a punt return can end in a fumble');
+  assert.deepEqual(screen('nfl', ['G']), ['Gives up a safety', 'Touchdown wiped out by a penalty', 'Commits a penalty'], 'a guard: held in his own end zone');
 });
 
 test('NHL and soccer: goalies get the goals against, skaters and outfield players the rest', () => {
