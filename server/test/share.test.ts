@@ -73,6 +73,17 @@ test('the card is a 1200×630 PNG, for teams and players (emoji and accents incl
   assert.equal(await shareCard('nope'), null);
 });
 
+test('a developer notice shared from a build that still shows Share: its page and card, from Hate Watch', async () => {
+  const { sendNotice } = await import('../src/notices.ts');
+  const { id } = sendNotice({ title: 'New this week: live F1 timing', body: "Update the app to see each car's gap." }, { now: 5_000 });
+  const page = shareLink(shareCode(id!), DESKTOP, ORIGIN);
+  assert.equal(page.status, 200);
+  assert.equal(meta(String(page.body), 'og:title'), 'New this week: live F1 timing');
+  const png = (await shareCard(shareCode(id!)))!; // the red "HW" badge and a NEWS pill, not a league's
+  assert.equal(png.subarray(1, 4).toString(), 'PNG');
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1200, 630]);
+});
+
 test('universal links: iOS is told Hate Watch opens /a/* links, and the app can fetch the alert', () => {
   assert.deepEqual(appSiteAssociation(), {
     applinks: { details: [{ appIDs: ['G9V9266QK5.com.hatewatch.app'], components: [{ '/': '/a/*', comment: 'Shared alerts' }] }] },

@@ -282,20 +282,36 @@ export const withLines = (body: string, lines: string[] | null | undefined) => (
  * for this device (other facts of the moment, folded in).
  */
 export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null; clip?: string | null }) {
-  const t = EVENT_TYPE_BY_ID.get(row.type);
   const meta = row.meta ? JSON.parse(row.meta) : null;
+  const t = EVENT_TYPE_BY_ID.get(row.type) ?? (row.type === NOTICE_TYPE ? noticeLook(meta) : undefined);
   const clip = clipShown(row.clip ? JSON.parse(row.clip) : null, meta); // its play's clip, while ESPN has it up and clips are on
   return {
     ...(clip ? { clip } : {}),
     ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
+    ...(row.type === NOTICE_TYPE && meta?.urgent ? { urgent: true } : {}),
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: withLines(row.body, row.extra ? JSON.parse(row.extra) : null), occurredAt: row.occurred_at, detectedAt: row.detected_at,
-    target: targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
+    target: row.type === NOTICE_TYPE ? NOTICE_SENDER : targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
     // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
     shareUrl: `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`,
   };
 }
+
+// ─── Developer notices (notices.ts): a message from Hate Watch in every feed, never a push ─────
+export const NOTICE_TYPE = 'app.notice';
+/** A notice's league: no league's, so it shows under All; builds without notices tag it "NEWS". */
+export const NOTICE_LEAGUE = 'news';
+/**
+ * Who a notice is from, as a team every build can draw: a red "HW" badge (builds draw a "badge://" logo as a
+ * badge in its colour with its code, as for F1's constructors). Builds that know notices draw the app's icon.
+ */
+export const NOTICE_SENDER = {
+  kind: 'team', key: 'app:hatewatch', league: NOTICE_LEAGUE, espnId: '', name: 'Hate Watch', shortName: 'Hate Watch', abbrev: 'HW',
+  location: null, color: '#E5232B', altColor: null, logo: 'badge://hatewatch', logoDark: null, logoW: 512, logoH: 512,
+} as const;
+/** Not an alert type (nothing to turn off in Settings): its emoji and label in the feed. */
+export const noticeLook = (meta: { urgent?: boolean } | null) => (meta?.urgent ? { emoji: '⚠️', label: 'Important: from Hate Watch' } : { emoji: '📣', label: 'From Hate Watch' });
 
 // ─── Publish: persist once, then fan out to every follower who wants it ───────────────────────
 const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)

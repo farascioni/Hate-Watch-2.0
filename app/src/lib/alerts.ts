@@ -15,5 +15,11 @@ export function openAlert(item: FeedItem) {
 
 export const openedAlert = (id: string) => opened.get(id);
 
+/**
+ * A developer notice: a message from Hate Watch itself in everyone's feed (never a push), for an emergency or news
+ * of what's coming (server notices.ts). It isn't about a team or player: no page to open, no league, nothing to share.
+ */
+export const isNotice = (item: Pick<FeedItem, 'type'>) => item.type === 'app.notice';
+
 /** Where who an alert is about opens: their player or team page. */
 export const targetHref = (target: Target) => `/target/${encodeURIComponent(target.key)}`;

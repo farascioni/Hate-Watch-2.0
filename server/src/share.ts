@@ -10,7 +10,7 @@ import { Resvg } from '@resvg/resvg-js';
 import { db } from './db.ts';
 import { targetDto } from './catalog.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
-import { feedItem } from './fanout.ts';
+import { feedItem, noticeLook, NOTICE_SENDER, NOTICE_TYPE } from './fanout.ts';
 import { LEAGUES, type League } from './leagues.ts';
 import { sharePage } from './pages.ts';
 
@@ -38,8 +38,8 @@ export function sharedAlert(code: string) {
 const PREVIEW_BOT = /bot|crawl|spider|facebookexternalhit|preview|slack|discord|whatsapp|telegram|embed/i;
 const IOS = /\b(iPhone|iPad|iPod)\b/;
 
-interface EventRow { id: string; type: string; league: string; target_key: string; title: string; body: string }
-const findEvent = (code: string) => db.prepare('SELECT id, type, league, target_key, title, body FROM events WHERE share_code = ?').get(code) as EventRow | undefined;
+interface EventRow { id: string; type: string; league: string; target_key: string; title: string; body: string; meta?: string | null }
+const findEvent = (code: string) => db.prepare('SELECT id, type, league, target_key, title, body, meta FROM events WHERE share_code = ?').get(code) as EventRow | undefined;
 
 export interface Reply { status: number; headers: Record<string, string>; body: string | Buffer }
 
@@ -91,8 +91,10 @@ const h = (type: string, style: Record<string, unknown>, ...children: unknown[])
   ({ type, props: { style: { display: 'flex', ...style }, children: children.length === 1 ? children[0] : children } });
 
 function cardTree(e: EventRow): El {
-  const t = targetDto(e.target_key);
-  const type = EVENT_TYPE_BY_ID.get(e.type);
+  // A developer notice is from Hate Watch: its red "HW" badge, and "News" where a league goes.
+  const notice = e.type === NOTICE_TYPE;
+  const t = notice ? NOTICE_SENDER : targetDto(e.target_key);
+  const type = notice ? noticeLook(e.meta ? JSON.parse(e.meta) : null) : EVENT_TYPE_BY_ID.get(e.type);
   // Team colours and initials instead of ESPN logos and headshots: their images aren't ours to spread around.
   const color = (t?.kind === 'team' ? t.color : t?.kind === 'player' ? t.teamColor : null) ?? '#3F3F46';
   const badge = t?.kind === 'team' ? t.abbrev : t?.name ? initials(t.name) : '?';
@@ -106,7 +108,7 @@ function cardTree(e: EventRow): El {
       h('div', { display: 'flex', alignItems: 'center', gap: 14 },
         h('div', { width: 18, height: 18, borderRadius: 9, backgroundColor: '#E5232B' }),
         h('div', { fontSize: 30, fontWeight: 900, letterSpacing: 3, color: '#FF3B44' }, 'HATE WATCH')),
-      h('div', { fontSize: 24, fontWeight: 800, color: '#D4D4D8', padding: '8px 18px', borderRadius: 12, border: '2px solid #2A2A31', backgroundColor: '#16161A' }, LEAGUES[e.league as League]?.name ?? e.league.toUpperCase())),
+      h('div', { fontSize: 24, fontWeight: 800, color: '#D4D4D8', padding: '8px 18px', borderRadius: 12, border: '2px solid #2A2A31', backgroundColor: '#16161A' }, notice ? 'NEWS' : LEAGUES[e.league as League]?.name ?? e.league.toUpperCase())),
     h('div', { flex: 1, display: 'flex', alignItems: 'center', gap: 44 },
       h('div', {
         width: 168, height: 168, borderRadius: 84, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

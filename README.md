@@ -331,6 +331,13 @@ On a device's first launch the app opens a nine-page guide over the Feed (`app/s
 
 A card in the feed (or on a player's, team's or game's page) shows three lines of an alert. Tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`): all of its text, its clip, how many other hate watchers got it, when it happened and a Share button. Who it's about is a row on top that opens their page, as the card's photo does. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the one tapped (`openAlert` in `app/src/lib/alerts.ts`). An alert that's in neither says it isn't in your feed anymore.
 
+## Developer notices
+
+A message from Hate Watch itself, in every install's feed and never pushed: for an emergency (an outage, alerts that went out wrong) or news of what's coming. Sent from the shell on the server (`server/src/notice-cli.ts`, the work in `server/src/notices.ts`): one event (type `app.notice`), a feed row for every device there is then, and the running server passes it to every open app within seconds (`watchNotices`, polling every 5 s), so it shows without a reload. Nothing in Settings turns it off, and the weekly recap doesn't count it.
+
+- **How it looks:** in builds from the next one: the app's icon, the title, three lines of the body, "From Hate Watch" (📣), edged in red; an urgent one says "Important: from Hate Watch" (⚠️), edged in amber. Tapping it opens all of it ("Hate Watch, From the developer"); no league tag, no page to open, no Share (`isNotice` in `app/src/lib/alerts.ts`). Builds before: a red "HW" badge (the sender is team-shaped with a `badge://` logo, which every build draws), a NEWS tag and the same label (`NOTICE_SENDER` in `fanout.ts`); build 12 opens an empty page when it's tapped.
+- **Send, list, take back:** `fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts send 'Title' 'Body'"` (`--urgent`, `--dry-run` to count who it would reach). Text with quotes goes as base64 of `{"title","body","urgent"}`: `send --b64 <base64>`. With no command it lists the latest; `withdraw <id>` takes one out of every feed (an app that has it open keeps it until it next loads its feed). Titles up to 120 characters. Devices created after a notice don't get it (`test/notices.test.ts`).
+
 ## Sharing an alert
 
 The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a picture of the alert, so it looks like a screenshot. Tapping it on an iPhone opens Hate Watch on that alert if it's installed, and the App Store if not.

@@ -43,6 +43,8 @@ export interface FeedItem {
   gameId?: string | null;
   /** A Successful Hate Watch: how many other people got this alert too. */
   alsoGot?: number;
+  /** A developer notice marked important (newer servers; lib/alerts.ts isNotice). */
+  urgent?: boolean;
   /** ESPN's clip of its play (a loss: of the winning play, or the recap), once it's out, while the server's switch is on. */
   clip?: Clip;
 }

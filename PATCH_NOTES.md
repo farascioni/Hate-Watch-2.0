@@ -11,11 +11,11 @@ Server updates already work on every build.
 
 SCORES
 - Before a game, its Box score tab previews it: leaders, last five games, injuries, ESPN's predictor. (Server)
-- A game's screen puts your alerts after the box score; you can minimize them.
+- A game's screen puts your alerts, minimizable, after the box score.
 
 UFC
 - Track UFC fighters: a loss says how, with lines for losing as the favorite or a streak; also a knockdown (live) and the walk-out. (Server)
-- With the UFC chip on, Scores has the next card (All fights with odds, or My fights); results come in as fights end.
+- With the UFC chip on, Scores has the next card (All fights with odds, or My fights); results as fights end.
 - A card's preview: each fight's odds, the tale of the tape and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
 - A loss by a finish says how and when (KO/TKO R1 1:20), and a lost title. (Server)
@@ -36,7 +36,7 @@ F1
 - Live: your driver lapped or 3+ places down from the grid; pit stops in the feed. (Server)
 
 FOOTBALL
-- A CFB chip with the FBS's 138 teams by conference: track a team (no players) for games, scores, box scores and standings; Top-25 teams show their rank. (Server)
+- A CFB chip with the FBS's 138 teams by conference: track a team (no players) for games, scores, box scores, standings; Top-25 ranks shown. (Server)
 - Alerts: the start, interceptions, lost fumbles, missed field goals, ejections, the QB pulled, falling behind, losing, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
 - A play ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
 - More teams' flags go out, with the team and foul named right. (Server)
@@ -52,8 +52,8 @@ NBA AND WNBA
 - Misses name the shot and distance ("missed a 27-foot three"), heaves aside. (Server)
 
 EVERYWHERE
-- Fixes can arrive without a new build (reopen the app once or twice).
-- Tracking both sides of a game or fight, its start is one alert, not two. (Server)
+- Fixes can arrive without a new build.
+- Tracking both sides, a game's start is one alert, not two. (Server)
 - Standings drops name the division in MLB, the NFL and the NHL. (Server)
 - Card names and titles wrap at large text sizes.
 - After a loss (F1: a race), a standings drop or elimination is a line on it. (Server)
@@ -65,7 +65,8 @@ EVERYWHERE
 - Tapping an alert opens all of it on its own screen; its photo opens their page.
 - Buttons center their labels; VoiceOver reads them as buttons.
 - No alert gets the same later line twice. (Server)
-- Settings no longer has a Leagues section; leagues off there come back on.
+- Notices from Hate Watch (outages, news) come in the feed, never pushed. (Server)
+- Settings has no Leagues section; leagues off there come back on.
 
 ## Build 12 (October 9, 2026)
 
