@@ -168,23 +168,95 @@ Audit it yourself: `cd server && node test/verify-catalog.ts`.
 
 ## Real-time: how fast is it?
 
-| Stage | Latency |
-|---|---|
-| ESPN publishes the play (measured live, MLB) | **~80–105s after it happens** (upstream; not ours) |
-| Our poll interval | ≤2s (`HW_LIVE_POLL_MS`) |
-| Detection + fan-out + WebSocket | <10 ms (WebSocket delivery measured at 1 ms locally) |
-| Push via Expo → APNs/FCM | typically 1–3s |
+**In short:** An alert reaches an open app within milliseconds of the server seeing the play, and a closed phone typically 1-3 seconds later through Expo's push service. Nearly all the delay before that is ESPN's: it posts a play well after it happens, so each live game's feeds are read every 2 seconds with ESPN's CDN cache bypassed. A few alerts wait on purpose, for ESPN to finish a review or a half-inning, and football alerts are revised when ESPN changes a play after posting it. The tables below give every stage and every deliberate wait, with the constant and environment variable behind each.
 
-Ways the delay is kept down:
+| Stage | Latency | Where |
+|---|---|---|
+| ESPN publishes the play | **~80–105s after it happens** (measured live on MLB when the server was first built; upstream, not ours) | ESPN |
+| Our poll interval | 2s per live game (`HW_LIVE_POLL_MS`), longer only when a poll itself runs long (below) | `GameTracker.loop` in `live.ts` |
+| ESPN's CDN cache | bypassed on every live read (it would add up to 10s) | `getJson(…, { bust: true })` in `espn.ts` |
+| Detection + fan-out + WebSocket | <10 ms (WebSocket delivery measured at 1 ms locally; `test/smoke.ts` prints it) | `publish()` in `fanout.ts` |
+| Push via Expo → APNs/FCM | typically 1–3s | `sendPushes` in `push.ts` |
 
-- **Two sources per game.** Each live game polls ESPN's *core* plays endpoint and the *site* summary in parallel and merges by play ID (identical across both). Measured live, core publishes plays **~18s sooner** than the summary. The detectors give identical results on both sources (`test/core-vs-site.ts`).
-- **The CDN cache is bypassed.** ESPN's CDN caches these endpoints for up to 10s. Live polls add a unique query parameter, and measured live, that surfaced every new play **4–10s sooner (avg 6.7s)**.
-- **Polls don't wait on each other.** Polls start every 2s, never overlap, and have a 4s timeout. A feed that fails, or answers in more than 3s, is logged with its name (`plays` or `summary`) and how long it took.
-- **Following starts tracking immediately.** Following a team or player mid-game rescans scoreboards immediately, so tracking starts within ~1s.
+**What production measures.** Every alert published writes a log line such as `[event] mlb.team.down_in_order → team:mlb:5: Guardians went down in order (lag 13.5s, 2 followers)` (`publish` in `fanout.ts`). The lag runs from ESPN's own timestamp on the play (its `wallclock`, kept as `NPlay.at`) to the moment the server published the alert, so it measures ESPN's posting delay plus ours from the time ESPN stamps, not from the moment the play happened, and it isn't the same number as the ~80–105s above. Alerts built when they're published (a final, a box-score fact, a standings drop) log 0.0s. On production during ALDS Game 5 (White Sox at Guardians, October 10 2026, in `server/data/recordings/mlb-401907994-prod.log` on the Mac), the 19 MLB alerts tied to a play had lags from 10.9s to 92.7s, median 23.9s. The longest were held on purpose: "Guardians lost an ABS challenge" logged 92.7s, most of it the ABS hold below.
+
+**How a game gets tracked.**
+
+- **Scoreboard scans.** The engine (`LiveEngine` in `live.ts`) reads every league's ESPN scoreboard every 10s (`HW_SCOREBOARD_MS`, `scanScoreboard`), cache-busted, with a 6s timeout. Every game on it gets a Scores tab card. College football's scoreboard lists every FBS game, a big read, so it's read every 20s (`HW_TEAMS_ONLY_SCOREBOARD_MS`), and only once in 5 minutes while no game is live or starting within 20 minutes.
+- **Which games.** A game is tracked when someone tracks either team: the teams people follow, plus the teams of the players they follow (`watchedTeamKeys`, cached 3s). Its tracker (`GameTracker`) starts when the game is live, or within 3 minutes of its start (`startsIn < 3 * 60_000`). A game seen before its start is remembered (`preSeen`) until its tracker starts, even if it goes live early, as a doubleheader's second game can. The log says `[<league>] tracking <ESPN's short name> (<event id>)`.
+- **"Hate Watch Starting".** A game the scanner saw before it started (`preSeen`, passed to the tracker as `sawPre`) gets its start alert when the tracker sees ESPN flip it from `pre` to `in`. A game first seen already under way (a follow in the 3rd quarter, a server restart) never gets one.
+- **Following mid-game.** Following or unfollowing someone (`PUT` and `DELETE /me/follows/:key` in `api.ts`, and "Delete all my data") calls `engine.kick()`. That clears the watched-teams cache and runs every league's scoreboard scan, F1's and the UFC's, and Up next at once, so a game already on starts tracking on that scan. If a scan is already running, the kick does nothing extra (`every()` skips a run while one is in flight), so the worst case is the next regular scan, up to 10s later.
+- **Stopping.** When nobody tracks either team any more, the tracker stops (`stopped tracking … nobody tracks either team now` in the log). At the final it finishes (the loss alerts, `finish`) and stops. Whichever sees the final first finishes the game, the tracker's poll or the scoreboard scan (`finish` runs once). When a tracked team's game is final on the scoreboard with no tracker at all (a restart just after the buzzer), the scan creates one just to finish it, if the game started less than 6 hours ago.
+- **History on attach.** When a tracker first reads a game, plays older than 90 seconds by ESPN's timestamp (`BACKFILL_WINDOW_MS`) update its state (the score, bases, who's in goal) but never alert, and box-score alerts are skipped on that first read. So following a team in the 7th inning doesn't replay the first six. The rest of what the tracker remembers is in [docs/duplicate-alerts.md](docs/duplicate-alerts.md), Layer 3.
+
+**Each poll** (`GameTracker.poll` in `live.ts`):
+
+- **Two sources per game, read in parallel** (`Promise.allSettled`): ESPN's *core* plays endpoint (`urls.corePlays`, logged as the `plays` feed) and the *site* summary (`urls.summary`, the `summary` feed). They're merged by play ID, which is identical across both (`mergePlays` in `detectors.ts`): the core list is kept in its own order, never sorted, a play in both is the core copy, and a play only the summary has is slotted in right after the last play the two share before it. Measured live, core publishes plays **~18s sooner** than the summary (the code's comment says 15-20s). The detectors give identical results on both sources: `test/core-vs-site.ts` runs three finished games (MLB 401907973, NHL 401891781, NBA 401811026) through each feed and the merge, and `logic.test.ts` checks the merge keeps play order.
+- **Which leagues read what.** MLB, the NBA, the WNBA and the NHL read both feeds as above. **The NFL** reads its plays from core alone: its summary has drives without participants, so it's used for the game's status, the header's score, the drives and the box score. **College football** reads the summary alone, its plays from the drives (`fromDrivePlays`), every 5s instead of 2s (`HW_TEAMS_ONLY_POLL_MS`), because its summary is big and a Saturday has dozens of games. **Soccer** reads the summary alone: its key events (`fromKeyEvents`: goals, cards, penalties, substitutions) are the plays and its commentary gives the fouls (`fromCommentary`); the core touch-by-touch feed is read every 10s (`HW_TOUCH_MS`), a page of 100 at a time, only while someone tracks a player in the match (`readTouches`). F1 and the UFC have their own engines: F1's is under "F1 how" in Notifications, the UFC's in `ufc.ts`'s header comment and `PATCH_NOTES.md`.
+- **One feed failing.** If one read fails, the other's plays are still used. The summary carries the game's status, so while it's failing the start alert, box-score facts and win probability wait for it (a final can still come from an "End of Game" play, or from the scoreboard). If every feed the league uses fails, the poll throws and logs `poll error`.
+- **The CDN cache is bypassed.** ESPN's CDN caches these endpoints for up to 10s (`max-age=10`). Live reads add a unique query parameter (`_hw=<time>`, the `bust` option of `getJson` in `espn.ts`), and measured live on an MLB game, that surfaced every new play **4–10s sooner (avg 6.7s)**. Conditional requests (an ETag, answered 304 from the cached body) are only for reads that aren't busted, such as the injury reports; a busted read never sends one.
+- **Timeouts and retries.** Each read of a live game's feeds has a 4s timeout (`timeoutMs: 4000`). `getJson` tries up to 3 times, waiting 250, 500 and 1,000 ms after each failure (a 404 stops at once), so a feed that's down can hold a poll for about 14 seconds before it gives up.
+- **Slow reads are logged.** A read over 3s (`SLOW_READ_MS`) logs `[<league> <game>] summary read took <n> ms`; a failed one logs `plays read failed after <n> ms: <error>`, naming the feed. This came from ALDS Game 5, where one alert went out 26 seconds late with nothing in the log, and 8 polls had both feeds over 4s.
+- **Polls don't overlap.** The next poll starts 2s after the last one *started* (`Math.max(250, LIVE_POLL_MS - lastPollMs)`). When a poll takes longer than 1.75s, the next starts 250 ms after it ends. `GET /health` lists every tracker with its `lastPollMs` (`engine.status()`), the quickest way to see a slow game on production.
+
+**Everything the server reads on a timer.** The engine's scans run through `every()` in `live.ts`, which never starts one while the last is still running; the game polls, the clips after a final and the notice check have their own loops:
+
+| What | How often | Setting |
+|---|---|---|
+| Each live game's plays and summary | 2s (college football 5s) | `HW_LIVE_POLL_MS`, `HW_TEAMS_ONLY_POLL_MS` |
+| Soccer's touch-by-touch feed, while a player in the match is tracked | 10s | `HW_TOUCH_MS` |
+| Every league's scoreboard | 10s (college football 20s; 5 min with no game near) | `HW_SCOREBOARD_MS`, `HW_TEAMS_ONLY_SCOREBOARD_MS` |
+| Standings | 60s (college football 10 min), and 15s after any final (`onGameFinal`) | `HW_STANDINGS_MS` |
+| Injury reports (not college football) | 30s | `HW_INJURIES_MS` |
+| League news, for off-field trouble and fines | 3 min | `HW_NEWS_MS` |
+| Yesterday's scoreboard, for the Scores tab's finals | 10 min | `HW_YESTERDAY_MS` |
+| F1: the scoreboard; followed drivers' status in a race; every car's timing | 30s; 15s; 30s | `HW_F1_SCAN_MS`, `HW_F1_STATUS_MS`, `HW_F1_BOARD_MS` |
+| UFC: a card being watched; looking for one | 10s; 5 min | constants in `ufc.ts` |
+| College football's AP poll | 30 min | `POLL_MS` in `cfb-poll.ts` |
+| Weekly recaps due | 15 min | `HW_RECAP_MS` |
+| Each tracked team's schedule, for Up next | 3h, and after each of its games | `HW_UPNEXT_REFRESH_MS` |
+| Clips after a final | every minute for an hour | `CLIPS_POLL_MS` |
+| A new developer notice, for open apps | 5s | `HW_NOTICE_POLL_MS` |
+
+**Alerts that wait on purpose.** Most alerts go out on the poll that first sees their play. These wait, because going out at once would sometimes be wrong:
+
+| Alert | Waits | Setting | Why |
+|---|---|---|---|
+| MLB: a lost ABS challenge | until a later play exists and 60s have passed (at the final, at once); a pitch missing from the feed must be missing two reads in a row | `HW_ABS_SETTLE_MS` | ESPN posts every challenged pitch "Confirmed" first and swaps in "Overturned" later (three wrong alerts on October 7, 2026; overturns took 10 and 15s in ALDS Game 5). `holdAbs`, `test/abs-settle.test.ts` |
+| MLB: a half-inning's end (down in order, stranded runners, NOBLETIGER) | the first read with the "End of the inning" play and the third out, 20s at most | `HW_HALF_END_WAIT_MS` | a stale read can have one without the other (`halfInningEnds`, `test/half-end-wait.test.ts`) |
+| MLB: an at-bat's result posted without its batter | until the batter is on it, 20s at most | `HW_HALF_END_WAIT_MS` | it can't be pinned on anyone yet (`waitForBatter`) |
+| MLB: being no-hit through 6 | until the box score agrees on zero hits | | the core feed's hit count can run ahead |
+| MLB: the pitcher's loss | the summary every 15s, up to 20 times (5 minutes), until ESPN posts the W/L | `HW_DECISION_RETRY_MS` | the decisions trail the last out (`finalPitching`) |
+| A playoff final | the scoreboard's next read with the series (every 10s), 120s at most, then the summary's series | `HW_PLAYOFF_FINAL_WAIT_MS` | to say whether the loss ended their season (`summaryEvent`) |
+| Football: a score the header has before the plays | 60s with the header 3+ points ahead while the plays trail its game clock, then it goes out without its play | `HEADER_AHEAD_MS` | ESPN's drives can lag the score by minutes (`headerAhead`) |
+| Football: a score taken back | two reads in a row where the plays and the header agree | | one short read isn't a reversal (`footballTakeBack`) |
+| Soccer: losing the ball, giving it away | until the next touch is in (the next 10s read) | `HW_TOUCH_MS` | each touch is judged by the one after (`soccerTouch`) |
+| UFC: a knockdown | 30s, in case the fight ends on it | `KD_HOLD_MS` in `ufc.ts` | the finish then says it |
+
+**Ways the delay is kept down, and alerts kept right:**
+
 - **No duplicates or stale floods.** Each event has a deterministic ID (`game:play:type:athlete`), so re-polls, restarts and overlapping sources never double-notify. Plays from before the server attached to a game aren't announced. Every layer of this (ids, storing an id once, the tracker's memory, one alert per moment, ESPN's edits, what a restart forgets) is in [docs/duplicate-alerts.md](docs/duplicate-alerts.md): read it before changing alert code.
-- **ESPN edits plays after publishing them, and scoring alerts allow for it.** A goal can be marked as scoring only after it first appears, and a disallowed goal is taken back. So each poll re-derives the score from every play instead of keeping a running total. Team alerts go out once per score each side reaches (`announced` in `GameTracker.poll`). A goal flagged late still alerts when the flag appears ("late score" in the logs). A goal that was taken back ("score went down") makes that team's next goal news again. A goal only visible through the next one (a 2-1 play right after 1-0) alerts for both teams, once. Checked by playing tonight's four NHL games plus MLB, NFL and NBA finals back through the real tracker a few plays per poll (2026-10-05): every scoring play reached the other team exactly once. The tracker also logs when it stops because nobody tracks either team.
-- **Football plays ESPN changes after it posts them** (`revisions.ts`, `GameTracker.poll`). Alerts still go out the moment a play is first seen: nothing waits for a review. In October 10 2026's twelve noon college games ESPN edited 49 plays in place (about 30 gained a flag; an interception became roughing the passer), took out or re-posted 31 (touchdowns and turnovers overturned on review, one touchdown posted under three ids), and changed drives' results after they ended. So each play and drive keeps the alerts it sent for 15 minutes, and each read compares them with what ESPN says now. An alert the play no longer has gets a line on it, with no push: "Wiped out by a penalty on Indiana: Roughing The Passer.", "Overturned on review.", "ESPN has since changed how the drive ended: End of Half." One it has now goes out then: a flag added later (feed only, as flags are), an incompletion that became an interception, the turnover on downs a review left. A play re-posted under a new id at the same spot (the same period, a start within 10 seconds, the same player) is that play, not a new one; one gone from the feed for 30 seconds is gone (a read can come back short). A score is taken back only when the plays, the score the latest plays carry and the header all agree, two reads running; its alerts get a line, and the same side scoring on that drive within 10 minutes is another line on them ("Then Wake Forest scored on the same drive: WAKE 16, NCSU 14."), not a second alert. An extra point never alerts on its own. When the drives lag the score by minutes (Missouri's last touchdown against Texas A&M never reached them), the header's score a minute ahead of the plays, while they trail its game clock, sends the score alert without its play. An "End of Game" play ends a football game only after a 4th-quarter play (ESPN put one after the 3rd quarter at Missouri, then took it out). Lines reach a device through the alert it got for that play, kept in memory for 6 hours (not across a restart). Checked by replaying that day's recording as the server read it, poll by poll, and in `test/play-revisions.test.ts`. The NFL's core plays go through the same code. Checked against the finished games of the 2026 season's first five weeks (a live NFL recording is still to come): ESPN marks a play wiped out by a penalty "- No Play." but keeps its type 73 times in 734 (sacks, incompletions, a strip-sack), so a wiped-out play alerts only its flags; after a review that reversed a call ESPN keeps the overturned call in front of "the play was REVERSED.", and what stands is the call after it (a pass interference that had wiped out an interception, itself overturned). An alert taken back that its play has again (a flag overturned on review, a play back in the feed, a re-post) gets a line on it ("Overturned on review: it stands.", "ESPN has since put this play back."), never a second alert. A flag's alert taken back while its play stands says what became of the flag: "ESPN has since charged this flag to Robert Hainsey." (a device that had the first player's alert gets that line, not the new player's flag as a second alert) or "ESPN has since taken the flag off." (Eagles at Jaguars, October 11 2026).
+- **ESPN edits plays after publishing them, and scoring alerts allow for it.** A goal can be marked as scoring only after it first appears, and a disallowed goal is taken back. So each poll re-derives the score from every play (`nextScore`) instead of keeping a running total. Team alerts go out once per score each side reaches (`announced` in `GameTracker.poll`):
+  - A goal flagged late still alerts when the flag appears, logged as `late score: play … became a scoring play after it was first published (<away>-<home>)` (on production on October 10, 2026: `[nba 401898396] late score: play 401898396144 became a scoring play after it was first published (24-28)`). In the NHL, that late goal also gets the goalie's "let one in" alert.
+  - A goal that was taken back is logged as `score went down to <away>-<home> (a goal taken back?); the next one is news again`, and that team's next goal is news again.
+  - A goal only visible through the next one (a 2-1 play right after 1-0) alerts for both teams, once.
+  - Checked by playing tonight's four NHL games plus MLB, NFL and NBA finals back through the real tracker a few plays per poll (2026-10-05): every scoring play reached the other team exactly once. `test/live-score.test.ts` drives a real `GameTracker` through these cases with plays shaped like ESPN's (WPG @ PIT, 2026-10-05).
+  - The tracker also logs when it stops because nobody tracks either team.
+- **Football plays ESPN changes after it posts them** (`revisions.ts`, `GameTracker.poll`). Alerts still go out the moment a play is first seen: nothing waits for a review. In October 10 2026's twelve noon college games ESPN edited 49 plays in place (about 30 gained a flag; an interception became roughing the passer), took out or re-posted 31 (touchdowns and turnovers overturned on review, one touchdown posted under three ids), and changed drives' results after they ended. So each play and drive keeps the alerts it sent for 15 minutes (`REVISE_MS`), and each read compares them with what ESPN says now:
+  - An alert the play no longer has gets a line on it, with no push: "Wiped out by a penalty on Indiana: Roughing The Passer.", "Overturned on review.", "ESPN has since changed how the drive ended: End of Half."
+  - One it has now goes out then: a flag added later (feed only, as flags are), an incompletion that became an interception, the turnover on downs a review left.
+  - A play re-posted under a new id at the same spot (the same period, a start within 10 seconds, the same player: `samePlay`) is that play, not a new one; one gone from the feed for 30 seconds (`GONE_MS`) is gone (a read can come back short).
+  - A score is taken back only when the plays, the score the latest plays carry and the header all agree, two reads running; its alerts get a line, and the same side scoring on that drive within 10 minutes (`RESCORE_MS`) is another line on them ("Then Wake Forest scored on the same drive: WAKE 16, NCSU 14."), not a second alert. An extra point never alerts on its own.
+  - When the drives lag the score by minutes (Missouri's last touchdown against Texas A&M never reached them), the header's score a minute ahead of the plays, while they trail its game clock, sends the score alert without its play.
+  - An "End of Game" play ends a football game only after a 4th-quarter play (ESPN put one after the 3rd quarter at Missouri, then took it out).
+  - Lines reach a device through the alert it got for that play, kept in memory for 6 hours (not across a restart).
+  - Checked by replaying that day's recording as the server read it, poll by poll, and in `test/play-revisions.test.ts`.
+  - The NFL's core plays go through the same code. Checked against the finished games of the 2026 season's first five weeks (a live NFL recording is still to come): ESPN marks a play wiped out by a penalty "- No Play." but keeps its type 73 times in 734 (sacks, incompletions, a strip-sack), so a wiped-out play alerts only its flags; after a review that reversed a call ESPN keeps the overturned call in front of "the play was REVERSED.", and what stands is the call after it (a pass interference that had wiped out an interception, itself overturned).
+  - An alert taken back that its play has again (a flag overturned on review, a play back in the feed, a re-post) gets a line on it ("Overturned on review: it stands.", "ESPN has since put this play back."), never a second alert.
+  - A flag's alert taken back while its play stands says what became of the flag: "ESPN has since charged this flag to Robert Hainsey." (a device that had the first player's alert gets that line, not the new player's flag as a second alert) or "ESPN has since taken the flag off." (Eagles at Jaguars, October 11 2026).
+  - How the revisions ledger works, and what it can't do after a restart, is in [docs/duplicate-alerts.md](docs/duplicate-alerts.md), Layer 5 and "What survives a restart".
 - **Feed order is by when it happened.** The feed is ordered by ESPN's wallclock time for the play, not by arrival time.
+- **Pushes never hold up anything.** `publish()` writes the feed rows and WebSocket frames first, then hands the pushes to `sendPushes` (`push.ts`), which posts them to Expo in chunks of 100 without waiting for the answer (10s timeout). Each push is `priority: 'high'` and `interruptionLevel: 'time-sensitive'` on the `hate-events` channel. A token Expo reports as `DeviceNotRegistered` is cleared, so a deleted app stops costing a request.
 
 **The remaining floor is ESPN's own delay.** To go faster you need a lower-latency feed per league: MLB StatsAPI (`statsapi.mlb.com/api/v1.1/game/{pk}/feed/live`), NHL (`api-web.nhle.com`), NBA (`cdn.nba.com/static/json/liveData`), or a paid provider such as Sportradar. Any of these can feed the same detector interface (`NPlay`); you'd map ESPN athlete IDs to league IDs by name + team.
 
@@ -333,10 +405,47 @@ A card in the feed (or on a player's, team's or game's page) shows three lines o
 
 ## Developer notices
 
-A message from Hate Watch itself, in every install's feed and never pushed: for an emergency (an outage, alerts that went out wrong) or news of what's coming. Sent from the shell on the server (`server/src/notice-cli.ts`, the work in `server/src/notices.ts`): one event (type `app.notice`), a feed row for every device there is then, and the running server passes it to every open app within seconds (`watchNotices`, polling every 5 s), so it shows without a reload. Nothing in Settings turns it off, and the weekly recap doesn't count it.
+**In short:** A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming. It's sent from a shell on the server with `server/src/notice-cli.ts`, which writes it straight into the database (the work is in `server/src/notices.ts`), and the running server shows it in open apps within about 5 seconds. The same command lists notices and withdraws one; nothing in Settings turns them off, and only the user decides when one goes out (CLAUDE.md, "Release flow").
 
-- **How it looks:** in builds from the next one: the app's icon, the title, three lines of the body, "From Hate Watch" (📣), edged in red; an urgent one says "Important: from Hate Watch" (⚠️), edged in amber. Tapping it opens all of it ("Hate Watch, From the developer"); no league tag, no page to open, no Share (`isNotice` in `app/src/lib/alerts.ts`). Builds before: a red "HW" badge (the sender is team-shaped with a `badge://` logo, which every build draws), a NEWS tag and the same label (`NOTICE_SENDER` in `fanout.ts`); build 12 opens an empty page when it's tapped.
-- **Send, list, take back:** `fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts send 'Title' 'Body'"` (`--urgent`, `--dry-run` to count who it would reach). Text with quotes goes as base64 of `{"title","body","urgent"}`: `send --b64 <base64>`. With no command it lists the latest; `withdraw <id>` takes one out of every feed (an app that has it open keeps it until it next loads its feed). Titles up to 120 characters. Devices created after a notice don't get it (`test/notices.test.ts`).
+**What sending one does** (`sendNotice` in `notices.ts`), in one database transaction:
+
+- One row in `events`: id `notice:<the time sent, in ms since 1970>`, type `app.notice` (`NOTICE_TYPE` in `fanout.ts`), league `news` (no league's, so it shows under All), target `app:hatewatch`, the title and body trimmed, `meta` `{"urgent":true}` or `{}`, and a share code like any alert.
+- A feed row for **every device there is at that moment**, `pushed` 0 (`INSERT … SELECT … FROM devices`). A device registered later doesn't get it.
+- `notices:latest` in `kv`: the id and time, for the running server to pass to open apps.
+- No push, ever. A notice doesn't go through `publish()`, so prefs, mutes, quiet hours and the alert bells never apply to it, and nothing calls the push sender (`test/notices.test.ts` checks that no push is sent). It's the one exception to "every alert goes through `publish`" in [docs/duplicate-alerts.md](docs/duplicate-alerts.md), Layer 2: its feed rows still use `ON CONFLICT DO NOTHING`.
+
+**How it reaches open apps.** `watchNotices()`, started at boot in `index.ts`, checks `notices:latest` every 5 seconds (`HW_NOTICE_POLL_MS`). When it changes, the server sends an `event` frame, the same shape as a live alert (`feedItem`), to every connected device whose feed has the notice, and logs `[notice] <id> sent live to the open apps of <n> devices: <title>`. Everyone else sees it the next time the app loads its feed (opening the app, reconnecting, pull to refresh). Two limits follow from watching only the latest:
+
+- Two notices sent within 5 seconds of each other: only the second goes out live; the first appears on the next feed load.
+- A notice sent while the server is down, or just before a restart, isn't sent live: the server starts from whatever `notices:latest` says at boot.
+
+**How it looks** (`FeedCard.tsx`, `alert/[id].tsx`, `isNotice` in `app/src/lib/alerts.ts`):
+
+- **Builds from the next one:** the app's icon (`AppAvatar`), the title, three lines of the body, and the label "From Hate Watch" with a megaphone emoji, the card edged in red (`colors.hateDim`). An urgent notice reads "Important: from Hate Watch" with a warning-sign emoji, edged in amber (`colors.warn`). The emoji and labels come from the server (`noticeLook` in `fanout.ts`). There's no league tag and no Share button, and the icon opens no page. Tapping it opens all of it on its own screen, from "Hate Watch, From the developer", again without Share.
+- **Builds before:** the sender is team-shaped (`NOTICE_SENDER` in `fanout.ts`: a team called Hate Watch, abbreviation HW, colour `#E5232B`, logo `badge://hatewatch`), so every build draws it as a red "HW" badge, as it does F1's constructors, and nothing crashes on it; it carries a NEWS tag (its league) and the same label. Build 12 opens an empty page when it's tapped.
+- **Where it doesn't count:** the weekly recap leaves notices out (`recap.ts`), and they're never a Successful Hate Watch. Settings → Clear feed deletes them with the rest of the feed, and "Delete all my data" removes them with the device.
+
+**The command** (`notice-cli.ts`), run on the server's machine:
+
+```bash
+fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts"                                    # the latest 20, newest first
+fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts send 'Title' 'Body' --dry-run"       # how many it would reach; sends nothing
+fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts send 'Title' 'Body'"                 # send it (--urgent: marked important)
+fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts send --b64 <base64 JSON>"            # the same, for text with quotes in it
+fly ssh console -a hate-watch-api -C "node /app/src/notice-cli.ts withdraw notice:<ms>"                  # take one back out of every feed
+```
+
+- **Which database.** `HW_DB` if set, else `/data/hatewatch.db` when it exists (the Fly volume), else `data/hatewatch.db`. It prints `database /data/hatewatch.db (<n> devices)` first, so a wrong database shows at once.
+- **`send "Title" "Body"`.** Prints `sent notice:<ms> to <n> devices, feed only` and then the notice as sent (`urgent "Title": Body` when urgent). `--dry-run` prints `would reach <n> devices (nothing sent)` and writes nothing. `--urgent` and `--dry-run` can go anywhere after `send`.
+- **`send --b64 <base64>`.** The base64 of `{"title","body","urgent"}` in UTF-8. `fly ssh console -C` passes one word whole, and base64 keeps quotes, apostrophes and emoji intact. It's urgent if the JSON says so or `--urgent` is given. Make it with `printf '%s' '<json>' | base64 | tr -d '\n'` (GNU base64 wraps long lines; the `tr` removes the breaks). For example, `{"title":"Live scores are delayed","body":"ESPN is slow tonight; alerts may come a minute late.","urgent":false}` is `eyJ0aXRsZSI6IkxpdmUgc2NvcmVzIGFyZSBkZWxheWVkIiwiYm9keSI6IkVTUE4gaXMgc2xvdyB0b25pZ2h0OyBhbGVydHMgbWF5IGNvbWUgYSBtaW51dGUgbGF0ZS4iLCJ1cmdlbnQiOmZhbHNlfQ==`.
+- **Its checks** (`noticeProblem`): a title and a body that aren't blank, and a title of 120 characters at most ("the title is 131 characters; keep it to 120 (the rest goes in the body)"). The body has no limit, but the feed card shows three lines of it. A notice that fails a check prints the problem and the usage line and exits with status 1, sending nothing.
+- **The list** (no command): the latest 20 notices, newest first, each as `<id>  <time, UTC>Z  <n> feeds[ URGENT]  "<title>": <body>`, where feeds is how many feeds still have it. With none: `no notices sent yet`.
+- **`withdraw <id>`.** Deletes the notice's feed rows and its event, and prints `withdrew <id> from <n> feeds`. It only touches notices: any other id, or one already withdrawn, prints `no notice <id>`. An app that has it on screen keeps it until it next loads its feed. There's no live frame for a withdrawal.
+- Any other command prints the usage line and exits with status 1.
+
+**Before sending one** (CLAUDE.md): only when the user asks, with its exact title and body, and whether it's urgent, confirmed first, since it goes to everyone. Check the reach with `--dry-run`, then send it with `--b64`. A deploy that includes `notice-cli.ts` has to be live first.
+
+**Tests** (`test/notices.test.ts`): a notice goes into every feed, never pushed, drawn as from Hate Watch (team-shaped with a `badge://` logo, league `news`); an urgent one says so; a dry run reaches no one, and the title and body checks; the weekly recap doesn't count notices; open apps get a new notice within seconds, and only those whose feed has it (a socket for a device created after it gets nothing); a notice is withdrawn from every feed, and `withdraw` refuses an id that isn't a notice.
 
 ## Sharing an alert
 
@@ -352,21 +461,109 @@ The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a
 
 ## Tests
 
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 314 tests in 49 files, offline, in about 4 seconds, all passing on October 11, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+
 ```bash
 cd server
-npm test                      # prefs, quiet hours, aliases, scoring, standings, F1 results, a simulated F1 race and its timing, game starts, share links, Scores tab, the hate watch counter
+npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
+npm test                      # every test/*.test.ts: 314 tests, offline, ~4s
+node --test test/notices.test.ts   # one file
+npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
 node test/core-vs-site.ts     # both ESPN sources produce identical detections
 HW_DEV=1 npm start & node test/smoke.ts   # end-to-end: search, follow, ws delivery, prefs, mute, unfollow, auth
 node test/f1-replay.ts        # F1 alert logic on the real, current race weekend vs ESPN's classification
+node test/verify-catalog.ts   # audits the ingested catalog: duplicates, images, logo fallbacks
+node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 ```
+
+**How the unit tests run.** `npm test` is `node --disable-warning=ExperimentalWarning --test test/*.test.ts`. Node 22.18 or later (`engines` in `package.json`) runs the TypeScript files as they are, with no build step. Every test file sets `process.env.HW_DB = ':memory:'` before it imports server code (`db.ts` opens its file on import), so the tests never touch `server/data/hatewatch.db`; `share.test.ts` also builds a throwaway database in the system's temp folder to test the share-code migration, and deletes it. ESPN is faked through seams the live code reads from (`liveDeps.getJson` in `live.ts`, `f1Deps` in `f1.ts`), and the play shapes and wording are ESPN's own from real games, named in each file's header comment. One fixture is checked in: `test/fixtures/alds-game5-401907994.json`, the plays of ALDS Game 5 trimmed from the live recording.
+
+**Every test file and what it checks:**
+
+| File | What it checks |
+|---|---|
+| `abs-settle.test.ts` | A lost ABS challenge waits for the review to settle, with ESPN's real plays and ids from October 7, 2026 (Rays @ Yankees, CLE @ CHW), when three alerts went out for challenges that were won |
+| `alds-game5.test.ts` | White Sox at Guardians, ALDS Game 5 (October 10, 2026), from the fixture: the bases loaded as its own alert; a half-inning judged from its plays as they stand; "C. Montgomery" found among two Montgomerys; the loss's lines at the final; ELIMINATED on "their team lost"; no quality start; a lost ABS challenge surviving a stale read; a slow scoreboard still eliminating; a failed read logged |
+| `box-score.test.ts` | The game screen's box score (`boxscore.ts`): a table per stat group, away team first, the bad numbers marked for red |
+| `bundling.test.ts` | One alert per play per device (`bundleByPlay`): the team's and its players' alerts become one with lines; `alt` gives one line; a later fact goes on the alert already sent, without a push |
+| `catalog-injured.test.ts` | Players on an injured list but off the roster (MLB's 60-day IL) still join their team |
+| `cfb.test.ts` | College football: its URLs, catalog, plays from drives, the college alert types, cards with top-25 ranks, the AP poll, an upset by an unranked team, a bowl game not being an elimination |
+| `challenges.test.ts` | MLB "Loses a challenge", ABS and replay, from ATL @ LAD (2026-10-04) and CHW @ CLE (2026-10-05), one alert per device per challenge |
+| `clips.test.ts` | ESPN's clips: a play's clip goes onto its alerts later without a push; a loss gets the winning play's clip or the recap; the `clips.*` switches take them out |
+| `crew-chief-review.test.ts` | Crew chief reviews that overturn a call: Volpe's home run taken away for fan interference (Rays @ Yankees, 2026-10-07) and the season's other overturned reviews |
+| `divisions.test.ts` | Search's "By division": each team's division, named the way fans say it |
+| `eliminated.test.ts` | A playoff knockout as that game's one Successful Hate Watch, from the scoreboard's series or an NFL playoff loss, including TB @ NYY (ALDS Game 3) through the live scoreboard scan |
+| `epl.test.ts` | The EPL from key events (goals, own goals, cards, penalties, subs) and the score counted from the goals, on four September 2026 matches |
+| `f1-live.test.ts` | A simulated race weekend through the real F1 engine (scan, live status, chequered flag, re-scan), and what lands in a follower's feed at each step |
+| `f1-merges.test.ts` | F1 alerts merged so a busy device isn't flooded (Singapore's sprint, October 10 2026: 33 notifications with everyone tracked): one start alert, a double DNF and no points taking in their drivers', one notification per session publish, penalties correcting results in place, a championship drop as a line |
+| `f1-preview.test.ts` | An F1 weekend's preview (`f1-preview.ts`): grids set and not, a weekend two weeks out, a live card's state, standings failing |
+| `f1-stats.test.ts` | F1's stats pages (`f1-stats.ts`): a race called off, retirements and non-starters, a team swap, look-alike race names |
+| `f1-timing.test.ts` | A running race's timing through the real engine: the running order with gaps, and a followed driver's pit stop, getting lapped and places lost (not for a pit cycle) |
+| `game-start.test.ts` | "Hate Watch Starting" on the pre-game to live flip, through a real `GameTracker`; never for a game first seen under way; the loss wording |
+| `half-end-wait.test.ts` | A half-inning's end waits for a read with its third out, but only `HW_HALF_END_WAIT_MS` (the bottom of the 8th of ALDS Game 5, whose third out never came) |
+| `hate-watches.test.ts` | The Settings counter: every Successful Hate Watch per device, whatever its alert settings, surviving a cleared feed, and counted for losses from before it existed |
+| `highlights.test.ts` | The game screen's Highlights (`highlights.ts`): ESPN's clips newest first while they're up, and the key plays |
+| `images.test.ts` | The `images.*` switches: photos and logos taken out of responses and live frames, leaving the `badge://` every build draws |
+| `injuries.test.ts` | One team alert per injury report update, NFL game-day "Active" never alerting, and iOS stacking a team's notifications in one thread |
+| `leaderboard.test.ts` | The top 100 of every filter, against a brute-force ranking of a few thousand random follows |
+| `live-score.test.ts` | Team scoring alerts when ESPN edits plays: a goal marked as scoring later, one taken back, one seen only through the next, through a real `GameTracker` (WPG @ PIT, 2026-10-05) |
+| `logic.test.ts` | The core rules: type and league switches, mute (feed, no push), aliases, quiet hours across midnight, scores never going backwards, standings by seed, the two feeds' merge keeping play order, stranded runners, down in order, caught stealing, delay of game and safeties, NOBLETIGER, scoring position, scored on and fell behind as one alert, F1 results, per-target choices, the per-alert bell, an onside kick (TEN @ BAL) |
+| `loss-facts.test.ts` | A loss's facts (a walk-off, losing as the favorite, a shutout, a sweep) as lines on one loss alert, on real games |
+| `mlb-outs.test.ts` | A hitter's outs by kind, double and triple plays, and a hit with a runner thrown out not being his out |
+| `new-alerts.test.ts` | Blowing a big lead live, a division rival clinching, ejections, the weekly misery recap, each one alert per device |
+| `news.test.ts` | Off-field trouble and fines or suspensions from ESPN's league news (NBA 2026-09-30, MLB 2026-10-04, NFL 2026-10-06) |
+| `notices.test.ts` | Developer notices: every feed, never pushed, drawn as from Hate Watch; urgent; dry run and the text checks; left out of the recap; live to open apps; withdrawn |
+| `pitchers.test.ts` | Blown saves, no quality starts and losses from the box score (NYY @ TB live, 2026-10-06; finals from 2026-09-20 and 2026-10-04) |
+| `play-revisions.test.ts` | Football plays ESPN changes after posting them, with October 10 2026's noon college games' own plays: a pick wiped out by a penalty, an incompletion turned interception, a flag added later, a touchdown overturned and scored on the same drive, one touchdown under three ids, the header ahead of lagging drives, a stray "End of Game", drives whose result changed |
+| `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
+| `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |
+| `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
+| `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
+| `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
+| `share.test.ts` | Share links: the `/a/<code>` page, its preview picture, the iPhone redirect to the App Store, codes for old alerts |
+| `soccer.test.ts` | Fouls and dives, penalties conceded, losing the ball, passes given away, and a 3+ goal loss (Coventry 0-5 Brighton, Fulham 1-1 Man United) |
+| `sport-alerts.test.ts` | The sport-by-sport alerts of October 2026 in ESPN's wording, each kept to one alert per device |
+| `stats.test.ts` | Stats pages for players and teams (Aaron Judge, Gerrit Cole, Trae Young, the Yankees, the EPL table) |
+| `team-lost.test.ts` | "Their team loses": one alert per device per loss, through a real `GameTracker`'s final and `publish()` |
+| `trackers.test.ts` | Hater counts on every follow and back from following or unfollowing, over real HTTP |
+| `ufc-classes.test.ts` | The UFC's weight classes and who heads each, and `/ufc/weight-classes` |
+| `ufc-preview.test.ts` | A UFC card's preview, before (Allen vs. Duncan, October 10 2026) and after (UFC 332), the calendar, the routes |
+| `ufc.test.ts` | The UFC: fighters as players, a card watched poll by poll, and what a fighter's haters get (UFC 332 and a Fight Night, 2026-10-03 and 09-26) |
+| `upnext.test.ts` | "Up next" from each tracked team's ESPN schedule, including "If Necessary" games and a season that's over |
+| `wnba.test.ts` | The WNBA: every NBA alert under its own switches, from the same detectors (NY @ ATL, 2026-10-04) |
+
+**Scripts that read live ESPN.** These aren't run by `npm test`, and they need the network:
+
+- `test/replay.ts [league:eventId …]`: replays finished games through the detectors as the live tracker would (default: `mlb:401907973`, `nfl:401872963`, `nhl:401891781`, `nba:401811026`). For each it prints PASS or FAIL for lead changes merged into one alert and for the tracked score against ESPN's final, the alerts by type, and how many same-id detections collapsed into one, as `publish()` would. Exit status 1 on any FAIL. This is the canary for ESPN changing its fields.
+- `test/core-vs-site.ts`: the three games above (not the NFL) through core plays, site plays and the merge; PASS only if all three give the same alerts in the same order.
+- `test/smoke.ts`: against a running server (`HW_URL`, default `http://localhost:8787`) started with `HW_DEV=1` (it uses `POST /dev/simulate`). It registers a device, searches, follows Bryce Harper and the Eagles, and checks WebSocket delivery (it prints the measured milliseconds), a type switched off, a per-player choice beating the global one, a muted target still reaching the feed, unfollowing, a bad token getting 401, `/privacy` and `/support`, and "Delete all my data" closing the socket (4401) and voiding the token. On a fresh database the server ingests rosters for about 30 seconds before it serves, so start it, wait for `[boot] catalog` in its output, then run the script.
+- `test/f1-replay.ts [eventId]`: the F1 results logic on a real weekend (the current or latest by default), against ESPN's classification.
+- `test/verify-catalog.ts`: audits the ingested catalog: unique players and teams, an image for every row, image sizes, and every logo fallback a real 404 from ESPN.
+- `test/find-nobletiger.ts [maxGames=40] [YYYYMMDD]`: runs the detector over recent finished MLB games until it finds NOBLETIGERs, and prints near-misses too.
+
+**Recordings and replays** (`server/data/recordings/`). `server/data/` is in `.gitignore`, so this folder exists only on the Mac that made it; nothing in it reaches GitHub or the other machine. It holds recordings of live games read from ESPN exactly as the server reads them (cache-busted, the same URLs; MLB, NBA and EPL games every 5 seconds, college football every 15, F1 and UFC every 10), the scripts that make and replay them, and the scripts that check a replay:
+
+- **Recorders** (`record-mlb.ts`, `record-mlb-sb.ts`, `record-nba.ts`, `record-epl.ts`, `record-cfb.ts`, `record-f1.ts`, `record-ufc.ts`, `record-ufc-fc.ts`). Each writes a `.jsonl` with a line per change: every play the first time it's seen and again whole each time ESPN edits it (`core`/`core-edit`, `site`/`site-edit`), plays that vanish (`core-gone`), and the header on change; the NBA and EPL recorders also log reads slower than the tracker's 4s timeout (`slow`). Full summaries go to `<out>-summaries.jsonl.gz`, the final summary and core plays to `<out>-final-summary.json` and `-final-core.json`, and the NBA and EPL recorders also save the standings before the game and 2, 15 and 30 minutes after it (`standings-after.ts` does it for MLB).
+- **The registry** (`recorders.py`, `recorders.jsonl`): one line per recorder that should be running, and `recorders.py --restart` relaunches any that died (the Claude app restarting stops what a session started in the background; so does a crash or a reboot).
+- **Replays** through the real `GameTracker` with virtual timers: `replay-mlb.ts` (ALDS Game 5, 401907994; `SRC=<server/src> FINAL=sb|fallback UNTIL=<iso> node replay-mlb.ts <out.json>`, many devices tracking single targets and combinations), `replay-cfb-noon.ts` (the twelve noon college games of October 10, 2026, three devices a game), and `replay-epl.ts` (Manchester City at Liverpool, 401879264, October 11, 2026).
+- **The checks** on a replay: `check-mlb.py <out.json>` (an independent tally, by regex over the final plays, of what should have alerted), `vs-prod.py <out.json>` (the replay's alerts against production's `[event]` log lines for the game), `edits-mlb.py` (ESPN's edits to the game's plays after posting them, and the recorder's gaps between reads), and `prod-read.js` (read-only: what production sent for the game, how many feeds and pushes, no device ids or tokens).
+- **On disk as of October 11, 2026:** ALDS Game 5 (MLB 401907994, with production's log), the October 10 noon college games, the F1 weekend of October 10 (600057445), the UFC card of October 10 (600061541), Manchester City at Liverpool (EPL 401879264), and recordings of October 11 NBA and MLB games.
+
+A change to alerts is checked by replaying the recorded game it's about and comparing the alert count before and after ([docs/duplicate-alerts.md](docs/duplicate-alerts.md), "How to change alerts safely").
 
 ## Known limits
 
-- ESPN's API is undocumented and unofficial. Field names can change; the replay tests are the canary.
-- Goalie-on-ice for NHL goals is inferred from the last save each goalie made. Empty-net goals are skipped.
-- MLB "gives up runs" credits the pitcher on the mound, not official earned-run or inherited-runner accounting.
-- Standings and injury alerts fire on change. The first snapshot after a fresh install is a silent baseline.
-- F1's live path (in-race DNFs and double DNFs) is tested with a simulated race through the real engine (`test/f1-live.test.ts`), and its timing (the running order's gaps, pit stops, lapped and places lost) the same way (`test/f1-timing.test.ts`). The timing was read from ESPN during the 2026 Singapore GP's last laps; ESPN only said "GREEN", then "CHECKER" at the end, so any other flag shows as ESPN words it ("SAFETY_CAR" is "Safety car").
-- Soccer: no injury alerts (ESPN's EPL injury report is empty), no losing streaks (the table has no streak) and no elimination. "Loses the ball" and "Gives the ball away" are judged from the touch after, since ESPN doesn't mark a pass or dribble as failed, and they haven't run against a live match yet. The first live EPL matches after this was added are on 2026-10-10.
-- F1 sprint qualifying sessions don't generate alerts (only Qualifying, Sprint and Race do). F1 has no injury report on ESPN.
+**In short:** Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning. Some alerts are inferred rather than read (the NHL goalie in net, MLB runs charged to whoever is pitching), some leagues lack data ESPN doesn't publish (soccer injuries and streaks, F1 injuries), and some paths have only been tested on simulations or recordings. Each limit below says why it exists and what to do about it, where there's anything.
+
+- **ESPN's API is undocumented and unofficial.** Field names, shapes and wording can change without notice, and nothing promises it stays up. *Why:* there's no official free feed for these leagues. *Workaround:* every test uses ESPN's real shapes and wording, and `node test/replay.ts` (finished games, tracked score against the final) is the canary; run it after anything looks off. The images and clips that lean on ESPN's rights can be switched off on the server without a build (`server/src/flags.ts`, CLAUDE.md "Release flow").
+- **ESPN's delay is the floor.** A play reaches us when ESPN posts it, tens of seconds after it happens (see "Real-time"). *Workaround:* a lower-latency feed per league through the same `NPlay` interface, listed at the end of "Real-time".
+- **The NHL goalie in net is inferred.** ESPN doesn't say who was in goal for each goal, so the tracker seeds each team's goalie from the box score when it first reads a game (`seedGoalies` in `live.ts`), then moves it to whoever makes each save, and to a goalie coming on as a substitute (`observePlay` in `detectors.ts`). An empty-net goal is nobody's: it gets no goalie alert, and the team that gave it up gets `nhl.team.empty_net_goal` ("… gave up an empty-netter to the …") instead.
+- **MLB "gives up runs" goes to the pitcher on the mound for that play** (the play's `pitcher`), not by official earned-run or inherited-runner rules. A reliever who lets an inherited runner score gets the alert, though the run is charged to the man before him. *Workaround for what's official:* blown saves, no quality start and the loss are read from ESPN's box score (`boxPitchers`, `pitcherEvents`), which uses the official numbers.
+- **Standings and injury alerts fire on change, and the first read is a silent baseline.** The last read is kept per league in the server's `kv` table (`standings:<league>`, `injuries:<league>`; `scanStandings`, `scanInjuries` in `live.ts`). A fresh database, a new server, or a newly added league starts with a baseline, so a change that happened before that first read never alerts. College football has no injury scan.
+- **A restart forgets what the server only keeps in memory.** Football revisions of plays posted before a restart, late lines for alerts sent before it, and MLB holds (an ABS challenge, a half-inning's end) are lost; the database's ids still stop anything going out twice. The full list is in [docs/duplicate-alerts.md](docs/duplicate-alerts.md), "What survives a restart". *Workaround:* deploy when nothing is live.
+- **F1's live path has only been tested on simulations and one recorded weekend.** In-race DNFs and double DNFs are tested with a simulated race through the real engine (`test/f1-live.test.ts`), and the timing (the running order's gaps, pit stops, lapped and places lost) the same way (`test/f1-timing.test.ts`). The timing was read from ESPN during the 2026 Singapore GP's last laps; ESPN only said "GREEN", then "CHECKER" at the end, so any other flag shows as ESPN words it, made readable ("SAFETY_CAR" is "Safety car"; `flagLabel` in `f1.ts`).
+- **F1 sessions with alerts are qualifying, the sprint and the race** (`sessionKind` in `f1.ts`). Sprint qualifying (ESPN's "SS", the sprint shootout) and practice send none. F1 has no injury report on ESPN, so no F1 injury alerts.
+- **Soccer has no injury alerts, no losing streaks and no elimination.** ESPN's EPL injury report is empty, the table carries no streak, and a league season has no playoff to be knocked out of (a drop into the relegation zone is its alert instead). "Loses the ball" and "Gives the ball away" are judged from the touch after (`soccerTouch`), since ESPN doesn't mark a pass or dribble as failed. A recording of Manchester City at Liverpool (October 11, 2026) is on the Mac for replaying them (`replay-epl.ts`); no soccer change has reached main since.
+- **Clips exist only where ESPN has them:** MLB, the NBA, the WNBA and the NHL (`CLIP_LEAGUES` in `live.ts`; ESPN had none for the NFL or soccer in October 2026), plus a lost UFC fight's clip.
+- **A developer notice reaches only the devices registered when it's sent,** and only the latest one goes out live (see "Developer notices").
