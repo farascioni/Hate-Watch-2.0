@@ -7,6 +7,9 @@
 // and blocks the edit (exit 2, the reason
 // fed back to the agent) until there is one, naming the docs for the file being edited. Once a session has read
 // them it's remembered (a marker in the temp folder), so later edits aren't checked again.
+// Alert code is stricter (ALERT_CODE, docs/duplicate-alerts.md "Files this covers"): every edit to it needs a full
+// read of docs/duplicate-alerts.md (or the vault's "Duplicate alert protection") since the latest user message, so
+// each new instruction that touches alerts starts by reading it again. Never remembered.
 // Off for an emergency: HW_DOCS_GATE=off.
 import { createReadStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -35,6 +38,49 @@ if (input.tool_name === 'Bash') {
   if (!CODE_PATH.test(file) || /\/node_modules\//.test(file)) process.exit(0);
 }
 
+// Alert code: the duplicate alert docs, read in full since the latest user message (checked on every edit).
+const ALERT_CODE = /(?:^|\/)(?:(?:server\/)?src\/(?:detectors|live|fanout|revisions|event-types|push|f1|ufc|news|recap|cfb-poll|hate-watches|notices|clips|db|api)\.ts$|(?:server\/)?test\/[^/]+$|(?:app\/)?src\/lib\/store\.tsx$)/;
+const DUP_DOC = /docs\/duplicate-alerts\.md|Duplicate alert protection\.md/;
+/** A full read of the duplicate alert docs: the Read tool on the whole file, cat/bat/less of it, or an Obsidian MCP call naming the note. */
+function readsDupDoc(name, inp = {}) {
+  if (name === 'Read') return DUP_DOC.test(String(inp.file_path ?? '').replace(/\\/g, '/')) && inp.offset == null && (inp.limit == null || inp.limit >= 400); // Windows paths too
+  // The doc is what cat prints (its argument, quoted or not), not a name further on (a heredoc that mentions it).
+  if (name === 'Bash') return /\b(?:cat|bat|less)\s+(?:-\w+\s+)*(?:"[^"]*(?:duplicate-alerts|Duplicate alert protection)\.md"|'[^']*(?:duplicate-alerts|Duplicate alert protection)\.md'|(?:[^\s|;&<>'"]|\\ )*(?:duplicate-alerts|Duplicate\\ alert\\ protection)\.md)/.test(String(inp.command ?? ''));
+  return /^mcp__.*obsidian/i.test(name) && /Duplicate alert protection|duplicate-alerts/.test(JSON.stringify(inp));
+}
+/** The user's own message (not a tool result, not a reminder the harness added). */
+const isPrompt = (d) => d.type === 'user' && !d.isMeta && (typeof d.message?.content === 'string'
+  || (Array.isArray(d.message?.content) && d.message.content.some((c) => c.type === 'text') && !d.message.content.some((c) => c.type === 'tool_result')));
+async function readDupSincePrompt(path) {
+  if (!path || !existsSync(path)) return false;
+  let read = false;
+  const lines = createInterface({ input: createReadStream(path, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (!line.includes('"type":"user"') && !line.includes('"tool_use"')) continue;
+    let d;
+    try { d = JSON.parse(line); } catch { continue; }
+    if (isPrompt(d)) { read = false; continue; }
+    if (d.type !== 'assistant' || !Array.isArray(d.message?.content)) continue;
+    for (const c of d.message.content) if (c.type === 'tool_use' && readsDupDoc(c.name, c.input)) read = true;
+  }
+  return read;
+}
+const transcripts = [input.transcript_path, input.agent_transcript_path].filter(Boolean);
+if (ALERT_CODE.test(file) && transcripts.some((t) => existsSync(t))) {
+  let ok = false;
+  for (const t of transcripts) if (await readDupSincePrompt(t)) { ok = true; break; }
+  if (!ok) {
+    process.stderr.write([
+      `Duplicate alert protection (CLAUDE.md "Read the docs first"): this ${input.tool_name === 'Bash' ? 'command writes to' : 'edits'} alert code (${file.replace(/^.*?\/(app|server)\//, '$1/')}).`,
+      'Before every change to alerts, read docs/duplicate-alerts.md in full again (the Read tool with no offset or limit),',
+      'or the vault\'s "Duplicate alert protection" note: since the latest user message, not just once a session.',
+      'It covers alert ids, publish() storing an id once, the game tracker\'s memory, moments and folds, ESPN\'s edits, restarts.',
+      'Then retry the edit.',
+    ].join('\n') + '\n');
+    process.exit(2);
+  }
+}
+
 const marker = join(tmpdir(), `hw-docs-read-${String(input.session_id ?? 'none').replace(/[^\w-]/g, '')}`);
 if (existsSync(marker)) process.exit(0);
 
@@ -51,7 +97,6 @@ async function readDocs(path) {
   }
   return false;
 }
-const transcripts = [input.transcript_path, input.agent_transcript_path].filter(Boolean);
 for (const t of transcripts) {
   if (await readDocs(t)) { try { writeFileSync(marker, ''); } catch {} process.exit(0); }
 }
@@ -59,6 +104,7 @@ if (!transcripts.some((t) => existsSync(t))) process.exit(0); // no transcript t
 
 // Which docs, for this file: its README sections and vault notes (CLAUDE.md "Read the docs first" has the full map).
 const AREAS = [
+  [/detectors|live\.ts|fanout|revisions|event-types|push\.ts|news\.ts|recap|hate-watches|notices|store\.tsx|\/test\//i, 'docs/duplicate-alerts.md (duplicate alert protection: read it before every change to alerts)'],
   [/f1|RaceOrder|F1Preview/i, 'README "Notifications" → "F1 drivers" / "F1 how", and "Scores tab"; vault "Formula 1"'],
   [/ufc|UfcCard/i, 'vault "UFC" (the README has no UFC section); PATCH_NOTES.md "UFC"'],
   [/revisions/i, 'README "Real-time" → "Football plays ESPN changes"; vault "Football play revisions"'],
