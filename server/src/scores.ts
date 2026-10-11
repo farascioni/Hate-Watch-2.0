@@ -20,7 +20,15 @@ export const scoresDeps = {
 type TeamDto = ReturnType<typeof teamDto>;
 /** `rank`: college football, a team's in the top 25 (ESPN's ranking on the scoreboard; its name on the card says it too, "#8 Indiana"). */
 export interface Side { team: TeamDto; score: number | null; winner?: boolean; rank?: number }
-export interface Driver { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }
+export interface Driver {
+  athleteId: string; key: string; name: string; position: number | null; teamKey?: string;
+  // A race or sprint, from ESPN's timing (f1.ts withBoard), on newer servers:
+  grid?: number;      // where they started
+  pits?: number;      // pit stops so far
+  gap?: string;       // while it runs: to the leader ("+8.975", "+1:17.979", "+1 lap"); the leader has none
+  interval?: string;  // while it runs: to the car ahead, on the lead lap ("+0.649")
+  out?: string;       // out of it: "Retired, lap 7", "Disqualified"
+}
 /** MLB: who's pitching and who's up. `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K"; batter "0-2" today). */
 export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
 export interface GameCard {
@@ -54,6 +62,9 @@ export interface GameCard {
   session?: string;       // F1: "Singapore GP · Race"
   eventId?: string;       // F1: the race weekend (its preview: /f1/events/:id/preview)
   order?: Driver[];       // F1: running order / classification
+  lap?: number;           // F1, while a race or sprint runs: the leader's lap, of `laps`
+  laps?: number;
+  flag?: string;          // F1, while it runs: the track's flag when it isn't green, as ESPN has it ("Safety car")
   /** Before the start: each side's chance from the betting line, the line, records and probable starters. */
   preview?: GamePreview;
 }
@@ -343,6 +354,7 @@ export function raceCard(ev: any, comp: any): GameCard {
     detail: state === 'in' ? (lap ? `Lap ${lap}` : 'Live') : state === 'post' ? 'Final' : '',
     session: `${ev.shortName ?? ev.name} · ${sessionName(comp)}`,
     order,
+    ...(state === 'in' && lap ? { lap } : {}),
   };
 }
 

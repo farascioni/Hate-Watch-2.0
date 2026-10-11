@@ -79,9 +79,21 @@ export interface GameCard {
   session?: string;
   /** F1: the race weekend, for its preview (newer servers). */
   eventId?: string;
-  order?: { athleteId: string; key: string; name: string; position: number | null; teamKey?: string }[];
+  order?: RaceDriver[];
+  /** F1, while a race or sprint runs (newer servers): the leader's lap of how many, and the track's flag when it isn't green ("Safety car"). */
+  lap?: number; laps?: number; flag?: string;
   /** Before the start (from ESPN's scoreboard). Missing from older servers. */
   preview?: GamePreview;
+}
+/** One car in an F1 session's running order. Newer servers add a race's or sprint's timing. */
+export interface RaceDriver {
+  athleteId: string; key: string; name: string; position: number | null; teamKey?: string;
+  /** Where they started, and their pit stops so far. */
+  grid?: number; pits?: number;
+  /** While it runs: the gap to the leader ("+8.975", "+1 lap"; the leader has none), and to the car ahead on the lead lap ("+0.649"). */
+  gap?: string; interval?: string;
+  /** Out of it: "Retired on lap 7", "Disqualified". */
+  out?: string;
 }
 /** A game that hasn't started: chances from the betting line, records, probable starters, form, series. */
 export interface GamePreview {

@@ -1,4 +1,4 @@
-import type { GameCard, GameSide, Target } from './types';
+import type { GameCard, GameSide, RaceDriver, Target } from './types';
 import { isFootball } from './leagueUi';
 
 // Scores tab helpers: which side of a game you hate, and how it's going for them.
@@ -19,6 +19,17 @@ export const trackedPlayers = (g: GameCard, side: Side, follows: Map<string, Tar
 /** F1: the drivers you track, or the cars of a constructor you track. */
 export const trackedDrivers = (g: GameCard, follows: Map<string, Target>) =>
   (g.order ?? []).filter((d) => follows.has(d.key) || (!!d.teamKey && follows.has(d.teamKey)));
+
+/** F1: a car's places since the start, "▲10 from P19", "▼3 from P4", "Started P1", read out in words. None out of it, or without a grid slot. */
+export function fromGrid(d: RaceDriver): { text: string; label: string; lost: boolean } | null {
+  if (!d.grid || !d.position || d.out) return null;
+  const n = d.grid - d.position, places = (k: number) => `${k} place${k === 1 ? '' : 's'}`;
+  if (n > 0) return { text: `▲${n} from P${d.grid}`, label: `up ${places(n)} from P${d.grid}`, lost: false };
+  if (n < 0) return { text: `▼${-n} from P${d.grid}`, label: `down ${places(-n)} from P${d.grid}`, lost: true };
+  return { text: `Started P${d.grid}`, label: `started P${d.grid}`, lost: false };
+}
+/** F1: "1 stop", "2 stops" (none before the first). */
+export const stopsText = (pits?: number) => (pits ? `${pits} stop${pits === 1 ? '' : 's'}` : null);
 
 export type Tone = 'good' | 'warn' | 'neutral' | 'done';
 /**

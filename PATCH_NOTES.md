@@ -16,21 +16,24 @@ SCORES
 UFC
 - Track UFC fighters: a loss says how, with lines for losing as the favorite or a losing streak; also a knockdown (live) and their walk-out. (Server)
 - With the UFC chip on, Scores has the next card: All fights with the odds, then the card after; My fights is yours. Results come in as fights end.
-- A card's preview, from Scores: one fight in full, with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five.
+- A card's preview, from Scores: one fight in full: the odds and how, the tale of the tape, both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
 - A loss by a finish says how and when (KO/TKO R1 1:20); a title fight says the title was lost. (Server)
 - A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
 - Women's weight classes are named in full. (Server)
 
 F1
-- Sprints get their alerts (lights out, a car retiring, the result); a driver's teammate is whoever drove the other car that weekend. (Server)
+- Sprints get their alerts; a driver's teammate is whoever drove the other car that weekend. (Server)
 - Lights out is one alert naming yours. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
 - Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. (Server)
-- Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, teammate battle, last five races.
+- Drivers and constructors have a Stats tab.
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
-- Before an F1 session, its screen previews the weekend: circuit, sessions, grid, championship.
-- With the F1 chip on, Scores has Live and Upcoming races, a race's grid once set. An F1 session's screen says "Your alerts from this race".
+- Before an F1 session, its screen previews the weekend.
+- With the F1 chip on, Scores has Live and Upcoming races.
+- A live race shows its lap of how many, and any flag but green. (Server)
+- A race's running order shows each car's gap, places from the grid and stops; its card, your drivers'.
+- Live: your driver lapped or 3+ places down from the grid; pit stops in the feed. (Server)
 
 FOOTBALL
 - A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank ("#8 Indiana"). (Server)

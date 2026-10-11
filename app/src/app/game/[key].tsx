@@ -10,9 +10,10 @@ import { FeedCard } from '../../components/FeedCard';
 import { BoxScoreView } from '../../components/BoxScore';
 import { HighlightsView } from '../../components/Highlights';
 import { F1PreviewView } from '../../components/F1Preview';
+import { RaceOrder } from '../../components/RaceOrder';
 import { Empty, SectionHeader, useNow } from '../../components/ui';
 import { trackedDrivers } from '../../lib/scores';
-import { colors, radius, space } from '../../theme';
+import { colors, space } from '../../theme';
 import type { F1Preview, FeedItem, GameDetail } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
 
@@ -21,7 +22,7 @@ const ALERTS_OPEN_KEY = 'game:alertsOpen';
 
 /**
  * One game from the Scores tab: the live score card, the box score and the highlights (ESPN's clips and the
- * key plays) as tabs (F1: the running order; before the session starts, the weekend's preview), then your
+ * key plays) as tabs (F1: the running order with its gaps and stops; before the session starts, the weekend's preview), then your
  * alerts from this game, which you can minimize. The card stays live over the socket; the box score and
  * highlights refresh every 15s while live.
  */
@@ -79,15 +80,8 @@ export default function GameScreen() {
           <F1PreviewView preview={preview} current={game.key} />
         ) : game.league === 'f1' ? (
           <>
-            <SectionHeader>Running order</SectionHeader>
-            <View style={styles.list}>
-              {(game.order ?? []).map((d) => (
-                <View key={d.key} style={[styles.line, mine.has(d.key) && styles.mine]}>
-                  <Text style={styles.when}>{d.position ? `P${d.position}` : '–'}</Text>
-                  <Text style={[styles.text, mine.has(d.key) && { color: colors.text, fontWeight: '800' }]}>{d.name}</Text>
-                </View>
-              ))}
-            </View>
+            <SectionHeader>{game.state === 'post' ? 'Results' : 'Running order'}</SectionHeader>
+            <RaceOrder game={game} mine={mine} />
           </>
         ) : (
           <>
@@ -127,11 +121,6 @@ const styles = StyleSheet.create({
   // Your alerts: the section's title and a chevron, the whole row a button that minimizes it.
   alertsHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: space(2) },
   alertsChevron: { paddingRight: space(4), paddingBottom: space(2) },
-  list: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  line: { flexDirection: 'row', gap: space(3), paddingHorizontal: space(3), paddingVertical: space(2.5), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  mine: { backgroundColor: colors.hateDim },
-  when: { color: colors.textFaint, fontSize: 12, fontWeight: '700', width: 64 },
-  text: { color: colors.textDim, fontSize: 14, lineHeight: 19, flex: 1 },
   // Box score and play by play: edge-to-edge tabs, the open one underlined in red (as on a player's page).
   tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, marginTop: space(4), marginBottom: space(3) },
   tab: { flex: 1, alignItems: 'center', paddingVertical: space(3), borderBottomWidth: 2, borderBottomColor: 'transparent', marginBottom: -StyleSheet.hairlineWidth },

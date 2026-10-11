@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
-import { hateTag, loseChance, statusLine, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
+import { fromGrid, hateTag, loseChance, statusLine, stopsText, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
 import { colors, radius, space } from '../theme';
 import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
@@ -104,9 +104,17 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   );
 }
 
+/**
+ * An F1 session: its name, the lap of how many with a bar (newer servers), the track's flag when it isn't green,
+ * and your drivers: where they are, their places since the start, gap to the leader and stops, or when they went out.
+ */
 function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
   const { follows } = useStore();
   const mine = trackedDrivers(game, follows);
+  // The server's status line names the flag too, for builds without the pill.
+  const line = game.flag ? statusLine(game).replace(` · ${game.flag}`, '') : statusLine(game);
+  // A red flag stops the race (good news, here); the chequered flag ends it; the rest slow it.
+  const flagTone = !game.flag ? TONE.neutral : /red/i.test(game.flag) ? TONE.good : /cheq|check/i.test(game.flag) ? TONE.neutral : TONE.warn;
   return (
     <>
       <View style={styles.inline}>
@@ -114,14 +122,34 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
         {/* Names and titles wrap rather than cut off, for large text sizes ("Singapore Airlines Singapore Grand Prix · Race"). */}
         <Text style={[styles.teamName, big && { fontSize: 18 }]}>{game.session}</Text>
       </View>
-      <Text style={styles.metaText}>{statusLine(game)}</Text>
-      {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
-      {mine.map((d) => (
-        <View key={d.key} style={styles.meta}>
-          <Text style={styles.teamName}>{d.name}</Text>
-          <Text style={styles.score}>{d.position ? `P${d.position}` : '–'}</Text>
+      <View style={[styles.inline, { flexWrap: 'wrap' }]}>
+        <Text style={styles.metaText}>{line}</Text>
+        {game.flag && game.state === 'in' ? <View style={[styles.pill, { backgroundColor: flagTone.bg }]}><Text style={[styles.pillText, { color: flagTone.fg }]}>{game.flag}</Text></View> : null}
+      </View>
+      {game.state === 'in' && game.lap && game.laps ? (
+        <View style={styles.bar} accessibilityLabel={`Lap ${game.lap} of ${game.laps}`}>
+          <View style={[styles.barFill, styles.lapFill, { width: `${Math.min(100, Math.round((game.lap / game.laps) * 100))}%` }]} />
         </View>
-      ))}
+      ) : null}
+      {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
+      {mine.map((d) => {
+        const grid = fromGrid(d);
+        const rest = [game.state === 'in' ? d.gap : null, stopsText(d.pits)].filter(Boolean).join(' · ');
+        return (
+          <View key={d.key} style={{ gap: 1 }}>
+            <View style={styles.meta}>
+              <Text style={styles.teamName}>{d.name}</Text>
+              <Text style={styles.score}>{d.position ? `P${d.position}` : '–'}</Text>
+            </View>
+            {d.out ? <Text style={[styles.atBat, styles.down]}>{d.out}</Text>
+              : grid || rest ? (
+                <Text style={styles.atBat}>
+                  {grid ? <Text style={grid.lost ? styles.down : undefined}>{grid.text}</Text> : null}{grid && rest ? ' · ' : ''}{rest}
+                </Text>
+              ) : null}
+          </View>
+        );
+      })}
     </>
   );
 }
@@ -235,6 +263,9 @@ const styles = StyleSheet.create({
   pillText: { fontSize: 12, fontWeight: '800' },
   bar: { height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
   barFill: { height: '100%', backgroundColor: colors.hate },
+  lapFill: { backgroundColor: colors.textDim },
+  // F1: a driver's places lost, or out of it: their bad afternoon, in the colour of good news here.
+  down: { color: '#FF8A8F', fontWeight: '700' },
   alert: { color: colors.textDim, fontSize: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: space(2) },
   diamond: { width: 30, height: 22, position: 'relative' },
   base: { position: 'absolute', width: 9, height: 9, borderWidth: 1, borderColor: colors.textDim, transform: [{ rotate: '45deg' }] },

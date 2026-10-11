@@ -97,6 +97,12 @@ export const urls = {
   f1Competitors: (eventId: string, compId: string) => `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/competitors?limit=50`,
   f1Status: (eventId: string, compId: string, athleteId: string) =>
     `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/competitors/${athleteId}/status`,
+  /** A car's timing in a session: its place, gap to the leader, laps behind and pit stops. */
+  f1CarStats: (eventId: string, compId: string, athleteId: string) =>
+    `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/competitors/${athleteId}/statistics`,
+  /** A session's status (the lap, and the track's flag) and its statistics (how many laps it runs). */
+  f1SessionStatus: (eventId: string, compId: string) => `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/status`,
+  f1SessionStats: (eventId: string, compId: string) => `${CORE}/racing/leagues/f1/events/${eventId}/competitions/${compId}/statistics`,
   // Soccer's are all in one folder, whatever the league.
   headshot: (lg: League, athleteId: string) => `https://a.espncdn.com/i/headshots/${SOCCER.has(lg) ? 'soccer' : lg === 'ufc' ? 'mma' : lg}/players/full/${athleteId}.png`,
   /** The UFC (ESPN's MMA): a fight's record on the core API (status and result, fighters' stats, odds), a fighter's (record, fight log), and the rankings. */
