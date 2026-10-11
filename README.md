@@ -188,15 +188,34 @@ The contact email on those pages comes from `HW_CONTACT_EMAIL` in `server/fly.to
 
 ### Donations (in-app tips)
 
-Settings → **Support Hate Watch** has a Donate button that offers three tip sizes. Tips are **consumable in-app purchases** via [`expo-iap`](https://openiap.dev/docs/setup/expo). Apple allows "tipping the developer" through in-app purchase in every country (guideline 3.1.1); external payment links would only be allowed on the US App Store. Tips unlock nothing, and our server never sees the payment.
+**In short:** Settings → **Support Hate Watch** has a Donate button that offers three tip sizes, sold as **consumable in-app purchases** through [`expo-iap`](https://openiap.dev/docs/setup/expo) (`app/src/lib/tips.ts`, `app/src/components/TipJar.tsx`, `TipJarStore.tsx`). Tips unlock nothing, can be bought again, and never touch our server: Apple and Google handle the payment. They work only in development and store builds; in Expo Go and on web the button explains that instead. Before they work, App Store Connect and Google Play need the agreements and the three products below.
 
-The product IDs are defined in `app/src/lib/tips.ts`:
+Apple allows "tipping the developer" through in-app purchase in every country (guideline 3.1.1); external payment links would only be allowed on the US App Store.
 
-| Product ID | Suggested price |
-|---|---|
-| `com.hatewatch.app.tip.coffee` | $1.99 |
-| `com.hatewatch.app.tip.pizza` | $4.99 |
-| `com.hatewatch.app.tip.trophy` | $9.99 |
+**What you see** (`DonateCard`): a card under the "Support Hate Watch" heading with a red "Donate" button (with a heart) and under it "Servers cost money and I'd like to keep the app ad free!" (a non-breaking space keeps "ad free!" together).
+
+**In a store or development build** (`TipJarStore`, used when `iapAvailable`):
+
+1. When the store connection is up, the app asks it for the three products (`fetchProducts`, type `in-app`).
+2. Tapping Donate swaps the button for one button per product the store returned, each with its emoji (coffee, pizza, trophy) and the store's localized price (`displayPrice`), and "Maybe later" under them, which puts the Donate button back.
+   - If no product came back: "Donations aren't available right now. Please try again later." when the store is connected, or "Can't reach the App Store right now. Please try again in a moment." when it isn't.
+3. Tapping a price starts the purchase (`requestPurchase`: `apple: { sku }`, `google: { skus: [sku] }`). That button shows a spinner and the others fade and can't be tapped until it's over.
+4. On success (`onPurchaseSuccess`, for these three product ids only) the app finishes the transaction as consumable (`finishTransaction({ isConsumable: true })`), which lets the same tip be bought again and stops Android's automatic refund after 3 days for an unacknowledged purchase. Then a success haptic and "Thank you!", "You just helped keep Hate Watch running, and ad free." The same callback fires on launch for a tip that was paid but never finished (the app was killed mid-purchase), so it gets finished then.
+5. Cancelling says nothing. Any other failure: "Donation didn't go through" with the store's message, or "Please try again."
+
+**In Expo Go and on web** (`TipJar`): there's no store to pay through, and importing `expo-iap` without its native module crashes the app, so `iapAvailable` (`Platform.OS !== 'web'` and `requireOptionalNativeModule('ExpoIap')` present) decides first, and `TipJarStore` is only `require`d when it's true. Otherwise the Donate button shows "Donations work in the App Store and Google Play versions of Hate Watch." (a system alert, or the browser's).
+
+**Setup in the app:** `expo-iap` is a dependency (`^5.8.2` in `app/package.json`) and a config plugin in `app/app.json`.
+
+The product IDs are defined in `app/src/lib/tips.ts` (`TIPS`, in this order on screen):
+
+| Product ID | Suggested price | Shown as |
+|---|---|---|
+| `com.hatewatch.app.tip.coffee` | $1.99 | coffee |
+| `com.hatewatch.app.tip.pizza` | $4.99 | pizza |
+| `com.hatewatch.app.tip.trophy` | $9.99 | trophy |
+
+The prices are set in App Store Connect and Google Play, not in the app; the app always shows the store's localized price.
 
 (`tip.small`, `tip.medium` and `tip.large` are burned: they were created as Non-Consumable, and App Store Connect can't change a product's type or reuse a product ID.)
 
@@ -208,19 +227,25 @@ The product IDs are defined in `app/src/lib/tips.ts`:
 4. **Google Play Console:** set up a payments profile, upload a build (the billing permission is added automatically), then create the same three IDs under **Monetize → Products → In-app products** and activate them.
 5. **Test with sandbox accounts.** On iOS, add a Sandbox tester in App Store Connect and buy through TestFlight. On Android, add a license tester.
 
-The Donate button needs a development or store build. In Expo Go and on web there's no store to pay through, so the button explains that instead. Apple and Google keep 15% under their small-business programs. Privacy label: purchases aren't collected by us, because Apple and Google handle them.
+Apple and Google keep 15% under their small-business programs. Privacy label: purchases aren't collected by us, because Apple and Google handle them.
 
 ### Icons and splash
 
-The artwork is an angry eye. Every icon is generated from vector source in [`app/scripts/build-icons.mjs`](app/scripts/build-icons.mjs):
+**In short:** The artwork is an angry eye: a red iris with a black pupil and a white glint in a white eye, under a tapered red brow that bears down toward it, on a near-black background with a dark red glow. Every icon and the splash image are drawn from that one vector mark by [`app/scripts/build-icons.mjs`](app/scripts/build-icons.mjs), which renders SVG to PNG with `@resvg/resvg-js` into `app/assets/`. After editing the script, regenerate with `cd app && npm run icons`.
 
-- the iOS 1024 px icon (opaque, as Apple requires)
-- the Android adaptive foreground, background and monochrome layers
-- the Android notification icon
-- the splash image
-- the web favicon
+**The mark** (`mark()`): drawn centred on (0, 0) about 690 units wide, so it fits a 1024 canvas at scale 1, and shifted down a little (`47 × scale`) so the brow and eye together look centred. The colours: background `#0B0B0D`, red `#E5232B`, eye white `#F4F4F5`, the iris ringed in dark red `#7A0D12`. The brow is thin at the outer end and thick where it meets the eye, which makes the scowl. The full-colour background is a radial gradient from `#3B0D12` through `#170A0C` to `#0B0B0D`. The one-colour version (`mono`) is white on transparent, with the iris cut out of the eye and the pupil left, for places that only use the shape.
 
-After editing the script, regenerate with `cd app && npm run icons`.
+**What it writes** (each line `render(file, options, pixels)`; the script prints each file and its size):
+
+| File | Size | What it is | Used by (`app/app.json`) |
+|---|---|---|---|
+| `icon.png` | 1024×1024 | full colour on the gradient, opaque and full bleed, as Apple requires (iOS applies its own mask) | `icon` |
+| `android-icon-background.png` | 1024×1024 | the gradient alone | `android.adaptiveIcon.backgroundImage` (with `backgroundColor` `#0B0B0D`) |
+| `android-icon-foreground.png` | 1024×1024 | the mark at 0.8 scale on transparent, inside the adaptive icon's safe zone (the inner 66%) | `android.adaptiveIcon.foregroundImage` |
+| `android-icon-monochrome.png` | 1024×1024 | the one-colour mark at 0.8 scale: Android 13's themed icon | `android.adaptiveIcon.monochromeImage` |
+| `splash-icon.png` | 1024×1024 | the mark at 1.2 scale on transparent | the `expo-splash-screen` plugin: `imageWidth` 220, `resizeMode` contain, on `#0B0B0D` |
+| `favicon.png` | 48×48 | full colour on the gradient | `web.favicon` |
+| `notification-icon.png` | 96×96 | the one-colour mark at 1.35 scale: white on transparent for Android's status bar | the `expo-notifications` plugin's `icon`, tinted `#E5232B`, channel `hate-events` |
 
 ## Data: rosters, duplicates, and images
 
@@ -397,80 +422,260 @@ A homer counts as "gives up runs" too, so turning off "gives up a HR" alone won'
 
 ## Scores tab
 
-**My games | All games:** a switch at the top of the tab. My games is described below. All games is every game live right now, then every one starting in the next 24 hours, whether you track a team in it or not. Each is grouped by league in the league chips' order ("NBA · 3 live", "NHL · 10 upcoming"), soonest first. The league chips filter it too, and the switch shows how many are live ("All games · 9 live"). The server already makes a card for every game on each league's scoreboard (read every 10s), so this is `allGames()` in `scores.ts`, served at `GET /me/scores/all`. Score pushes go only to devices that track a side, so the app re-reads the list every 15 seconds while All games is open, and uses the pushed copy of any game you do track. Tapping a game opens its game screen, tracked or not.
+**In short:** The Scores tab lists games. "My games" is today's games for the teams you track and the teams of the players you track (live first, then later today, then finals, each kept for 24 hours after it ends), followed by "Up next", each tracked team's next game. "All games" is every game live now or starting in the next 24 hours, whether you track anyone in it or not. The cards come from the server's ESPN scoreboard reads every 10 seconds, with scores and details patched in sooner by the 2-second game tracker, and every change is pushed over the WebSocket to the devices that track a side; tapping a card opens its game screen, with the live card, the box score and highlights, and your alerts from that game.
 
-**Before a game starts**, its card is a preview, from the same scoreboard read (`gamePreview` in `scores.ts`, no extra requests): each team's record under its name (with the home side's record at home and the away side's on the road; a 0-0 record isn't shown), and its chance to win where the score will be, under one "Win %" label at the top of the card. The chances come from the moneyline with the bookmaker's margin taken out (`lineChances`: each price's implied chance divided by their total, so CLE -115 / CHW -104 is 51% / 49%; soccer's three-way line gives the draw too), in whole percents adding up to 100. Under the card: MLB probable pitchers with their record and ERA ("P. Messick (0-1, 4.15 ERA)"), NHL probable goalies, the line and over/under with whose it is ("Odds (DraftKings): CLE -115 · O/U 7", plus "Draw 19%" in soccer), soccer form, and a playoff series ("CHW lead series 2-1"). A tracked side gets "Chance the Guardians lose" with its bar, from the other side's chance, the same line live games have from ESPN's win probability.
+**The switch at the top** (`app/src/app/(tabs)/scores.tsx`). Two segments, "My …" and "All …". The word is the server's word for what the league chip shows (`eventsWord`, from each league's `ui.events` in `server/src/leagues.ts`): "games" for the NBA, MLB, NFL, NHL, EPL, college football and the WNBA, "fights" for the UFC, and "events" with All picked, since that mixes leagues. So with MLB picked it reads "My games | All games · 3 live", and with All, "My events | All events · 9 live". The "· N live" count is how many games in the All list are live for the chip that's picked, shown in either view because the tab reads the All list on every visit. Under the switch is the league filter (`FilterBar`, without Everything / Teams / Players). F1's and the UFC's chips replace the switch with views of their own (below).
 
-The second tab lists today's games for the teams you track and the teams of players you track. Live games come first, then later today, then finals. Each final stays for 24 hours after it ends, so the last game a team played is still there the next day ("Final · Yesterday"). Every game shows, so both halves of a doubleheader are there, labelled from ESPN's note ("Doubleheader - Game 1 - Makeup from May 23" → "Game 1 · Final", "Game 2 · 7:05 PM").
+**My games, step by step.**
 
-- **When a final ends:** the server records the moment it sees a game go final (`endedAt`). For one already over when first seen (after a restart), it uses a typical game length after the start (MLB 3h, NFL 3¼h, NBA 2¼h, NHL 2½h, F1 2h; `GAME_LENGTH_MS`). The app applies the same 24-hour rule on its own clock, so a final drops off even with the tab open.
-- **Yesterday's games:** ESPN's scoreboard rolls over to the new day, and a restart forgets what the server had seen. So every 10 minutes it also reads yesterday's scoreboard (ESPN's date, US Eastern) for finals it doesn't have (`scanYesterday` in `live.ts`). Games are forgotten once they're off the scoreboard, a day and a half past their start, and off the tab. Each card shows the score, clock or inning, the NFL down and distance, MLB bases and outs, and a status pill from the hater's side:
+- The server decides which games are yours: `deviceTeams` in `server/src/scores.ts` takes every team the device follows, plus the team of every player it follows, unless that player's "Show their team's games" switch is off (`playerTeams[playerKey].scores === false` in prefs). Any F1 follow (a driver or a constructor) adds every F1 session. The answer is cached for 5 seconds per device and dropped on every follow, unfollow (`forgetDeviceTeams` in `PUT`/`DELETE /me/follows/:key`) and `playerTeams` change in `PUT /me/prefs`, so the tab changes at once.
+- `gamesFor` keeps the cards that involve one of those teams and are in the window (`inWindow`): live, or starting within 24 hours, or final for less than 24 hours (`KEEP_FINALS_MS`). It sorts live first, then upcoming (soonest first), then finals (newest start first).
+- The app shows them in three sections, "Live now", "Later today" and "Final" (`SECTION` in `app/src/lib/scores.ts`), each with its count ("Live now · 2"), filtered by the league chip. The app applies the same 24-hour window on its own clock (`inWindow` in `app/src/lib/scores.ts`, re-checked every tick of `useNow`), so a final drops off even while the tab stays open.
+- Every game shows, so both halves of a doubleheader are there. ESPN's note ("Doubleheader - Game 1 - Makeup from May 23") becomes the card's `note`, "Game 1", and the status line starts with it: "Game 1 · Final", "Game 2 · 7:05 PM" (`statusLine`).
+- A final from a day before today says which day: "Final · Yesterday", or the weekday ("Final · Sun") (`dayLabel`).
+- Then "Up next" (below). On a day with no games for the chip, that list is the whole screen, under a line in the chip's word: "No NFL games today.", or "No events today." with All. The line is left out when the first Up next game is today: a game tonight can be in Up next before ESPN's scoreboard turns over to the new day.
+- With nothing at all: tracking nobody shows "Nobody to hate yet" with a "Find someone to hate" button that opens Search; tracking only F1 (or the F1 chip) shows the F1 message (below); otherwise "No NHL games today" ("No events today" with All), "When a team you track, or a player's team, plays today, the game shows up here with the live score."
 
-- **"Down 7" (red):** good news.
-- **"Threatening" (amber):** the team you hate is in a spot to score (NFL red zone, or a runner in scoring position while they bat).
-- **"Up 3" / "Tied" (grey).**
-- **"Successful Hate Watch!" (finals).**
+**All games.** `GET /me/scores/all` returns `allGames()`: every card the server holds that is live, or upcoming and starting within 24 hours, tracked or not (finals are left out). It's sorted live first, then upcoming, then by league in the server's league order (`LEAGUE_IDS`: NBA, MLB, NFL, NHL, F1, EPL, UFC, CFB, with the WNBA always last), then by start. The app groups them the same way, live by league, then upcoming by league, under headers like "NBA · 3 live" and "NHL · 10 upcoming", in the league chips' order. The server only pushes a game to devices that track a side, so while All games is open (or the F1 chip is on) the app re-reads the list every 15 seconds (`ALL_GAMES_MS`), and for any game you do track it uses the store's socket-fed copy, which is fresher. A game that went final since the last read drops off. Tapping a game opens its game screen, tracked or not. Empty, in the chip's word: "No NBA games today", "Every game that's live or starts in the next 24 hours shows up here, whether you track anyone in it or not." (with All: "No events today", "Every event that's live…").
 
-Live MLB cards also show the count next to the bases and outs, plus two lines: "Pitching: S. Armstrong, 6 pitches" and "At bat: M. Murakami, 1 for 3, RBI, K". Tracked players' names show in red, and the game screen adds the pitcher's full line ("0.1 IP, 0 ER, 0 H, 0 BB"). The pitcher, batter, their lines and the count come from the scoreboard's `situation`, which leaves them out between innings. Pitches thrown come from the summary's box score ("PC", or the first half of "PC-ST") that the 2s tracker already reads (`boxPitchCounts`), matched to the current pitcher's id, so a pitching change shows the new pitcher's own count.
+**A card, top to bottom** (`GameCardView` in `app/src/components/GameCard.tsx`):
 
-The other sports get their own lines under the score (`LiveDetails` in `app/src/components/GameCard.tsx`). Tracked players show in red there too:
+- **The two teams**, away first. Each row has the logo and the short name (both open the team's page; VoiceOver offers "Open the Falcons page" as an action on the card), "Tracking" next to a team you track, the names of tracked players on a side you only track through them ("Bryce Harper"), and the score. A side you don't track, and the side that lost a final, have their name or score dimmed. College football teams in the top 25 carry their rank in the name ("#8 Indiana", `rankOf`; ESPN's 99 means unranked).
+- **The status line**: the start time before a game ("8:15 PM" today, "Tue 8:15 PM" otherwise), ESPN's short status while live ("Q4 - 2:14", "Bot 8th"), and for football the ball and the down ("Q3 - 4:12 · ATL ball, 3rd & 8 at NO 41").
+- **MLB's bases, outs and count** next to the status line: a diamond with the occupied bases filled, two out lights, and the count ("2-1").
+- **The status pill**, from the hater's side (`hateTag`). Only when exactly one side is yours: hating both sides of a game gets no pill.
+  - "Down 7" (red): good news.
+  - "Threatening" (amber): the team you hate is in a spot to score: in football, in the red zone with the ball; in MLB, batting with a runner on second or third.
+  - "Up 3" or "Tied" (grey).
+  - Finals: "Successful Hate Watch!" (green) when they lost, "They won" or "Tie" (grey) otherwise.
+- **"N other hate watchers"** under a final that gave you a Successful Hate Watch (see the counter section): `withHateWatch` in `server/src/hate-watches.ts` adds `hateWatch.alsoGot` to this device's copy of the card. Score frames over the socket are everyone's copy, so the app keeps its own count on the card when they arrive (`frame.kind === 'score'` in `app/src/lib/store.tsx`).
+- **Live details** (`LiveDetails`), names of players you track in red:
+  - **MLB:** "Pitching: S. Armstrong, 6 pitches" and "At bat: M. Murakami, 1 for 3, RBI, K". The pitcher, batter, their lines and the count come from the scoreboard's `situation`, which leaves them out between innings ("Mid 5th", "End 4th": nobody is batting then). ESPN's batter line "1-3" reads "1 for 3". Pitches thrown come from the summary's box score that the 2-second tracker already reads ("PC", or the first half of "PC-ST", `boxPitchCounts`), matched to the current pitcher's id, so a pitching change shows the new pitcher's own count. When there's no pitch count, and always on the game screen, the pitcher's line follows ("0.1 IP, 0 ER, 0 H, 0 BB").
+  - **NBA, WNBA:** "Top scorers: T. Jerome 10 pts · N. Alexander-Walker 12 pts", from each competitor's `leaders` on the scoreboard (`leader`).
+  - **NFL, college football:** "Timeouts left: ATL 3 · NO 3" while live, from `situation`, and the passer for the team with the ball ("Passing: T. Shough, 0/1, 0 YDS"; "1 TD" and "1 INT" are added once there are any). The game screen shows both passers. Once a game kicks off the scoreboard only names one passing leader for the whole game, so each side's passer (whoever has the most attempts) comes from the box score the tracker reads (`boxPassers`). The card keeps it through the final.
+  - **NHL:** "Shots on goal: OTT 6 · BOS 3" and "In net: L. Ullmark (3 saves on 3) · J. Swayman (4 saves on 6)". The scoreboard only has each team's saves, so a side's shots on goal are the other side's saves plus its own goals. The goalie and their saves come from the box score (`boxGoalies`): the goalie the tracker has in net, so a change shows the new one, or else the last goalie the box lists. Scoreboard reads don't carry goalies, so the card keeps the last ones through the final.
+  - **Soccer:** "Shots on target: LIV 3 · BOU 2" and, once anyone's been sent off, "Red cards 🟥 IPS 1 · EVE 0", from the scoreboard's statistics and match details.
+  - **Every league but MLB:** "Last play: …" while live: ESPN's text for the latest play, skipping "Start of …", "End of …" and "Official Timeout". In soccer it's the latest goal or card with its minute ("Last play: 63' Own Goal: L. Martínez").
+- **Before the start, a preview** (`gamePreview` in `server/src/scores.ts`, from the same scoreboard read, no extra requests):
+  - Each team's record under its name, with the home side's record at home and the away side's on the road ("84-78 · 48-33 at home", "85-77 · 44-37 away"). A 0-0 record isn't shown, so a team before its first game has none.
+  - Its chance to win where the score will go, under one "Win %" label at the top of the card. The chances come from the moneyline with the bookmaker's margin taken out (`lineChances`): each price's implied chance (a price of -115 is 115/215, +380 is 100/480, "EVEN" is 50%), divided by their total, rounded to whole percents, with the favourite taking any rounding leftover so they add up to 100. CLE -115 / CHW -104 is 51% / 49%; DAL -500 / TB +380 is 80% / 20%; a soccer line of -260 / +700 with the draw at +400 is 69% / 12% and a 19% draw. With no price for one side there are no chances.
+  - Under the card: "Probable pitchers: P. Messick (0-1, 4.15 ERA) · H. Smith (0-0, 1.42 ERA)" in MLB, "Probable goalies" in the NHL ("TBD" for a side ESPN hasn't named); the line and over/under with whose it is ("Odds (DraftKings): CLE -115 · O/U 7", plus "Draw 19%" in soccer); soccer's form ("Form: LIV LWWWW · BOU WDLWW"); and a playoff series ("CHW lead series 2-1").
+  - A card with nothing to say (a preseason game with no line and 0-0 records) has no preview.
+- **"Chance the Guardians lose"** with a bar, when you track one side (`loseChance`): live, it's 1 minus ESPN's win probability for that side, where ESPN publishes it; before the start, the other side's chance from the line (in soccer a draw isn't a loss, so it's only the other side's win). Win probability comes from the scoreboard's last play and from the summary the 2-second tracker reads (`patchGame`), rounded to a tenth of a percent so float noise doesn't count as a change.
+- **The newest alert from that game** at the bottom, its emoji, title and how long ago, from the feed (`latest` in `scores.tsx`).
+- Finals are drawn a little faded.
 
-- **NBA, WNBA:** "Top scorers: T. Jerome 10 pts · N. Alexander-Walker 12 pts", from each competitor's `leaders` on the scoreboard (the game's points leader once it starts).
-- **NFL:** "Timeouts left: ATL 3 · NO 3" from `situation`, and the passer for the team with the ball ("Passing: T. Shough, 0/1, 0 YDS"; TD and INT are added once there are any). The game screen shows both passers. Once a game kicks off, the scoreboard only names one passing leader for the whole game, so each side's passer (whoever has the most attempts) comes from the summary's box score that the 2s tracker reads (`boxPassers`). It's kept through the final.
-- **Soccer:** "Shots on target: LIV 3 · BOU 2" and, once anyone's been sent off, "Red cards 🟥 IPS 1 · EVE 0", from the scoreboard's stats and match details. Its last play is the latest goal or card ("Last play: 63' Own Goal: L. Martínez"). The game screen's play list is the key events with their minute.
-- **NHL:** "Shots on goal: OTT 6 · BOS 3" and "In net: L. Ullmark (3 saves on 3) · J. Swayman (4 saves on 6)". The scoreboard only has each team's saves, so shots on goal are the other side's saves plus their goals. The goalie in net and their saves come from the summary's box score that the 2s tracker already reads (`boxGoalies`). It's the goalie the tracker has in net (so a change shows the new goalie), or else the last goalie the box lists. Scoreboard reads don't carry goalies, so the line stays on the card through the final.
-- **NBA, WNBA, NFL, NHL:** "Last play: …", ESPN's text for the latest play while the game is live ("Start of …", "End of …" and "Official Timeout" are skipped).
-- Checked live on 2026-10-05 against MEM @ ATL, OTT @ BOS and ATL @ NO.
+**F1 on the Scores tab.** A session card (race, sprint or qualifying, `raceCard`) shows the session ("Singapore GP · Race"), its status ("Lap 56", "Final"), the flag when it isn't green as a pill ("Safety car"; a red flag is drawn as good news), a lap bar ("Lap 56 of 62", newer servers), and for each driver you track (or both cars of a constructor you track) their place, then their places since the start, gap to the leader and stops ("▲10 from P19 · +1:24.603 · 1 stop", `fromGrid` and `stopsText`), or how they went out ("Retired, lap 7"). Any F1 follow shows every session. With the F1 chip on, the switch is "Live races | Upcoming races" instead: Live races is what's running, then finals from the last 24 hours; Upcoming races is the weekend's qualifying, sprint and race still to come (practice isn't shown), each a card once the server has it and otherwise a row with its day and time that opens the weekend's preview, with the grid under a sprint or race once ESPN has set it ("Grid set after Qualifying." until then), and a "Preview the weekend" link on top. With no race live: "No race live right now", "Next: Qualifying, Sat 9:00 AM."
 
-Where ESPN publishes win probability (NBA, NFL, MLB), a bar shows the chance they lose. The newest alert from the game sits underneath. F1 race, sprint and qualifying sessions show your drivers' (or your constructor's cars') places; a race or sprint while it runs has "Lap 56 of 62" with a bar, the flag when it isn't green ("Safety car", also on the status line every build shows), and under each of your drivers their places since the start, gap to the leader and stops ("▲10 from P19 · +1:24.603 · 1 stop"), or when they went out. Tapping a card opens `app/src/app/game/[key].tsx`: the live card, the box score and highlights as tabs (F1: the full running order, `RaceOrder.tsx`, with each car's gap to the leader and to the car ahead, places since the start and stops, in the timing's order while it runs; or before the session the weekend's preview), then your alerts from that game (you can minimize them).
+**F1 with nothing on** (the F1 chip, or All when every follow is F1): "No F1 sessions today", then "Next race weekend: Singapore Airlines Singapore Grand Prix, Oct 9–11." (or "The … is this weekend. Practice isn't shown here." once the weekend has started), then which sessions show up, with a "Preview the weekend" button (and "Find someone to hate" when you track no F1 driver or constructor). Between weekends ESPN's F1 scoreboard still shows the last one, so the next one comes from its calendar: `setF1Calendar` keeps every weekend's name, dates and event id, and `nextF1Weekend` is the first one that hasn't ended.
 
-- **Where the data comes from** (`server/src/scores.ts`): the live engine already reads every league's ESPN scoreboard every 10s, and F1's every 30s. Each read upserts a card per game (`gameCard` / `raceCard`). The 2s game tracker patches in scores from the play-by-play, which runs ahead of the scoreboard, and win probability from the summary (`patchGame`). While a game is live, each side's score only goes up, so a stale scoreboard read can't undo a run the feed already announced. The final read is exact.
-- **Up next:** under today's games, each tracked team's next game that isn't already a card on the tab, soonest first (\`UpNextRow\`): "Falcons vs Ravens · NBC · Sun 8:20 PM", "Yankees vs Rays · ALDS Game 3 · TBS", "Hawks at Spurs · Preseason", "Dodgers at Braves · NLDS Game 4 · if necessary". The tracked team comes first, and two tracked teams in one game are one row ("Saints at Falcons"). A team tracked through a player says so ("Tracking Patrick Mahomes"). Past a week it shows the date ("Oct 18"); before ESPN sets a time, "Time TBA". Tapping a row opens the team's page. It follows the league filter, and a team whose season is over has no row. **No games today:** the list becomes the screen, under "No NFL games today." (left out when the next game is tonight, which can be in Up next before ESPN's scoreboard turns over to the new day).
-  - **Where it comes from** (\`server/src/upnext.ts\`): each tracked team's ESPN schedule (\`/teams/{id}/schedule\`; soccer adds \`?fixture=true\`), read per team, not per device. A schedule covers one part of the season, so when that part has nothing left (the last preseason game is played) the next part is read. Read when someone starts tracking the team, again 3 hours later, and right after any of its games ends, since the next game is a different one then. NHL schedules are the biggest, about 1 MB a team. \`GET /me/scores\` adds \`upNext\`; older app builds ignore it.
-- **F1 with nothing on** (the F1 filter, or All when you only track F1): "No F1 sessions today", then "Next race weekend: Singapore Airlines Singapore Grand Prix, Oct 9–11." (or "…is this weekend. Practice isn't shown here." once first practice starts), then which sessions show up. Between weekends, ESPN's F1 scoreboard still shows the last one, so the next one comes from its calendar.
-- **Live:** any change is pushed as `{ kind: 'score', game }` over the existing WebSocket, only to connected devices that track a side (`deviceTeams`: teams plus followed players' teams, cached 5s and reset on follow/unfollow). The first sighting of a game (e.g. after a restart) is a baseline, not a push.
-- **API:** `GET /me/scores` lists the device's games, plus `nextF1`: the F1 race weekend that's on, or else the next one, from the F1 scoreboard's calendar (`setF1Calendar` / `nextF1Weekend`). `GET /me/games/<league:id>` adds the device's alerts from that game (`events.game_id`; F1 alerts now store their session id there) and the play-by-play from ESPN's summary, cached 8s while live and 5 min after. Feed items carry `gameId`, so the app links alerts to their game.
-- Checked live against CHW @ CLE on 2026-10-05: the card, the losing chance (Guardians 25% to lose), a pushed update at the top of the 6th, and the game screen's play-by-play.
+**The UFC on the Scores tab.** With the UFC chip on, the tab reads `GET /ufc/cards` every 30 seconds while it's open. "All fights" is the next card (with a link to its preview, its name, date and venue, each segment's fights under a header with the segment's name, start time and broadcast), then "Coming up", the card after. "My fights" is the fights of the fighters you track on either card. A fight opens the card with that fight on top.
+
+**Up next.** Under today's games, each tracked team's next game that isn't already a card on the tab, soonest first (`UpNextRow` in `app/src/components/UpNextRow.tsx`), one row each.
+
+- The title puts the tracked team first: "Falcons vs Ravens" at home, "Hawks at Spurs" away. Two tracked teams in one game are one row, away at home: "Saints at Falcons".
+- Under it, the league tag and, joined by " · ": who you track on that team if it's only through players ("Tracking Patrick Mahomes"), what kind of game it is ("ALDS Game 3", "NLDS Game 4 · if necessary", "Preseason") and the national TV channel ("NBC", "TBS").
+- On the right, the day and the time: "Today", "Tomorrow", a weekday within a week ("Sun"), or the date past that ("Oct 18"); and the time, or "Time TBA" before ESPN sets one (`upNextWhen`).
+- Tapping a row opens the tracked team's page. The list follows the league chip, drops a game more than an hour past its start, and a team with nothing scheduled (its season is over) has no row.
+- **Where it comes from** (`server/src/upnext.ts`): each tracked team's ESPN schedule (`/teams/{id}/schedule`; soccer adds `?fixture=true`, since its plain schedule lists results). The next game is the first one that hasn't started and starts no more than an hour ago (`nextFromSchedule`). A schedule covers one part of the season, so when that part has nothing left (the last preseason game is played) the regular season's (`?seasontype=2`) and then the postseason's (`?seasontype=3`) are read (`fetchNext`). The round and "if necessary" come from the schedule's note ("ALDS - Game 4 If Necessary" becomes "ALDS Game 4 · if necessary"), and a preseason game with no note says "Preseason". TV is the national broadcast, else the first one listed.
+- **When it's read:** per team, not per device, so ten devices tracking the Yankees cost one read. A loop checks every minute (`startUpNext`) for teams that were never read or were read 3 hours ago (`HW_UPNEXT_REFRESH_MS`), four at a time; a follow kicks it at once, and a follow that comes during a read gets another read right after. When a team's game ends its entry is dropped (`staleUpNext`), since its next game is a different one now. Only teams in the game leagues are read (not F1 constructors or the UFC). NHL schedules are the biggest, about 1 MB a team.
+- `GET /me/scores` carries it as `upNext` (`upNextFor`: the device's teams' next games, one per game, soonest first). Older app builds ignore it.
+
+**The game screen** (`app/src/app/game/[key].tsx`), opened by tapping any card:
+
+- The card on top, larger, with the extra lines (both passers, the pitcher's line). It stays live from the socket, and the screen re-reads the server every 15 seconds while the game is live; pull to refresh reads it at once.
+- Two tabs: **Box score** (`BoxScoreView`, tracked players marked; "The box score shows up here once it starts." before the game) and **Highlights** (ESPN's clips and the game's key plays, including the plays that sent you alerts; "Highlights show up here once it starts."). ESPN's clips can be switched off on the server (`clips.highlights` in `server/src/flags.ts`).
+- F1: a running order instead ("Running order", or "Results" after), with each car's gap to the leader and to the car ahead, places since the start and stops (`RaceOrder.tsx`), in the timing's order while it runs; before the session starts, the weekend's preview.
+- Then "Your alerts from this game · 4" ("this race" in F1, "this fight" in the UFC), your alerts from that game, newest first, joined live by ones that arrive over the socket. Tapping the heading minimizes it, and the choice is kept on the device for every game screen (`game:alertsOpen` in AsyncStorage). With none: "Nothing yet. When something goes wrong for them, it lands here."
+- A game the server no longer has (it's off the scoreboard and past its day): "This game isn't available", "Games stay on the Scores tab until the day after they finish."
+
+**Where the data comes from** (`server/src/scores.ts`, `server/src/live.ts`):
+
+- **The scoreboard read.** The live engine reads every game league's ESPN scoreboard every 10 seconds (`HW_SCOREBOARD_MS`; college football every 20 seconds, and only every 5 minutes when no game is live or starting within 20 minutes), F1's every 30 seconds. Every game on it becomes a card (`gameCard`; F1 sessions `raceCard`), whether anyone tracks it or not, stored in memory by key (`<league>:<ESPN event id>`; F1 `f1:<session id>`) through `upsertGame`.
+- **The 2-second tracker.** For a game someone tracks, the tracker's play-by-play runs ahead of the scoreboard, so it patches in the score, win probability, MLB pitch counts, NHL goalies and NFL passers as it reads them (`patchGame`). While a game is live each side's score only goes up, so a stale scoreboard read can't undo a run the feed already announced; the final read is exact. NHL goalies and NFL passers are kept through the final, since scoreboard reads don't carry them.
+- **When a final ended.** The server records `endedAt` when it sees a game go final. For one already over the first time it's seen (after a restart, or from yesterday's scoreboard), it uses a typical game length after the start (`GAME_LENGTH_MS`: MLB 3h, NFL 3¼h, college football 3½h, NBA 2¼h, WNBA 2h, NHL 2½h, soccer 2h, F1 2h; capped at now).
+- **Yesterday's games.** ESPN's scoreboard rolls over to the new day, and a restart forgets what the server had seen. So every 10 minutes (`HW_YESTERDAY_MS`) it also reads each league's scoreboard for yesterday (ESPN's date, US Eastern) and adds the finals it doesn't have (`scanYesterday`). Games are forgotten (`pruneGames`) once they're off the scoreboard, a day and a half past their start, and off the tab.
+- **Live.** Any change is pushed as `{ kind: 'score', game }` over the WebSocket, only to connected devices that track a side (`broadcast` with `deviceTeams`). A change means the card's JSON differs from the last one sent. The first sighting of a game (after a restart) is a baseline, not a push.
+
+**API:**
+
+- `GET /me/scores` → `{ games, nextF1, upNext }`: the device's cards (with `hateWatch.alsoGot` on finals that gave it a Successful Hate Watch), the F1 weekend that's on or else the next one (`{ name, startsAt, endsAt, eventId }`), and Up next. The app reads it when the tab is focused, on pull to refresh, on every socket (re)connect, and after every follow or unfollow.
+- `GET /me/scores/all` → `{ games }`: All games, with the same per-device `hateWatch`.
+- `GET /me/games/<league:id>` → `{ game, alerts, plays, box, clips, keyPlays }`: the card, the device's alerts from that game (by `events.game_id`; F1 alerts store their session id there; up to 100, newest first), and from one read of ESPN's summary, cached 8 seconds while live and 5 minutes otherwise (`gameDetail`): the box score, the clips (empty when `clips.highlights` is off), the device's key plays (`forDevice`), and `plays`, the latest 25 plays newest first (MLB at-bat results only, NFL drives flattened, soccer its key events) for builds from before the Highlights tab. 404 for a game the server doesn't have. If ESPN fails, the card and alerts still come back.
+- Feed items carry `gameId`, so the app links alerts to their game.
+
+**Checked:** live against CHW @ CLE on 2026-10-05 (the card, the losing chance with the Guardians 25% to lose, a pushed update at the top of the 6th, the game screen's play-by-play), and MEM @ ATL, OTT @ BOS and ATL @ NO for the other sports' lines. `server/test/scores.test.ts` covers the cards from real scoreboard events, scores that never go backwards, which devices get a change, each device's games, the MLB at-bat lines, the other sports' live details, F1 cards and calendar, the play-by-play, finals and doubleheaders, All games and the preview (the CLE @ CHW ALDS Game 4 scoreboard of 2026-10-08); `server/test/upnext.test.ts` covers Up next.
 
 ## Stats pages
 
-Every player and team page has a **Stats** button next to Track (not F1, for now), which opens \`app/src/app/stats/[key].tsx\`.
+**In short:** Every player and team page opens on a **Stats** tab (next to "Recent misery"): a player's season line, postseason and career, their last five games and their team's next game; a team's record and standing, its season line (the EPL's league table instead), its last five results and its next game; F1 drivers and constructors their championship season, and UFC fighters their record. The numbers worth gloating about (strikeouts, interceptions, errors, cards) are in red when there are any, and in a team's form an L is the green one. The server builds each page from ESPN at `GET /targets/:key/stats` (`server/src/stats.ts`) and keeps it for 10 minutes.
 
-- **Players:** the season line ESPN picks for their position (a hitter's AVG and strikeouts, a pitcher's innings and earned runs, a QB's yards and interceptions, a goalie's save %, a soccer player's goals, cards and fouls), then postseason and career, their last five games with their line in each ("3 AB · 3 SO"), and their team's next game. MLB's athlete overview only has a hitter's career line, so the season row comes from the stats endpoint. Soccer splits a player's stats by competition; the league's own one is used (\`fullName\` in \`leagues.ts\`).
-- **Teams:** record and standing ("93-68 · 2nd in AL East", home and road), a season line picked per league (MLB: AVG, runs, HR, OPS, strikeouts, ERA, WHIP, errors; NFL: points and yards per game, interceptions, giveaways, turnover margin, sacks taken, penalties, 3rd down %; NBA and WNBA: points, FG%, 3P%, rebounds, assists, turnovers, fouls; NHL: goals for and against, save %, shooting %, power play goals, penalty minutes, +/-), titled with the part of the season ESPN has ("2026 Postseason"), the last five results, and the next game. ESPN has no team stat line for soccer, so the EPL's is its table: position, points, W-D-L, goals for and against, goal difference.
-- **The hater's view:** the numbers worth gloating about are in red: a hitter's strikeouts and caught stealing, a pitcher's earned runs, homers and walks allowed, a QB's interceptions and sacks, turnovers and fouls, penalty minutes, cards, a team's giveaways and errors. Only when there are some (0 penalty minutes isn't red). In a team's form, an L is the green one.
-- **API:** \`GET /targets/:key/stats\` (\`server/src/stats.ts\`), public, from ESPN's athlete overview (\`site.web.api.espn.com/apis/common/v3/…/athletes/{id}/overview\`), team, team statistics, standings and schedule endpoints, cached 10 minutes a page. 404 for F1.
+**Where it shows.** A player's or team's page (`app/src/app/target/[key].tsx`, opened from Search, the Tracking tab, a roster, the leaderboard, a game card's team or an alert) has two tabs under the name, the hater count and the Track button: **Stats**, which opens first, and **Recent misery** (your alerts about them from the last 24 hours). The stats are fetched alongside the page. If ESPN doesn't answer, the tab says "Couldn't load the stats. ESPN didn't answer." with "Try again". A team's roster, with its position chips, follows under both tabs. The same stats also have a screen of their own, `app/src/app/stats/[key].tsx` (titled "NYY stats"), kept for links that still open it; nothing in the app links there now. Both draw `StatsView` (`app/src/components/StatsView.tsx`).
+
+**What's on a page, top to bottom:**
+
+- **Record** (teams, and UFC fighters): the overall record, large ("93-68"), ESPN's standing summary under it ("2nd in AL East"), and the splits ESPN has ("Home 46-34 · Road 47-34"; "Away" where ESPN calls it that).
+- **Stat groups**, each a heading and a grid of tiles. A tile is the number, ESPN's short label ("SO"), and what it means ("Strikeouts"). A tile marked bad is drawn in red with a red-tinted frame.
+- **"Last 5 games"** ("Last 5 races" in F1, "Last 5 fights" in the UFC; "Last 3 games" when there are only three). A team's section starts with its form, oldest to newest, as round chips: an L is green (a Successful Hate Watch), a W plain, a tie or draw grey. Then one row per game: the date ("Oct 6"), "vs" or "@", the opponent's logo and code, and the result and score ("L 2-5"), the L in green. A player's row adds their line in that game under it.
+- **"Next game"** ("Next race", "Next fight"): the same row as the Scores tab's Up next ("Yankees vs Rays · ALDS Game 3 · TBS", the day and time), which opens the team's page.
+- A footer: "Stats from ESPN, updated every 10 minutes. In red: the numbers worth gloating about." A page with no record, groups or games says "No stats yet", "ESPN doesn't have numbers for them this season."
+
+**Players** (`playerPage`), from ESPN's athlete overview (`site.web.api.espn.com/apis/common/v3/sports/<sport>/<league>/athletes/{id}/overview`):
+
+- **The season line ESPN picks for their position:** a hitter's average and strikeouts, a pitcher's innings and earned runs, a quarterback's yards and interceptions; a goalie's save percentage; a soccer player's goals, cards and fouls. The group is the overview's "Regular Season" split, titled "Regular season". Soccer splits a player's stats by competition, so it's the league's own one, matched by its full name in `leagues.ts` ("2026-27 English Premier League"), or else the first split that isn't career or projected.
+- **MLB hitters:** the overview has only their career line, so the season row comes from the athlete stats endpoint (`…/athletes/{id}/stats`): the latest season of its first category, titled "2026 season". That second read happens only when the overview has no regular-season split, and never for soccer.
+- **Postseason** and **Career**, when ESPN has them, with the same columns.
+- **The last five games**, from the overview's game log: date, home or away, opponent and logo, W/L/T/D, score, and the player's line in that game. The line is up to 10 of their numbers, and zeros after the first are left out, as are words like "Started": Aaron Judge's 2-0 win over the Mets reads "3 AB · 3 SO", his 8-3 win at Minnesota "4 AB · 1 R · 1 H · 1 HR · 3 RBI · 2 SO".
+- **Next game:** their team's (`nextGameOf` in `server/src/upnext.ts`: the Up next entry if the server has a fresh one, else a read of the team's schedule now).
+- **In red** (`BAD` and `badFor` in `server/src/stats.ts`), only when there are some (`some`: 0 isn't red):
+  - MLB hitters: strikeouts, caught stealing, grounded into double plays.
+  - MLB pitchers (positions P, SP, RP): earned runs, homers allowed, walks, losses, blown saves. A pitcher's strikeouts are his good number, so they stay white.
+  - NFL quarterbacks: interceptions, sacks, fumbles, fumbles lost. Other NFL players: fumbles and fumbles lost.
+  - NBA and WNBA: turnovers, fouls (totals and per game), technical and flagrant fouls.
+  - NHL skaters: penalty minutes, giveaways. Goalies: goals against, goals against average, losses, overtime losses.
+  - Soccer: fouls committed, yellow and red cards, own goals, offsides, goals conceded.
+- Real example (`server/test/stats.test.ts`): Aaron Judge's page is "2026 season: GP 66 · HR 18 · SO 85 · CS 0 · AVG .241" with the 85 strikeouts red and 0 caught stealing not, then "Career: GP 1211 · AB 4342 · H 1262 · HR 386 · SO 1454". Gerrit Cole's "Regular season: IP 127.0 · ER 51 · HR 22 · K 131" has ER and HR red and his 131 strikeouts white.
+
+**Teams** (`teamPage`), from ESPN's team (`/teams/{id}`), team statistics (`/teams/{id}/statistics`), standings and schedule endpoints, read in parallel:
+
+- **Record and standing:** the team's total record, `standingSummary`, and its home and road splits.
+- **The season line, picked per league** (`TEAM_STATS`), each tile ESPN's code on top and our words under it (where our words are the code itself, "ERA", ESPN's own: "Earned Run Average"):
+  - MLB: batting average, runs, home runs, OPS, strikeouts (red), ERA, WHIP, errors (red).
+  - NFL and college football (whose statistics use the NFL's names): points per game, yards per game, interceptions thrown (red), giveaways (red), turnover margin, sacks taken (red), penalties (red), 3rd down %.
+  - NBA and WNBA: points, FG%, 3P%, rebounds, assists, turnovers (red) and fouls (red), the counting ones per game.
+  - NHL: goals, goals against (red), save %, shooting %, power play goals, penalty minutes (red), +/-.
+  - It's titled with the part of the season ESPN has: "2026 Postseason" or "2026 regular season". A real example: the Yankees in the 2026 postseason, "Batting avg .246 · Strikeouts 33 · ERA 1.32 · Errors 0", with the 33 strikeouts red and no errors not.
+- **Soccer:** ESPN has no team stat line, so the EPL's is its table (`tableGroup`, from the standings), "League table": POS, PTS, P, W-D-L, GF, GA (red when any) and GD. Example: "POS 6th · PTS 9 · P 5 · W-D-L 2-3-0 · GF 7 · GA 4 · GD +3".
+- **The last five results** (`recentFromSchedule`): the schedule's finished games, newest first ("@ TB L 2-5", "@ TB L 0-1", "vs TB W 9-0"). A game without a score (postponed) is skipped; a level score is T, or D in soccer, whose plain schedule is its results.
+- **Next game:** `nextGameOf`, as above.
+
+**F1** (`server/src/f1-stats.ts`): a driver's page is their points and place in the championship, wins, podiums, poles, DNFs, average finish and races ahead of their teammate (the other car that day), then their last five races ("Oct 4 · Monaco GP · DNF", a DNF or no points drawn like a loss). A constructor's is the same for both cars, with one-twos and double DNFs. DNFs and losing to the teammate are the red ones. It reads the championship standings, the season scoreboard (every session's finishing order) and each finished race's cars once (kept in `kv`). F1 rows have no "vs" or "@" and no form chips.
+
+**The UFC** (`fighterPage` in `server/src/ufc.ts`): the fighter's record ("Record": W, L in red, KO W, SUB W, KO L and SUB L in red, from ESPN's records), and their last five fights from the overview's fight history, each with the opponent, W or L, how it ended (with the round, except for a decision), and ESPN's description. No next fight. The UFC's placeholder team has no page.
+
+**API:** `GET /targets/:key/stats` (public, no device token) → `{ key, kind, league, record?, groups: [{ title, tiles: [{ label, name, value, bad? }] }], recent: [{ id, date, home, opponent, opponentLogo?, result, score, line? }], next }`. 404 for a key the catalog doesn't know, a league that doesn't exist, or the UFC's placeholder team (`statsFor`). Each page is cached for 10 minutes (`TTL_MS`), so a busy page is one set of ESPN reads every 10 minutes; up to 500 pages are kept, and a failed read isn't kept, so the next request tries again. ESPN reads time out after 8 to 10 seconds; a failed statistics or schedule read leaves that part out rather than failing the page.
 
 ## Successful Hate Watch counter
 
-The top of Settings shows how many Successful Hate Watches the device has had, with the teams that gave it the most ("Falcons 4 · Hawks 3 · Guardians 2", then "+2 more"). Tapping "+N more" expands the card into every team it has hate watched, most first, with each one's league and count; "Show less" folds it back. F1 constructors show their full names there, since ESPN's F1 short names are junk (Ferrari is "JK"). One counts each time a team you track loses (`team.lost`), or the team of a player you track (`player.team_lost`). That one is counted under the team, so the list only ever shows teams: tracking Freddie Freeman puts the Dodgers on it. A loss counts once per device, however many ways you track that team (the team and a player, or two players): the player's alert is recorded under the team loss's own event id (`hateWatchOf`), and `hate_watches` has one row per device and event. In F1 it counts when your constructor finishes outside the points (`f1.team.no_points`, a double DNF included).
+**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), with the teams that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
 
-- **"23 other hate watchers":** every Successful Hate Watch alert says how many other people got it in their feed, on the Feed card and on the game's final on the Scores tab ("1 other hate watcher", "0 other hate watchers"). The count is the alert's feed rows minus you (`RECIPIENTS`, indexed by `feed_event`). A team's loss counts everyone who got any alert about it, the team's or a player's (each device gets one), by game (`events_game`). It's settled when the alert goes out, because `publish()` now works out who gets it before sending it, so the live alert carries the number too. The Scores tab adds it per device (`withHateWatch`) to finals that gave that device one, and the app keeps it on the card when everyone's score frames update the game. People with the "Loses a game" alert off don't get the alert, so they don't count and don't see a number.
-- **Counted on the server** (`server/src/hate-watches.ts`): `publish()` adds a `hate_watches` row for every device tracking the team or a player on it, before alert settings are checked. Turning "Loses a game" or "Their team loses" off doesn't stop the count, and Settings → Clear feed doesn't reset it. "Delete all my data" does, because the rows cascade with the device. Re-polls don't double count (one row per device and event).
-- **Live:** after each new one, the device's sockets get `{ kind: 'hateWatches', tally }`. The app also reads `GET /me/hate-watches` (`{ total, teams: [{ target, count }] }`, most first) whenever its socket connects.
-- **Losses from before the counter:** on the first start with it, the server counts the losses already in each feed, plus the ones that happened while a device tracked the team but never reached the feed (the alert was off). A `kv` flag makes this run once.
+**What you see** (`app/src/components/HateWatchCounter.tsx`, the first card in Settings):
+
+- The total, large and red, then "Successful Hate Watch" or "Successful Hate Watches", and under it "Each time a team you track lost." (or, at 0, "Your first one lands when a team you track loses."). While it's loading the number is "–".
+- Up to three chips for the teams that gave it the most, each with the logo, the short name and the count: "Falcons 4 · Hawks 3 · Guardians 2". F1 constructors show their full names there, since ESPN's F1 short names are junk (Ferrari is "JK").
+- With more than three teams, a "+2 more" chip. Tapping it expands the card into every team it has hate watched, most first, one row each with the logo, full name, league tag and count; "Show less" folds it back. The change animates.
+
+**What counts** (`HATE_WATCH_TYPES` and `isHateWatch`):
+
+- `team.lost`: a team you track loses ("Successful Hate Watch! Eagles lost to the Bears"). That includes an elimination and a blowout, which are the loss with other words; an alert that counts as a loss through its aliases counts too.
+- `player.team_lost`: the team of a player you track loses ("Successful Hate Watch! Freddie Freeman and the Dodgers lost to the Giants").
+- `<soccer league>.team.heavy_loss`: a 3+ goal loss ("Coventry were thrashed 5-0 by Brighton"), sent instead of the plain loss to those who want it.
+- `f1.team.no_points`: your constructor finishes outside the points, and `f1.team.double_dnf` (a double DNF), which is also a no-points finish.
+- `ufc.lost`: a fighter you track loses.
+- Draws and ties send no loss, so they never count.
+
+**Counted under the team, once per loss** (`hateWatchOf`). A player's "their team lost" and soccer's 3+ goal loss carry the team loss's own event id (`meta.lostId`) and the team's key (`meta.teamKey`), and are recorded under those. (The loss's other facts sent in its place, like "lost as 78% favorites" from `lossFacts`, carry `lostId` too but aren't recorded themselves; the loss alongside them already counted for every tracker.) So tracking Freddie Freeman puts the Dodgers on the list, never Freeman, and tracking the Dodgers and Freeman (or Freeman and Mookie Betts) counts one loss once. The table `hate_watches` has one row per device and event id (`ON CONFLICT DO NOTHING`), so re-polls and restarts never count twice. The UFC is the exception: `ufc.lost` is about the fighter, so a fighter you track appears on the list under their own name.
+
+**When it's counted** (`publish()` in `server/src/fanout.ts`). Right after a new alert is stored, for every device it's addressed to (everyone tracking its target, plus, for a team's alert, anyone tracking one of its players with "Get their team's alerts" on), a Successful Hate Watch adds a row, before the device's alert settings are checked. So turning "Loses a game" or "Their team loses" off doesn't stop the count, and neither does the type's league switch. Each device whose count went up gets `{ kind: 'hateWatches', tally }` on its open sockets at once. A device that tracks nobody involved isn't counted.
+
+**Taken back.** When an alert's facts change after it went out (an F1 result a penalty changed, `reviseEvent`), and it's withdrawn or no longer a Successful Hate Watch, its rows are deleted and each device that had one gets its new tally.
+
+**Kept and reset.** Settings → Clear feed doesn't touch the count (the rows aren't feed rows). "Delete all my data" (`DELETE /me`) does: `hate_watches` rows cascade with the device.
+
+**"23 other hate watchers."** Every Successful Hate Watch alert says how many other people got it in their feed: on the Feed card, on the alert's own screen, and on the game's final on the Scores tab ("1 other hate watcher", "0 other hate watchers"; `AlsoGot` in `app/src/components/ui.tsx`).
+
+- It's `alsoGot` on the feed item (`feedItem` in `fanout.ts`): the alert's recipients minus you, only for a loss alert (`isLossAlert`: a Successful Hate Watch type, or an alert carrying `lostId`; not one that was withdrawn).
+- Read from the database, it's the `RECIPIENTS` column: for a loss with a game, the number of different devices that got any loss alert from that game and league, the team's or a player's (each device gets one); otherwise the alert's own feed rows (indexed by `feed_event`).
+- It's settled when the alert goes out: `publish()` works out who gets each alert before sending any, and adds up a loss moment's deliveries across its alerts, so the live alert carries the number too.
+- On the Scores tab, `withHateWatch` adds `hateWatch: { alsoGot }` to this device's copy of a final that gave it a Successful Hate Watch, and the app keeps it on the card when everyone's score frames update the game.
+- People with the loss alert off don't get the alert, so they don't count in it and don't see a number (though their counter still went up).
+- Example (`server/test/hate-watches.test.ts`): three devices track an NFL team and one has "Loses a game" off. The loss counts for all three; the two that got it each see "1 other hate watcher"; the one with it off sees no number on the final.
+
+**Losses from before the counter.** On the first start with it, the server counted the `team.lost`, `f1.team.no_points` and `f1.team.double_dnf` alerts already in each feed, plus the ones that happened while a device tracked the team (followed before the loss was detected) but never reached its feed because the alert was off. A `kv` flag (`hate_watches_backfilled`) makes this run once. Players' "their team lost" came later and is only counted as it happens.
+
+**API:** `GET /me/hate-watches` → `{ total, teams: [{ target, count }] }`, most first (ties: the most recent loss first). The app reads it every time its socket connects, and takes each `hateWatches` frame as it comes.
+
+**Checked** in `server/test/hate-watches.test.ts`: losses from before the counter (in a feed, and with the alert off; not one from before the device tracked the team), a loss counting for every tracker with the alert on or off, once, with one `hateWatches` frame; the winners not counting; the "others" count live, from the feed, and on the Scores tab; clearing the feed keeping the count; an F1 constructor out of the points and a double DNF counting while a game start doesn't; and "Delete all my data" taking the count with it.
 
 ## Leaderboard
 
-The podium button at the top left of every tab opens `app/src/app/leaderboard.tsx`: the most hated athletes and teams, ranked by how many people (devices) track them. It uses the same filter as the Feed and Tracking tabs, in the same words. Everything / Teams / Athletes with "All" is the global board (every team in every sport, every athlete, or both), and a league chip narrows it to one sport: its people are Players there (F1: Drivers; the UFC has Fighters alone, college football Teams alone). Ranks count only what the filter shows, so with MLB players picked, the most hated MLB player is 1st. The top three get 🥇🥈🥉. Ties share a rank and read "T-2" (under the medal in the top three), and the next count is the next rank with no gap, as in 1, T-2, T-2, 3. Tied entries are listed by name. The server flags a tie (`tied`) over the whole filtered list, so it still shows when the other half of the tie is past the top 100. Anything you track says "Tracking". Tapping a row opens that player or team.
+**In short:** The podium button at the top left of every tab opens the most hated athletes and teams, ranked by how many people (devices) track them, filtered like the Feed: Everything, Teams or Players, in every sport or one league. Each filter is the top 100 ranked on the server within that filter, with 🥇🥈🥉 for the top three, ties shown as "T-2" with no gaps after them, and a note when the list is cut. It comes from `GET /leaderboard` (`server/src/leaderboard.ts`), public because it's only counts, never who.
 
-- **The top 100.** Each filter shows at most 100, whatever a client asks for (`LEADERBOARD_MAX`). When there are more, the list ends with "Showing the top 100 of 224." If the 100th place falls inside a tie, it adds how many tied with it didn't fit: "124 more are also tied for 13th with 1 hater." Ties are listed by name, so that cut is alphabetical.
-- **Accuracy.** Each filter is ranked on the server from its own list, never by filtering the global top 100, so a league's board reaches its 100th entry even when the global board stops sooner. `test/leaderboard.test.ts` checks every filter (3 kinds × every league and All) against a brute-force count of a few thousand random follows. On 2026-10-07 every filter on production matched a fresh count from its database. Switching filters quickly can't leave the wrong board up: only the latest request's reply is shown.
+**Opening it.** Every tab's header has a podium icon at the top left (`app/src/app/(tabs)/_layout.tsx`), instead of a sixth tab. It pushes `app/src/app/leaderboard.tsx`, titled "Leaderboard", with a Back button.
 
-- **API:** `GET /leaderboard?kind=team|player&league=nfl&limit=100` (`server/src/leaderboard.ts`) returns `{ entries, total, moreTied }`. It's public because it's only counts, never who. It's counted live from `follows` (target keys are `kind:league:id`, so each filter is a key prefix). The screen reloads on every filter change, each time it's opened, and on pull to refresh.
+**The filter** (`FilterBar`, the same as the Feed and Tracking tabs, in the same words):
+
+- **Everything / Teams / Players.** The third reads "Athletes" with All, "Players" in a league, "Drivers" in F1 and "Fighters" in the UFC (`playersTitle`, from each league's `ui.players`). The UFC has only fighters and college football only teams (`ui.kinds` in `server/src/leagues.ts`), so with those chips there's no choice to make.
+- **The league chips:** All, then the leagues you track, then More (every league, by sport). "All" is the global board: Everything with All is every athlete and team in every sport, Teams with All is every team in every league.
+- **Ranks count only what the filter shows**, so with MLB players picked the most hated MLB player is 1st, even if he's 40th overall.
+
+**A row:** the rank, the photo or logo, the name with "Tracking" if you track them, the league tag and their subtitle, and the count on the right ("12 haters", "1 hater"). Tapping a row opens their page. Above the list: "Ranked by how many people track them on Hate Watch."
+
+**Ranks and ties** (`leaderboard()`):
+
+- Sorted by haters, most first; ties are listed by name (alphabetically).
+- Ties share a rank, and the next count is the next rank with no gap: 1, T-2, T-2, 3 (the 3rd most hated count, not the 4th entry).
+- The top three ranks get 🥇🥈🥉 instead of a number; a tie there shows "T-2" under the medal.
+- The server flags a tie (`tied`) over the whole filtered list, not just the 100 it sends, so the 100th entry still reads as tied when the other half of the tie didn't fit.
+
+**The top 100.** Each filter shows at most 100 entries, whatever a client asks for (`LEADERBOARD_MAX`; `limit` is clamped to 1–100). When there are more, the list ends with "Showing the top 100 of 224." If the 100th place falls inside a tie, it adds how many tied with it didn't fit: "124 more are also tied for 13th with 1 hater." Ties are listed by name, so that cut is alphabetical.
+
+**Accuracy.** Each filter is ranked on the server from its own list, never by filtering the global top 100, so a league's board reaches its 100th entry even when the global board stops sooner. `server/test/leaderboard.test.ts` checks every filter (3 kinds × every league and All) against a brute-force count of a few thousand random follows, and that no request gets more than 100. On 2026-10-07 every filter on production matched a fresh count from its database. Switching filters quickly can't leave the wrong board up: each load is numbered and only the latest request's reply is shown, and the list clears while the new one loads.
+
+**When it loads:** each time the screen is opened or comes back into view (so follows made elsewhere show), on every filter change, and on pull to refresh.
+
+**Empty and failed:** "Nobody hates any NBA players yet", "Track someone and they'll show up here.", with "Show everything" when a filter is on (else "Find someone to hate", which opens Search). If the server doesn't answer: "Couldn't load the leaderboard" with "Try again".
+
+**API:** `GET /leaderboard?kind=team|player&league=nfl&limit=100` → `{ entries: [{ rank, tied, haters, target }], total, moreTied }`. `total` is everyone in the filtered list; `moreTied` is how many tied with the last entry shown were left out. A `kind` other than `team` or `player`, or an unknown league, is a 400. It's counted live from `follows` with one grouped query: target keys are `kind:league:id`, so each filter is a key prefix (`team:nfl:%`, or `team:%` and `player:%` for Everything). A follow shows at once. A target that has left the catalog is dropped.
 
 ## Startup guide
 
-On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): welcome, tracking from Search, the Feed and sharing (with a Successful Hate Watch's "23 other hate watchers"), the Scores tab (live details, the chance they lose, finals for a day), the leaderboard (the podium button at the top left of every tab), global alert settings, the Successful Hate Watch counter at the top of Settings, and the Tracking tab (each one's hater count, 🔔 and ⚙️), then "You're all set". Swipe or tap Next. Skip (top right) ends it from any page. The last page's "Find someone to hate" goes to Search. The pictures are drawings of the real controls, so nothing in the guide changes settings.
+**In short:** On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, and "You're all set". It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
 
-- **Once per install:** `hatewatch.guideSeen` in AsyncStorage, set as soon as the guide opens (`app/src/lib/guide.ts`). Deleting the app shows it again.
-- **Rewatch:** Settings → About → Show the guide opens it without the first-run extras. The last button says Done and returns to Settings.
-- **Notification permission waits for it:** the store awaits `guideSettled` before `registerForPush()`, so on first launch the system prompt comes right after the guide instead of covering it. The last page warns that the prompt is coming.
-- Each page scrolls vertically if it doesn't fit (small phones, large text sizes). It's checked on iPhone SE (375×667) and 390×844.
+**The pages,** in order (`PAGES`). Each has an icon (the first a large devil face), where in the app it is, a title, a sentence or two, and on most a drawing of the real control:
+
+1. "Welcome to Hate Watch": track the players and teams you can't stand, and know within seconds when something goes wrong for them.
+2. Search tab, "Pick who to hate": type a player or team and tap Track; it names the NBA, MLB, NFL, NHL, F1, Premier League and WNBA, and says you can track as many as you like.
+3. Feed tab, "Every bad moment, live": alerts land in the feed newest first and arrive as notifications; a Successful Hate Watch shows how many other hate watchers got it ("23 other hate watchers"); the share icon sends one to a friend.
+4. Scores tab, "Every game, live": the score, how badly it's going for them, who has the ball or who's pitching, the chance they lose; finals stay for a day; tap one for the play-by-play.
+5. Top left of every tab, "See who's most hated": the leaderboard ranks athletes and teams by how many people hate them, filtered like the feed (drivers in F1, fighters in the UFC).
+6. Settings tab, "Choose your alerts": each kind of alert on or off for every league, and the bell that decides between a notification and the feed only.
+7. Settings tab, "Keep score": the Successful Hate Watch counter at the top of Settings, every time a team you track loses or the team of a player you track; "+3 more" shows every team.
+8. Tracking tab, "Fine-tune one player or team": a drawing of Daniel Jones' row, then what's next to everyone you track: the hater count ("How many people hate them, you included."), the bell (no notifications about just them; their alerts still reach the feed) and the gear (pick exactly which alerts you get about them, which beats the global settings).
+9. "You're all set": you can watch the guide again any time from Settings. On the first run it adds "Next, your phone will ask to send you notifications. Allow them so alerts reach you even when the app is closed."
+
+**Moving through it:** swipe sideways (pages snap), or tap Next at the bottom. From the second page a Back link at the top left goes to the previous one. Skip at the top right closes it from any page but the last. Dots under the pages show where you are. The last page's button is "Find someone to hate" on the first run (it closes the guide and opens Search) and "Done" when rewatched (back to Settings). The pictures are drawings of the real controls, not live ones, so nothing in the guide changes settings.
+
+**Once per install** (`app/src/lib/guide.ts`):
+
+- On launch the root layout (`app/src/app/_layout.tsx`) asks `needsGuide()`, once the navigator is ready. If `hatewatch.guideSeen` isn't in AsyncStorage, it opens `/guide?first=1`; otherwise it settles the guide at once. A storage error counts as seen: better no guide than a stuck one.
+- The guide marks itself seen (the time) as soon as it opens, so quitting the app halfway through doesn't bring it back next launch.
+- Deleting the app clears AsyncStorage, so a reinstall shows it again.
+- It's a full-screen modal with a fade, and it can't be swiped down; Skip, Done or the last button close it.
+
+**Rewatch:** Settings → About → "Show the guide" ("How tracking and alerts work") opens `/guide` without `first=1`: no notification line on the last page, and the last button says Done and returns to Settings.
+
+**Notification permission waits for it:** `guideSettled` is a promise that resolves when the guide closes (finished or skipped), or at once on a launch that doesn't show it. The store awaits it before `registerForPush()`, so on first launch the system prompt comes right after the guide instead of covering it. The last page warns that the prompt is coming.
+
+**Small screens:** each page scrolls vertically on its own if it doesn't fit (small phones, large text sizes). It's checked on iPhone SE (375×667) and 390×844.
 
 ## An alert on its own screen
 
-A card in the feed (or on a player's, team's or game's page) shows three lines of an alert. Tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`): all of its text, its clip, how many other hate watchers got it, when it happened and a Share button. Who it's about is a row on top that opens their page, as the card's photo does. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the one tapped (`openAlert` in `app/src/lib/alerts.ts`). An alert that's in neither says it isn't in your feed anymore.
+**In short:** A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the copy that was tapped. A developer notice opens the same way, from Hate Watch, with no page to open and nothing to share.
+
+**Where it opens from:** any alert card (`FeedCard`): the Feed, a game's "Your alerts from this game", a player's or team's "Recent misery", and a shared alert's screen. The card shows the title and three lines of the body; tapping it calls `openAlert` (`app/src/lib/alerts.ts`), which remembers the tapped alert in memory and opens `/alert/<id>` (the id URL-encoded, and decoded again on the screen, as is if it can't be).
+
+**What's on it, top to bottom:**
+
+- The header "Alert", with Back.
+- **Who it's about:** a row with their photo or logo, name and subtitle and a chevron, which opens their player or team page, as the card's photo does. A target that has left the catalog has no row. A developer notice shows the app's icon, "Hate Watch" and "From the developer" instead, and doesn't open anything.
+- **The title** with the alert's emoji, and **the whole body**, every line of it, including lines added after it went out. Both can be selected and copied.
+- **"N other hate watchers"** on a Successful Hate Watch (see the counter section).
+- **When:** the league tag (not on a notice), the alert type's name, and the date and time ("Sat, Oct 11, 4:05 PM"), with "(2h ago)" when it's less than a day old.
+- **Its clip**, when it has one (`AlertClip`).
+- **"Share this alert"** (not on a notice): the same share as the card's button (see Sharing an alert). Where the link can only be copied (a browser without a share sheet) it says "Copied" with a check for 2 seconds.
+
+**Which copy it shows:** the feed's copy of that alert when the feed has it, so a fact that comes later (an `eventUpdate` frame that adds a line) shows up live on the open screen; otherwise the one that was tapped (`openedAlert`), which covers alerts from a game screen, a player's page or a share link that aren't in the loaded feed. An alert in neither (a link to an alert that was cleared, after the app restarted) says "This alert isn't in your feed anymore." with "Go to your feed"; while the app is still loading it shows a spinner instead.
 
 ## Developer notices
 
@@ -481,15 +686,48 @@ A message from Hate Watch itself, in every install's feed and never pushed: for 
 
 ## Sharing an alert
 
-The share button on a feed alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a picture of the alert, so it looks like a screenshot. Tapping it on an iPhone opens Hate Watch on that alert if it's installed, and the App Store if not.
+**In short:** Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a 1200×630 picture of the alert that the server draws from its own data, so it looks like a screenshot. On an iPhone with Hate Watch installed, tapping it opens the app on that alert (a universal link); without the app it goes to the App Store; anywhere else it's a web page with the card and a download button. The code is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `server/src/db.ts`), and the server side is `server/src/share.ts`.
 
-- **Opening the app (iOS universal links):** the app lists `applinks:hate-watch-api.fly.dev` in `ios.associatedDomains`, and the server's `/.well-known/apple-app-site-association` says app `G9V9266QK5.com.hatewatch.app` (`HW_IOS_APP_ID`) opens `/a/*`. With the app installed, iOS opens it without asking the server. Expo Router drops the domain and routes the path to `app/src/app/a/[code].tsx`, which fetches `GET /shared/<code>` and shows the alert plus a Track button. The root layout's `unstable_settings.anchor = '(tabs)'` puts the tabs underneath, so Back works even on a cold start from a link. iOS reads the association file (through Apple's CDN) when the app is installed or updated. If someone long-presses a link and picks "Open in Safari", iOS remembers that for the domain until they pick "Open in Hate Watch". Android App Links aren't set up yet; they need `assetlinks.json` with the Play signing key fingerprint.
+**Sharing, step by step** (`app/src/lib/share.ts`):
 
-- **The code** is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `db.ts`), stored in `events.share_code` and indexed. Alerts from before share links got theirs when the server started. Every feed item carries `shareUrl`.
-- **`GET /a/<code>`** (`share.ts`): an iPhone, iPad or iPod gets a 302 to the App Store. Everyone else, including link-preview fetchers (Messages sends `facebookexternalhit … Twitterbot`, which never gets the redirect), gets a page with Open Graph and Twitter card tags, Apple's Smart App Banner, the card and a download button. Unknown codes get a 404 page, or the App Store on an iPhone.
-- **`GET /a/<code>/card.png`**: the 1200×630 card, drawn on the server from our own alert data with `satori` (layout to SVG) and `@resvg/resvg-js` (SVG to PNG), in Inter from `@fontsource/inter`, with emoji as Twemoji images from jsDelivr. No user uploads, so no user-generated content to moderate. The card shows team colours and initials, not ESPN logos or headshots. Cached in memory and for a day by HTTP, since alerts never change.
-- **The app** (`app/src/lib/share.ts`) shares just the URL on iOS, so Messages shows one bubble, the card. On Android the link goes at the end of the text.
-- `HW_APP_STORE_URL` overrides the store link (default `https://apps.apple.com/app/id6819054268`) and `HW_PUBLIC_URL` the link's host. The App Store link only works once the app is released.
+1. Tap the share icon on an alert card (`FeedCard`), or "Share this alert" on the alert's own screen. Developer notices have no share button.
+2. Every feed item carries `shareUrl` (`feedItem` in `server/src/fanout.ts`: `HW_PUBLIC_URL`, default `https://hate-watch-api.fly.dev`, plus `/a/<code>`).
+3. On iOS (and in a browser with a share sheet) the share sheet gets just the URL, so Messages shows one bubble: the card. Android's share sheet only takes text, so it gets "<emoji> <title>", a new line, and the link. If an alert has no `shareUrl` (an old server), it shares the text instead: the emoji and title, the body, and "via Hate Watch" with the app's devil emoji.
+4. The sheet is titled "Share this alert", with the alert's title as the subject (email).
+5. A browser with no share sheet copies the text to the clipboard instead, and the button says "Copied" for 2 seconds. Cancelling a share does nothing.
+
+**The code** (`shareCode()`): the first 11 characters of the base64url SHA-256 of the alert's id, so the same alert always has the same link. It's stored in `events.share_code` and indexed (`events_share`). Alerts from before share links got theirs when the server started (`db.ts` fills in any missing ones at boot). A developer notice gets one too.
+
+**`GET /a/<code>`** (`shareLink`):
+
+- **An iPhone, iPad or iPod** (by user agent) that isn't a link-preview bot gets a 302 to the App Store (`HW_APP_STORE_URL`, default `https://apps.apple.com/app/id6819054268`), whether or not the code exists, uncached and varying on user agent. With the app installed iOS never asks the server: it opens the app (below).
+- **Everyone else, including link-preview fetchers**, gets an HTML page (`sharePage` in `server/src/pages.ts`). Messages fetches previews as "facebookexternalhit … Twitterbot" and must never get the redirect, so anything whose user agent matches bot, crawl, spider, facebookexternalhit, preview, slack, discord, whatsapp, telegram or embed gets the page. The page has:
+  - Open Graph tags (`og:title` the alert's title, `og:description` its body, `og:url`, `og:site_name` "Hate Watch", and `og:image` the card at `/a/<code>/card.png` with its type, 1200×630 size and alt text) and Twitter's (`summary_large_image`, `twitter:title`, `twitter:image`), so the preview is the card at full width.
+  - Apple's Smart App Banner (`apple-itunes-app`, the app id taken from the store link).
+  - The card as an image, a "Download Hate Watch on the App Store" button, and one sentence about the app.
+  - Cached 5 minutes. A `HEAD` request is answered like `GET`, for preview fetchers that check first. Page and card URLs use the host the request came to (and `x-forwarded-proto`).
+- **An unknown code** gets the same page with status 404, the title "This alert isn't available" and no image (or the App Store, on an iPhone).
+
+**`GET /a/<code>/card.png`** (`shareCard`): the card, drawn on the server from our own alert data with `satori` (layout to SVG) and `@resvg/resvg-js` (SVG to PNG). No user uploads, so no user-generated content to moderate.
+
+- 1200×630, the size link previews show large. A near-black background with a red glow at the top.
+- Top: a red dot and "HATE WATCH" on the left; the league ("NFL", "EPL") in a pill on the right ("NEWS" for a developer notice).
+- Middle: a 168-pixel circle in the team's colour (a player's team colour; dark grey without one) with the team's code or the player's initials ("FF" for Freddie Freeman; Jr., Sr., II, III and IV are skipped), its text black or white, whichever reads on that colour. Team colours and initials, not ESPN logos or headshots: their images aren't ours to spread around. Next to it the title (cut to 110 characters, in one of three sizes by length) and the body (cut to 120, grey; a score like "LAD 0" doesn't break across lines).
+- Bottom: the alert type's emoji and name, as in Settings, and a red "Get Hate Watch on the App Store" button.
+- Text is Inter (500, 800 and 900 weights, from `@fontsource/inter`), with the Latin Extended subset so names like Dončić and Jokić draw. Emoji are Twemoji SVGs (16.0.1) fetched from jsDelivr, with a 3-second timeout and a blank space if one fails.
+- Alerts never change, so cards are cached in memory (up to 300) and by HTTP for a day (`public, max-age=86400`). 404 for an unknown code.
+
+**Opening the app (iOS universal links):**
+
+- The app lists `applinks:hate-watch-api.fly.dev` in `ios.associatedDomains` (`app/app.json`), and the server's `/.well-known/apple-app-site-association` says app `G9V9266QK5.com.hatewatch.app` (`HW_IOS_APP_ID`: Apple Team ID plus bundle id) opens `/a/*` ("Shared alerts").
+- iOS reads the association file (through Apple's CDN) when the app is installed or updated. If someone long-presses a link and picks "Open in Safari", iOS remembers that for the domain until they pick "Open in Hate Watch".
+- Expo Router drops the domain and routes the path to `app/src/app/a/[code].tsx`. It fetches `GET /shared/<code>` (public: `{ item }`, the alert as a feed item, or 404) and shows the alert card, then "Get alerts like this about Freddie Freeman" with a Track button. A code that's gone says "This alert isn't available anymore." with "Go to your feed".
+- The root layout's `unstable_settings.anchor = '(tabs)'` puts the tabs underneath, so Back works even on a cold start from a link.
+- Android App Links aren't set up yet; they need `assetlinks.json` with the Play signing key fingerprint.
+
+**Settings:** `HW_APP_STORE_URL` overrides the store link and `HW_PUBLIC_URL` the link's host. The App Store link only works once the app is released.
+
+**Checked** in `server/test/share.test.ts`: feed items carry their link; an iPhone goes straight to the App Store; link previews get the page with the card as its image; the card is a 1200×630 PNG for teams and players, emoji and accents included; a developer notice shared from a build that still shows Share gets its page and card from Hate Watch; the association file names `/a/*` and the app can fetch the alert; and alerts from before share links get codes when the server starts.
 
 ## Tests
 
