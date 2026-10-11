@@ -36,6 +36,12 @@
             "command": "f=\"$HOME/Documents/obsidian/hate-watch/.tools/sync.sh\"; [ -x \"$f\" ] && \"$f\"; true",
             "async": true,
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "f=\"$HOME/hate watch/server/data/recordings/recorders.py\"; [ -f \"$f\" ] && /usr/bin/python3 \"$f\" --restart; true",
+            "timeout": 60,
+            "statusMessage": "Checking the recorders"
           }
         ]
       }

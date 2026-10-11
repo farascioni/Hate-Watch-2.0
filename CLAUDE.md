@@ -8,7 +8,7 @@
 - **Release flow**: ask before every commit, push or deploy; deploys, switches, notices, builds, updates, the league display, EAS's queue.
 - **Don't run npx expo lint in app/**: typecheck only, and the lockfile check.
 - **Patch notes**: every shipped change, under 4,000 characters, no emoji.
-- **Two machines (Windows and Mac)**: setting up a machine, logins, what stays local.
+- **Two machines (Windows and Mac)**: setting up a machine, logins, what stays local, the Mac's game recorders.
 
 The app is in `app/` (Expo, see `app/CLAUDE.md` and `app/AGENTS.md`), the server in `server/` (Node, SQLite, Fly.io). `README.md` is the map of how everything works.
 
@@ -51,3 +51,4 @@ Both machines work from this repo, and neither needs the other turned on. Produc
 - On a new machine, or after a `git pull`: `bash claude-config/install.sh` sets Claude Code's user settings, this file's notes and the two scouts to the repo's copies. Anything it replaces is kept beside it as `<name>.before-<time>`. Then `npm ci` in `app/` and in `server/`.
 - Logins, once per machine: Claude Code itself, `npx eas-cli@latest login`, `fly auth login`, and GitHub for `git push`. GitHub takes a personal access token (classic, `repo` scope, from github.com/settings/tokens), not the account password: run `git push` in a terminal, give the username `farascioni` and paste the token as the password, and the keychain or credential manager keeps it.
 - Not in git, so each machine keeps its own: `.claude/settings.local.json`, `app/.expo/`, `server/data/` (the dev database, which the server rebuilds from ESPN on first start), and Claude's memory under `~/.claude/projects/`. This file is the shared copy of the notes that matter.
+- Game recorders (the Mac; `server/data/recordings/recorders.py`, not in git): a background task dies when the Claude app restarts, so start every recorder through the script's registry (`recorders.jsonl`), never as a session's own background task. A SessionStart hook in `.claude/settings.json` runs `recorders.py --restart` and puts each recorder's state in the session's context (a start, a resume and a context summary all fire it), so read that instead of running it again. The script relaunches the dead ones; you tell the user and the recorder's owner session about any it relaunched.
