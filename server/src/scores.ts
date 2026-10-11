@@ -52,7 +52,7 @@ export interface GameCard {
   count?: { balls: number; strikes: number }; // MLB: the at-bat's count
   pitcher?: LivePlayer;  // MLB: pitches = thrown today (from the box score)
   batter?: LivePlayer;
-  winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (NFL, MLB, NBA)
+  winProb?: { home: number; away: number }; // chance each side wins, where ESPN publishes it (read for any league that has it)
   lastPlay?: string;      // NBA, NFL, NHL: ESPN's text for the latest play (soccer: the latest goal or card, "57' Goal: A. Isak")
   leaders?: { home?: LivePlayer; away?: LivePlayer }; // NBA: each side's top scorer; NFL: each side's passer
   timeouts?: { home: number; away: number };          // NFL: timeouts left

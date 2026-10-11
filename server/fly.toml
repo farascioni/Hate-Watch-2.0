@@ -1,5 +1,8 @@
-# Hate Watch API on Fly.io. Deploy from this folder: fly deploy --ha=false
-# App names are global on Fly: if "hate-watch-api" is taken, change it here AND in app/eas.json.
+# Hate Watch API on Fly.io. Deploy from this folder: fly deploy --remote-only (the very first deploy, which creates
+# the machine, was fly deploy --ha=false, so there is exactly one; later deploys keep it: README "Server → Fly.io").
+# App names are global on Fly: if "hate-watch-api" is taken, change it here and everywhere the host is named: app/eas.json
+# (preview and production), app/package.json's update script, app/src/lib/api.ts's fallback, app/app.json's
+# associatedDomains, and the server's own public URL (HW_PUBLIC_URL, fanout.ts). README "If you rename the Fly app".
 app = "hate-watch-api"
 primary_region = "iad"   # US East: closest to ESPN's API and most US users
 
@@ -27,7 +30,8 @@ primary_region = "iad"   # US East: closest to ESPN's API and most US users
     hard_limit = 2500
 
 [[http_service.checks]]
-  # First boot downloads ~5,000 players and verifies every image (~30-60s) before listening.
+  # First boot downloads ~7,000 players and verifies every image before listening: about 30-60s here (16s measured
+  # on a laptop); the grace period below covers it.
   grace_period = "120s"
   interval = "30s"
   timeout = "5s"

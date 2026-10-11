@@ -55,6 +55,13 @@ const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yest
 const NEWS_MS = Number(process.env.HW_NEWS_MS ?? 3 * 60_000); // off-field trouble, fines and suspensions (news.ts)
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
+/**
+ * A game attached on the server's first scoreboard read of its league (a restart, a deploy): plays this old are still
+ * news. ESPN posts plays 80-105 s after they happen, so with 90 s a play the old server never read could already be
+ * history. Safe because everything the old server did send is in the database, and the same ids stop at the insert
+ * (docs/duplicate-alerts.md, "What survives a restart"). A game followed later keeps 90 s: its old plays went to nobody.
+ */
+const BOOT_BACKFILL_MS = Number(process.env.HW_BOOT_BACKFILL_MS ?? 5 * 60_000);
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
 const DECISION_RETRY_MS = Number(process.env.HW_DECISION_RETRY_MS ?? 15_000);
 const DECISION_TRIES = 20;
@@ -114,6 +121,8 @@ export interface GameInfo {
   sawPre?: boolean;
   venue?: string;
   tv?: string;
+  /** Attached on the server's first scoreboard read of its league (a restart): plays up to BOOT_BACKFILL_MS old are news. */
+  atBoot?: boolean;
 }
 
 export class GameTracker {
@@ -551,7 +560,7 @@ export class GameTracker {
       final = { home: Math.max(...plays.map((p) => p.home)), away: Math.max(...plays.map((p) => p.away)) };
     }
 
-    const cutoff = Date.now() - BACKFILL_WINDOW_MS;
+    const cutoff = Date.now() - (this.info.atBoot ? BOOT_BACKFILL_MS : BACKFILL_WINDOW_MS);
     // The score is re-derived from every play on every poll, not kept as a running total, because
     // ESPN edits plays after publishing them: a goal can be marked as scoring only later, and a
     // disallowed goal is taken back. A running total would miss the first and, after the second,
@@ -805,6 +814,8 @@ class LiveEngine {
   private trackers = new Map<string, GameTracker>();
   /** Watched games seen before their start but not tracked yet (a tracker attaches 3 min out; a doubleheader nightcap can start early). */
   private preSeen = new Set<string>();
+  /** Leagues whose scoreboard has been read since the server started: a game attached before that was live at boot. */
+  private scanned = new Set<League>();
   private kickers: Partial<Record<League, () => void>> = {};
   private standingsKick: Partial<Record<League, () => void>> = {};
   private upNextKick?: () => void;
@@ -874,7 +885,7 @@ class LiveEngine {
 
       if (relevant && !tr && (state === 'in' || (state === 'pre' && startsIn < 3 * 60_000))) {
         const tv = comp.broadcasts?.find((b: any) => b.market === 'national')?.names?.[0] ?? comp.broadcasts?.[0]?.names?.[0];
-        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv });
+        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv, atBoot: !this.scanned.has(lg) });
         this.trackers.set(key, tr);
         log(`[${lg}] tracking ${ev.shortName ?? ev.name} (${ev.id})`);
         tr.start();
@@ -895,6 +906,7 @@ class LiveEngine {
       }
     }
     for (const [k, t] of this.trackers) if (t.finished && !(sb.events ?? []).some((e: any) => `${lg}:${e.id}` === k) && k.startsWith(lg)) this.trackers.delete(k);
+    this.scanned.add(lg); // games attached from now on are new follows: 90 s of history (BOOT_BACKFILL_MS)
   }
 }
 
@@ -915,16 +927,23 @@ export async function scanYesterday(lg: League, now = Date.now()) {
   }
 }
 
-function every(ms: number, fn: () => Promise<void>): () => void {
-  let running = false;
+/**
+ * Runs `fn` now and then `ms` after each run ends, never two at once. The function it returns runs it at once (a new
+ * follow: LiveEngine.kick). A kick that comes while a run is under way runs it again as soon as that one ends: that run
+ * may have read the follows before the new one, and waiting for the next turn left a game untracked for up to `ms`.
+ */
+export function every(ms: number, fn: () => Promise<void>, opts: { unref?: boolean } = {}): () => void {
+  let running = false, again = false;
   let timer: NodeJS.Timeout;
   const run = async () => {
     clearTimeout(timer);
-    if (running) return;
+    if (running) { again = true; return; }
     running = true;
+    again = false;
     try { await fn(); } catch (e) { log('loop error', String(e)); }
     running = false;
-    timer = setTimeout(run, ms);
+    timer = setTimeout(run, again ? 0 : ms);
+    if (opts.unref) timer.unref?.(); // a test's loop, so the test can end (the server's keep the process up, as recorders need)
   };
   void run();
   return () => void run();
@@ -983,6 +1002,11 @@ export function dropBody(was: StandingSnap, cur: StandingSnap, from = was.rank, 
 
 /** ESPN's clincher marks that mean a division title: y, and the ones that include it (z: the conference or league's best, *: home field, p: Presidents' Trophy). */
 const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
+/**
+ * The WNBA has no divisions, and its playoffs are seeded league-wide, so ESPN marks no conference title (2026's final
+ * standings: the East's 1st had only "x"). Its clinch is ESPN's "*", the league's best record, for the conference rivals.
+ */
+const WNBA_TOP_SEED = new Set(['*']);
 
 /**
  * Standings news, one alert per team per read: being eliminated, a division rival clinching the division,
@@ -1001,9 +1025,11 @@ export async function scanStandings(lg: League) {
   if (!prev.size) return; // first snapshot is the baseline
   const day = new Date().toISOString().slice(0, 10), year = new Date().getFullYear(), at = Date.now();
   const onLoss = (key: string, line: string) => ({ lateOn: { targetKey: key, since: at - DROP_ON_LOSS_MS, types: [], loss: true, line } });
-  // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions).
-  const clinched = [...now].filter(([id, cur]) => DIVISION_TITLE.has(cur.clincher) && !DIVISION_TITLE.has(prev.get(id)?.clincher ?? ''));
-  const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
+  // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions); in the WNBA, a
+  // conference rival that just clinched the league's best record (divisionsOf gives the WNBA's conferences).
+  const titles = lg === 'wnba' ? WNBA_TOP_SEED : DIVISION_TITLE;
+  const clinched = [...now].filter(([id, cur]) => titles.has(cur.clincher) && !titles.has(prev.get(id)?.clincher ?? ''));
+  const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl', 'wnba'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
   const events: Detected[] = [];
   for (const [teamId, cur] of now) {
     const was = prev.get(teamId);
@@ -1018,7 +1044,9 @@ export async function scanStandings(lg: League) {
       const div = divisions.get(teamId)?.name;
       if (rivalId === teamId || !div || divisions.get(rivalId)?.name !== div) continue;
       const rival = catalog.teamByEspn(lg, rivalId)?.shortName ?? 'A rival';
-      events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched the ${div}`, body: `${team.shortName} won't win the division.`, fold: `The ${rival} clinched the ${div}.`, meta: { teamId, rivalId } });
+      const won = lg === 'wnba' ? "the WNBA's best record" : `the ${div}`;
+      events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched ${won}`,
+        body: lg === 'wnba' ? `${team.shortName} won't be the top seed.` : `${team.shortName} won't win the division.`, fold: `The ${rival} clinched ${won}.`, meta: { teamId, rivalId } });
     }
     // Soccer: into the relegation zone (ESPN's table note), before the drop that put them there.
     const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');

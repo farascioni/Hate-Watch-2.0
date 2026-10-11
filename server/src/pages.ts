@@ -1,5 +1,5 @@
 // Public HTML pages linked from the App Store listing and the app's Settings screen.
-const CONTACT = process.env.HW_CONTACT_EMAIL ?? 'support@example.com';
+const CONTACT = process.env.HW_CONTACT_EMAIL ?? 'hatewatchfeedback@gmail.com';
 const UPDATED = 'October 5, 2026';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);

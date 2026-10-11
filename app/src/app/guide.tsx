@@ -23,7 +23,7 @@ const PAGES: Page[] = [
   },
   {
     key: 'track', icon: 'search', where: 'Search tab', title: 'Pick who to hate',
-    body: 'Type a player or team and tap Track. The NBA, MLB, NFL, NHL, F1, Premier League and WNBA are all here, and you can track as many as you like.',
+    body: 'Type a player or team and tap Track. The NBA, MLB, NFL, college football, NHL, F1, the UFC, the Premier League and the WNBA are all here, and you can track as many as you like.',
     demo: () => (
       <DemoCard>
         <Badge text="DAL" color="#041E42" />
@@ -115,14 +115,14 @@ const PAGES: Page[] = [
   },
   {
     key: 'record', icon: 'medal', where: 'Settings tab', title: 'Keep score',
-    body: 'The top of Settings counts your Successful Hate Watches: every time a team you track loses, or the team of a player you track. Tap "+3 more" to see every team.',
+    body: 'The top of Settings counts your Successful Hate Watches: every time a team or a UFC fighter you track loses, or the team of a player you track. Tap "+3 more" to see every team.',
     demo: () => (
       <View style={[styles.demoCard, { borderColor: colors.hateDim, gap: space(3) }]}>
         <View style={[styles.row, { gap: space(4) }]}>
           <Text style={styles.recordCount}>12</Text>
           <View style={{ flex: 1 }}>
             <Text style={[styles.demoTitle, { fontSize: 17 }]}>Successful Hate Watches</Text>
-            <Text style={styles.demoSub}>Each time a team you track lost.</Text>
+            <Text style={styles.demoSub}>Each time a team or fighter you track lost.</Text>
           </View>
         </View>
         <View style={[styles.inline, { flexWrap: 'wrap' }]}>

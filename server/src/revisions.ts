@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { TEAMS_ONLY, teamKey } from './leagues.ts';
 import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ruled, scoreLine, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
@@ -88,7 +89,6 @@ export interface Revision { fresh: Detected[]; lines: Detected[] }
 export class PlayLedger {
   private plays = new Map<string, PlayEntry>(); // by the play's id now (a re-post moves it)
   private drives = new Map<string, { sig: string; firstAt: number; history: boolean; alerts: Map<string, Detected> }>();
-  private n = 0;
   private readonly g: GameCtx;
   private readonly log: (msg: string) => void;
 
@@ -103,9 +103,13 @@ export class PlayLedger {
    * Lines on alerts that went out, for the devices that got them (as their alert or a line on another of their
    * moment's), with no push: publish() adds a moment's `foldOnly` fact to the alert each device already has for it.
    * (Every football alert has a moment: bundleByPlay. One without would go out as an alert of its own: none.)
+   * A line's id is its alert's id and its own words (hashed), the same in every tracker: a counter started over with a
+   * new tracker (a game followed again) and could reuse a stored id, dropping a new line. The same words on the same
+   * alert are the same fact, and a feed row shows a line once anyway (addLateLine).
    */
   linesOn(es: Detected[], line: string, alt?: string): Detected[] {
-    return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${++this.n}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
+    const key = createHash('sha256').update(line).digest('base64url').slice(0, 10);
+    return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${key}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
       title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}) }));
   }
 

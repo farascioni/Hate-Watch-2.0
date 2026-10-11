@@ -15,7 +15,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 - [NFL delay of game / safety](#nfl-delay-of-game--safety): a team's delay of game given to its quarterback; a safety for the team and the player responsible.
 - [NFL onside kick](#nfl-onside-kick): the receiving team's alert when the other side kicks onside and keeps the ball (NFL and college).
 - [NBA](#nba): blocks, missed free throws, missed shots (named, with the distance, late and close), turnovers, technicals and ejections, fouls and fouling out, scoreless at the half, brick nights, the other team's star, a 14-0 run.
-- [WNBA](#wnba): how the WNBA gets a copy of every NBA alert, its own thresholds, and the one shared alert that never fires for it.
+- [WNBA](#wnba): how the WNBA gets a copy of every NBA alert, its own thresholds, and its rival-clinch alert (the league's best record: it has no divisions).
 - [Soccer (EPL)](#soccer-epl): every soccer alert: goals against a keeper, own goals, missed penalties, cards, VAR, the woodwork, early subs, late goals, the relegation zone, and the shared team alerts in soccer.
 - [EPL how](#epl-how): how a match is read: key events for plays, the score counted from goals, the keeper in goal tracked through subs and red cards.
 - [Soccer fouls and penalties conceded](#soccer-fouls-and-penalties-conceded): fouls, handballs and dives from the commentary, the fouler from the text, a penalty conceded for the player and the team.
@@ -410,7 +410,7 @@ The NBA's player alerts from plays, the box score at halftime and at the final, 
 - **Same detectors:** `PLAYER_DETECTORS.wnba` is `nba()`. Its alert types are built as `${lg}.got_blocked` and so on, so a WNBA play makes `wnba.*` alerts.
 - **Its own numbers** where the WNBA differs (`detectors.ts`): a run of 12-0 (`RUN_POINTS.wnba`), a star's 30 (`STAR_POINTS.wnba`), a blowout at 20 (`BLOWOUT_MARGIN.wnba`), a blown lead of 15 live and 12 at the final (`BLEW_LEAD_LIVE`, `BLEW_LEAD`), a worse team .200 below after 8 games (`WORSE_GAP`, `MIN_GAMES`).
 - **Shared alerts it gets:** losses and their facts, lead changes, game starts, injuries, standings drops, losing streaks, elimination, off-field news, their team losing, the Hate Watch streak and the weekly recap.
-- **Rival clinches the division:** `team.rival_clinched` lists the WNBA (through `withWnba`), but `scanStandings` only looks for division clinches in MLB, the NFL, the NBA and the NHL, so a WNBA rival clinching never fires.
+- **Rival clinches the division:** the WNBA has no divisions and seeds its playoffs league-wide, so ESPN marks no conference title (its final 2026 standings: the East's 1st had only "x"). For the WNBA, `scanStandings` sends this alert when a conference rival clinches the league's best record (ESPN's "*", `WNBA_TOP_SEED`): "The Lynx clinched the WNBA's best record", body "Valkyries won't be the top seed." (`test/new-alerts.test.ts`). A playoff spot ("x") isn't a clinch.
 - **Checked:** the README row records NY @ ATL (WNBA playoffs, 2026-10-04) through the live tracker. `test/wnba.test.ts` checks a missed shot ("Allisha Gray missed a 5-foot pull-up jumper") and a lead change ("Liberty scored 2 to take the lead over the Dream").
 - **In the app:** the WNBA is the last league everywhere (`LEAGUE_IDS`, README "Notifications").
 
@@ -866,9 +866,8 @@ The team alerts every league shares, and the standings alerts. The loss and its 
 
 ### Rival clinches the division (feed only by default)
 
-- **Trigger:** in MLB, the NFL, the NBA or the NHL, a team whose standings clincher becomes a division title (`DIVISION_TITLE`: "y", or "z", "*", "p", which include it). Every other team in that division (`divisionsOf`, from `server/src/divisions.ts`) gets the alert.
+- **Trigger:** in MLB, the NFL, the NBA or the NHL, a team whose standings clincher becomes a division title (`DIVISION_TITLE`: "y", or "z", "*", "p", which include it). Every other team in that division (`divisionsOf`, from `server/src/divisions.ts`) gets the alert. The WNBA has no divisions: there, a team getting ESPN's "*" (the league's best record, `WNBA_TOP_SEED`) is the clinch, for the rest of its conference: "The Lynx clinched the WNBA's best record", body "Valkyries won't be the top seed.".
 - **Title:** "The <Rival> clinched the <division>", body "<Team> won't win the division.", fold "The <Rival> clinched the <division>.". Id `clinch:${league}:${rivalId}:${year}:${teamId}`.
-- The WNBA is listed for this type but never checked ([WNBA](#wnba)).
 
 ### One alert per team per standings read
 

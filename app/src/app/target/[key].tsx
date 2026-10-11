@@ -18,7 +18,7 @@ export default function TargetScreen() {
   const targetKey = decodeURIComponent(key);
   const { feed, noteTrackers, leagueInfo } = useStore();
   const [recent, setRecent] = useState<FeedItem[]>([]);
-  const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first; F1 has no stats yet, so only misery
+  const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first (F1 and the UFC have stats pages too: f1-stats.ts, ufc.ts)
   const [stats, setStats] = useState<StatsPage | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);

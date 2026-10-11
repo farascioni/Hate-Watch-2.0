@@ -60,7 +60,7 @@ decide which of several true alerts a device gets.
 - **Don't re-run detectors on a changed MLB result.** Some MLB ids are built from the play's text, and a rewrite
   would make a new id. `GameTracker.poll` logs the change instead (one exception, a crew chief review; below).
 - **Changing an id's shape re-sends.** A deploy that changes how an id is built sends every alert made again with
-  the new shape as new: the last 90 seconds of each game in progress, and F1 results for sessions that started in
+  the new shape as new: the last 5 minutes of each game in progress (a deploy is a restart: `atBoot`), and F1 results for sessions that started in
   the last 8 hours, which are read again after a restart.
 
 Every alert (`Detected` in `server/src/detectors.ts`) has an `id`, the "deterministic dedupe key". It's the primary
@@ -101,7 +101,7 @@ from the tests):
 | Weekly recap (`recap.ts`) | `recap:${first 16 characters of a base64url SHA-256 of the device id}:${week}` | `recap:Vf3jywfTfArsGwqS:2026-10-05` |
 | Developer notice (`notices.ts`) | `notice:${time sent, in ms}` | |
 | A test alert (`POST /dev/simulate`, `api.ts`) | `sim:${random uuid}`: new every time on purpose, so each test sends | |
-| A revision's line (`linesOn` in `revisions.ts`) | `${the alert's id}:changed:${n}`, `n` a counter in the game's ledger (see Known gaps) | `401858481:401858481541:cfb.team.interception:158:changed:1` |
+| A revision's line (`linesOn` in `revisions.ts`) | `${the alert's id}:changed:${hash}`, `hash` the first 10 characters of a base64url SHA-256 of the line's words: the same line on the same alert is the same id in any tracker | `401858481:401858481541:cfb.team.interception:158:changed:` and the hash of "Wiped out by a penalty on Indiana: Roughing The Passer." |
 
 **Ids keyed on text.** A few MLB alerts are keyed on the play's text instead of its id: caught stealing, out on the
 bases, a run handed over on a wild pitch or a balk (and the runs it counts as), and a lost replay challenge. ESPN
@@ -168,8 +168,9 @@ line to one device's feed row (not if the row is gone, nor if it already has tha
 
 - **A play goes to the detectors once**, on its first sighting (`seen`). Don't call detectors for plays the tracker
   has already seen; a change to a seen play is a revision (Layer 5) or a logged change (MLB), never a fresh judgment.
-- **The first read of anything is a baseline**, not news: plays older than 90 seconds when the tracker attaches, the
-  box score's pitchers, finished drives, standings, injuries, news.
+- **The first read of anything is a baseline**, not news: plays older than 90 seconds when the tracker attaches (5
+  minutes for a game live when the server started: below), the box score's pitchers, finished drives, standings,
+  injuries, news.
 - **Once-a-game facts are marked done** (`onceDone`, `pitching`) when sent or baselined.
 
 `GameTracker` (`server/src/live.ts`), one per live game, polls ESPN every 2 seconds (the core plays and the site
@@ -181,7 +182,10 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
   is judged once, when it's ready.
 - **History on attach:** when the tracker first attaches to a game (a new follow, or a server restart), plays whose
   time (ESPN's wallclock) is older than `BACKFILL_WINDOW_MS` (90 seconds) update its state and its score but are
-  never alerted. A game first seen already under way never gets "Hate Watch Starting": the start alert needs the
+  never alerted. A game attached on the server's first scoreboard read of its league (`atBoot`: it was live when the
+  server started, so this is a restart) takes `BOOT_BACKFILL_MS` (5 minutes, `HW_BOOT_BACKFILL_MS`) instead: a play
+  the old server never read is still news, and the ones it did send stop at the insert (Layer 2;
+  `restart-backfill.test.ts`). A game first seen already under way never gets "Hate Watch Starting": the start alert needs the
   tracker to have seen the game before it started (`sawPre`). The box score's pitcher alerts (a blown save, no
   quality start), finished drives and scoreless halves are baselined on the first read, not sent.
 - **`announced`:** the score each side's team alerts have gone out for. The score is re-derived from every play on
@@ -388,7 +392,7 @@ Nebraska's own plays (game 401858481, October 10 2026). One device tracks Nebras
    version's alerts are Indiana's flag, `cfb.team.penalty` for Indiana. The interception is gone from them.
 4. **The line.** The interception's kind is dropped, and `changeLine` reads "NO PLAY" in the ruling: "Wiped out by a
    penalty on Indiana: Roughing The Passer." `linesOn` makes a `foldOnly` alert with the interception's moment, id
-   `…:cfb.team.interception:158:changed:1`, and `poll` publishes it on its own. `publish` finds the moment in
+   `…:cfb.team.interception:158:changed:<hash of the line>`, and `poll` publishes it on its own. `publish` finds the moment in
    `delivered` for the Nebraska device and calls `addLateLine`: the interception's feed row gets the line, the app
    gets an `eventUpdate` frame, and nothing is pushed.
 5. **The flag.** Indiana's penalty is new, so it goes out as an alert: "Indiana was flagged: Roughing The Passer",
@@ -443,9 +447,10 @@ A restart, step by step:
    been sent yet.
 3. **Trackers attach as new.** The scoreboard scan finds each live game in which someone tracks a team and starts a `GameTracker` for it, with an
    empty `seen` and the pregame facts read back from `kv`.
-4. **The first read.** Plays more than 90 seconds old are history: they rebuild the score, `announced`, the bases,
-   the goalies and the half-inning, and send nothing. A play from the last 90 seconds is detected again with the
-   same id, which the database already has, so `publish` stops at the insert. The box score's pitchers, finished
+4. **The first read.** Each game live at boot is attached `atBoot`, so plays more than 5 minutes old are history: they rebuild the score, `announced`, the bases,
+   the goalies and the half-inning, and send nothing. A play from the last 5 minutes is detected again with the
+   same id, which the database already has, so `publish` stops at the insert, and one the old server never read
+   goes out as news. The box score's pitchers, finished
    drives and scoreless halves are baselines. The game was first seen already under way, so no "Hate Watch Starting".
 5. **Off-game scans.** Standings, injuries and news compare with their `kv` baselines and find nothing new. F1
    reads the results of sessions from the last 8 hours again; their ids are stored, so nothing goes out
@@ -464,9 +469,12 @@ What is lost:
   empty, and a revision line has no `delivered` entry to land on.
 - **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, from before the
   90-second window is history.
-- **Plays nobody read.** The 90-second window counts from the play's own time (ESPN's wallclock), and ESPN posts
-  plays about 80 to 105 seconds after they happen (measured live on MLB, README "Real-time"). A play the old server hadn't read yet can
-  already be older than 90 seconds when the new tracker first reads it, and it's then history: never alerted.
+- **Plays nobody read** (fixed October 11, 2026). The 90-second window counts from the play's own time (ESPN's
+  wallclock), and ESPN posts plays well after that time: in production during ALDS Game 5, 10.9 to 92.7 seconds after it
+  (median 23.9; README "Real-time", "What production measures"), plus the seconds the server is down for the deploy.
+  With 90 seconds, a play the old server hadn't read yet could already be history for the new one. Games live at boot
+  now take 5 minutes (`atBoot`, Layer 3), which covers it; a game followed later keeps 90 seconds, since its older
+  plays went to nobody.
 
 This is one reason for the decision **"No production restarts during live games"**: deploy when nothing is live.
 
@@ -477,14 +485,16 @@ This is one reason for the decision **"No production restarts during live games"
 - **Text-keyed MLB ids** depend on ESPN's text staying the same. A re-judged rewritten result would make a new id,
   which is why changed results are logged, not judged again.
 - **A fold sentence is compared as text.** Two wordings of the same fact are two lines.
-- **Revision lines' ids use a counter** (`linesOn` in `revisions.ts`: `${id}:changed:${n}`, with `n` counting from
-  1 in each game's ledger). It starts again with every tracker, so a line for the same alert can get an id already
-  stored, and `publish` drops it at the insert. After a restart that loses nothing more (the line has no
-  `delivered` entry to land on anyway). But a game also gets a new tracker without a restart: the live engine stops
-  one when nobody tracks either team and starts a fresh one when someone follows again (`live.ts`), while
-  `delivered` in `fanout.ts` still holds the moment. A later revision's line can then collide with a stored
-  `:changed:1` and be silently lost. It breaks Layer 1's rule.
-- **The 90-second window and ESPN's delay:** see "Plays nobody read" above.
+- **A soccer foul that ESPN later marks "Penalty conceded"** is judged again (`fouls` in `GameTracker`), and the
+  penalty's alerts have their own ids and moment (`soccerFoul`), so a device can get the foul (feed only) and then
+  the penalty (pushed) as two alerts about one foul. To be fixed with the Man City at Liverpool review's soccer
+  changes, which rework the same code.
+- **Fixed on October 11, 2026:** revision lines' ids used a counter (`${id}:changed:${n}`) that started over with every
+  tracker, so a game followed again could give a new line a stored id and lose it; they're now the line's own words
+  hashed (Layer 1). And the 90-second window could skip a play the old server never read at a restart; games live at
+  boot now take 5 minutes ("Plays nobody read").
+- **The same revision line twice on one alert** (a play taken back, put back, then taken back again) has the same id,
+  so the second "taken back" is dropped at the insert. The alert's row already shows that line once.
 
 ## How to change alerts safely
 
@@ -500,7 +510,8 @@ This is one reason for the decision **"No production restarts during live games"
 6. **Test it.** Run a re-poll of the same feed (nothing new), a restart in the middle of a game (nothing new), the play
    in both feeds (one alert), and a player and his team tracked together (one alert). The tests that cover this:
    `bundling.test.ts`, `play-revisions.test.ts`, `live-score.test.ts`, `challenges.test.ts`, `crew-chief-review.test.ts`,
-   `f1-merges.test.ts`, `hate-watches.test.ts`, `logic.test.ts`, `sport-alerts.test.ts` and `clips.test.ts`. Replay a
+   `f1-merges.test.ts`, `hate-watches.test.ts`, `logic.test.ts`, `sport-alerts.test.ts`, `clips.test.ts` and
+   `restart-backfill.test.ts` (a restart's 5 minutes, revision lines' ids). Replay a
    recorded game (`server/data/recordings/`) and compare the alert count.
 
 ## Files this covers

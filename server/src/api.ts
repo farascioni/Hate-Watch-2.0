@@ -179,7 +179,7 @@ route('GET', '/leaderboard', false, (_r, url) => {
   return leaderboard({ kind: (kind ?? undefined) as 'team' | 'player' | undefined, league: (league ?? undefined) as League | undefined, limit });
 });
 
-// ─── Settings counter: Successful Hate Watches (a team you track lost) ─────────────────────────
+// ─── Settings counter: Successful Hate Watches (a team or UFC fighter you track lost) ─────────────────────────
 route('GET', '/me/hate-watches', true, (req) => hateWatchTally(req.deviceId!));
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────

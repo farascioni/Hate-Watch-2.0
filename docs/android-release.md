@@ -123,7 +123,7 @@ The emulator can't do Google's device verification (step 9), but it's enough for
    - **Ads:** no ads.
    - **Content rating:** complete the IARC questionnaire honestly (no violence, no user-generated content, no gambling, no location sharing). It should come out at the lowest rating.
    - **Target audience:** 18 and over. That keeps the app out of the stricter children's-app rules.
-   - **Data safety:** the app collects **device or other IDs** (an app-generated device ID and the push token) for **app functionality**. It's not shared with third parties, it's encrypted in transit (HTTPS), and users can delete it (Settings → Delete all my data). It collects no name, email, location, contacts or photos. In-app purchases are processed by Google Play, and Hate Watch doesn't store payment details.
+   - **Data safety:** the app collects **device or other IDs** (an app-generated device ID and the push token) for **app functionality**. It's not shared with third parties, it's encrypted in transit (HTTPS), and users can delete it (Settings → Delete all my data). It collects no name, email, location, contacts or photos. (Settings → Give feedback opens the person's own mail app with a `mailto:` link: their mail app sends it, and the app never sees the address. That's why this answer leaves email out; check it against Play's current Data safety form. The privacy page says an email they choose to send reaches us, and the README's App Store answers make the same choice.) In-app purchases are processed by Google Play, and Hate Watch doesn't store payment details.
    - **News app:** no. **Government app:** no. **Financial features:** none. **Health:** none.
 
 **Claude can do this:** render the 512 px icon, the 1024 × 500 feature graphic and 1080 × 1920 phone screenshots with the same tooling as the App Store screenshots, and draft both descriptions.
@@ -197,7 +197,7 @@ Do this with a borrowed phone any time before you apply for production. It takes
   ```bash
   npx eas-cli@latest build --platform android --profile production --auto-submit
   ```
-- **Claude can do this: share links on Android.** Today a shared alert opens the App Store page. Once the Play listing is live, I can send Android visitors to the Play Store instead, and set up Android App Links (an `assetlinks.json` on the server, plus intent filters in `app.json`) so share links open the app directly when it's installed, like iOS universal links. That needs the app-signing SHA-256 fingerprint from Play Console → Setup → App signing.
+- **Claude can do this: share links on Android.** Today only an iPhone, iPad or iPod is sent to the App Store (`server/src/share.ts` checks the browser's user agent); on an Android phone a shared alert opens the server's card page (the alert's picture and a download button that points to the App Store). Once the Play listing is live, I can send Android visitors to the Play Store instead, and set up Android App Links (an `assetlinks.json` on the server, plus intent filters in `app.json`) so share links open the app directly when it's installed, like iOS universal links. That needs the app-signing SHA-256 fingerprint from Play Console → Setup → App signing.
 - **Claude can do this: the README.** Once you've been through this once, I can fold the parts that turned out to matter into the README's Deploy section.
 
 ## Sources
