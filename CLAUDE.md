@@ -2,6 +2,16 @@
 
 The app is in `app/` (Expo, see `app/CLAUDE.md` and `app/AGENTS.md`), the server in `server/` (Node, SQLite, Fly.io). `README.md` explains how everything works.
 
+## Read the docs first
+Before planning or changing anything (a feature, a fix, an alert, its wording, a release step), read what the docs say about that area, and say in your plan which sections you read. The code does what they describe: a change that departs from them updates them in the same change (the README section, `PATCH_NOTES.md`).
+- `README.md` is the reference for how everything works, and its headings are the map: Notifications (every league's alerts, the defaults, Settings), Real-time (polling, football play revisions), Data (rosters, images), Scores tab, Stats pages, Successful Hate Watch counter, Leaderboard, Startup guide, An alert on its own screen, Developer notices, Sharing an alert, Tests, Known limits. The UFC and college football are in `PATCH_NOTES.md` and their modules' header comments (`server/src/ufc.ts`, `cfb-poll.ts`).
+- This file for releasing: deploys, builds, over-the-air updates, patch notes, server switches, the two machines.
+- `app/AGENTS.md` before touching any Expo or React Native API (fetch the versioned Expo docs), and `docs/` for store releases.
+- The module's own header comment: every file in `server/src` starts with what it does and why.
+- On the Mac, the Hate Watch Obsidian vault (`~/Documents/obsidian/hate-watch`, start at `Home.md`) has all of this split by topic, with the game review reports and the standing decisions. It's a private copy; the repo wins where they differ.
+- Side sessions and subagents follow the same rule: a brief names the docs to read first.
+- A hook enforces it (`.claude/settings.json` runs `.claude/hooks/require-docs.mjs`): an edit to `app/` or `server/` code (with the edit tools, or a shell command that writes to a code file; read-only commands pass) is blocked until the session has read `README.md`, `docs/`, an `AGENTS.md` or the vault, and the block says which docs cover that file. `HW_DOCS_GATE=off` in the environment turns it off for an emergency.
+
 ## Release flow
 - After a change is built and tested, ask before you commit, push or deploy, every time. Don't do any of them unasked. The user wants a say before anything goes public or live, and Apple sign-in is theirs to do.
 - Server: deploy from `server/` with `flyctl deploy --remote-only` (or `fly deploy --remote-only`). The app `hate-watch-api` runs on one machine with its SQLite database on a volume at `/data`. Before anything that changes production data, back it up with SQLite's `VACUUM INTO` into `/data`.
