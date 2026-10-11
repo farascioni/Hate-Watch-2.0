@@ -125,6 +125,33 @@ test('MLB: chased early, and when "no quality start" came first, a line on it wi
 const nbaCtx = (): any => ({ league: 'nba', gameId: 'B', homeId: '2', awayId: '18', goalies: new Map() });
 const foul = (i: number) => ({ id: `f${i}`, type: 'Personal Foul', typeSlug: '', text: 'Jayson Tatum personal foul', teamId: '2', participants: [{ id: '4065648' }], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false });
 
+test('NBA: a missed shot says what it was and from how far (ESPN plays from October 2026 preseason games); a heave is no alert', () => {
+  const ctx = (homeId: string, awayId: string): any => ({ league: 'nba', gameId: 'B', homeId, awayId, goalies: new Map() });
+  const espn = (id: string, type: string, text: string, team: string, away: number, home: number, period: number, clock: string, x: number, y: number, pointsAttempted: number) =>
+    ({ id, type: { text: type }, text, awayScore: away, homeScore: home, period: { number: period }, clock: { displayValue: clock }, team: { id: team }, participants: [{ athlete: { id: '1' } }], shootingPlay: true, coordinate: { x, y }, pointsAttempted });
+  const miss = (homeId: string, awayId: string, p: any, name: string) => d.missedShot(ctx(homeId, awayId), d.fromSitePlay(p), name);
+  // Nuggets (5) host Celtics (2); Rockets (10) at Mavericks (6); Bulls (4) host Grizzlies (29).
+  assert.equal(miss('5', '2', espn('40189839211', 'Jump Shot', 'Peyton Watson misses 27-foot three point jumper', '5', 0, 0, 1, '11:38', 8, 21, 3), 'Peyton Watson'), 'Peyton Watson missed a 27-foot three');
+  assert.equal(miss('6', '10', espn('401898395291', 'Driving Floating Jump Shot', 'Kevin Durant misses driving floating jump shot', '10', 49, 33, 2, '5:03', 31, 11, 2), 'Kevin Durant'),
+    'Kevin Durant missed a 12-foot driving floater', "no distance in ESPN's words: from where he shot it");
+  assert.equal(miss('5', '2', espn('401898392747', 'Driving Layup Shot', 'Chris Cenac Jr. misses driving layup', '2', 122, 111, 4, '50.2', 25, 2, 2), 'Chris Cenac Jr.'), 'Chris Cenac Jr. missed a driving layup', 'at the rim: no distance');
+  assert.equal(miss('5', '2', espn('401898392574', 'Heave Jump Shot', 'Craig Porter Jr. misses heave jump shot', '5', 99, 96, 3, '0.0', 25, 69, 3), 'Craig Porter Jr.'), null, 'a heave');
+  assert.equal(miss('5', '2', espn('h2', 'Jump Shot', 'Peyton Watson misses 44-foot three point jumper', '5', 50, 50, 2, '0.4', 25, 45, 3), 'Peyton Watson'), null, '40 feet out is a heave, whatever ESPN calls it');
+  const wilson = (away: number, home: number, clock = '2.0') => espn('401908940765', 'Step Back Jump Shot', 'Caleb Wilson misses 26-foot three point step back jumpshot', '4', away, home, 4, clock, 36, 25, 3);
+  assert.equal(miss('4', '29', wilson(102, 100), 'Caleb Wilson'), 'Caleb Wilson missed a 26-foot step-back three for the lead with 2 seconds left');
+  assert.equal(miss('4', '29', wilson(102, 99, '0.4'), 'Caleb Wilson'), 'Caleb Wilson missed a 26-foot step-back three to tie it with 0.4 seconds left');
+  assert.equal(miss('4', '29', wilson(102, 98), 'Caleb Wilson'), 'Caleb Wilson missed a 26-foot step-back three', 'down 4: it would have tied nothing');
+  assert.equal(miss('4', '29', wilson(102, 100, '41.0'), 'Caleb Wilson'), 'Caleb Wilson missed a 26-foot step-back three', 'more than 30 seconds left');
+  assert.equal(miss('5', '2', espn('f3', 'Driving Floating Jump Shot', 'Peyton Watson misses 23-foot three point driving floating jump shot', '5', 0, 0, 1, '9:00', 3, 9, 3), 'Peyton Watson'), 'Peyton Watson missed a 23-foot three', 'a floater from three is a three');
+  assert.equal(miss('5', '2', espn('e8', 'Jump Shot', 'Peyton Watson misses 8-foot jumper', '5', 0, 0, 1, '9:00', 25, 9, 2), 'Peyton Watson'), 'Peyton Watson missed an 8-foot jumper');
+  // Through the detectors, from the core feed's shape too.
+  const tatum = (type: string, text: string, x: number, y: number, pts: number) => ({ ...d.fromSitePlay(espn('t1', type, text, '2', 0, 0, 1, '10:00', x, y, pts)), participants: [{ id: '4065648' }] });
+  assert.deepEqual(PLAYER_DETECTORS.nba(nbaCtx(), tatum('Pullup Jump Shot', 'Jayson Tatum misses 25-foot three point pullup jump shot', 47, 14, 3)).map((e) => [e.type, e.title]), [['nba.missed_shot', 'Jayson Tatum missed a 25-foot pull-up three']]);
+  assert.deepEqual(PLAYER_DETECTORS.nba(nbaCtx(), tatum('Heave Jump Shot', 'Jayson Tatum misses heave jump shot', 25, 80, 3)), []);
+  assert.deepEqual(d.fromCorePlay({ id: 'c1', type: { text: 'Jump Shot' }, text: 'x', shootingPlay: true, coordinate: { x: 8, y: 21 }, pointsAttempted: 3 }).shot, { x: 8, y: 21, points: 3 });
+  assert.equal(d.fromSitePlay({ id: 'ft', type: { text: 'Free Throw - 1 of 2' }, text: 'x', shootingPlay: true, coordinate: { x: -214748340, y: -214748365 }, pointsAttempted: 1 }).shot, undefined, "a free throw's placeholder spot");
+});
+
 test('NBA: the 6th personal foul is fouling out, in place of the foul (technicals don\'t count)', () => {
   const g = nbaCtx();
   const nb = (p: any) => { const es = PLAYER_DETECTORS.nba(g, p); observePlay(g, p); return es; };

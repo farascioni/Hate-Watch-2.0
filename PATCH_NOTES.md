@@ -10,23 +10,23 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 Server updates already work on every build.
 
 SCORES
-- Before a game starts, its Box score tab previews it: season leaders and stats, the last five games, injuries, ESPN's predictor. (Server)
+- Before a game starts, its Box score tab previews it: season leaders, the last five games, injuries, ESPN's predictor. (Server)
 - On a game's screen, your alerts from it come after the box score, and you can minimize them.
 
 UFC
 - Track UFC fighters. A loss is a Successful Hate Watch that says how, with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
-- With the UFC chip on, Scores has the next card: All fights lists every fight by segment with the odds, then the card after; My fights is your fighters' fights. Results come in as fights end.
-- A card's preview, from Scores: one fight in full, with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five. Names open their pages.
+- With the UFC chip on, Scores has the next card: All fights lists every fight with the odds, then the card after; My fights is yours. Results come in as fights end.
+- A card's preview, from Scores: one fight in full, with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
 - A loss by a finish says how and when (KO/TKO R1 1:20); a title fight adds "Lost the Lightweight title" or "Lost a Lightweight title fight". (Server)
 - A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
 - Women's weight classes are named in full. (Server)
 
 F1
-- Sprints get their alerts (lights out, a car retiring, the result). Sessions are named in full, and a driver's teammate is whoever drove the other car that weekend. (Server)
+- Sprints get their alerts (lights out, a car retiring, the result); a driver's teammate is whoever drove the other car that weekend. (Server)
 - Lights out is one alert naming your constructors and drivers. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
 - Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. (Server)
-- Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, the teammate battle, the last five races.
+- Drivers and constructors have a Stats tab: the championship, wins, podiums, poles, DNFs, teammate battle, last five races.
 - A driver's page no longer names their constructor twice.
 - Search lists F1's constructors A to Z and every driver by constructor.
 - Before an F1 session, its screen previews the weekend: the circuit, each session, the grid once set, the championship.
@@ -34,10 +34,13 @@ F1
 
 FOOTBALL
 - A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank ("#8 Indiana"). (Server)
-- Alerts: the game starting, an interception, a lost fumble, a missed field goal, a player ejected, the quarterback pulled, falling behind, losing, a turnover on downs, the red zone, falling in or out of the AP Top 25; sacks and flags in the feed. (Server)
+- Alerts: the start, interceptions, lost fumbles, missed field goals, ejections, the quarterback pulled, falling behind, losing, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
 - A play ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
 - More teams' flags go out, with the team and foul named right. (Server)
 - NFL: a play wiped out alerts only its flag; a strip-sack lost is a lost fumble. (Server)
+
+NBA AND WNBA
+- Misses name the shot and distance ("missed a 27-foot three"), heaves aside. (Server)
 
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build, after you reopen the app once or twice.

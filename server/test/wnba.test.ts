@@ -33,7 +33,7 @@ test('every NBA alert has a WNBA twin, and every multi-league alert the NBA is i
 
 test('the basketball detectors on a WNBA play: wnba.* alerts, named from the WNBA roster', () => {
   const miss = play({ type: 'Pullup Jump Shot', text: 'Allisha Gray misses 5-foot pullup jump shot', shooting: true, teamId: '20', participants: [{ id: '3058901' }] });
-  assert.deepEqual(PLAYER_DETECTORS.wnba(g, miss).map((e) => [e.type, e.targetKey, e.title]), [['wnba.missed_shot', 'player:wnba:3058901', 'Allisha Gray missed a shot']]);
+  assert.deepEqual(PLAYER_DETECTORS.wnba(g, miss).map((e) => [e.type, e.targetKey, e.title]), [['wnba.missed_shot', 'player:wnba:3058901', 'Allisha Gray missed a 5-foot pull-up jumper']]);
   const turnover = play({ id: 'p2', type: 'Bad Pass\nTurnover', text: 'Allisha Gray bad pass (Breanna Stewart steals)', teamId: '20', participants: [{ id: '3058901' }] });
   assert.deepEqual(PLAYER_DETECTORS.wnba(g, turnover).map((e) => e.type), ['wnba.turnover']);
 });

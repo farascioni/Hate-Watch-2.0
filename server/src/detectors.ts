@@ -26,6 +26,7 @@ export interface NPlay {
   hits?: { home: number; away: number }; // MLB: each team's hits so far (the core feed only: the summary's plays don't say)
   strength?: string;       // NHL goals: "Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot"
   driveId?: string;        // football: the drive it's in (a score taken back and scored again on that drive is one score: live.ts)
+  shot?: { x: number; y: number; points: number }; // basketball: where a field goal was taken (ESPN's court feet, the rim at 25,1) and its worth
 }
 
 export interface GameCtx {
@@ -155,7 +156,14 @@ export function fromSitePlay(p: any): NPlay {
     penaltyMinutes: p.type?.penaltyMinutes ? Number(p.type.penaltyMinutes) : undefined,
     ...(p.strength?.text ? { strength: String(p.strength.text) } : {}),
     ...periodFields(p),
+    ...shotOf(p),
   };
+}
+
+/** Basketball: a field goal's spot and worth, where ESPN gives them (a free throw's spot is a placeholder far off the court). */
+function shotOf(p: any): Pick<NPlay, 'shot'> {
+  const x = Number(p.coordinate?.x), y = Number(p.coordinate?.y), points = Number(p.pointsAttempted);
+  return p.shootingPlay && x >= 0 && x <= 50 && y >= 0 && y <= 94 && (points === 2 || points === 3) ? { shot: { x, y, points } } : {};
 }
 
 /**
@@ -216,6 +224,7 @@ export function fromCorePlay(p: any): NPlay {
     ...periodFields(p),
     ...(p.clock?.displayValue ? { clock: String(p.clock.displayValue) } : {}),
     ...driveOf(p.drive?.$ref),
+    ...shotOf(p),
   };
 }
 /** Football: the drive a core-API play is in, from its ref ("…/drives/40167178901"), when it has one. */
@@ -1357,6 +1366,49 @@ function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | u
   return qb ? { qb, named: !!named } : undefined;
 }
 
+/** ESPN's basketball shot types as a fan says them; any other is ESPN's own, lowercased, without "shot". */
+const SHOT_NAME: Record<string, string> = {
+  'Jump Shot': 'jumper', 'Pullup Jump Shot': 'pull-up jumper', 'Step Back Jump Shot': 'step-back jumper', 'Fade Away Jump Shot': 'fadeaway',
+  'Turnaround Fade Away Jump Shot': 'turnaround fadeaway', 'Turnaround Jump Shot': 'turnaround jumper', 'Running Pullup Jump Shot': 'running pull-up',
+  'Running Jump Shot': 'running jumper', 'Floating Jump Shot': 'floater', 'Driving Floating Jump Shot': 'driving floater',
+  'Driving Floating Bank Jump Shot': 'driving bank floater', 'Fade Away Bank Jump Shot': 'fadeaway bank shot', 'Layup Shot': 'layup',
+  'Driving Layup Shot': 'driving layup', 'Running Layup Shot': 'running layup', 'Cutting Layup Shot': 'cutting layup',
+  'Driving Finger Roll Layup': 'driving finger roll', 'Layup Driving Reverse': 'driving reverse layup', 'Layup Shot Putback': 'putback',
+  'Tip Shot': 'tip-in', 'Alley Oop Layup Shot': 'alley-oop layup', 'Driving Dunk Shot': 'driving dunk', 'Running Dunk Shot': 'running dunk',
+  'Driving Hook Shot': 'driving hook', 'Turnaround Hook Shot': 'turnaround hook',
+};
+
+/**
+ * A missed field goal as a fan says it: "missed a 27-foot three", "missed a 12-foot driving floater", "missed a driving
+ * layup" (no distance inside 5 feet), and in the last 30 seconds of the 4th or overtime, a shot that would have tied it
+ * or given them the lead says so ("for the lead with 2 seconds left"). The distance is ESPN's ("misses 27-foot three
+ * point jumper"), else measured from where it was taken (within a foot of ESPN's 94% of the time, 616 shots, Oct 2026).
+ * A heave (ESPN's type, or 40 feet out) is no alert. Without ESPN's shot type: "missed a three", "missed a shot".
+ */
+export function missedShot(g: GameCtx, p: NPlay, name: string): string | null {
+  const three = p.shot ? p.shot.points === 3 : /three point/i.test(p.text);
+  const said = p.text.match(/(\d+)-foot/)?.[1];
+  const ft = said ? Number(said) : p.shot ? Math.round(Math.hypot(p.shot.x - 25, p.shot.y - 1)) : undefined;
+  if (/heave/i.test(p.type) || (ft ?? 0) >= 40) return null;
+  let kind = SHOT_NAME[p.type] ?? p.type.toLowerCase().replace(/\s*shot$/, '');
+  if (!kind || /miss/.test(kind)) return `${name} missed ${three ? 'a three' : 'a shot'}`;
+  // A three keeps a jump shot's move ("pull-up three", "step-back three"); anything else ESPN calls it is just a three.
+  if (three) kind = kind === 'jumper' || /floater|layup|dunk|hook|tip-in|putback|roll|bank/.test(kind) ? 'three' : `${kind.replace(/\s*jumper$/, '')} three`;
+  const what = `${ft != null && ft >= 5 ? `${ft}-foot ` : ''}${kind}`;
+  return `${name} missed ${/^(8|11|18|8\d)-|^[aeiou]/i.test(what) ? 'an' : 'a'} ${what}${lateAndClose(g, p, three ? 3 : 2)}`;
+}
+
+/** The last 30 seconds of the 4th or overtime, and the shot would have tied it or given them the lead: " for the lead with 2 seconds left". */
+function lateAndClose(g: GameCtx, p: NPlay, points: number): string {
+  const left = p.clockSec;
+  if ((p.periodNum ?? 0) < 4 || left == null || left > 30 || !p.teamId) return '';
+  const home = p.teamId === g.homeId;
+  const mine = home ? p.home : p.away, theirs = home ? p.away : p.home;
+  if (mine > theirs || mine + points < theirs) return '';
+  const secs = left >= 1 ? `${Math.floor(left)} second${Math.floor(left) === 1 ? '' : 's'}` : `${left.toFixed(1)} seconds`;
+  return `${mine + points === theirs ? ' to tie it' : ' for the lead'} with ${secs} left`;
+}
+
 /** NBA and WNBA (same play-by-play): alerts are `nba.*` or `wnba.*`, each league with its own switches. */
 function nba(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
@@ -1370,8 +1422,8 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
     } else if (/free throw/i.test(t + p.type) && /miss/i.test(t)) {
       out.push(mk(g, p, `${lg}.missed_free_throw`, actor!, `${nameOf(lg, actor!)} missed a free throw`));
     } else if (/miss/i.test(t)) {
-      const three = /three point/i.test(t);
-      out.push(mk(g, p, `${lg}.missed_shot`, actor!, `${nameOf(lg, actor!)} missed ${three ? 'a three' : 'a shot'}`));
+      const title = missedShot(g, p, nameOf(lg, actor!));
+      if (title) out.push(mk(g, p, `${lg}.missed_shot`, actor!, title));
     }
   } else if (/turnover/i.test(p.type) && actor && p.participants.length) {
     out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`));
