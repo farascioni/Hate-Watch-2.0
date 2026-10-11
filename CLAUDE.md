@@ -8,7 +8,7 @@ Before planning or changing anything (a feature, a fix, an alert, its wording, a
 - This file for releasing: deploys, builds, over-the-air updates, patch notes, server switches, the two machines.
 - `app/AGENTS.md` before touching any Expo or React Native API (fetch the versioned Expo docs), and `docs/` for store releases.
 - The module's own header comment: every file in `server/src` starts with what it does and why.
-- On the Mac, the Hate Watch Obsidian vault (`~/Documents/obsidian/hate-watch`, start at `Home.md`) has all of this split by topic, with the game review reports and the standing decisions. It's a private copy; the repo wins where they differ.
+- On the Mac, the Hate Watch Obsidian vault (`~/Documents/obsidian/hate-watch`, start at `Home.md`) has all of this split by topic, with the game review reports and the standing decisions. It's a private copy; the repo wins where they differ. It rebuilds itself from GitHub's main (the README, this file, `PATCH_NOTES.md` and the commit log) when a session starts and after any git push, pull, fetch or merge (`.claude/settings.json`; nothing happens on a machine without it), so a change documented in the README is documented there too.
 - Side sessions and subagents follow the same rule: a brief names the docs to read first.
 - A hook enforces it (`.claude/settings.json` runs `.claude/hooks/require-docs.mjs`): an edit to `app/` or `server/` code (with the edit tools, or a shell command that writes to a code file; read-only commands pass) is blocked until the session has read `README.md`, `docs/`, an `AGENTS.md` or the vault, and the block says which docs cover that file. `HW_DOCS_GATE=off` in the environment turns it off for an emergency.
 

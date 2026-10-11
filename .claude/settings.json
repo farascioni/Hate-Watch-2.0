@@ -22,6 +22,31 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$HOME/Documents/obsidian/hate-watch/.tools/sync.sh\"; [ -x \"$f\" ] && \"$f\"; true",
+            "async": true,
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$HOME/Documents/obsidian/hate-watch/.tools/sync.sh\"; [ -x \"$f\" ] && \"$f\" --hook; true",
+            "async": true,
+            "timeout": 120
+          }
+        ]
+      }
     ]
   }
 }
