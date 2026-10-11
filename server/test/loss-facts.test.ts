@@ -169,8 +169,8 @@ test('one alert per device for the loss, with the facts it wants as lines (Dodge
   const got = (dev: string) => feed(dev).map((i) => `${i.type}: ${i.title} | ${i.body}`);
   const lost = 'team.lost: Successful Hate Watch! Dodgers lost to the Giants';
   assert.deepEqual(got('dodgers-fan'), [`${lost} | Lost as 64% favorites. Shut out. Lost to the 10-13 Giants. Lost 5 straight. Final Score: 3 to 0`]);
-  assert.deepEqual(got('ohtani-fan'), ['player.team_lost: Successful Hate Watch! Shohei Ohtani and the Dodgers lost to the Giants | Final Score: 3 to 0'],
-    'a player\'s fan gets "their team lost", as before: the facts are team alerts');
+  assert.deepEqual(got('ohtani-fan'), ['player.team_lost: Successful Hate Watch! Shohei Ohtani and the Dodgers lost to the Giants | Lost as 64% favorites. Shut out. Lost to the 10-13 Giants. Lost 5 straight. Final Score: 3 to 0'],
+    'a player\'s fan gets "their team lost" with the facts as lines, as the team\'s fan does');
   assert.deepEqual(got('both'), got('dodgers-fan'), 'the team and its player: the team\'s alert, once');
   assert.deepEqual(got('loss-off'), ['team.lost_as_favorite: Successful Hate Watch! Dodgers lost to the Giants as 64% favorites | Shut out. Lost to the 10-13 Giants. Lost 5 straight. Final Score: 3 to 0'],
     '"Loses a game" off: the first fact they want is the alert, saying the loss too');

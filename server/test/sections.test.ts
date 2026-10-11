@@ -48,6 +48,6 @@ test('MLB in full, as Settings shows it', () => {
     'Defense: Commits an error · Lets a run score on a passed ball',
     'Pitching: Blows a save · Takes the loss · Gives up a home run · Gets chased early · Hands over a run · No quality start · Gives up runs · Issues a walk / HBP',
     'Challenges: Loses a challenge',
-    'Team: Gets no-hit · NOBLETIGER · Strands runners in scoring position · Has a position player pitching · Opponent has runners in scoring position',
+    'Team: Gets no-hit · NOBLETIGER · Opponent loads the bases · Strands runners in scoring position · Has a position player pitching · Opponent has runners in scoring position',
   ]);
 });

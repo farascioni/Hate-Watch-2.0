@@ -11,6 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
+  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent,
 } from './detectors.ts';
 import { eventChanged, publish } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -64,6 +65,10 @@ const TOUCH_PAGE = 100;
 const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
 /** How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). */
 const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
+/** MLB: how long a half-inning's end waits for a read with its third out (halfInningEnds), and an at-bat's result for its batter. */
+const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
+/** A read of ESPN slower than this is logged, with which feed (poll). */
+const SLOW_READ_MS = 3000;
 /** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
 const RECAP_MS = Number(process.env.HW_RECAP_MS ?? 15 * 60_000);
 /** Football: after a score is taken back, the same side scoring on that drive within this long is that score (a line on its alert), not another. */
@@ -128,7 +133,16 @@ export class GameTracker {
   /** Soccer: commentary fouls already alerted (play id → 'foul' / 'penalty-conceded'). */
   private fouls = new Map<string, string>();
   /** Lost ABS challenges waiting for the review to settle, by pitch (holdAbs). */
-  private absHeld = new Map<string, { events: Detected[]; since: number }>();
+  private absHeld = new Map<string, { events: Detected[]; since: number; missing?: number; reversed?: boolean }>();
+  /**
+   * MLB: half-innings whose "End Inning" play has come, waiting for a read with their third out (halfInningEnds): the
+   * play, when it came, and what the old way (each play as first seen) made of the half then, for the log.
+   */
+  private halfEnds = new Map<string, { playId: string; since: number; seen: string }>();
+  /** MLB: at-bat results ESPN posted without their batter, not judged until he's on them (or HALF_END_WAIT_MS passes). */
+  private noBatter = new Map<string, number>();
+  /** MLB: each at-bat result's text and roles as last seen, to log ESPN's changes to a result after posting it. */
+  private resultSigs = new Map<string, string>();
   /** MLB: each at-bat result's text as last seen, to catch a crew chief review ESPN writes into it later. */
   private resultTexts = new Map<string, string>();
   /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
@@ -307,6 +321,9 @@ export class GameTracker {
    * that night were challenges won). So a loss goes out once the game has moved past that pitch and
    * ABS_SETTLE_MS have passed (at the final, at once), and only if the pitch still reads Confirmed and,
    * on an at-bat's last pitch, the result doesn't say it was overturned. Returns what to send now.
+   * A pitch missing from one read isn't taken back: ESPN serves stale copies that drop the latest plays for a read
+   * (six times in ALDS Game 5, October 10 2026), so it takes two reads in a row without it. How long ESPN took to
+   * post an overturn is logged (10 and 15 seconds in that game), to settle on a shorter wait.
    */
   private holdAbs(events: Detected[], plays: NPlay[], over: boolean): Detected[] {
     const send: Detected[] = [];
@@ -318,14 +335,20 @@ export class GameTracker {
     }
     for (const [slot, held] of this.absHeld) {
       const versions = plays.filter((p) => pitchSlot(p.id) === slot);
+      held.missing = versions.length ? 0 : (held.missing ?? 0) + 1;
+      if (!held.reversed && versions.some((p) => absCall(p) === 'overturned')) {
+        held.reversed = true;
+        log(`[mlb ${this.ctx.gameId}] ABS challenge at ${slot} overturned ${Math.round((Date.now() - held.since) / 1000)}s after ESPN posted it confirmed`);
+      }
       const latest = versions.length ? plays.lastIndexOf(versions[versions.length - 1]) : -1;
       if (!over && (latest === plays.length - 1 || Date.now() - held.since < ABS_SETTLE_MS)) continue;
+      if (!over && held.missing === 1) continue; // gone from one read: a stale copy, or taken back? the next read says
       this.absHeld.delete(slot);
       const atBat = slot.slice(0, -2), pitchNo = slot.slice(-2);
       const inAtBat = (p: NPlay) => pitchSlot(p.id).length === slot.length && pitchSlot(p.id).startsWith(atBat);
       const lastPitch = !plays.some((p) => inAtBat(p) && isPitch(p) && pitchSlot(p.id).slice(-2) > pitchNo);
       const result = plays.find((p) => inAtBat(p) && p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter'));
-      const why = !versions.length ? 'was taken back'
+      const why = held.missing >= 2 ? 'was taken back'
         : versions.some((p) => absCall(p) === 'overturned') ? 'was overturned'
         : lastPitch && result && /\bchallenged:? call on the field (?:was )?overturned\b/i.test(result.text) ? "was overturned (the at-bat's result says so)"
         : null;
@@ -333,6 +356,37 @@ export class GameTracker {
       send.push(...held.events);
     }
     return send;
+  }
+
+  /** MLB: whether to keep waiting for the batter on an at-bat's result (awaitingBatter), HALF_END_WAIT_MS at most. */
+  private waitForBatter(p: NPlay, now: number): boolean {
+    const since = this.noBatter.get(p.id);
+    if (since === undefined) { this.noBatter.set(p.id, now); log(`[mlb ${this.ctx.gameId}] result ${p.id} posted without its batter: waiting ("${p.text}")`); return true; }
+    if (now - since < HALF_END_WAIT_MS) return true;
+    log(`[mlb ${this.ctx.gameId}] result ${p.id} still has no batter after ${HALF_END_WAIT_MS / 1000}s: judged as it is`);
+    return false;
+  }
+
+  /**
+   * MLB: each half-inning whose "End Inning" play has come, judged from its plays as this read has them, once a read has
+   * its third out (mlbHalfInningEnd): usually the read the "End Inning" play came in, so its alerts bundle with that
+   * out's. A read without the "End Inning" play is a stale copy, and waits. After HALF_END_WAIT_MS it's judged as it
+   * stands. The log says when the plays as first seen would have made something else of it.
+   */
+  private halfInningEnds(plays: NPlay[], now: number): Detected[] {
+    const out: Detected[] = [];
+    for (const [key, w] of this.halfEnds) {
+      const late = now - w.since >= HALF_END_WAIT_MS;
+      if (!late && !plays.some((p) => p.id === w.playId)) continue;
+      const es = mlbHalfInningEnd(this.ctx, plays, key, late);
+      if (!es) continue;
+      this.halfEnds.delete(key);
+      const { last, half } = halfFromPlays(this.ctx, plays, key);
+      const stands = `${last?.id} pas=${half?.pas.length ?? 0} reached=${!!half?.reached}`;
+      if (stands !== w.seen || late) log(`[mlb ${this.ctx.gameId}] ${key} over: ${es.map((e) => e.type).join(', ') || 'nothing'} (as the plays stand: ${stands}; as first seen: ${w.seen}${late ? `; no third out after ${HALF_END_WAIT_MS / 1000}s` : ''})`);
+      out.push(...es);
+    }
+    return out;
   }
 
   /**
@@ -427,10 +481,20 @@ export class GameTracker {
   async poll() {
     const { league, gameId, homeId, awayId } = this.ctx;
     const soccer = SOCCER.has(league), teamsOnly = TEAMS_ONLY.has(league);
+    // Each read's failure, and a read over SLOW_READ_MS, is logged with its feed: one feed failing is otherwise silent
+    // (ALDS Game 5: an alert 26 seconds late with nothing in the log, and 8 polls with both feeds over 4 s).
+    const read = async (feed: string, url: string) => {
+      const t0 = performance.now(), ms = () => Math.round(performance.now() - t0);
+      try {
+        const r = await liveDeps.getJson(url, { bust: true, timeoutMs: 4000 });
+        if (ms() > SLOW_READ_MS) log(`[${league} ${gameId}] ${feed} read took ${ms()} ms`);
+        return r;
+      } catch (e) { log(`[${league} ${gameId}] ${feed} read failed after ${ms()} ms: ${String(e)}`); throw e; }
+    };
     // Soccer's plays are its summary's key events; a teams-only league's (college football) its drives': one read.
     const [core, summary] = await Promise.allSettled([
-      soccer || teamsOnly ? Promise.resolve({ items: [] }) : liveDeps.getJson(urls.corePlays(league, gameId), { bust: true, timeoutMs: 4000 }),
-      liveDeps.getJson(urls.summary(league, gameId), { bust: true, timeoutMs: 4000 }),
+      soccer || teamsOnly ? Promise.resolve({ items: [] }) : read('plays', urls.corePlays(league, gameId)),
+      read('summary', urls.summary(league, gameId)),
     ]);
     if (summary.status === 'rejected' && (soccer || teamsOnly || core.status === 'rejected')) throw summary.reason;
 
@@ -500,7 +564,9 @@ export class GameTracker {
       score = nextScore(prev, p);
       // History from before we attached updates state but is never notified.
       const history = this.first && p.at < cutoff;
-      const fresh = !this.seen.has(p.id);
+      // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
+      const waiting = league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now);
+      const fresh = !waiting && !this.seen.has(p.id);
       if (fresh) {
         this.seen.add(p.id);
         // Football: a play ESPN took out and re-posted under a new id is that play again, revised (already counted).
@@ -512,6 +578,12 @@ export class GameTracker {
         } else {
           const es = history ? [] : PLAYER_DETECTORS[league](this.ctx, p);
           events.push(...es);
+          // MLB: a half-inning's end is judged from its plays, on a read with its third out (halfInningEnds).
+          const ended = league === 'mlb' && !history ? endedHalf(p) : undefined;
+          if (ended) {
+            const h = this.ctx.half, r = this.ctx.lastResult; // what the plays as first seen made of it, for the log
+            this.halfEnds.set(ended, { playId: p.id, since: now, seen: `${r?.id} pas=${h?.key === ended ? h.pas.length : 0} reached=${h?.key === ended && h.reached}` });
+          }
           observePlay(this.ctx, p);
           if (football) this.ledger.add(p, es, { history }, now);
         }
@@ -523,10 +595,15 @@ export class GameTracker {
       // rewritten as "Volpe doubled, Lombard Jr. scored. Umpire review: HR call on the field was
       // overturned…"). Detectors see a play once, so a rewritten result is checked for a review alone,
       // and only when the review is what's new (a result that had one when we attached is history).
-      if (league === 'mlb' && p.typeSlug === 'play-result') {
+      if (league === 'mlb' && p.typeSlug === 'play-result' && !waiting) {
         const was = this.resultTexts.get(p.id);
         this.resultTexts.set(p.id, p.text);
         if (!fresh && !history && was !== undefined && was !== p.text && !/\bumpire review:/i.test(was)) events.push(...umpireReviewLost(this.ctx, p));
+        // Any other change to a result after it was posted is logged, not judged again: alerts keyed on a play's text
+        // (caught stealing, out on the bases, a gift run) would go out a second time, and a strikeout's count move.
+        const sig = `${p.text} [${p.participants.map((x) => x.role).sort().join(' ')}]`, before = this.resultSigs.get(p.id);
+        this.resultSigs.set(p.id, sig);
+        if (before !== undefined && before !== sig && !history) log(`[mlb ${gameId}] result ${p.id} changed after it was posted: "${before}" → "${sig}"`);
       }
       const up = (s: 'home' | 'away') => score[s] > this.announced[s];
       if (up('home') || up('away')) {
@@ -538,7 +615,7 @@ export class GameTracker {
         if (history) continue;
         const es = teamScoreEvents(this.ctx, from, p, { ...led });
         events.push(...(football ? this.footballScore(es, p, said, now, changed) : es));
-        if (!fresh) {
+        if (!fresh && !waiting) {
           log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
         }
@@ -553,6 +630,7 @@ export class GameTracker {
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
     this.score = score;
+    if (league === 'mlb') events.push(...this.halfInningEnds(plays, now));
     if (soccer && summary.status === 'fulfilled') {
       // Fouls and penalties conceded, from the commentary. A foul's penalty can be written a moment later.
       for (const p of fromCommentary(summary.value, score)) {
@@ -613,7 +691,8 @@ export class GameTracker {
     if (final && this.postseason) {
       // The scoreboard's read (every 10s) finishes it with the series; this is the fallback.
       this.finalSeenAt ||= Date.now();
-      if (Date.now() - this.finalSeenAt >= PLAYOFF_FINAL_WAIT_MS) { log(`[${league} ${gameId}] playoff final without the scoreboard's series after ${PLAYOFF_FINAL_WAIT_MS / 1000}s`); this.finish(final); }
+      // Without it, the summary's own series says whether it's the end of their season (summaryEvent).
+      if (Date.now() - this.finalSeenAt >= PLAYOFF_FINAL_WAIT_MS) { log(`[${league} ${gameId}] playoff final without the scoreboard's series after ${PLAYOFF_FINAL_WAIT_MS / 1000}s: the summary's`); this.finish(final, summaryEvent(this.box)); }
     } else if (final) this.finish(final);
   }
 
@@ -666,10 +745,13 @@ export class GameTracker {
     if (this.finished) return;
     this.finished = true;
     for (const id of [this.ctx.homeId, this.ctx.awayId]) staleUpNext(teamKey(this.ctx.league, id)); // their next game is another one now
-    const lastHalf = mlbFinalHalfInning(this.ctx); // the final half-inning gets no "End Inning" play
-    if (lastHalf.length) publish(bundleByPlay(lastHalf), this.ctx.league); // on the last out's alert, like any other half-inning
-    if (this.ctx.league === 'mlb') void this.finalPitching(final);
+    // The final half-inning gets no "End Inning" play: judged here, from every play. Its alerts about the team that lost
+    // are lines on the loss (finalHalfOnLoss); any others go out like any half-inning's, on the last out's alert.
+    const lastHalf = this.ctx.league === 'mlb' ? mlbFinalHalfInning(this.ctx, this.plays) : [];
     const lost = gameLostEvent(this.ctx, final, Date.now(), ev ? eliminationOf(this.ctx.league, ev) : null);
+    const half = lost ? finalHalfOnLoss(this.ctx, lastHalf, lost) : { lines: [], rest: lastHalf };
+    if (half.rest.length) publish(bundleByPlay(half.rest), this.ctx.league);
+    if (this.ctx.league === 'mlb') void this.finalPitching(final);
     db.prepare('DELETE FROM kv WHERE key = ?').run(this.preKey); // the game is over: its pregame is spent (this.pre has it)
     // Each player's bad night from the box score (not the preseason's): lines on their team's loss, or their own alerts after a win.
     const seasonType = Number(this.box?.header?.season?.type ?? this.pre.seasonType ?? 2);
@@ -687,7 +769,9 @@ export class GameTracker {
     const periods = Math.max(0, ...this.plays.map((p) => p.periodNum ?? 0));
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
     const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
-    const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...playerTeamLostEvents(this.ctx, lost, trackedPlayersOn(lost.targetKey)), ...players];
+    // Its lines (the facts, the last half-inning) reach those who track only a player on the team too, on "their team lost".
+    const tracked = trackedPlayersOn(lost.targetKey);
+    const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...half.lines, ...playerTeamLostEvents(this.ctx, lost, tracked), ...playerLossLines([...facts, ...half.lines], tracked), ...players];
     // The loss's alerts get the winning play's clip (the play that put the winner ahead for good), else the recap (clips.ts).
     const winning = leadStory(this.plays, lost.meta?.winnerId === this.ctx.homeId ? 'home' : 'away').goAhead?.id;
     for (const e of loss) if (e.moment === lost.moment) e.meta = { ...e.meta, lossClip: true, ...(winning ? { clipPlayId: winning } : {}) };

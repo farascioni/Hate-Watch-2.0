@@ -10,57 +10,62 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 Server updates already work on every build.
 
 SCORES
-- Before a game starts, its Box score tab previews it: season leaders, the last five games, injuries, ESPN's predictor. (Server)
-- On a game's screen, your alerts from it come after the box score, and you can minimize them.
+- Before a game, its Box score tab previews it: leaders, last five games, injuries, ESPN's predictor. (Server)
+- A game's screen puts your alerts after the box score; you can minimize them.
 
 UFC
-- Track UFC fighters: a loss says how, with lines for losing as the favorite or a losing streak; also a knockdown (live) and their walk-out. (Server)
-- With the UFC chip on, Scores has the next card: All fights with the odds, then the card after; My fights is yours. Results come in as fights end.
-- A card's preview, from Scores: one fight in full: the odds and how, the tale of the tape, both fighters' last five.
+- Track UFC fighters: a loss says how, with lines for losing as the favorite or a streak; also a knockdown (live) and the walk-out. (Server)
+- With the UFC chip on, Scores has the next card (All fights with odds, or My fights); results come in as fights end.
+- A card's preview: each fight's odds, the tale of the tape and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
-- A loss by a finish says how and when (KO/TKO R1 1:20); a title fight says the title was lost. (Server)
-- A loss gets ESPN's clip of the fight when there is one (main events and title fights). (Server)
+- A loss by a finish says how and when (KO/TKO R1 1:20), and a lost title. (Server)
+- A loss gets ESPN's clip of the fight, when there is one. (Server)
 - Women's weight classes are named in full. (Server)
 
 F1
-- Sprints get their alerts; a driver's teammate is whoever drove the other car that weekend. (Server)
-- Lights out is one alert naming yours. A team's double DNF or no points takes in its drivers' alerts; alerts at once are one notification. (Server)
-- Race and sprint results come when they end, not up to 40 minutes later; a penalty after corrects them. (Server)
+- Sprints get alerts; a driver's teammate is whoever drove the other car that weekend. (Server)
+- Lights out is one alert naming yours; a team's double DNF or no points takes in its drivers' alerts, sent as one notification. (Server)
+- Race and sprint results come as they end; a later penalty corrects them. (Server)
 - Drivers and constructors have a Stats tab.
 - A driver's page no longer names their constructor twice.
-- Search lists F1's constructors A to Z and every driver by constructor.
+- Search lists F1's constructors A to Z, and drivers by constructor.
 - Before an F1 session, its screen previews the weekend.
 - With the F1 chip on, Scores has Live and Upcoming races.
-- A live race shows its lap of how many, and any flag but green. (Server)
+- A live race shows the lap and any flag but green. (Server)
 - A race's running order shows each car's gap, places from the grid and stops; its card, your drivers'.
 - Live: your driver lapped or 3+ places down from the grid; pit stops in the feed. (Server)
 
 FOOTBALL
-- A CFB chip with the FBS's 138 teams, by conference in Search: track a team (no players) for its games, scores, box scores and standings. Top-25 teams show their rank ("#8 Indiana"). (Server)
-- Alerts: the start, interceptions, lost fumbles, missed field goals, ejections, the quarterback pulled, falling behind, losing, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
+- A CFB chip with the FBS's 138 teams by conference: track a team (no players) for games, scores, box scores and standings; Top-25 teams show their rank. (Server)
+- Alerts: the start, interceptions, lost fumbles, missed field goals, ejections, the QB pulled, falling behind, losing, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
 - A play ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
 - More teams' flags go out, with the team and foul named right. (Server)
 - NFL: a play wiped out alerts only its flag; a strip-sack lost is a lost fumble. (Server)
+
+MLB
+- A homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
+- Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught more reliably. (Server)
+- Playoff exits say ELIMINATED on players' alerts too; the loss's facts and losing pitcher are lines. (Server)
+- No quality start needs 2+ earned runs when pulled early; errors by "C. Montgomery" reach Colson. (Server)
 
 NBA AND WNBA
 - Misses name the shot and distance ("missed a 27-foot three"), heaves aside. (Server)
 
 EVERYWHERE
-- Fixes and screen changes can arrive without a new build (reopen the app once or twice).
+- Fixes can arrive without a new build (reopen the app once or twice).
 - Tracking both sides of a game or fight, its start is one alert, not two. (Server)
 - Standings drops name the division in MLB, the NFL and the NHL. (Server)
-- Card names and titles wrap at large text sizes instead of cutting off.
-- MLB: a homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
-- After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert. (Server)
+- Card names and titles wrap at large text sizes.
+- After a loss (F1: a race), a standings drop or elimination is a line on it. (Server)
 - Filters (the leaderboard's too) say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
 - League filters show yours, then More: every league by sport.
-- Clips don't play on their own: open one, then press play.
+- Clips play only when you press play.
 - Tapping an alert opens all of it on its own screen; its photo opens their page.
-- Buttons center their labels, and VoiceOver reads them as buttons.
+- Buttons center their labels; VoiceOver reads them as buttons.
 - No alert gets the same later line twice. (Server)
-- Settings no longer has a Leagues section; leagues turned off there come back on.
+- Settings no longer has a Leagues section; leagues off there come back on.
 
 ## Build 12 (October 9, 2026)
 

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 process.env.HW_DB = ':memory:';
 const { wants, shouldDeliver, pushAllowed, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { parseStandings } = await import('../src/live.ts');
-const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, PLAYER_DETECTORS, teamScoreEvents } = await import('../src/detectors.ts');
+const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, mlbHalfInningEnd, PLAYER_DETECTORS, teamScoreEvents } = await import('../src/detectors.ts');
 
 const play = (o: object) => ({ id: '1', type: '', typeSlug: '', text: '', participants: [], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false, ...o });
 const { normalize } = await import('../src/catalog.ts');
@@ -81,8 +81,8 @@ test('MLB: stranding runners in scoring position', () => {
     participants: [{ id: '1', role: 'pitcher' }, { id: '2', role: 'batter' }, ...runners.map((r, i) => ({ id: `${10 + i}`, role: r }))],
     ...extra,
   });
-  const endInning = play({ id: 'end', typeSlug: 'end-inning', teamId: '22' });
-  const run = (runners: string[]) => { const g = ctx(); observePlay(g, result(runners)); return PLAYER_DETECTORS.mlb(g, endInning); };
+  // A half-inning's end is judged from its plays (the game tracker calls this on the read with its third out).
+  const run = (runners: string[]) => mlbHalfInningEnd(ctx(), [result(runners)], 'Top4')!;
 
   const second = run(['onSecond']);
   assert.equal(second.length, 1);
@@ -98,10 +98,8 @@ test('MLB: stranding runners in scoring position', () => {
   assert.equal(run([]).length, 0);
 
   // The game's last half-inning has no End Inning play: checked at the final instead.
-  const g = ctx(); observePlay(g, result(['onThird']));
-  assert.equal(mlbFinalHalfInning(g).length, 1);
-  const walkoff = ctx(); observePlay(walkoff, result(['onSecond'], { outs: 1 }));
-  assert.equal(mlbFinalHalfInning(walkoff).length, 0, 'a walk-off ends with fewer than 3 outs');
+  assert.equal(mlbFinalHalfInning(ctx(), [result(['onThird'])]).length, 1);
+  assert.equal(mlbFinalHalfInning(ctx(), [result(['onSecond'], { outs: 1 })]).length, 0, 'a walk-off ends with fewer than 3 outs');
 });
 
 test('MLB: going down in order, and striking out in order', () => {
@@ -112,11 +110,7 @@ test('MLB: going down in order, and striking out in order', () => {
     id: `ab${n++}`, typeSlug: 'play-result', teamId: '22', text, outs: o.outs ?? 0, scoring: !!o.scoring, period: { type: 'Bottom', number: 2 },
     participants: [{ id: 'P', role: 'pitcher' }, { id: 'B', role: 'batter' }, ...(o.runners ?? []).map((r, i) => ({ id: `R${i}`, role: r }))],
   });
-  const inning = (...plays: ReturnType<typeof play>[]) => {
-    const g = ctx();
-    for (const p of plays) observePlay(g, p);
-    return PLAYER_DETECTORS.mlb(g, play({ id: `end${n++}`, typeSlug: 'end-inning', teamId: '22' })).filter((e) => e.type === 'mlb.team.down_in_order');
-  };
+  const inning = (...plays: ReturnType<typeof play>[]) => (mlbHalfInningEnd(ctx(), plays, 'Bottom2', true) ?? []).filter((e) => e.type === 'mlb.team.down_in_order');
 
   const [dio] = inning(ab('Chourio grounded out to third.', { outs: 1 }), ab('Turang grounded out to third.', { outs: 2 }), ab('Bauers struck out swinging.', { outs: 3 }));
   assert.equal(dio.targetKey, 'team:mlb:22', 'the batting team');
@@ -141,9 +135,7 @@ test('MLB: going down in order, and striking out in order', () => {
   assert.deepEqual(inning(ab('Bauers flied out to center.', { outs: 1 }), ab('Bauers flied out to center.', { outs: 1 })), [], 'two outs is not an inning');
 
   // The game's last half-inning has no End Inning play: checked at the final.
-  const g = ctx();
-  for (const p of [ab('Jones grounded out to first.', { outs: 1 }), ab('Lombard Jr. grounded out to second.', { outs: 2 }), ab('Chisholm Jr. grounded out to first.', { outs: 3 })]) observePlay(g, p);
-  assert.deepEqual(mlbFinalHalfInning(g).map((e) => e.type), ['mlb.team.down_in_order']);
+  assert.deepEqual(mlbFinalHalfInning(ctx(), [ab('Jones grounded out to first.', { outs: 1 }), ab('Lombard Jr. grounded out to second.', { outs: 2 }), ab('Chisholm Jr. grounded out to first.', { outs: 3 })]).map((e) => e.type), ['mlb.team.down_in_order']);
 });
 
 test('MLB: caught stealing is pinned on the runner from the base they left', () => {
@@ -240,12 +232,8 @@ test('MLB: NOBLETIGER (bases loaded, nobody out, no runs) and no duplicate with 
     participants: [{ id: 'P', role: 'pitcher' }, { id: `B${n}`, role: 'batter' }, ...runners.map((r, i) => ({ id: `R${i}`, role: r }))],
     ...extra,
   });
-  const endInning = play({ id: 'end', typeSlug: 'end-inning', period: { type: 'Mid', number: 4 } });
-  const inning = (...plays: ReturnType<typeof play>[]) => {
-    const g: any = { league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() };
-    for (const p of plays) observePlay(g, p);
-    return PLAYER_DETECTORS.mlb(g, endInning);
-  };
+  const ctx = (): any => ({ league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() });
+  const inning = (...plays: ReturnType<typeof play>[]) => mlbHalfInningEnd(ctx(), plays, 'Top4', true) ?? [];
   const types = (es: { type: string; unless?: string }[]) => es.map((e) => (e.unless ? `${e.type} unless ${e.unless}` : e.type));
 
   // Walk loads them with 0 outs, then K, popup, K: classic NOBLETIGER, bases still loaded.
@@ -260,9 +248,7 @@ test('MLB: NOBLETIGER (bases loaded, nobody out, no runs) and no duplicate with 
   assert.deepEqual(types(inning(ab(0, LOADED), ab(3, []))), ['mlb.team.nobletiger'], 'triple play: NOBLETIGER, nobody left to strand');
 
   // The game's last half-inning (no "End Inning" play) is checked at the final.
-  const g: any = { league: 'mlb', gameId: 'g', homeId: '15', awayId: '22', goalies: new Map() };
-  for (const p of [ab(0, LOADED), ab(1, LOADED), ab(2, LOADED), ab(3, LOADED)]) observePlay(g, p);
-  assert.deepEqual(types(mlbFinalHalfInning(g)), ['mlb.team.nobletiger', 'mlb.team.stranded_risp unless mlb.team.nobletiger']);
+  assert.deepEqual(types(mlbFinalHalfInning(ctx(), [ab(0, LOADED), ab(1, LOADED), ab(2, LOADED), ab(3, LOADED)])), ['mlb.team.nobletiger', 'mlb.team.stranded_risp unless mlb.team.nobletiger']);
 
   // Delivery: every user gets exactly ONE alert for that inning, depending on their toggles.
   const [noble, stranded] = classic;
@@ -298,9 +284,12 @@ test('MLB: opponent gets a runner in scoring position: the fielding team hears i
   assert.match(stole.body, /^Top 1st: Acuña Jr\. stole second\. — /);
   assert.equal(stole.unless, undefined);
   assert.deepEqual(live(g, runnerPlay('Top 1', 'play-result', 'Acuña Jr. stole second.', ['onSecond'])), [], "ESPN's duplicate of the steal");
-  const loaded = live(g, ab('Top 1', 'Albies walked, Olson to second, Acuña Jr. to third.', ['onFirst', 'onSecond', 'onThird']));
-  assert.deepEqual(loaded.map((e) => [e.foldOnly, e.fold, e.moment === `g:play:${stole.meta?.playId}:team:mlb:15`]), [[true, 'Bases loaded now, nobody out.', true]],
-    'once per half-inning: the bases loading since is only a line on that alert (its moment), never a second one');
+  const walk = ab('Top 1', 'Albies walked, Olson to second, Acuña Jr. to third.', ['onFirst', 'onSecond', 'onThird']);
+  const loaded = PLAYER_DETECTORS.mlb(g, walk);
+  observePlay(g, walk);
+  assert.deepEqual(loaded.filter((e) => e.type === 'mlb.team.opponent_risp'), [], 'once per half-inning');
+  assert.deepEqual(loaded.filter((e) => e.type === 'mlb.team.bases_loaded').map((e) => [e.targetKey, e.body.split(' — ')[0]]), [['team:mlb:15', 'Top 1st, nobody out: Albies walked, Olson to second, Acuña Jr. to third.']],
+    'the bases loading since is an alert of its own ("Opponent loads the bases")');
 
   const [double] = live(g, ab('Bottom 1', 'Rojas doubled to left.', ['onSecond']));
   assert.equal(double.targetKey, 'team:mlb:22', 'bottom of the inning: the away team is fielding');

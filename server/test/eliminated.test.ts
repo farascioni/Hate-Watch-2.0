@@ -86,7 +86,7 @@ test('tonight: if the Rays finish the sweep at Yankee Stadium, one alert says it
   assert.deepEqual(feed('yankees-hater'), [sweep]);
   assert.deepEqual(feed('eliminations-only'), [sweep], 'loss alerts off, eliminations on: still told');
   assert.deepEqual(feed('both-off'), []);
-  assert.deepEqual(feed('judge-hater'), ['player.team_lost: Successful Hate Watch! Aaron Judge and the Yankees lost to the Rays | Swept 3-0 by the Rays in the ALDS. Final Score: 5 to 2']);
+  assert.deepEqual(feed('judge-hater'), ['player.team_lost: Successful Hate Watch! Aaron Judge and the Yankees got SWEPT 🧹 and are ELIMINATED ⚰️ | Swept 3-0 by the Rays in the ALDS. Final Score: 5 to 2']);
   assert.deepEqual(feed('rays-hater'), [], 'the Rays won');
   for (const dev of ['yankees-hater', 'both-off', 'judge-hater']) assert.equal(hateWatchTally(dev).total, 1, `${dev}: one Successful Hate Watch`);
 });

@@ -573,7 +573,7 @@ function streakLines(deviceId: string, prefs: Prefs, e: Detected, folded: Detect
   const watched = watchedOfLast(deviceId, hateWatchOf(streak!).targetKey, n);
   if (watched < 3) return [];
   const mine = watched === n ? 'every one' : String(watched);
-  const i = folded.indexOf(streak!);
+  const i = folded.findIndex((x) => x.type === 'team.losing_streak'); // the team's, or its copy on a player's alert (playerLossLines)
   if (i >= 0) { folded[i] = { ...streak!, fold: `Lost ${n} straight, ${mine} on your Hate Watch.` }; return []; }
   if (e === streak) return [`${watched === n ? 'Every one' : watched} on your Hate Watch.`];
   return [`Your Hate Watch streak: ${watched} straight losses.`];

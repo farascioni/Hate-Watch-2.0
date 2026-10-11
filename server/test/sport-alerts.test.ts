@@ -50,7 +50,15 @@ const mlbCtx = (): any => ({ league: 'mlb', gameId: 'M', homeId: '10', awayId: '
 let n = 0;
 const ab = (half: string, text: string, pitcher: string, batter: string, x: object = {}) => ({ id: `ab${n++}`, type: 'Play Result', typeSlug: 'play-result', text, teamId: half.startsWith('Top') ? '30' : '10',
   period: { type: half.split(' ')[0], number: Number(half.split(' ')[1]) }, participants: [{ id: pitcher, role: 'pitcher' }, { id: batter, role: 'batter' }], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false, ...x });
-const run = (g: any, p: any) => { const es = PLAYER_DETECTORS.mlb(g, p); observePlay(g, p); return es; };
+const played = new WeakMap<object, any[]>();
+/** What the tracker does with a play: its alerts, and at an "End Inning" play the half-inning's, from its plays. */
+const run = (g: any, p: any) => {
+  const plays = [...(played.get(g) ?? []), p]; played.set(g, plays);
+  const ended = d.endedHalf(p);
+  const es = [...PLAYER_DETECTORS.mlb(g, p), ...(ended ? d.mlbHalfInningEnd(g, plays, ended) ?? [] : [])];
+  observePlay(g, p);
+  return es;
+};
 
 test('MLB: the 3rd and 4th strikeouts are a hat trick and a golden sombrero, in place of the strikeout', () => {
   const g = mlbCtx();
@@ -135,7 +143,7 @@ test("MLB: the team scored on hears what batted the runs in (ESPN's words from O
 
 test('MLB: being no-hit through 6, once, only from a hit count ESPN gave', () => {
   const g = mlbCtx();
-  const end = (half: string) => ({ ...ab(half, 'End of inning', '5000', '33192'), typeSlug: 'end-inning', type: 'End Inning', participants: [] });
+  const end = (half: string) => ({ ...ab(half, 'End of inning', '5000', '33192'), typeSlug: 'end-inning', type: 'End Inning', participants: [], period: { type: half.startsWith('Top') ? 'Mid' : 'End', number: Number(half.split(' ')[1]) } });
   run(g, ab('Bottom 6', 'Judge flied out to center.', '5000', '33192', { outs: 3 }));
   assert.deepEqual(run(g, end('Bottom 6')).filter((e) => e.type === 'mlb.team.no_hit'), [], 'no hit count yet: no guess');
   const h = mlbCtx();

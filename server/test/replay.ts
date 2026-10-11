@@ -3,7 +3,7 @@
 import { loadCatalog } from '../src/catalog.ts';
 import { getJson } from '../src/espn.ts';
 import { urls, type League } from '../src/leagues.ts';
-import { PLAYER_DETECTORS, fromCorePlay, fromSitePlay, mlbFinalHalfInning, nextScore, observePlay, teamScoreEvents, type GameCtx, type Detected } from '../src/detectors.ts';
+import { PLAYER_DETECTORS, endedHalf, fromCorePlay, fromSitePlay, mlbFinalHalfInning, mlbHalfInningEnd, nextScore, observePlay, teamScoreEvents, type GameCtx, type Detected } from '../src/detectors.ts';
 
 loadCatalog();
 const games = process.argv.slice(2).length ? process.argv.slice(2) : ['mlb:401907973', 'nfl:401872963', 'nhl:401891781', 'nba:401811026'];
@@ -28,10 +28,12 @@ for (const g of games) {
     const prev = score;
     score = nextScore(prev, p);
     events.push(...PLAYER_DETECTORS[league](ctx, p));
+    const ended = league === 'mlb' ? endedHalf(p) : undefined; // a half-inning's end, from its plays, as the tracker judges it
+    if (ended) events.push(...(mlbHalfInningEnd(ctx, plays.slice(0, plays.indexOf(p) + 1), ended, true) ?? []));
     if (score.home !== prev.home || score.away !== prev.away) events.push(...teamScoreEvents(ctx, prev, p));
     observePlay(ctx, p);
   }
-  events.push(...mlbFinalHalfInning(ctx)); // what the live tracker does at the final
+  events.push(...mlbFinalHalfInning(ctx, plays)); // what the live tracker does at the final
   // publish() stores each id once, so same-id detections become one notification. Mirror that.
   const raw = events.length;
   const unique = [...new Map(events.map((e) => [e.id, e])).values()];

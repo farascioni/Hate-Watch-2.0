@@ -1,0 +1,7003 @@
+{
+"about": "White Sox (4) at Guardians (5), ALDS Game 5, ESPN event 401907994, October 10 2026: real core plays (trimmed) from a recording of the live feed, the final box score's pitchers, and the series.",
+"plays": [
+{
+"id": "4019079940300000059",
+"type": {
+"text": "Start Inning",
+"type": "start-inning"
+},
+"text": "Bottom of the 2nd inning",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 0,
+"wallclock": "2026-10-11T00:29:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Burke pitches to Jo Adell",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:29:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:29:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301030037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 2 : Strike 2 Swinging",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:29:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:30:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301050023",
+"type": {
+"text": "Foul Out",
+"type": "foul-out"
+},
+"text": "Pitch 4 : Ball In Play",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:30:40Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Adell fouled out to first.",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:30:40Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940301990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 1,
+"wallclock": "2026-10-11T00:30:40Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940302010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Burke pitches to Nathaniel Lowe",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 2,
+"wallclock": "2026-10-11T00:31:08Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940302020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 2,
+"wallclock": "2026-10-11T00:31:08Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940302030024",
+"type": {
+"text": "Ground Out",
+"type": "ground-out"
+},
+"text": "Pitch 2 : Ball In Play",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 2,
+"wallclock": "2026-10-11T00:31:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940302990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Lowe grounded out to second.",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 2,
+"wallclock": "2026-10-11T00:31:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940302990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 2,
+"wallclock": "2026-10-11T00:31:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Burke pitches to Travis Bazzana",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303020021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 1 : Strike 1 Foul",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303030021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 2 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:32:27Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:32:51Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303050037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 4 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:33:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Bazzana struck out swinging.",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:33:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940303990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 2
+},
+"outs": 3,
+"wallclock": "2026-10-11T00:33:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4867679"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079940399990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 2nd inning",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 2
+},
+"outs": 0,
+"wallclock": "2026-10-11T00:33:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079941000000059",
+"type": {
+"text": "Start Inning",
+"type": "start-inning"
+},
+"text": "Top of the 6th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:34:20Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Gavin Williams pitches to Colson Montgomery",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:34:20Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001020037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 1 : Strike 1 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:34:20Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001030037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 2 : Strike 2 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:34:37Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001040026",
+"type": {
+"text": "Hit By Pitch",
+"type": "hit-by-pitch"
+},
+"text": "Pitch 3 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:35:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "C. Montgomery hit by pitch.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:35:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941001990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:35:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Gavin Williams pitches to Brenton Doyle",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:35:39Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:35:39Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002030005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 2 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:36:02Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002040021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 3 : Strike 1 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:36:23Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002050037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 4 : Strike 2 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:36:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002060037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 5 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:37:10Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Doyle struck out swinging.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:37:10Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941002990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 1,
+"wallclock": "2026-10-11T01:37:10Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42462"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Gavin Williams pitches to Sam Antonacci",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:37:37Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:37:37Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003030021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 2 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:38:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:38:40Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003050021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 4 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:39:01Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003060021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 5 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:39:24Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003070021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 6 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:40:01Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003080022",
+"type": {
+"text": "Fly Out",
+"type": "fly-out"
+},
+"text": "Pitch 7 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:40:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Antonacci flied out to right.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:40:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941003990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:40:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5207167"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941004010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Gavin Williams pitches to Kyle Teel",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:41:01Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941004020021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 1 : Strike 1 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:41:01Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 0,
+"homeHits": 4
+},
+{
+"id": "4019079941004030002",
+"type": {
+"text": "Single",
+"type": "single"
+},
+"text": "Pitch 2 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:41:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941004990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Teel singled to right, C. Montgomery to second.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:41:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941004990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:41:34Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Gavin Williams pitches to Miguel Vargas",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:42:54Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005020089",
+"type": {
+"text": "Ball - Overturned",
+"type": "ball---overturned"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:42:54Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005030005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 2 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:43:25Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 3",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:43:47Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005050036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 4 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:44:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005060005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 5 : Ball 4",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:44:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Vargas walked, Teel to second, C. Montgomery to third.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:44:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941005990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 2,
+"wallclock": "2026-10-11T01:44:33Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345076"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006001157",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Sabrowski relieved Williams",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:45:04Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Erik Sabrowski pitches to Munetaka Murakami",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:47:45Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:47:45Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006030037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 2 : Strike 2 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:48:01Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:48:20Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006050090",
+"type": {
+"text": "Ball - Confirmed",
+"type": "ball---confirmed"
+},
+"text": "Pitch 4 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:49:05Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006060037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 5 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:49:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Murakami struck out swinging.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:49:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941006990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 6
+},
+"outs": 3,
+"wallclock": "2026-10-11T01:49:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5194333"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/42453"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4743772"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872685"
+},
+"type": "onThird"
+}
+],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941099990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "Middle of the 6th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Mid",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:49:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941300000059",
+"type": {
+"text": "Start Inning",
+"type": "start-inning"
+},
+"text": "Bottom of the 7th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:07:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941301010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Newcomb pitches to Nathaniel Lowe",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:07:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941301020024",
+"type": {
+"text": "Ground Out",
+"type": "ground-out"
+},
+"text": "Pitch 1 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:07:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941301990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Lowe grounded out to first.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:07:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941301990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:07:46Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40538"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Newcomb pitches to Travis Bazzana",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:08:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:08:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302030021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 2 : Strike 1 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:08:21Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302040021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 3 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:08:39Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302050010",
+"type": {
+"text": "Batter Reached On Error - Batter To First",
+"type": "batter-reached-on-error---batter-to-first"
+},
+"text": "Pitch 4 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:09:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Bazzana safe at first on fielding error by shortstop C. Montgomery.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:09:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941302990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:09:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Newcomb pitches to Patrick Bailey",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:09:35Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:09:35Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303030036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 2 : Strike 2 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:09:51Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303040024",
+"type": {
+"text": "Ground Out",
+"type": "ground-out"
+},
+"text": "Pitch 3 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:10:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5007707"
+},
+"type": "onFirst"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Bailey grounded into double play, shortstop to second to first, Bazzana out at second.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:10:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941303990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 7
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:10:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4345843"
+},
+"type": "batter"
+}
+],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941399990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 7th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 7
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:10:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941500000059",
+"type": {
+"text": "Start Inning",
+"type": "start-inning"
+},
+"text": "Bottom of the 8th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:26:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 5
+},
+{
+"id": "4019079941501000757",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Peters in center field.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:25:05Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 5
+},
+{
+"id": "4019079941501001057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Grichuk in right field.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:25:05Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 5
+},
+{
+"id": "4019079941501010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Sean Newcomb pitches to Petey Halpin",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:26:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 5
+},
+{
+"id": "4019079941501020037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 1 : Strike 1 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:26:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 5
+},
+{
+"id": "4019079941501030003",
+"type": {
+"text": "Double",
+"type": "double"
+},
+"text": "Pitch 2 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:27:30Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941501990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Halpin doubled to center.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:27:30Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941501990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:27:30Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/33856"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941502001157",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Taylor relieved Newcomb",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:30:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941502010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Grant Taylor pitches to Brayan Rocchio",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41217"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941502020024",
+"type": {
+"text": "Ground Out",
+"type": "ground-out"
+},
+"text": "Pitch 1 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41217"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onSecond"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941502990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Rocchio grounded out to shortstop, Halpin to third.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41217"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941502990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41217"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Grant Taylor pitches to Steven Kwan",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:30:50Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503030005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 2 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:31:05Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 3",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:31:23Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503050005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 4 : Ball 4",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:31:43Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Kwan walked.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:31:43Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941503990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:31:43Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Grant Taylor pitches to Jose Ramirez",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504020081",
+"type": {
+"text": "Automatic Ball - IBB",
+"type": "automatic-ball---ibb"
+},
+"text": "Pitch 1 : Automatic Ball - IBB 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504030081",
+"type": {
+"text": "Automatic Ball - IBB",
+"type": "automatic-ball---ibb"
+},
+"text": "Pitch 2 : Automatic Ball - IBB 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504040081",
+"type": {
+"text": "Automatic Ball - IBB",
+"type": "automatic-ball---ibb"
+},
+"text": "Pitch 3 : Automatic Ball - IBB 3",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504050081",
+"type": {
+"text": "Automatic Ball - IBB",
+"type": "automatic-ball---ibb"
+},
+"text": "Pitch 4 : Automatic Ball - IBB 4",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Ramírez intentionally walked, Kwan to second.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941504990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:32:07Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Grant Taylor pitches to Chase DeLauter",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:33:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:33:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505030036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 2 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:34:14Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505040015",
+"type": {
+"text": "Batters Fielders Choice - Runner Out",
+"type": "batters-fielders-choice---runner-out"
+},
+"text": "Pitch 3 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:34:49Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4722962"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "DeLauter grounded into fielder's choice to second, Ramírez to second, Kwan to third, Halpin out at home.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:34:49Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941505990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:34:49Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Grant Taylor pitches to Jo Adell",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:35:19Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506020036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 1 : Strike 1 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:35:19Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506030036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 2 : Strike 2 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:35:37Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:35:59Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506050021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 4 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:36:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506060024",
+"type": {
+"text": "Ground Out",
+"type": "ground-out"
+},
+"text": "Pitch 5 : Ball In Play",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:36:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Adell grounded out to third.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:36:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941506990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Bottom",
+"number": 8
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:36:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4927630"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/40854"
+},
+"type": "batter"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4619649"
+},
+"type": "onFirst"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/32801"
+},
+"type": "onSecond"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/41996"
+},
+"type": "onThird"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941599990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 8th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:36:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941600000059",
+"type": {
+"text": "Start Inning",
+"type": "start-inning"
+},
+"text": "Top of the 9th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:39:54Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601000757",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Genao at second base.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:38:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Cade Smith pitches to Munetaka Murakami",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:39:54Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601020037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 1 : Strike 1 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:39:54Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601030036",
+"type": {
+"text": "Strike Looking",
+"type": "strike-looking"
+},
+"text": "Pitch 2 : Strike 2 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:40:06Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601040005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 3 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:40:21Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601050037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 4 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:40:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Murakami struck out swinging.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:40:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941601990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 1,
+"wallclock": "2026-10-11T02:40:38Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4872595"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Cade Smith pitches to Andrew Benintendi",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:41:00Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:41:00Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602030021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 2 : Strike 1 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:41:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602040037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 3 : Strike 2 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:41:35Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602050005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 4 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:41:51Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602060005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 5 : Ball 3",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:42:05Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602070021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 6 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:42:20Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602080021",
+"type": {
+"text": "Foul Ball",
+"type": "foul-ball"
+},
+"text": "Pitch 7 : Strike 2 Foul",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:42:40Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602090037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 8 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:43:04Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Benintendi struck out swinging.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:43:04Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941602990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 2,
+"wallclock": "2026-10-11T02:43:04Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/34986"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603010001",
+"type": {
+"text": "Start Batter/Pitcher",
+"type": "start-batterpitcher"
+},
+"text": "Cade Smith pitches to Tristan Peters",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:43:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603020005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 1 : Ball 1",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:43:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603030037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 2 : Strike 1 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:43:44Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603040092",
+"type": {
+"text": "Strike Looking - Confirmed",
+"type": "strike-looking---confirmed"
+},
+"text": "Pitch 3 : Strike 2 Looking",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:44:00Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603050005",
+"type": {
+"text": "Ball",
+"type": "ball"
+},
+"text": "Pitch 4 : Ball 2",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:44:29Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603060037",
+"type": {
+"text": "Strike Swinging",
+"type": "strike-swinging"
+},
+"text": "Pitch 5 : Strike 3 Swinging",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:44:47Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603990057",
+"type": {
+"text": "Play Result",
+"type": "play-result"
+},
+"text": "Peters struck out swinging.",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:44:47Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+},
+{
+"id": "4019079941603990099",
+"type": {
+"text": "End Batter/Pitcher",
+"type": "end-batterpitcher"
+},
+"text": "",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Top",
+"number": 9
+},
+"outs": 3,
+"wallclock": "2026-10-11T02:44:47Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/4987924"
+},
+"type": "pitcher"
+},
+{
+"athlete": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/athletes/5085893"
+},
+"type": "batter"
+}
+],
+"awayHits": 3,
+"homeHits": 6
+}
+],
+"endInnings": [
+{
+"id": "4019079940399990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 2nd inning",
+"awayScore": 0,
+"homeScore": 0,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 2
+},
+"outs": 0,
+"wallclock": "2026-10-11T00:33:13Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 0,
+"homeHits": 0
+},
+{
+"id": "4019079941099990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "Middle of the 6th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "Mid",
+"number": 6
+},
+"outs": 0,
+"wallclock": "2026-10-11T01:49:09Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/4"
+},
+"participants": [],
+"awayHits": 1,
+"homeHits": 4
+},
+{
+"id": "4019079941399990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 7th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 7
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:10:17Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 2,
+"homeHits": 5
+},
+{
+"id": "4019079941599990058",
+"type": {
+"text": "End Inning",
+"type": "end-inning"
+},
+"text": "End of the 8th inning",
+"awayScore": 0,
+"homeScore": 2,
+"scoringPlay": false,
+"scoreValue": 0,
+"period": {
+"type": "End",
+"number": 8
+},
+"outs": 0,
+"wallclock": "2026-10-11T02:36:52Z",
+"team": {
+"$ref": "http://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb/seasons/2026/teams/5"
+},
+"participants": [],
+"awayHits": 3,
+"homeHits": 6
+}
+],
+"endGame": [],
+"pitchingLabels": [
+"IP",
+"H",
+"R",
+"ER",
+"BB",
+"K",
+"HR",
+"PC-ST",
+"ERA",
+"PC"
+],
+"pitchers": [
+{
+"teamId": "4",
+"id": "4867679",
+"name": "Sean Burke",
+"starter": true,
+"active": false,
+"stats": [
+"5.0",
+"4",
+"2",
+"2",
+"0",
+"4",
+"1",
+"71-48",
+"3.77",
+"71"
+],
+"notes": [
+{
+"type": "pitchingDecision",
+"text": "L, 1-1"
+}
+]
+},
+{
+"teamId": "4",
+"id": "33856",
+"name": "Sean Newcomb",
+"starter": false,
+"active": false,
+"stats": [
+"2.0",
+"2",
+"0",
+"0",
+"0",
+"3",
+"0",
+"23-20",
+"2.57",
+"23"
+],
+"notes": []
+},
+{
+"teamId": "4",
+"id": "4927630",
+"name": "Grant Taylor",
+"starter": false,
+"active": true,
+"stats": [
+"1.0",
+"0",
+"0",
+"0",
+"2",
+"0",
+"0",
+"13-7",
+"4.15",
+"13"
+],
+"notes": []
+},
+{
+"teamId": "5",
+"id": "4345076",
+"name": "Gavin Williams",
+"starter": true,
+"active": false,
+"stats": [
+"5.2",
+"1",
+"0",
+"0",
+"2",
+"12",
+"0",
+"94-65",
+"1.54",
+"94"
+],
+"notes": [
+{
+"type": "pitchingDecision",
+"text": "W, 1-0"
+}
+]
+},
+{
+"teamId": "5",
+"id": "5194333",
+"name": "Erik Sabrowski",
+"starter": false,
+"active": false,
+"stats": [
+"0.1",
+"0",
+"0",
+"0",
+"0",
+"1",
+"0",
+"5-3",
+"7.36",
+"5"
+],
+"notes": [
+{
+"type": "pitchingDecision",
+"text": "H, 1"
+}
+]
+},
+{
+"teamId": "5",
+"id": "4187661",
+"name": "Hunter Gaddis",
+"starter": false,
+"active": false,
+"stats": [
+"1.1",
+"2",
+"0",
+"0",
+"0",
+"4",
+"0",
+"24-18",
+"0.00",
+"24"
+],
+"notes": [
+{
+"type": "pitchingDecision",
+"text": "H, 2"
+}
+]
+},
+{
+"teamId": "5",
+"id": "4987924",
+"name": "Cade Smith",
+"starter": false,
+"active": true,
+"stats": [
+"1.2",
+"0",
+"0",
+"0",
+"0",
+"4",
+"0",
+"27-18",
+"1.35",
+"27"
+],
+"notes": [
+{
+"type": "pitchingDecision",
+"text": "S, 1"
+}
+]
+}
+],
+"roster": [
+{
+"id": "5207167",
+"name": "Sam Antonacci",
+"teamId": "4"
+},
+{
+"id": "4743772",
+"name": "Kyle Teel",
+"teamId": "4"
+},
+{
+"id": "42453",
+"name": "Miguel Vargas",
+"teamId": "4"
+},
+{
+"id": "4872595",
+"name": "Munetaka Murakami",
+"teamId": "4"
+},
+{
+"id": "34986",
+"name": "Andrew Benintendi",
+"teamId": "4"
+},
+{
+"id": "5085893",
+"name": "Tristan Peters",
+"teamId": "4"
+},
+{
+"id": "5136929",
+"name": "Chase Meidroth",
+"teamId": "4"
+},
+{
+"id": "4872685",
+"name": "Colson Montgomery",
+"teamId": "4"
+},
+{
+"id": "42462",
+"name": "Brenton Doyle",
+"teamId": "4"
+},
+{
+"id": "31399",
+"name": "Randal Grichuk",
+"teamId": "4"
+},
+{
+"id": "4867679",
+"name": "Sean Burke",
+"teamId": "4"
+},
+{
+"id": "33856",
+"name": "Sean Newcomb",
+"teamId": "4"
+},
+{
+"id": "4927630",
+"name": "Grant Taylor",
+"teamId": "4"
+},
+{
+"id": "41996",
+"name": "Steven Kwan",
+"teamId": "5"
+},
+{
+"id": "32801",
+"name": "Jose Ramirez",
+"teamId": "5"
+},
+{
+"id": "4619649",
+"name": "Chase DeLauter",
+"teamId": "5"
+},
+{
+"id": "40854",
+"name": "Jo Adell",
+"teamId": "5"
+},
+{
+"id": "40538",
+"name": "Nathaniel Lowe",
+"teamId": "5"
+},
+{
+"id": "5007707",
+"name": "Travis Bazzana",
+"teamId": "5"
+},
+{
+"id": "5204351",
+"name": "Angel Genao",
+"teamId": "5"
+},
+{
+"id": "4345843",
+"name": "Patrick Bailey",
+"teamId": "5"
+},
+{
+"id": "4722962",
+"name": "Petey Halpin",
+"teamId": "5"
+},
+{
+"id": "41217",
+"name": "Brayan Rocchio",
+"teamId": "5"
+},
+{
+"id": "4345076",
+"name": "Gavin Williams",
+"teamId": "5"
+},
+{
+"id": "5194333",
+"name": "Erik Sabrowski",
+"teamId": "5"
+},
+{
+"id": "4187661",
+"name": "Hunter Gaddis",
+"teamId": "5"
+},
+{
+"id": "4987924",
+"name": "Cade Smith",
+"teamId": "5"
+}
+],
+"gameNote": "ALDS - Game 5",
+"series": {
+"type": "playoff",
+"summary": "CLE wins series 3-2",
+"completed": true,
+"totalCompetitions": 5,
+"competitors": [
+{
+"id": "5",
+"wins": 3
+},
+{
+"id": "4",
+"wins": 2
+}
+]
+}
+}

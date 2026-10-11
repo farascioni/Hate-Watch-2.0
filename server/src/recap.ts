@@ -37,9 +37,12 @@ export function recapFor(deviceId: string, now = Date.now()) {
     AND e.type != '${RECAP_TYPE}'`).get(deviceId, start, end) as { n: number }).n;
   const total = watches.reduce((s, w) => s + w.n, 0);
   if (!total && alerts < MIN_ALERTS) return null;
-  // The worst loss they got: the biggest margin.
-  const low = db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
-    AND e.type = 'team.lost' ORDER BY CAST(json_extract(e.meta, '$.margin') AS INTEGER) DESC LIMIT 1`).get(deviceId, start, end) as { title: string } | undefined;
+  // The worst loss they got, whichever of its alerts it was (the team's, "their team lost", a fact in its place: its
+  // team loss is `lostId`): an elimination first, then the biggest margin.
+  const low = db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id LEFT JOIN events l ON l.id = json_extract(e.meta, '$.lostId')
+    WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ? AND (e.type = 'team.lost' OR json_extract(e.meta, '$.lostId') IS NOT NULL)
+    ORDER BY COALESCE(json_extract(e.meta, '$.eliminated'), json_extract(l.meta, '$.eliminated'), 0) DESC,
+      CAST(COALESCE(json_extract(e.meta, '$.margin'), json_extract(l.meta, '$.margin')) AS INTEGER) DESC LIMIT 1`).get(deviceId, start, end) as { title: string } | undefined;
   const top = watches[0]?.target_key ?? (db.prepare(`SELECT e.target_key FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
     GROUP BY e.target_key ORDER BY COUNT(*) DESC LIMIT 1`).get(deviceId, start, end) as { target_key: string } | undefined)?.target_key;
   if (!top) return null;

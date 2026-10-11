@@ -4,7 +4,7 @@
 import { loadCatalog } from '../src/catalog.ts';
 import { getJson } from '../src/espn.ts';
 import { urls } from '../src/leagues.ts';
-import { PLAYER_DETECTORS, fromSitePlay, mlbFinalHalfInning, observePlay, type GameCtx } from '../src/detectors.ts';
+import { PLAYER_DETECTORS, endedHalf, fromSitePlay, mlbFinalHalfInning, mlbHalfInningEnd, observePlay, type GameCtx, type NPlay } from '../src/detectors.ts';
 
 loadCatalog();
 const maxGames = Number(process.argv[2] ?? 40);
@@ -20,17 +20,20 @@ while (games < maxGames && found < 2) {
     const comp = s.header.competitions[0];
     const g: GameCtx = { league: 'mlb', gameId: ev.id, goalies: new Map(), homeId: comp.competitors.find((c: any) => c.homeAway === 'home').id, awayId: comp.competitors.find((c: any) => c.homeAway === 'away').id };
     const loadedHalves = new Set<string>();
-    const events = [];
+    const events = [], plays: NPlay[] = [];
     for (const raw of s.plays ?? []) {
       const p = fromSitePlay(raw);
+      plays.push(p);
       events.push(...PLAYER_DETECTORS.mlb(g, p));
+      const ended = endedHalf(p); // a half-inning's end is judged from its plays, as the game tracker does
+      if (ended) events.push(...(mlbHalfInningEnd(g, plays, ended, true) ?? []));
       observePlay(g, p);
       if (g.half?.loadedNoOuts && !loadedHalves.has(g.half.key)) {
         loadedHalves.add(g.half.key);
         console.log(`  [${ev.shortName} ${g.half.key}] bases loaded, 0 outs after: "${p.text}"`);
       }
     }
-    events.push(...mlbFinalHalfInning(g));
+    events.push(...mlbFinalHalfInning(g, plays));
     for (const e of events.filter((e) => e.type === 'mlb.team.nobletiger')) {
       found++;
       const twin = events.find((x) => x.type === 'mlb.team.stranded_risp' && x.targetKey === e.targetKey && x.at === e.at);

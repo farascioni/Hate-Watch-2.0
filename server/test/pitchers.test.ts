@@ -38,12 +38,14 @@ test('box score: each pitcher, whether they started or are pitching now, outs re
   assert.deepEqual(peralta, { id: '1', teamId: '30', starter: true, active: false, ip: '4.2', outs: 14, er: 1, line: '4.2 IP, 3 H, 1 ER, 2 BB, 5 K', notes: ['L, 0-1'] });
 });
 
-test('no quality start: when the starter is pulled before 6 innings, or gives up a 4th earned run; once', () => {
+test('no quality start: when the starter is pulled before 6 innings having given up 2+ earned runs, or gives up a 4th; once', () => {
   const done = new Set<string>();
-  const pulled = box([{ id: '1', ip: '4.2', er: 1, starter: true }, { id: '2', ip: '0.0', er: 0, active: true }], [{ id: '4', ip: '4.0', er: 0, starter: true, active: true }]);
+  const pulled = box([{ id: '1', ip: '4.2', er: 2, starter: true }, { id: '2', ip: '0.0', er: 0, active: true }], [{ id: '4', ip: '4.0', er: 0, starter: true, active: true }]);
   assert.deepEqual(pitcherEvents(g, boxPitchers(pulled), live, done).map((e) => [e.type, e.targetKey, e.title, e.body]), [
-    ['mlb.pitcher.no_quality_start', 'player:mlb:1', 'No quality start for Freddy Peralta: pulled after 4.2 innings', '4.2 IP, 3 H, 1 ER, 2 BB, 5 K — NYY 3, TB 1'],
+    ['mlb.pitcher.no_quality_start', 'player:mlb:1', 'No quality start for Freddy Peralta: pulled after 4.2 innings', '4.2 IP, 3 H, 2 ER, 2 BB, 5 K — NYY 3, TB 1'],
   ], 'still pitching through 4 (Schlittler) is not news yet');
+  // Pulled early after a good start is no bad night: Gavin Williams, ALDS Game 5 (5.2 IP, 1 H, 0 ER, 12 K), and 1 earned run.
+  for (const er of [0, 1]) assert.deepEqual(pitcherEvents(g, boxPitchers(box([{ id: '1', ip: '5.2', er, starter: true }], [])), live, new Set()), [], `${er} earned`);
   assert.deepEqual(pitcherEvents(g, boxPitchers(pulled), live, done), [], 'the next read: already said');
   const rocked = box([], [{ id: '4', ip: '3.1', er: 4, starter: true, active: true }]);
   assert.equal(pitcherEvents(g, boxPitchers(rocked), live, done)[0].title, 'No quality start for Cam Schlittler: 4 earned runs in 3.1 innings', 'still in the game, but it is settled');

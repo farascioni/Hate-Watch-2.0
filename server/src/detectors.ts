@@ -45,12 +45,12 @@ export interface GameCtx {
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
   /**
-   * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs) and for
-   * "opponent has runners in scoring position" (`risp`: the batting team has had one this half, first on
-   * `rispPlay`; `loadedTold`: the bases loading since went on that alert), and "goes down in order" (`pas`:
-   * each plate appearance's result; `reached`: anyone got on or scored).
+   * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs), for "opponent has
+   * runners in scoring position" (`risp`: the batting team has had one this half) and "opponent loads the bases"
+   * (`loadedTold`: it went out this half), and "goes down in order" (`pas`: each plate appearance's result;
+   * `reached`: anyone got on or scored). A half's end is judged from its plays instead (halfFromPlays).
    */
-  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; rispPlay?: string; loadedTold?: boolean; pas: { id: string; text: string }[]; reached: boolean };
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; loadedTold?: boolean; pas: { id: string; text: string }[]; reached: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
@@ -464,13 +464,20 @@ function onTeam(g: GameCtx, p: NPlay, teamId: string | undefined) {
   return p.participants.find((x) => playerTeamId(g.league, x.id) === teamId)?.id;
 }
 
-/** Resolve "error by shortstop Smith" style text to an athlete on a given team by last name. */
-function byLastName(g: GameCtx, teamId: string, lastName: string) {
+/**
+ * Resolve "error by shortstop Smith" style text to an athlete on a given team by last name. When two teammates share
+ * it, ESPN puts the first initial in front ("error by shortstop C. Montgomery": Colson and Braden, White Sox, October
+ * 2026), and `initial` picks between them.
+ */
+function byLastName(g: GameCtx, teamId: string, lastName: string, initial?: string) {
   const target = normalize(lastName);
   const roster = catalog.roster(teamKey(g.league, teamId));
-  const hits = roster.filter((pl) => normalize(pl.name).split(' ').slice(1).join(' ').endsWith(target));
+  let hits = roster.filter((pl) => normalize(pl.name).split(' ').slice(1).join(' ').endsWith(target));
+  if (hits.length > 1 && initial) hits = hits.filter((pl) => normalize(pl.name).startsWith(initial.toLowerCase()));
   return hits.length === 1 ? hits[0].espnId : undefined;
 }
+/** A first initial ESPN may put before a last name ("C. Montgomery"): its letter is the group. */
+const INITIAL = String.raw`(?:([A-Z])\. )?`;
 
 function mk(g: GameCtx, p: NPlay, type: string, athleteId: string, title: string, extra: Partial<Detected> = {}): Detected {
   return {
@@ -515,9 +522,8 @@ export const ordinal = (n: number) => {
  * is in it too: "stranded runners on first and second".
  * Uses the half-inning's last at-bat result, whose runner roles are the bases after the third out.
  */
-function strandedRisp(g: GameCtx): Detected[] {
-  const r = g.lastResult;
-  if (!r?.teamId) return [];
+function strandedRisp(g: GameCtx, r: NPlay): Detected[] {
+  if (!r.teamId) return [];
   const on = (base: string) => r.participants.some((x) => x.role === base);
   const [first, second, third] = [on('onFirst'), on('onSecond'), on('onThird')];
   const risp = Number(second) + Number(third);
@@ -545,22 +551,25 @@ const halfLabel = (p: NPlay) => (p.period ? `${p.period.type === 'Top' ? 'Top' :
  * Only at-bat results that list the batter carry reliable outs + bases after the play; ESPN stamps
  * pitches and runner events with the at-bat's final outs instead.
  */
+/** The current half-inning's state, a new one when `key` is another half. */
+const halfOf = (g: GameCtx, key: string) => (g.half?.key === key ? g.half : (g.half = { key, loadedNoOuts: false, scoredSince: false, risp: false, pas: [], reached: false }));
+
 function trackHalfInning(g: GameCtx, p: NPlay) {
   const key = halfKey(p);
   if (!key) return; // "End Inning" / "Mid" / "End" markers
-  if (g.half?.key !== key) g.half = { key, loadedNoOuts: false, scoredSince: false, risp: false, pas: [], reached: false };
+  const h = halfOf(g, key);
   // Checked before this play can load the bases: a run that scores on the loading play doesn't count.
-  if (g.half.loadedNoOuts && p.scoring) g.half.scoredSince = true;
+  if (h.loadedNoOuts && p.scoring) h.scoredSince = true;
   if (p.typeSlug === 'play-result' && p.outs === 0 && p.participants.some((x) => x.role === 'batter')) {
     const on = (base: string) => p.participants.some((x) => x.role === base);
-    if (on('onFirst') && on('onSecond') && on('onThird')) g.half.loadedNoOuts = true;
+    if (on('onFirst') && on('onSecond') && on('onThird')) h.loadedNoOuts = true;
   }
-  if (inScoringPosition(basesAfter(p)) && !g.half.risp) { g.half.risp = true; g.half.rispPlay = p.id; }
+  if (inScoringPosition(basesAfter(p))) h.risp = true;
   // An at-bat result lists the runners after it: anyone on (a hit, a walk, an error, extra innings' runner
   // on second) or a run (a solo homer leaves the bases empty) means it wasn't 1-2-3.
-  if (p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter') && !g.half.pas.some((x) => x.id === p.id)) {
-    g.half.pas.push({ id: p.id, text: p.text });
-    if (p.scoring || p.participants.some((x) => x.role === 'onFirst' || x.role === 'onSecond' || x.role === 'onThird')) g.half.reached = true;
+  if (p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter') && !h.pas.some((x) => x.id === p.id)) {
+    h.pas.push({ id: p.id, text: p.text });
+    if (p.scoring || p.participants.some((x) => x.role === 'onFirst' || x.role === 'onSecond' || x.role === 'onThird')) h.reached = true;
   }
 }
 
@@ -596,10 +605,12 @@ function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
   const where = bases!.length === 3 ? 'the bases loaded' : bases!.length === 1 ? `a runner on ${bases![0]}` : `runners on ${bases![0]} and ${bases![1]}`;
   // An at-bat result or a steal explains how they got there; a pitch's text ("Ball 2") doesn't.
   const says = p.typeSlug === 'play-result' || !p.participants.some((x) => x.role === 'batter');
+  // The play that loaded the bases has its own alert ("Opponent loads the bases"): this one only for those with that off.
+  const loading = p.typeSlug === 'play-result' && bases!.length === 3;
   return [{
     id: `${g.gameId}:${key}:mlb.team.opponent_risp:${fieldingId}`,
     type: 'mlb.team.opponent_risp',
-    ...(p.scoring ? { unless: 'team.opponent_scored' } : {}),
+    ...(loading ? { unless: 'mlb.team.bases_loaded' } : p.scoring ? { unless: 'team.opponent_scored' } : {}),
     targetKey: teamKey('mlb', fieldingId),
     title: `${teamName('mlb', battingId)} have ${where} against the ${teamName('mlb', fieldingId)}`,
     body: `${halfLabel(p)}${says ? `: ${p.text}` : ''} — ${scoreLine(g, p)}`,
@@ -609,38 +620,73 @@ function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
 }
 
 /**
- * The bases loading after that alert, in the same half-inning (once): a line on it ("Bases loaded now, 1
- * out."), never an alert of its own. It shares the alert's moment (its play's), so the alert already sent
- * gets the line, without a push (publish's late lines); it's that alert's type, so only those who want it.
- * From an at-bat result, the one play that both loads the bases and says how (a walk, a hit, an error).
+ * Team alert for the FIELDING team: the opponent just loaded the bases (once per half-inning), from the at-bat result
+ * that loaded them (a walk, a hit, an error, a hit batter), with how many out. A push by default: White Sox at
+ * Guardians, ALDS Game 5, Vargas walked with two out in the 6th and Guardians fans heard nothing. It's that play's
+ * alert for the team (bundleByPlay), first among them, so tracking the pitcher too, his walk is a line on this one.
  */
-function basesLoadedLater(g: GameCtx, p: NPlay): Detected[] {
-  const key = halfKey(p), h = g.half, b = g.bases;
+function basesLoaded(g: GameCtx, p: NPlay): Detected[] {
+  const key = halfKey(p), b = g.bases;
   const wasLoaded = !!(b?.onFirst && b.onSecond && b.onThird); // the bases before this play (observePlay updates them after)
-  if (!key || h?.key !== key || !h.rispPlay || h.rispPlay === p.id || h.loadedTold || wasLoaded) return [];
-  if (p.typeSlug !== 'play-result' || basesAfter(p)?.length !== 3) return [];
+  if (!key || wasLoaded || p.typeSlug !== 'play-result' || basesAfter(p)?.length !== 3) return [];
+  const h = halfOf(g, key);
+  if (h.loadedTold) return [];
   h.loadedTold = true;
   const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
   const outs = p.outs ?? 0;
   return [{
-    id: `${g.gameId}:${key}:mlb.team.opponent_risp:loaded:${fieldingId}`, type: 'mlb.team.opponent_risp', targetKey: teamKey('mlb', fieldingId),
-    title: `${teamName('mlb', battingId)} have the bases loaded against the ${teamName('mlb', fieldingId)}`,
-    body: `${halfLabel(p)}: ${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id },
-    moment: playMoment(g.gameId, h.rispPlay, teamKey('mlb', fieldingId)),
-    fold: `Bases loaded now, ${outs ? outs : 'nobody'} out${outs > 1 ? 's' : ''}.`, foldOnly: true,
+    id: `${g.gameId}:${key}:mlb.team.bases_loaded:${fieldingId}`, type: 'mlb.team.bases_loaded', targetKey: teamKey('mlb', fieldingId),
+    title: `${teamName('mlb', battingId)} loaded the bases against the ${teamName('mlb', fieldingId)}`,
+    body: `${halfLabel(p)}, ${outs ? `${outs} out${outs > 1 ? 's' : ''}` : 'nobody out'}: ${p.text} — ${scoreLine(g, p)}`,
+    at: p.at, meta: { gameId: g.gameId, playId: p.id },
   }];
 }
 
+/** A play's place in its at-bat (its id's 5th and 6th digits from the end): "99" for the at-bat's result, "00" before the first pitch (a substitution, a pitching change). */
+const pitchNumber = (id: string) => (/^\d{9,}$/.test(id) ? id.slice(-6, -4) : undefined);
+/** An at-bat's result ESPN has posted without its batter on it yet: the game tracker doesn't judge it until he is (live.ts). */
+export const awaitingBatter = (p: NPlay) => p.typeSlug === 'play-result' && pitchNumber(p.id) === '99' && !p.participants.some((x) => x.role === 'batter');
+/** The half-inning an "End Inning" play closes: "Middle of the 6th" (Mid) the top, "End of the 8th" (End) the bottom. */
+export const endedHalf = (p: NPlay) => (p.typeSlug === 'end-inning' && (p.period?.type === 'Mid' || p.period?.type === 'End') ? `${p.period.type === 'Mid' ? 'Top' : 'Bottom'}${p.period.number}` : undefined);
+
 /**
- * Everything that fires when a half-inning ends. If it was a NOBLETIGER, that alert is sent and the
- * stranded-runners alert for the same inning becomes `unless` it: each user gets exactly one of them
- * (the NOBLETIGER if they want it, otherwise the stranded alert if they want that).
+ * A half-inning as its plays stand in a read: its state from scratch (trackHalfInning over its plays) and its last
+ * result (a substitution or pitching change, which ESPN also calls a play result, aside). `done`: the read has its
+ * third out, the at-bat's batter on it if it's an at-bat. Judging from this, not from each play as first seen, is what
+ * keeps a half-inning's end from depending on the order and state ESPN's feed was read in (ALDS Game 5, October 10
+ * 2026: three end-of-inning alerts went missing on the two live servers, at different innings; a replay of the same
+ * plays sent all of them).
  */
-function halfInningEnded(g: GameCtx): Detected[] {
-  const r = g.lastResult;
+export function halfFromPlays(g: GameCtx, plays: NPlay[], key: string) {
+  const tmp = { ...g, half: undefined } as GameCtx;
+  let last: NPlay | undefined;
+  for (const p of plays) {
+    if (halfKey(p) !== key) continue;
+    trackHalfInning(tmp, p);
+    if (p.typeSlug === 'play-result' && pitchNumber(p.id) !== '00') last = p;
+  }
+  const done = !!last && (last.outs ?? 0) >= 3 && !awaitingBatter(last);
+  return { half: tmp.half, last, done };
+}
+
+/**
+ * A half-inning's end, judged from the plays of a read (halfFromPlays): NOBLETIGER, stranded runners, down in order, the
+ * no-hit watch. Null while the read doesn't have its third out, unless `force` (the game tracker gives up waiting).
+ */
+export function mlbHalfInningEnd(g: GameCtx, plays: NPlay[], key: string, force = false): Detected[] | null {
+  const { half, last, done } = halfFromPlays(g, plays, key);
+  if (!done && !force) return null;
+  return halfInningEnded(g, key, last, half);
+}
+
+/**
+ * Everything that fires when a half-inning ends, from its last result `r` and its state `h`. If it was a NOBLETIGER,
+ * that alert is sent and the stranded-runners alert for the same inning becomes `unless` it: each user gets exactly one
+ * of them (the NOBLETIGER if they want it, otherwise the stranded alert if they want that).
+ */
+function halfInningEnded(g: GameCtx, key: string, r: NPlay | undefined, h: GameCtx['half']): Detected[] {
   if (!r?.teamId) return [];
-  const key = halfKey(r);
-  const noble = !!key && g.half?.key === key && g.half.loadedNoOuts && !g.half.scoredSince;
+  const noble = h?.key === key && h.loadedNoOuts && !h.scoredSince;
   const out: Detected[] = [];
   if (noble) out.push({
     id: `${g.gameId}:${key}:mlb.team.nobletiger:${r.teamId}`,
@@ -651,10 +697,10 @@ function halfInningEnded(g: GameCtx): Detected[] {
     at: r.at,
     meta: { gameId: g.gameId, playId: r.id },
   });
-  for (const s of strandedRisp(g)) out.push(noble ? { ...s, unless: 'mlb.team.nobletiger' } : s);
-  out.push(...downInOrder(g, r, key));
+  for (const s of strandedRisp(g, r)) out.push(noble ? { ...s, unless: 'mlb.team.nobletiger' } : s);
+  out.push(...downInOrder(g, r, key, h));
   out.push(...noHitWatch(g, r));
-  return out;
+  return out.map((e) => ({ ...e, meta: { ...e.meta, inning: r.period?.number } })); // the inning, for a line on the loss (finalHalfOnLoss)
 }
 
 /**
@@ -673,9 +719,8 @@ function noHitWatch(g: GameCtx, r: NPlay): Detected[] {
 }
 
 /** Team alert: three up, three down, nobody on. "Struck out in order" when all three struck out. */
-function downInOrder(g: GameCtx, r: NPlay, key: string | undefined): Detected[] {
-  const h = g.half;
-  if (!key || h?.key !== key || h.reached || h.pas.length !== 3) return [];
+function downInOrder(g: GameCtx, r: NPlay, key: string, h: GameCtx['half']): Detected[] {
+  if (h?.key !== key || h.reached || h.pas.length !== 3) return [];
   const ks = h.pas.filter((x) => /struck out/i.test(x.text)).length;
   const team = teamName('mlb', r.teamId!);
   return [{
@@ -690,9 +735,30 @@ function downInOrder(g: GameCtx, r: NPlay, key: string | undefined): Detected[] 
   }];
 }
 
-/** The game's final half-inning has no "End Inning" play; the tracker calls this at the final. */
-export function mlbFinalHalfInning(g: GameCtx): Detected[] {
-  return g.league === 'mlb' && g.lastResult?.outs === 3 ? halfInningEnded(g) : []; // walk-offs end with < 3 outs
+/** The game's final half-inning has no "End Inning" play; the tracker calls this at the final, with every play. */
+export function mlbFinalHalfInning(g: GameCtx, plays: NPlay[]): Detected[] {
+  const last = [...plays].reverse().find((p) => p.typeSlug === 'play-result' && halfKey(p) && pitchNumber(p.id) !== '00');
+  const key = last && halfKey(last);
+  if (g.league !== 'mlb' || !key || (last.outs ?? 0) < 3) return []; // walk-offs end with < 3 outs
+  return mlbHalfInningEnd(g, plays, key, true) ?? [];
+}
+
+/**
+ * At the final, the last half-inning's alerts about the team that lost (it made the last three outs, so it's the loser,
+ * but for a game called early) are lines on its loss: "Struck out in order in the 9th." (ALDS Game 5: it went out in the
+ * same second as "White Sox are ELIMINATED", as an alert of its own). With the loss off, each is still an alert. The
+ * no-hit watch stays its own: the loss says "No-hit." from the box score.
+ */
+export function finalHalfOnLoss(g: Pick<GameCtx, 'league'>, events: Detected[], lost: Detected): { lines: Detected[]; rest: Detected[] } {
+  const lines: Detected[] = [], rest: Detected[] = [];
+  for (const e of events) {
+    const n = Number(e.meta?.inning ?? 0);
+    if (e.targetKey !== lost.targetKey || e.type === 'mlb.team.no_hit' || !n) { rest.push(e); continue; }
+    const team = teamName(g.league, e.targetKey.split(':')[2]);
+    const what = asLine(e.title.startsWith(`${team} `) ? e.title.slice(team.length + 1) : e.title).replace(/\.$/, '');
+    lines.push({ ...e, moment: lost.moment, fold: `${what[0].toUpperCase()}${what.slice(1)} in the ${ordinal(n)}.` });
+  }
+  return { lines, rest };
 }
 
 type Base = 'onFirst' | 'onSecond' | 'onThird';
@@ -701,8 +767,8 @@ const STOLEN_FROM: Record<string, Base> = { second: 'onFirst', third: 'onSecond'
 /** Picked off a base means the runner was standing on it. */
 const PICKED_AT: Record<string, Base> = { first: 'onFirst', second: 'onSecond', third: 'onThird' };
 const NAME = String.raw`([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III|IV))?)`;
-const PICKED_OFF = new RegExp(`${NAME} picked off (?:and caught stealing (second|third|home)|(first|second|third))`, 'u');
-const CAUGHT_STEALING = new RegExp(`${NAME} caught stealing (second|third|home)`, 'u');
+const PICKED_OFF = new RegExp(`${INITIAL}${NAME} picked off (?:and caught stealing (second|third|home)|(first|second|third))`, 'u');
+const CAUGHT_STEALING = new RegExp(`${INITIAL}${NAME} caught stealing (second|third|home)`, 'u');
 
 /**
  * Player alert: a runner thrown out stealing OR picked off (one notification type, one toggle).
@@ -715,22 +781,22 @@ const CAUGHT_STEALING = new RegExp(`${NAME} caught stealing (second|third|home)`
  * text); the id is built from the text, not the play id, so both collapse into one notification.
  */
 function runnerOut(g: GameCtx, p: NPlay): Detected | null {
-  let lastName: string, from: Base, what: string;
+  let lastName: string, initial: string | undefined, from: Base, what: string;
   const po = p.text.match(PICKED_OFF);
   const cs = po ? null : p.text.match(CAUGHT_STEALING); // check pickoffs first: "picked off and caught stealing"
   if (po) {
-    const [, name, stealing, at] = po;
-    [lastName, from, what] = stealing ? [name, STOLEN_FROM[stealing], `got picked off (caught stealing ${stealing})`] : [name, PICKED_AT[at], `got picked off ${at}`];
+    const [, first, name, stealing, at] = po;
+    [lastName, initial, from, what] = stealing ? [name, first, STOLEN_FROM[stealing], `got picked off (caught stealing ${stealing})`] : [name, first, PICKED_AT[at], `got picked off ${at}`];
   } else if (cs) {
-    const [, name, stealing] = cs;
-    [lastName, from, what] = [name, STOLEN_FROM[stealing], `got caught stealing ${stealing}`];
+    const [, first, name, stealing] = cs;
+    [lastName, initial, from, what] = [name, first, STOLEN_FROM[stealing], `got caught stealing ${stealing}`];
   } else return null;
 
   const fullName = (id: string) => catalog.playerByEspn('mlb', id)?.name;
-  const matches = (id: string) => normalize(fullName(id) ?? '').endsWith(normalize(lastName));
+  const matches = (id: string) => normalize(fullName(id) ?? '').endsWith(normalize(lastName)) && (!initial || normalize(fullName(id) ?? '').startsWith(initial.toLowerCase()));
   let runner = g.bases?.[from];
   if (!runner || (fullName(runner) && !matches(runner))) {
-    runner = p.teamId ? byLastName(g, p.teamId, lastName) : undefined; // play team = batting team
+    runner = p.teamId ? byLastName(g, p.teamId, lastName, initial) : undefined; // play team = batting team
   }
   if (!runner) return null;
   const half = p.period ? `${p.period.type}${p.period.number}` : '';
@@ -748,7 +814,7 @@ function runnerOut(g: GameCtx, p: NPlay): Detected | null {
 /** A run that scored on a wild pitch, a passed ball or a balk: "Mitchell scored on Burke wild pitch.", "Outman scored on a balk." */
 const GIFT_RUN = /\bscored on (?:an? )?(?:[A-Z][\p{L}'.-]+ )?(wild pitch|passed ball|balk)\b/iu;
 /** Thrown out on the bases in an at-bat's result: "Contreras out stretching at third.", "Manzardo doubled off first.", "Goodman thrown out at home." */
-const BASE_OUT = new RegExp(`${NAME} (out stretching at (?:second|third|home)|doubled off (?:first|second|third)|(?:thrown )?out at home)`, 'gu');
+const BASE_OUT = new RegExp(`${INITIAL}${NAME} (out stretching at (?:second|third|home)|doubled off (?:first|second|third)|(?:thrown )?out at home)`, 'gu');
 
 /**
  * Player alert: thrown out on the bases (caught stealing and pickoffs are runnerOut's). The batter's own
@@ -759,8 +825,9 @@ function outOnBases(g: GameCtx, p: NPlay): Detected[] {
   if (p.typeSlug !== 'play-result' || !p.teamId || /caught stealing|picked off/i.test(p.text)) return [];
   const [batter] = role(p, 'batter');
   const out: Detected[] = [];
-  for (const [, name, how] of p.text.matchAll(BASE_OUT)) {
-    const who = batter && normalize(catalog.playerByEspn('mlb', batter)?.name ?? '').endsWith(normalize(name)) ? batter : byLastName(g, p.teamId, name);
+  for (const [, initial, name, how] of p.text.matchAll(BASE_OUT)) {
+    const batterName = normalize(catalog.playerByEspn('mlb', batter)?.name ?? '');
+    const who = batter && batterName.endsWith(normalize(name)) && (!initial || batterName.startsWith(initial.toLowerCase())) ? batter : byLastName(g, p.teamId, name, initial);
     if (!who) continue;
     const what = how.replace(/^thrown out/, 'out').replace(/^out stretching/, 'thrown out stretching').replace(/^out at home/, 'thrown out at home').replace(/^doubled off/, 'doubled off');
     out.push({ ...mk(g, p, 'mlb.runner.out_on_bases', who, `${nameOf('mlb', who)} got ${what}`), id: `${g.gameId}:bases:${halfKey(p) ?? ''}:${normalize(p.text).replace(/ /g, '-')}:${who}` });
@@ -930,7 +997,9 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
   for (const p of pitchers) {
     const note = (re: RegExp) => p.notes.find((n) => re.test(n));
     const bs = note(/^BS?\b/), loss = o.final ? note(/^L\b/) : undefined;
-    const noQs = p.starter && (p.er >= 4 || ((!p.active || o.final) && p.outs < 18));
+    // Pulled before 6 innings, it's only a bad night with 2 or more earned runs: Gavin Williams left a 2-0 ALDS Game 5
+    // after 5.2 scoreless innings and 12 strikeouts (October 10 2026), and "No quality start" said nothing a hater wants.
+    const noQs = p.starter && (p.er >= 4 || ((!p.active || o.final) && p.outs < 18 && p.er >= 2));
     const chased = p.starter && !p.active && !o.final && p.outs < CHASED_OUTS;
     const facts = PITCHER_ORDER.filter((t, i) => [bs, chased, noQs, loss][i] && !done.has(`${t}:${p.id}`));
     if (!facts.length) continue;
@@ -949,11 +1018,14 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
       has('loss') && after(loss) ? `now ${after(loss)}` : '',
     ].filter(Boolean);
     // His start's two facts can come at different times (a 4th earned run, then the hook): one moment, so the
-    // later one is a line on the alert he already had.
-    const start = facts.every((t) => t === 'mlb.pitcher.chased' || t === 'mlb.pitcher.no_quality_start')
-      ? { moment: `${g.gameId}:start:${p.id}`, fold: has('chased') ? `Chased after ${innings(p)}.` : asLine(title) } : {};
+    // later one is a line on the alert he already had. The loss is his team's loss's moment: a line on the loss alert a
+    // device got a few seconds before ("Sean Burke took the loss: 5.0 IP, 4 H, 2 ER, now 1-1."), its own alert only
+    // with the loss off (ALDS Game 5: two pushes 30 seconds apart for anyone tracking the losing pitcher).
+    const moment = has('loss') ? { moment: lossMoment(g.gameId), fold: `${title}: ${p.line.split(', ').slice(0, 3).join(', ')}${after(loss) ? `, now ${after(loss)}` : ''}.` }
+      : facts.every((t) => t === 'mlb.pitcher.chased' || t === 'mlb.pitcher.no_quality_start')
+        ? { moment: `${g.gameId}:start:${p.id}`, fold: has('chased') ? `Chased after ${innings(p)}.` : asLine(title) } : {};
     out.push({
-      id: `${g.gameId}:${facts[0]}:${p.id}`, type: facts[0], ...(facts.length > 1 ? { aliases: facts.slice(1) } : {}), ...start,
+      id: `${g.gameId}:${facts[0]}:${p.id}`, type: facts[0], ...(facts.length > 1 ? { aliases: facts.slice(1) } : {}), ...moment,
       targetKey: playerKey('mlb', p.id), title,
       body: `${p.line}${extra.length ? ` · ${extra.join(' · ')}` : ''} — ${o.final ? 'Final: ' : ''}${scoreLine(g, o.score)}`,
       at: o.at, meta: { gameId: g.gameId, athleteId: p.id },
@@ -964,8 +1036,9 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
 
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
 function mlb(g: GameCtx, p: NPlay): Detected[] {
-  // ESPN marks every half-inning except the game's last with an "End Inning" play.
-  if (p.typeSlug === 'end-inning') return halfInningEnded(g);
+  // ESPN marks every half-inning except the game's last with an "End Inning" play. Its alerts come from the half's
+  // plays as they stand once a read has its third out (mlbHalfInningEnd, which the game tracker calls), not from here.
+  if (p.typeSlug === 'end-inning') return [];
   const out: Detected[] = [];
   const [batter] = role(p, 'batter');
   const [pitcher] = role(p, 'pitcher');
@@ -996,6 +1069,8 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
       out.push(mk(g, p, 'mlb.batter.popout', batter, `${nameOf('mlb', batter)} ${what}`));
     }
   }
+  // Ahead of the pitcher's alerts on the play: tracking the team and the pitcher, this is the alert, the walk a line on it.
+  out.push(...basesLoaded(g, p));
   if (pitcher) {
     const runs = p.scoring ? Math.max(p.scoreValue, 1) : 0;
     const pn = nameOf('mlb', pitcher);
@@ -1027,20 +1102,19 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     }
     if (isResult && /\b(walked|hit by pitch)\b/i.test(t) && !pushedIn) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
     // A passed ball that scores a run is the catcher's ("…on a passed ball by Langeliers").
-    const catcherName = gift && /passed ball/i.test(gift[1]) ? t.match(/passed ball by ([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/u)?.[1] : undefined;
-    const catcher = catcherName && p.teamId ? byLastName(g, p.teamId === g.homeId ? g.awayId : g.homeId, catcherName) : undefined;
+    const pb = gift && /passed ball/i.test(gift[1]) ? t.match(new RegExp(String.raw`passed ball by ${INITIAL}([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III))?)`, 'u')) : null;
+    const catcher = pb && p.teamId ? byLastName(g, p.teamId === g.homeId ? g.awayId : g.homeId, pb[2], pb[1]) : undefined;
     if (catcher) out.push({ ...mk(g, p, 'mlb.catcher.passed_ball', catcher, `${nameOf('mlb', catcher)} let a run score on a passed ball`), id: textId('mlb.catcher.passed_ball', catcher) });
   }
   out.push(...outOnBases(g, p));
   const runner = runnerOut(g, p);
   if (runner) out.push(runner);
   out.push(...opponentRisp(g, p));
-  out.push(...basesLoadedLater(g, p));
   out.push(...challengeLost(g, p));
-  const err = t.match(/error by (?:\w+ )?(?:baseman |fielder |stop )?([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)/);
+  const err = t.match(new RegExp(String.raw`error by (?:\w+ )?(?:baseman |fielder |stop )?${INITIAL}([A-Z][\w'.-]+(?: (?:Jr\.|Sr\.|II|III))?)`));
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;
-    const who = byLastName(g, fieldingTeam, err[1]);
+    const who = byLastName(g, fieldingTeam, err[2], err[1]);
     if (who) out.push(mk(g, p, 'mlb.fielder.error', who, `${nameOf('mlb', who)} committed an error`));
   }
   return out;
@@ -1653,6 +1727,19 @@ export interface Elimination { loserId: string; winnerId: string; sweep: boolean
  * game is a knockout. The standings never mark these teams eliminated (they keep the "x"/"y" they
  * clinched with). A series lost without a win is a sweep: "Swept 3-0 by the Rays in the ALDS".
  */
+/**
+ * A game's summary in the shape of its scoreboard event, for eliminationOf when the scoreboard is slow with a playoff
+ * final: the summary has the series too, as one of a list ("CLE wins series 3-2", ALDS Game 5, October 2026), and the
+ * round as its `gameNote` ("ALDS - Game 5").
+ */
+export function summaryEvent(s: any): any {
+  const comp = s?.header?.competitions?.[0];
+  if (!comp) return undefined;
+  const series = Array.isArray(comp.series) ? comp.series.find((x: any) => x?.type === 'playoff') : comp.series;
+  const notes = comp.notes?.length ? comp.notes : s.header.gameNote ? [{ type: 'event', headline: s.header.gameNote }] : [];
+  return { id: s.header.id, season: s.header.season, status: comp.status, competitions: [{ ...comp, notes, series }] };
+}
+
 export function eliminationOf(lg: League, ev: any): Elimination | null {
   const c = ev?.competitions?.[0];
   if (ev?.season?.type !== 3 || !ev.status?.type?.completed || !c) return null;
@@ -1724,7 +1811,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
     at,
     meta: { gameId: g.gameId, winnerId, margin: w - l, score: `${w}-${l}`, ...(blowout ? { blowout: true } : {}), ...(elim ? { eliminated: true, sweep: elim.sweep } : {}) },
     ...(elim ? { aliases: ['team.eliminated'] } : {}),
-    moment: `${g.gameId}:final:lost`,
+    moment: lossMoment(g.gameId),
   };
 }
 
@@ -1761,13 +1848,15 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
   const loserId = lost.targetKey.split(':')[2];
   const winnerId = (lost.meta?.winnerId as string | undefined) ?? '';
   const team = teamName(g.league, loserId), winner = teamName(g.league, winnerId);
-  // A blowout says so here too ("got BLOWN OUT by"); an elimination's own line is in the body.
-  const how = lost.meta?.blowout && !lost.meta?.eliminated ? (SOCCER.has(g.league) ? `were thrashed ${lost.meta.score} by` : 'got BLOWN OUT by') : 'lost to';
+  // A blowout says so here too ("got BLOWN OUT by"); an elimination as the team's alert does ("…and the White Sox are
+  // ELIMINATED ⚰️"), its line in the body.
+  const how = lost.meta?.eliminated ? (lost.meta.sweep ? 'got SWEPT 🧹 and are ELIMINATED ⚰️' : 'are ELIMINATED ⚰️')
+    : `${lost.meta?.blowout ? (SOCCER.has(g.league) ? `were thrashed ${lost.meta.score} by` : 'got BLOWN OUT by') : 'lost to'} ${the(g.league, winner)}`;
   return [...players].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({
     id: `${g.gameId}:final:player.team_lost:${p.espnId}`,
     type: 'player.team_lost',
     targetKey: p.key,
-    title: `Successful Hate Watch! ${p.name} and ${the(g.league, team)} ${how} ${the(g.league, winner)}`,
+    title: `Successful Hate Watch! ${p.name} and ${the(g.league, team)} ${how}`,
     body: lost.body,
     at: lost.at,
     meta: { gameId: g.gameId, athleteId: p.espnId, lostId: lost.id, teamKey: lost.targetKey },
@@ -1775,6 +1864,20 @@ export function playerTeamLostEvents(g: Pick<GameCtx, 'league' | 'gameId'>, lost
     firstFollowed: true,
   }));
 }
+
+/**
+ * The loss's lines (its facts: shut out, a walk-off, lost as favorites…; the last half-inning's) for those who track
+ * only a player on the losing team: a copy of each per tracked player, a line on that player's "their team lost" and
+ * never an alert of its own (foldOnly). It's the fact's own type, so the device's setting for that fact decides.
+ */
+export function playerLossLines(lines: Detected[], players: { key: string; espnId: string }[]): Detected[] {
+  return players.flatMap((p) => lines.filter((e) => e.fold).map((e) => ({
+    ...e, id: `${e.id}:${p.espnId}`, targetKey: p.key, foldOnly: true, meta: { ...e.meta, athleteId: p.espnId },
+  })));
+}
+
+/** A team's loss and every alert that is part of it (its facts, "their team lost", the losing pitcher's) share this moment. */
+export const lossMoment = (gameId: string) => `${gameId}:final:lost`;
 
 /**
  * A team's alerts for a play that scored on them. They're one moment per team: blowing a big lead (`led`:
