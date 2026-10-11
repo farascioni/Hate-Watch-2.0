@@ -1,9 +1,17 @@
 # Hate Watch 😈
 
+**In short:** Hate Watch is a phone app for following the athletes and teams you can't stand, and getting a push the moment something bad happens to them. It is two programs in one repository: an Expo app in `app/` and a Node server in `server/` that reads ESPN, spots bad plays in live games and sends them to the people who track them. Production is one Fly.io machine (`hate-watch-api`) with a SQLite database, and app builds come from EAS.
+
+The rest of this README is the reference for how everything works. **Run it** starts the app and the server on your own machine. **Deploy** covers the server on Fly.io, the iOS and Android builds on EAS, App Store Connect, donations and the icons. **Data** explains where teams, players and images come from and how the catalog stays free of duplicates and wrong faces. **Real-time** covers how fast an alert arrives and how football plays that ESPN rewrites are handled. **Notifications** lists every alert type, the defaults for new installs and every setting. Then the app's screens and features: the **Scores tab**, the **Stats pages**, the **Successful Hate Watch counter**, the **Leaderboard**, the **Startup guide**, **An alert on its own screen**, **Developer notices** and **Sharing an alert**. **Tests** says how the code is checked, and **Known limits** what isn't covered or can't be. The UFC and college football are described in `PATCH_NOTES.md` and in the header comments of `server/src/ufc.ts` and `server/src/cfb-poll.ts`. Releasing is in `CLAUDE.md`, and the Google Play release in `docs/android-release.md`.
+
 Track the athletes and teams you can't stand. Get a push the moment something bad happens to them.
 
-- **`app/`**: iOS + Android app (Expo SDK 57, React Native, Expo Router). Also runs on web for development.
-- **`server/`**: Node backend. It ingests rosters from ESPN, watches live games, detects negative plays, and fans them out to the feed, a WebSocket, and push notifications (APNs/FCM via Expo Push).
+- **`app/`**: the iOS and Android app, built with Expo SDK 57 (`expo` ~57.0.26), React Native 0.86 and Expo Router. It also runs on the web, for development. It talks to the server over REST and a WebSocket. The server's address is `EXPO_PUBLIC_API_URL`, or `http://localhost:8787` in a development build and `https://hate-watch-api.fly.dev` in a release build (`app/src/lib/api.ts`, `API_URL`). The WebSocket is the same address with `ws` in place of `http`, at `/ws` (`WS_URL`).
+- **`server/`**: the Node backend. Node runs its TypeScript sources directly (`"engines": { "node": ">=22.18" }`, and Node 24 in the Docker image), with SQLite from `node:sqlite`. It has three jobs:
+  - It builds a catalog of every team and player from ESPN (`server/src/catalog.ts`, see Data below).
+  - It watches live games and detects bad plays (`live.ts`, `detectors.ts`).
+  - It sends each alert to the feed, to the open apps over the WebSocket, and to phones as a push through Expo Push, which hands it to APNs (iOS) or FCM (Android) (`fanout.ts`, `push.ts`).
+- **Nine leagues**, in the order the app lists them (`LEAGUE_IDS` in `server/src/leagues.ts`): the NBA, MLB, NFL, NHL, Formula 1, the Premier League (EPL), the UFC, college football (FBS teams only, no players) and the WNBA. The WNBA always goes last, wherever a league is added in `LEAGUES`. Each league's look in the app (its chip colour, its filter, what its people and events are called) is set by `ui` in `LEAGUES`, so it changes with a server deploy rather than an app build.
 
 ```
 ESPN (core plays + site summary, polled in parallel every 2s per live game)
@@ -15,25 +23,108 @@ injuries (30s)                                 ├─► feed rows ─► WebSoc
                                                └─► Expo Push ─► APNs / FCM (app closed)
 ```
 
+How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
+
+- **Each live game is read every 2 seconds** (`HW_LIVE_POLL_MS`, default 2000). Each read fetches ESPN's core play-by-play and the site summary at the same time (`Promise.allSettled`) and merges their plays (`mergePlays`). Soccer and college football read the summary alone. A college football game is read every 5 seconds (`HW_TEAMS_ONLY_POLL_MS`).
+- **Slower loops:** the scoreboard every 10 seconds (`HW_SCOREBOARD_MS`), to find games going live or final. Standings every 60 seconds (`HW_STANDINGS_MS`). Injury reports every 30 seconds (`HW_INJURIES_MS`).
+- **`publish()` stores each alert once** in the `events` table. Its primary key is a deterministic id built from what happened (for example game, play, type and athlete), so reading the same play again never alerts twice.
+- **Each follower's settings decide what they get.** An alert type or league they switched off is skipped, unless they set that target's alerts on their own (a per-target setting beats the global switches, `typeEnabledFor`). Push also skips a target they muted (it still reaches their feed) and their quiet hours (default off, 23:00 to 08:00 America/New_York, `DEFAULT_PREFS` in `fanout.ts`).
+- **Open apps** get the alert as a WebSocket frame within milliseconds. **A closed app** gets it as a push.
+
 ## Run it
 
+**In short:** Start the server with `cd server && npm ci && npm start`. It listens on port 8787 and keeps its development database in `server/data/hatewatch.db`. On the very first start, that database is empty, so the server reads every league from ESPN before it starts listening. Start the app with `cd app && npm ci && npx expo start`. A development build talks to `http://localhost:8787` unless `EXPO_PUBLIC_API_URL` says otherwise. Push needs a physical phone and a development build. `HW_DEV=1` adds a route for sending yourself a test alert.
+
 ```bash
-cd server && npm install && npm start          # ingests ~5,000 players on first boot (~30s), serves :8787
-cd app && npm install && npx expo start        # press i / a, or w for web
+cd server && npm ci && npm start          # first start: reads every league from ESPN, then serves :8787
+cd app && npm ci && npx expo start        # press i / a, or w for web
 ```
 
-On a physical phone, point the app at your machine: `EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:8787 npx expo start`.
+Install with `npm ci`, not `npm install`. `npm ci` installs exactly what `package-lock.json` says and never rewrites it. A rewritten lockfile has broken an EAS build before (see CLAUDE.md). Don't run `npx expo lint` in `app/` either: ESLint isn't set up, so it installs ESLint and rewrites the lockfile.
 
-**Push notifications** need an EAS project and a development build. Remote push doesn't work in Expo Go on Android.
+**The server, step by step** (`server/src/index.ts`, `db.ts`):
+
+1. `npm start` runs `node --disable-warning=ExperimentalWarning src/index.ts`. Node runs the TypeScript directly, with no build step. That needs Node 22.18 or later (`engines` in `server/package.json`).
+2. `db.ts` opens the SQLite database at `HW_DB`, which defaults to `data/hatewatch.db`. The path is relative to the folder you start in, so start the server from `server/`. The folder is created if it's missing (`mkdirSync`). The database runs in WAL mode, with foreign keys on, and its tables are created if they don't exist: `teams`, `players`, `devices`, `follows`, `events`, `feed`, `hate_watches` and `kv`. Columns added after launch are added to an older database on start: `events.share_code`, `players.positions`, `events.clip` and `feed.extra`. `server/data/` is in `server/.gitignore`, so each machine has its own development database.
+3. `loadCatalog()` reads the teams and players into memory.
+   - **If the catalog is empty** (a new machine, or a deleted database), the server logs `[boot] catalog empty; ingesting rosters from ESPN…` and reads every league before it listens. Fly's health check gives a first boot 120 seconds (`grace_period` in `server/fly.toml`), whose comment estimates 30 to 60 seconds. The latest full read of the development database, on 2026-10-11, came to 309 teams and 6,980 players.
+   - **If a league is missing** from a catalog that isn't empty (a deploy that adds a league, as F1, the WNBA, the UFC and college football each were), the server logs `[boot] catalog missing …; ingesting in the background` and serves at once. The read it then starts covers every league, not just the missing one.
+4. It logs `[boot] catalog { teams, players }` and `[boot] next roster refresh in N min`, then schedules the 6-hour refresh (see Data).
+5. It starts the API on `PORT` (default 8787; production uses 8080, set in `fly.toml`), the live-game engine (`engine.start()`), and the watcher that sends developer notices to open apps (`watchNotices()`).
+6. On `SIGTERM` or `SIGINT` (Ctrl-C, or a deploy), it closes the HTTP server and the database and exits.
+
+To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, catalog: { teams, players }, live: … }`. `GET /catalog/report` returns the last ingest's report, with each league's counts and every problem it noted.
+
+**Server scripts** (`server/package.json`):
+
+| Script | What it runs | What it's for |
+|---|---|---|
+| `npm start` | `src/index.ts` | The server. |
+| `npm run ingest` | `src/ingest-cli.ts` | One full catalog read into the database, outside the server. It prints each league's counts as JSON, the first 50 of its notes, and the time it took. It doesn't load the existing catalog first, so if the F1, UFC or college football step fails here, that league's rows aren't kept (players are replaced), and every UFC photo is checked again. |
+| `npm test` | `node --test test/*.test.ts` | Every test. Tests set `HW_DB=':memory:'`, so they never touch the development database. |
+| `npm run typecheck` | `tsc --noEmit` | Type check. |
+
+**Server environment variables.** None is needed to run locally; the defaults suit development. Production sets `PORT`, `HW_DB=/data/hatewatch.db` and `HW_CONTACT_EMAIL` in `fly.toml`.
+
+| Variable | Default | What it does (file) |
+|---|---|---|
+| `PORT` | 8787 | The HTTP and WebSocket port (`index.ts`). |
+| `HW_DB` | `data/hatewatch.db` | The SQLite file (`db.ts`). `flag-cli.ts` and `notice-cli.ts` use `/data/hatewatch.db` when it exists, otherwise `data/hatewatch.db`. |
+| `HW_DEV` | unset | `1` adds `POST /dev/simulate` (below). It must stay unset in production (`fly.toml`). |
+| `EXPO_ACCESS_TOKEN` | unset | Sent as a Bearer token with every push, for Expo's enhanced push security (`push.ts`). |
+| `HW_FLAGS_OFF` | unset | A comma-separated list of server switches to keep off, such as `clips.feed` (`flags.ts`, CLAUDE.md). |
+| `HW_PUBLIC_URL` | `https://hate-watch-api.fly.dev` | Where share links point (`fanout.ts`). |
+| `HW_CONTACT_EMAIL` | `support@example.com` | The address on `/privacy` and `/support` (`pages.ts`). |
+| `HW_APP_STORE_URL` | `https://apps.apple.com/app/id6819054268` | The App Store link on share pages (`share.ts`). |
+| `HW_IOS_APP_ID` | `G9V9266QK5.com.hatewatch.app` | The app allowed to open share links, served in `/.well-known/apple-app-site-association` (`share.ts`). |
+| `HW_LIVE_POLL_MS` | 2000 | How often each live game is read (`live.ts`). |
+| `HW_TEAMS_ONLY_POLL_MS` | 5000 | How often each live college football game is read. |
+| `HW_SCOREBOARD_MS` | 10000 | The scoreboard: games going live or final. |
+| `HW_TEAMS_ONLY_SCOREBOARD_MS` | 20000 | College football's scoreboard around game time. |
+| `HW_STANDINGS_MS` | 60000 | Standings, including F1's (`live.ts`, `f1.ts`). |
+| `HW_INJURIES_MS` | 30000 | Injury reports. |
+| `HW_YESTERDAY_MS` | 600000 | Yesterday's finals, for the Scores tab. |
+| `HW_NEWS_MS` | 180000 | League news: off-field trouble, fines and suspensions. |
+| `HW_DECISION_RETRY_MS` | 15000 | MLB: how often to look again for the winning and losing pitchers after a final, up to 20 times. |
+| `HW_TOUCH_MS` | 10000 | Soccer: the touch-by-touch feed, read only while someone tracks a player in the match. |
+| `HW_PLAYOFF_FINAL_WAIT_MS` | 120000 | How long a playoff final waits for the scoreboard to say whether the season is over. |
+| `HW_ABS_SETTLE_MS` | 60000 | How long a lost ABS challenge waits in case ESPN overturns it. |
+| `HW_HALF_END_WAIT_MS` | 20000 | MLB: how long the end of a half-inning waits for a read that has its third out. |
+| `HW_RECAP_MS` | 900000 | How often to check for weekly recaps to send. |
+| `HW_F1_SCAN_MS` | 30000 | F1's scoreboard: sessions starting and finishing (`f1.ts`). |
+| `HW_F1_STATUS_MS` | 15000 | F1: tracked drivers' race status. |
+| `HW_F1_BOARD_MS` | 30000 | F1: every car's timing during a race or sprint. |
+| `HW_NOTICE_POLL_MS` | 5000 | How often the server looks for a new developer notice to send to open apps (`notices.ts`). |
+| `HW_UPNEXT_REFRESH_MS` | 10800000 | How often Up Next is refreshed (`upnext.ts`). |
+
+**The app** (`app/package.json`):
+
+| Script | What it runs |
+|---|---|
+| `npm start` / `npx expo start` | The Expo dev server. Press `i` for the iOS simulator, `a` for Android, `w` for the web. |
+| `npm run ios` / `npm run android` / `npm run web` | `expo start` with that platform opened. |
+| `npm run typecheck` | `tsc --noEmit`, the type check CLAUDE.md asks for before a build or an update (with the lockfile check). |
+| `npm run icons` | Rebuilds the icons and splash from `scripts/build-icons.mjs`. |
+| `npm run update` | Publishes an over-the-air update **to production** (`EXPO_PUBLIC_API_URL=https://hate-watch-api.fly.dev`, channel `production`). It's not for development; ask before running it (CLAUDE.md). |
+
+**Which server the app uses** (`app/src/lib/api.ts`): `EXPO_PUBLIC_API_URL` when it's set. Otherwise a development build (`__DEV__`) uses `http://localhost:8787`, and a release build uses production's `https://hate-watch-api.fly.dev`, never localhost. The `preview` and `production` profiles in `eas.json` set `EXPO_PUBLIC_API_URL` to production too. On a physical phone, `localhost` is the phone itself, so point the app at your computer's address on the network:
 
 ```bash
-cd app && npx eas-cli@latest init                       # writes extra.eas.projectId into app.json
+EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:8787 npx expo start
+```
+
+**For Claude Code's preview,** `.claude/launch.json` defines two configurations. `hate-watch-web` runs `npx --prefix app expo start --web --port 8081`, the app on the web at port 8081. `hate-watch-server` runs `npm --prefix server start`, the server on port 8787.
+
+**Push notifications** need a development build on a physical device. The app asks for a push token only on a real phone. On the web it reports "Push is not supported on web", and on a simulator "Push needs a physical device" (`registerForPush` in `app/src/lib/push.ts`). The token is requested with the EAS project id, which this repository already has in `app/app.json` (`extra.eas.projectId`). A fork with its own EAS project sets it with `eas init`. Remote push doesn't work in Expo Go on Android.
+
+```bash
+cd app && npx eas-cli@latest init                       # writes extra.eas.projectId into app.json (only for a new EAS project)
 npx eas-cli@latest build --profile development --platform all
 ```
 
-Set `EXPO_ACCESS_TOKEN` on the server if you enable enhanced push security in Expo.
+The `development` profile in `eas.json` is a development client (`developmentClient: true`) for internal distribution. Set `EXPO_ACCESS_TOKEN` on the server if you turn on enhanced push security in Expo.
 
-Dev mode (`HW_DEV=1 npm start`) adds `POST /dev/simulate` and a "Send a test event" button in Settings.
+**Dev mode: a test alert.** Starting the server with `HW_DEV=1 npm start` adds `POST /dev/simulate` (`server/src/api.ts`). The route needs a device's token, like the app's own requests. It takes an optional `targetKey` and `type` in the body. Without them, it picks one of the device's follows at random, and an alert type at random that fits it (a player or team alert for that league). It then publishes the alert through the normal path, so it reaches the feed, the WebSocket and push. The alert's title reads `[TEST] <name>: <alert label>`, its body "Simulated event from /dev/simulate", and its id is `sim:<uuid>`. A device that follows nothing gets 400 "follow something first". In the app, Settings shows a "Send a test event (dev)" button in every development build (`__DEV__`). That button calls this route, so against a server started without `HW_DEV=1` it fails with "Simulate failed" (404, "no route").
 
 ## Deploy
 
@@ -133,38 +224,88 @@ After editing the script, regenerate with `cd app && npm run icons`.
 
 ## Data: rosters, duplicates, and images
 
-Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/.../teams` and `/teams/{id}/roster`. They cover the **NBA, WNBA, MLB, NFL, NHL, Formula 1 and the Premier League (EPL)**. The NHL is included because several of the requested alerts are hockey alerts. ESPN files soccer leagues under a code rather than a name (the EPL is `soccer/eng.1`), kept as `slug` in `leagues.ts`; every ESPN URL goes through it.
+**In short:** Every team and player comes from ESPN's public API. The server reads it all again every 6 hours (`ingest()` in `server/src/catalog.ts`), and right away when what the read collects changes (`INGEST_VERSION`, now 5). Players are deduplicated twice: on ESPN athlete id, then on normalized name plus birth date. Nothing is committed with a duplicate key or a player without an image, and every photo and game-league logo is fetched to check it exists. A player ESPN has no photo for shows their team's logo with their jersey number, never someone else's face. F1 constructors, which have no logos on ESPN, get a drawn badge instead.
 
-Last ingest (2026-10-06): **150 teams, 5,505 players**, 214 of them from injured lists.
+Teams and rosters come from the ESPN endpoints documented in [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API): `site.api.espn.com/apis/site/v2/sports/<sport>/<league>/teams?limit=100` and `/teams/{id}/roster` (`urls` in `server/src/leagues.ts`). They cover the **NBA, WNBA, MLB, NFL, NHL, Formula 1 and the Premier League (EPL)**. The UFC and college football are read their own way (below). The NHL is included because several of the requested alerts are hockey alerts. ESPN files soccer leagues under a code rather than a name: the EPL is `soccer/eng.1`, and college football is `football/college-football`. That code is kept as `slug` in `LEAGUES`, and every ESPN URL goes through it (`path()` in `leagues.ts`). The catalog's keys are `team:<league>:<espnId>` and `player:<league>:<espnId>` (`teamKey`, `playerKey`), so the same ESPN id in two leagues is never one row.
+
+**The latest full ingest** was on the development database on 2026-10-11 at 18:01 UTC, with `INGEST_VERSION` 5. Its report is the `ingest:report` row in `kv`, which `GET /catalog/report` serves. It has **309 teams and 6,980 players**, 203 of them added from injured lists. It noted no problems. These are the development database's counts; production's aren't checked here. The README's previous count, from the ingest of 2026-10-06, was 150 teams and 5,505 players (seven leagues then).
 
 | | Teams | Players | Verified headshots | Logo fallback |
 |---|---|---|---|---|
-| NBA | 30 | 607 | 546 | 61 |
+| NBA | 30 | 618 | 603 | 15 |
 | WNBA | 15 | 221 | 200 | 21 |
-| MLB | 30 | 1,269 (189 injured) | 1,222 | 47 |
-| NFL | 32 | 2,542 | 2,539 | 3 |
-| NHL | 32 | 843 (25 injured) | 826 | 17 |
+| MLB | 30 | 1,303 (182 injured) | 1,257 | 46 |
+| NFL | 32 | 2,554 | 2,551 | 3 |
+| NHL | 32 | 840 (21 injured) | 822 | 18 |
 | F1 | 11 constructors | 23 drivers | 15 | 8 (team badge) |
 | EPL | 20 | 585 | 38 | 547 (club crest) |
+| UFC | 1 (a placeholder, never shown) | 836 fighters | 829 | 7 (UFC badge) |
+| College football | 138 FBS teams | none (teams only) | | |
 
-- **EPL players mostly show their club crest.** ESPN has photos for only a few Premier League players (38 of 585), so the rest get the crest, the same accuracy-first fallback as call-ups elsewhere. ESPN's EPL injury report is empty, so nobody is added from it.
-- **Every position played.** A roster entry has its main position and `positions`, every one ESPN lists them at this season: Shohei Ohtani is DH, P and SP, and Miguel Rojas, who has pitched mop-up innings, 2B, RP, P, 1B, 3B, SS, DH and PH. Stored as `players.positions` (`positionsOf` in `catalog.ts`; `INGEST_VERSION` 3 rebuilt the catalog to read it). It decides which alerts fit a player (below).
-- **Injured lists too.** A player on MLB's 60-day IL comes off the 40-man roster ESPN serves, and NHL long-term injured reserve players are left off too, so Carlos Correa wasn't on the Astros. The ingest also reads each league's injury report and adds anyone on it who isn't on a roster to the team it lists them under (`injuredOffRoster` in `catalog.ts`), with the same duplicate checks and headshot verification. NBA and NFL rosters already include their injured players.
-- **Refreshes every 6 hours, counted from the last one.** Deploys restart the server, and a timer that started over each time kept putting refreshes off. A change to what the ingest collects bumps `INGEST_VERSION`, so the next boot rebuilds in the background right away (`nextIngestIn`).
-- **No duplicates.** Players are deduped on ESPN athlete ID, with a second pass on normalized name + birth date. Teams are deduped on ID and abbreviation. The ingest throws rather than commit a duplicate key, and the database primary keys enforce it again.
-- **Every team and player has an image.** The ingest won't commit a row without one.
-- **Images are accurate.** Each headshot URL must be keyed by that athlete's own ESPN ID, and ESPN's alt text must match the player's name (0 mismatches). Every image is fetched (PNG header via HTTP Range) to confirm it exists and to record its true pixel size.
-- **No wrong faces.** ESPN has no photo for 137 players (practice squad, call-ups; every one re-checked as a real 404). They show their **team logo plus a jersey-number badge**.
-- **Images are scaled properly.** The app asks ESPN's image combiner for exactly the pixels it draws (points × screen density) at the image's native aspect ratio. That matters because sizes vary: 4,894 headshots are 600×436, 2 are square, and one logo is 4096×4096. Headshots use cover + top anchoring so faces aren't cropped. Logos use contain, with ESPN's dark-mode variant when it exists.
-- Rosters refresh every 6 hours. If a refresh fails, the previous catalog stays. On boot, the server also imports if any league is missing from its catalog (that's how F1 arrived on the existing server).
+**How an ingest runs, step by step** (`ingest()` in `catalog.ts`). The leagues go one at a time, in `LEAGUE_IDS` order:
+
+1. **Teams.** It reads the league's team list and drops inactive teams (`isActive: false`) and All-Star teams (`isAllStar`). It dedupes teams on ESPN id, then on abbreviation as a second guard, noting `<league>: duplicate team <name> dropped`.
+   - The logo is ESPN's `default` logo (not its dark one). If there isn't one, it's `a.espncdn.com/i/teamlogos/<league>/500/<abbrev>.png`.
+   - The dark-mode logo (`logoDark`) is ESPN's `dark` one, when it has one; 296 of the 309 teams do.
+   - The team colour and second colour come as hex with a `#` added: the Houston Astros are `#002d62` and `#eb6e1f`.
+   - Every logo is fetched, eight at a time (`mapLimit(…, 8)`), to confirm it exists and record its size. A team without a logo stops the whole ingest ("refusing to ingest a team without an image"), so the old catalog stays.
+2. **Rosters,** six teams at a time. MLB, NFL and NHL rosters group players by position (`{ position, items }`), and the NBA's is a flat list. Both are flattened.
+3. **Injured lists.** It reads the league's injury report and adds anyone on it who isn't on a roster (`injuredOffRoster`), under the team the report lists them with. A player's id comes from the report's athlete, or from the `/id/<n>` in their player-card link. A report group whose team isn't in the league's catalog is skipped. If the report fails to load, the ingest carries on with the rosters alone.
+4. **Dedupe** on ESPN id, then on normalized name plus birth date (details below).
+5. **Players,** 24 at a time. Each gets a key, name, short name, main position, every position (`positionsOf`), jersey and team. Then its image is checked (details below).
+6. **Checks before anything is written.** Every team and player key must be unique across all leagues ("duplicate key after dedupe"), and every player must have an image with a width ("player without image"). Either failure throws, and nothing is written.
+7. **One transaction.** Teams are upserted (`ON CONFLICT(key) DO UPDATE`), so a team is never deleted. Players are replaced: `DELETE FROM players`, then every player is inserted again. A player who has left every roster leaves the catalog. Their follows are kept, so they come back if they're signed again.
+8. **Afterwards.** It saves the report to `kv` as `ingest:report`, along with the UFC's weight classes and belts (`ufc:weight-classes`, `ufc:belts`) and college football's conferences (`cfb:conferences`). Then it reloads the in-memory catalog and the search index (`loadCatalog()`).
+
+The log line for each league reads, for example, `[ingest] MLB: 30 teams, 1303 players (182 from injured lists, 1257 headshots, 46 logo fallbacks, 0 dupes removed)`.
+
+- **EPL players mostly show their club crest.** ESPN has photos for only a few Premier League players (38 of 585), so the rest get the crest. That's the same accuracy-first fallback as call-ups elsewhere. Soccer headshots are all in one folder, whatever the league (`a.espncdn.com/i/headshots/soccer/players/full/<id>.png`). The EPL's injury report added nobody (0 in the 2026-10-11 ingest), so EPL rosters are ESPN's rosters alone.
+- **Every position played.** A roster entry has its main position and `positions`, every one ESPN lists them at this season. Shohei Ohtani is DH, P and SP. Miguel Rojas, who has pitched mop-up innings, is 2B, RP, P, 1B, 3B, SS, DH and PH. `positionsOf` in `catalog.ts` puts the main position first and drops repeats, and returns null when ESPN lists none. The list is stored comma-separated as `players.positions` (`"DH,P,SP"`). It decides which alerts fit a player: a pitcher's alert settings have no hitting alerts, and a skater's no goalie alerts (`server/test/positions.test.ts`). `INGEST_VERSION` 3 rebuilt the catalog to read it.
+- **Injured lists too.** A player on MLB's 60-day IL comes off the 40-man roster ESPN serves, and NHL players on long-term injured reserve are left off too. So Carlos Correa wasn't on the Astros. The ingest also reads each league's injury report and adds anyone on it who isn't on a roster to the team it lists them under (`injuredOffRoster` in `catalog.ts`), with the same duplicate checks and headshot verification. A player on the 10-day IL, like Cristian Javier, is still on the 40-man roster and isn't added twice (`server/test/catalog-injured.test.ts`). NBA and NFL rosters already include their injured players: the first real run added 189 MLB players, 25 NHL players and none for the NBA or NFL (commit d7c1087, 2026-10-06).
+- **Refreshes every 6 hours, counted from the last one** (`INGEST_EVERY_MS`, `nextIngestIn`). Deploys restart the server, and a timer that started over on each restart kept putting refreshes off. Now the server reads when the last ingest ran and waits only what's left. In the test, a deploy at 16:00 UTC after an ingest at 12:50 waits 2 hours 50 minutes, keeping the 18:50 refresh. An overdue refresh runs at once. After that first refresh, one runs every 6 hours (`setInterval` in `index.ts`).
+- **`INGEST_VERSION` rebuilds right away.** A change to what the ingest collects bumps `INGEST_VERSION`. A report from an older version (or from before versions existed) makes the next boot rebuild in the background at once. The versions so far:
+  - 2: injured lists (commit 8292ab3, 2026-10-06)
+  - 3: every position played (967a823, 2026-10-07)
+  - 4: UFC weight classes (7443305, 2026-10-10)
+  - 5: college football (9fca8a2, 2026-10-10)
+- **A failed refresh keeps the old catalog.** The server logs `[ingest] refresh failed, keeping previous catalog`, and nothing is written, because the write happens only after every league has been read. F1, the UFC and college football are read in steps of their own. If one of them fails, that league keeps the rows it already has and the failure becomes a note in the report, without stopping the other leagues. This came after a deploy on 2026-10-10 at 15:06 UTC: ESPN's F1 entry list was a 404 before the grid was out, the whole refresh failed, and the new college football teams didn't arrive (commit f970f7b). Any other league's failure, such as a team list that won't load or a missing logo, still stops the whole refresh.
+- **A missing league is read on boot.** If any league in `LEAGUE_IDS` has no teams in the catalog, the server starts a full ingest in the background right away. That's how F1 arrived on the existing server, and later the WNBA, the UFC and college football. An empty catalog is read before the server listens (see Run it).
+- **No duplicates.**
+  - Players are deduped on ESPN athlete id first. The first entry is kept, and the rest are noted: `<league>: <name> (<id>) listed on HOU and …; kept first`.
+  - Then a second pass catches one person under two ESPN ids: the same normalized name and the same birth date (`dateOfBirth`). It applies only when ESPN gives a birth date. `normalize()` removes accents, lowercases, and turns anything that isn't a letter, digit or space into a space, so "José Ramírez" and "Jose Ramirez" match.
+  - Teams are deduped on id and abbreviation.
+  - The ingest throws rather than commit a duplicate key, and the database primary keys (`teams.key`, `players.key`) enforce it again.
+- **Every team and player has an image.** The ingest won't commit a player without one ("player without image"), or an NBA, WNBA, MLB, NFL, NHL or EPL team without a logo it has fetched. College football's logos aren't fetched (they're all 500×500 on ESPN), and the UFC's and F1's teams use drawn badges.
+- **Images are checked for accuracy.** A headshot is ESPN's own URL from the roster, or `a.espncdn.com/i/headshots/<league>/players/full/<id>.png`. Two checks are logged as problems in the report, but neither stops the ingest. A headshot URL must contain that athlete's own ESPN id (`/<id>.png`), and ESPN's alt text must match the player's name after `normalize()`; the mismatches are counted in `headshotAltMismatch`, and there were 0 in every league. Every image is fetched to confirm it exists and to record its true pixel size (`probePng` in `server/src/espn.ts`).
+  - It asks for only the first 32 bytes (`Range: bytes=0-31`), checks the PNG signature, and reads the width and height from the IHDR header (bytes 16 and 20).
+  - A 404, or a response that isn't an image, means no photo. Other failures are tried 3 times, 8 seconds each, with waits of 0.3, 0.6 and 1.2 seconds. After that the image counts as missing too, which is why the audit below checks every fallback again.
+- **No wrong faces.** When ESPN has no photo for a player (practice squads and call-ups, mostly), the player gets their team's logo, never a guess (`imageKind: 'team_logo'`). In the 2026-10-11 ingest that was 103 players across the NBA, WNBA, MLB, NFL and NHL. The app draws them as the **team logo plus a jersey-number badge** in the team's colour (`app/src/components/Avatar.tsx`).
+- **Images are scaled properly.** The app asks ESPN's image combiner (`a.espncdn.com/combiner/i?img=…&w=…&h=…`) for exactly the pixels it draws: the size in points times the screen density (`PixelRatio`), at the image's native aspect ratio, and never larger than the source (`sizedImage` in `app/src/lib/images.ts`). That matters because sizes vary. In the 2026-10-11 catalog, 6,313 headshots are 600×436, 2 are 600×600, and one NFL logo is 4096×4096. Every other ESPN logo in the catalog is 500×500. Headshots use cover with top anchoring, so faces aren't cropped. Logos use contain, so the whole mark shows, with ESPN's dark-mode variant when it exists. Only ESPN images go through the combiner. A `badge://` image is drawn by the app.
+- **Search** comes from the same catalog (`search()` in `catalog.ts`). Names are normalized the same way. An exact match scores 100, a prefix 80, every word matching the start of a word 60, and a match anywhere else 30. Teams get 5 points more, so a team comes before a player with the same score. Teams that aren't listed (the UFC's placeholder) are left out.
+- **The image switches** (`images.headshots`, `images.logos`) take ESPN's photos and logos out of everything the server sends, without a build. A team or player then gets a `badge://hidden` image, which the app draws as a badge in the team's colour with its code, and a player's jersey number (`withoutImages` in `server/src/images.ts`; CLAUDE.md has the commands). The catalog itself keeps its images.
+- **The UFC** (ESPN's `mma`) has no rosters. Its fighters come from the UFC cards on ESPN's scoreboard, read a month at a time, from 24 months back to 3 months ahead (`ingestUfc`). Each fighter's weight class is the one from their latest fight, and the Contender Series is left out. Fighters need a team, so they all belong to one placeholder, "Ultimate Fighting Championship" (`UFC_TEAM`), which no list or search shows. Its logo is a UFC badge in the UFC's red (`badge://ufc`). A fighter who already has a checked photo keeps it; only new fighters, and those still without a photo, are checked again. The details are in `server/src/ufc.ts` and `ufc-classes.ts`.
+- **College football** is teams only: the FBS (ESPN group 80), read from its conferences, with no rosters and no logo checks (ESPN's are all 500×500), in about 24 reads (`ingestCfb`). A read that finds fewer than 100 teams is treated as a bad read, and the teams already in the catalog are kept. Its season starts in July (`cfbSeason`). The details are in `server/src/cfb-poll.ts`.
 
 **Formula 1 is different** (ESPN sport `racing`, league `f1`):
 
 - **Drivers** are the ones who actually raced this season: the championship standings plus this weekend's entry list. The season's athlete list also includes reserves.
 - **Team and car number** come from this weekend's entry list. ESPN's athlete records can be stale after a team move: Lindblad's record says "Red Bull #36", but he races the Racing Bulls #41. The record is only the fallback, for a driver who isn't entered (e.g. Tsunoda, replaced mid-season).
-- **Constructors have no logos on ESPN** (404, `logos: null`). Rather than use trademarked logos from elsewhere, the app draws a badge in the team's official ESPN colour with a code (FER, MCL, RBR…), with black or white text for contrast. Drivers without an ESPN headshot (8, all re-checked as 404) get that badge plus their car number.
+- **Which entry list:** the latest session of the weekend whose entry list ESPN serves. A race's list is a 404 until its grid is out (the evening after qualifying), even though the scoreboard already lists its cars. If no session's list loads, the athlete records alone decide (`ingestF1` in `catalog.ts`).
+- **A driver whose team matches no constructor** is skipped and noted in the report ("matches no constructor; skipped"), rather than put on the wrong team.
+- **Constructors have no logos on ESPN** (404, `logos: null`). Rather than use trademarked logos from elsewhere, the app draws a badge in the team's official ESPN colour with a code, with black or white text for contrast. The colour falls back to grey (`#888888`) when ESPN has none. The image is `badge://f1` (`F1_BADGE`), and the codes are `F1_CODES`: ALP, AMR, AUD, CAD, FER, HAA, MCL, MER, RB, RBR, WIL. The text colour is whichever reads better on the team's colour (`readableOn` in `Avatar.tsx`): dark on Alpine's yellow (`#FFF500`) and Williams' white, white on Ferrari's red. Drivers without an ESPN headshot (8, all re-checked as 404) get that badge plus their car number. In the 2026-10-11 ingest they were Antonelli (12), Bearman (87), Bortoleto (5), Colapinto (43), Hadjar (6), Lawson (30), Lindblad (41) and Piastri (81).
 
 Audit it yourself: `cd server && node test/verify-catalog.ts`.
+
+It reads the database at `HW_DB` (by default `server/data/hatewatch.db`) and prints:
+
+- duplicate player keys, and duplicate ESPN ids within a league
+- players with the same name on the same team
+- players without an image, and teams without a logo
+- every headshot size and logo size, with how many of each
+- headshots whose URL isn't keyed by the player's own id
+- every logo fallback checked again against ESPN with a `HEAD` request, as a tally of status codes. Every one should be a real 404, not a network failure.
+
+It opens the database through `db.ts`, as the server does, so an older database gets any missing tables and columns added, the same as on a server start.
 
 ## Real-time: how fast is it?
 
