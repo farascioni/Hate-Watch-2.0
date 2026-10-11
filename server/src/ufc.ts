@@ -1,14 +1,17 @@
 // The UFC, from ESPN's MMA data: fighters are players (catalog.ts, on a placeholder team), and a card is
 // watched while one of them is on it. Every 10 seconds the card (each fight's status) and, for a fight in
 // progress, both fighters' knockdown counts; when a fight ends, its result (how, when). A fighter you track:
-//   - a fight starting;
+//   - a fight starting: its walk-outs, about 6 minutes before the bell (ESPN's "Pre-fight" is 'in' already, from
+//     the end of the fight before);
 //   - a knockdown (ESPN's knockdown events name nobody, so it's a fighter's count going up: their opponent went
-//     down). Held 30 seconds: if the fight ends on it, it's a line on the loss instead (a KO is one alert);
+//     down). Held 30 seconds, and for as long as ESPN has the fight stopped (it can take 5 minutes to post the
+//     result): if the fight ends on it, it's a line on the loss instead (a KO is one alert);
 //   - a loss, the Successful Hate Watch, saying how ("got knocked out", "tapped out", the judges' cards) and when
 //     ("KO/TKO R1 1:20"), with lines of their own switches: a title fight (theirs to lose, or one they were
-//     after), as the favorite, a losing streak.
+//     after), as the favorite, a losing streak. ESPN says a fight's final a few seconds before it names the
+//     winner, and its clock flips between the time into the round and the time left for minutes after.
 // A loss gets ESPN's clip of the fight when there is one (the bigger fights: main events, title fights), the
-// way a game's loss gets its winning play's (clips.ts): looked for every few minutes for three hours after,
+// way a game's loss gets its winning play's (clips.ts): looked for every few minutes for six hours after,
 // under its own switch, clips.loss.ufc (flags.ts).
 // Nothing is sent for what already happened when a fight was first read (a restart mid-card, a fighter tracked
 // mid-fight). A title fight is ESPN's word on the fight itself (its `types`), and who held the belt is from the
@@ -42,9 +45,13 @@ const RESULT_WAIT_MS = 3 * 60_000;     // a fight over without ESPN's result yet
 const FAVORITE = 60;                   // "lost as the favorite": the line gave them this much (percent) or more
 const ATTACH_BEFORE_MS = 60 * 60_000;  // a card is watched from an hour before its start
 const CLIP_EVERY_MS = 2 * 60_000;      // a lost fight's clip: looked for this often
-const CLIP_WAIT_MS = 3 * 3600_000;     // for this long after the result
+const CLIP_WAIT_MS = 6 * 3600_000;     // for this long after the result (Oct 10 2026: one came 3h20m after)
 const CLIP_EARLY_MS = 2 * 60_000;      // a clip out this much before we saw the result is still the fight's (ESPN's result can lead ours)
 
+/** The fight's begun: its walk-outs or later. ESPN's "Pre-fight" is 'in' too, from the end of the fight before. */
+const begun = (f: Fight) => f.state === 'in' && !/PRE_FIGHT/.test(f.status);
+/** The fight going on, not stopped: ESPN's END_OF_ROUND (between rounds, or a stoppage) or END_OF_FIGHT holds a knockdown. */
+const running = (f: Fight) => f.state === 'in' && !/END_OF/.test(f.status);
 const get = (url: string) => ufcDeps.getJson(url, { timeoutMs: 8000, bust: true });
 const fighterName = (id: string, fallback = 'Their opponent') => catalog.playerByEspn('ufc', id)?.name ?? fallback;
 /** The fighters someone tracks (ESPN ids). */
@@ -89,7 +96,9 @@ function howLost(r: FightResult | null, f: Fight, winner: Fighter, loser: Fighte
   const when = (what: string) => (r?.period && r.clock ? `${what} R${r.period} ${r.clock}` : what);
   if (r?.name === 'kotko') {
     const what = [lower(r.desc), r.target ? `to the ${lower(r.target)}` : ''].filter(Boolean).join(' ');
-    return { verb: `got knocked out by ${winner.name}`, how: `KO/TKO${what ? ` (${what})` : ''}${at}.`, when: when('KO/TKO') };
+    // Knocked out by what ESPN names (punches, a kick); without it (a retirement on the stool, a doctor's stoppage, or not said yet), stopped.
+    const struck = !!r.desc && !/retire|doctor|injur|corner/i.test(r.desc);
+    return { verb: `${struck ? 'got knocked out by' : 'got stopped by'} ${winner.name}`, how: `KO/TKO${what ? ` (${what})` : ''}${at}.`, when: when('KO/TKO') };
   }
   if (r?.name === 'submission') return { verb: `tapped out to ${winner.name}`, how: `Submission${r.desc ? ` (${lower(r.desc)})` : ''}${at}.`, when: when('Submission') };
   const kind = r?.name.match(/^decision-+(\w+)/)?.[1];
@@ -110,6 +119,19 @@ export interface LossFacts {
   streak?: number;
   /** Knockdowns of the loser in the finish (each the fight's nth, in its round), as lines. */
   knockdowns?: { n: number; round: number }[];
+}
+
+/**
+ * When a fight was stopped, into its round ("2:59"): ESPN's result clock flips for minutes between that and the time
+ * left ("2:01", the round clock where it stopped), so a clock within 2 seconds of where it stopped (`stop`, the last
+ * round clock read live) is turned around. UFC rounds are five minutes.
+ */
+export function finishClock(clock: string, stop?: { period: number; clock: string }, period?: number): string {
+  const secs = (c: string) => { const m = c.match(/^(\d+):(\d\d)$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const c = secs(clock), s = stop && stop.period === period ? secs(stop.clock) : null;
+  if (c == null || s == null || c >= 300 || Math.abs(c - s) > 2) return clock;
+  const t = 300 - c;
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 }
 
 /**
@@ -159,22 +181,25 @@ export function knockdownAlert(f: Fight, athleteId: string, n: number, round: nu
   };
 }
 
-/** A fight starting, for each of its fighters. */
+/** A fight starting, for each of its fighters: one alert for a device tracking both (the one it followed first). */
 export function fightStartAlerts(f: Fight, at = ufcDeps.now()): Detected[] {
   return f.fighters.map((me) => {
     const them = f.fighters.find((p) => p.id !== me.id);
     return {
       id: `${f.id}:ufc.fight_start:${me.id}`, type: 'ufc.fight_start', targetKey: playerKey('ufc', me.id),
-      title: `Hate Watch Starting: ${me.name} vs ${them?.name ?? '?'}`, body: `${f.weight ? `${f.weight}${f.rounds ? `, ${f.rounds} rounds` : ''}. ` : ''}${f.eventName}.`, at,
-      meta: { gameId: f.id, athleteId: me.id },
+      title: `Hate Watch Starting: ${me.name} vs ${them?.name ?? '?'}`, body: `${/WALKING/.test(f.status) ? 'Walking out now. ' : ''}${f.weight ? `${f.weight}${f.rounds ? `, ${f.rounds} rounds` : ''}. ` : ''}${f.eventName}.`, at,
+      meta: { gameId: f.id, athleteId: me.id }, moment: `${f.id}:ufc:start`, firstFollowed: true,
     };
   });
 }
 
 // ─── Watching a card ──────────────────────────────────────────────────────────────────────────
 interface Held { athleteId: string; n: number; round: number; at: number }
-/** `tail`: reads left after the result, for knockdowns ESPN's stats count late (the loser's: lines on the loss). */
-interface FightWatch { state: string; kd: Map<string, number> | null; held: Held[]; done: boolean; overAt: number | null; tail: number; loserId?: string; chances?: Map<string, number> }
+/**
+ * `tail`: reads left after the result, for knockdowns ESPN's stats count late (the loser's: lines on the loss).
+ * `stop`: the round clock last read live (time left), for the result's clock (finishClock).
+ */
+interface FightWatch { started: boolean; stop?: { period: number; clock: string }; kd: Map<string, number> | null; held: Held[]; done: boolean; overAt: number | null; tail: number; loserId?: string; chances?: Map<string, number> }
 const TAIL_READS = 6;
 
 /** The card's date as ESPN's scoreboard files it (US Eastern). */
@@ -233,11 +258,14 @@ export class CardWatch {
       const f = fightOf(ev, c);
       if (!f.fighters.some((p) => tracked.has(p.id))) continue;
       // A fight first read now (the card's first read, or a fighter tracked mid-card) starts where it is: nothing late.
-      const w: FightWatch = this.fights.get(f.id) ?? { state: f.state, kd: null, held: [], done: f.state === 'post', overAt: null, tail: 0 };
+      const w: FightWatch = this.fights.get(f.id) ?? { started: begun(f) || f.state === 'post', kd: null, held: [], done: f.state === 'post', overAt: null, tail: 0 };
       this.fights.set(f.id, w);
-      if (/cancel|postpon/i.test(f.status)) { Object.assign(w, { done: true, tail: 0, held: [], state: f.state }); continue; } // called off: nothing to wait for
+      if (/cancel|postpon/i.test(f.status)) { Object.assign(w, { done: true, tail: 0, held: [] }); continue; } // called off: nothing to wait for
       if (!w.chances && f.state === 'pre') w.chances = await this.chances(f);
-      if (f.state === 'in' && w.state === 'pre' && !this.first) out.push(...fightStartAlerts(f, now));
+      if (!w.started && begun(f) && !this.first) out.push(...fightStartAlerts(f, now));
+      w.started ||= begun(f);
+      // Where the round's clock stood when it stopped (time left): the result's clock is sometimes that, not the time in.
+      if (f.state === 'in' && f.period >= 1 && /^\d+:\d\d$/.test(f.clock)) w.stop = { period: f.period, clock: f.clock };
       // Knockdowns: a fighter's count going up is their opponent going down (the opponent's nth).
       const late: Held[] = [];
       if (!w.done ? f.state === 'in' || f.state === 'post' : w.tail > 0) {
@@ -257,9 +285,11 @@ export class CardWatch {
       if (f.state === 'post' && !w.done) {
         w.overAt ??= now;
         const status = await get(`${urls.ufcFight(f.eventId, f.id)}/status`).catch(() => null);
-        const r = resultOf(status);
-        // Over once ESPN has its result (a draw or no contest too: no loser, no alert), or a few minutes after.
-        if (r || now - w.overAt >= RESULT_WAIT_MS) {
+        const r0 = resultOf(status), r = r0 && { ...r0, clock: finishClock(r0.clock, w.stop, r0.period) };
+        // Over once ESPN has its result and its winner (it names the winner a few seconds after it says final; a draw
+        // or no contest has none: no loser, no alert), or a few minutes after.
+        const decided = f.fighters.some((p) => p.winner === true) || /draw|contest|overturn/i.test(`${r?.name} ${r?.display}`);
+        if ((r && decided) || now - w.overAt >= RESULT_WAIT_MS) {
           w.done = true;
           w.tail = TAIL_READS;
           const loser = f.fighters.find((p) => p.winner === false);
@@ -273,7 +303,7 @@ export class CardWatch {
             };
             const lost = lossAlerts(f, r, facts, now), winner = f.fighters.find((p) => p.winner === true);
             out.push(...lost);
-            if (lost.length && loser && winner) clipJobs.push({ eventId: f.eventId, fightId: f.id, loserId: loser.id, winnerId: winner.id, since: w.overAt });
+            if (lost.length && loser && winner) clipJobs.push({ eventId: f.eventId, fightId: f.id, loserId: loser.id, winnerId: winner.id, names: [loser.name, winner.name], since: w.overAt });
             // The winner went down on the way to winning: still a knockdown, for whoever tracks them.
             for (const h of w.held.filter((x) => x.athleteId !== loser?.id)) out.push(knockdownAlert(f, h.athleteId, h.n, h.round, now));
           }
@@ -281,9 +311,8 @@ export class CardWatch {
         }
       }
       // Knockdowns whose fight went on: their own alerts.
-      for (const h of w.held.filter((x) => now - x.at >= KD_HOLD_MS && f.state === 'in')) out.push(knockdownAlert(f, h.athleteId, h.n, h.round, now));
-      w.held = w.held.filter((x) => !(now - x.at >= KD_HOLD_MS && f.state === 'in'));
-      w.state = f.state;
+      for (const h of w.held.filter((x) => now - x.at >= KD_HOLD_MS && running(f))) out.push(knockdownAlert(f, h.athleteId, h.n, h.round, now));
+      w.held = w.held.filter((x) => !(now - x.at >= KD_HOLD_MS && running(f)));
     }
     this.first = false;
     if (out.length) publish(out, 'ufc');
@@ -292,21 +321,25 @@ export class CardWatch {
     const onCard = new Set((ev.competitions ?? []).map((c: any) => String(c.id)));
     for (const id of [...this.fights.keys()]) if (!onCard.has(id)) this.fights.delete(id);
     const over = (c: any) => c.status?.type?.state === 'post' || /cancel|postpon/i.test(String(c.status?.type?.name ?? ''));
-    if ((ev.competitions ?? []).every(over) && [...this.fights.values()].every((w) => w.done && w.tail <= 0)) this.stopped = true;
+    if ((ev.competitions ?? []).length && (ev.competitions ?? []).every(over) && [...this.fights.values()].every((w) => w.done && w.tail <= 0)) this.stopped = true;
     if (now - this.startedAt >= CARD_MAX_MS) this.stopped = true;
   }
 }
 
 // ─── A lost fight's clip ──────────────────────────────────────────────────────────────────────
 /** A fight that's over, to look for its clip: who lost to whom, and when we saw the result. */
-export interface ClipJob { eventId: string; fightId: string; loserId: string; winnerId: string; since: number }
+export interface ClipJob { eventId: string; fightId: string; loserId: string; winnerId: string; names?: [string, string]; since: number }
 
 /**
- * A fight's clip, from ESPN's videos: the first tagged with both fighters that came out after the result (their
- * stare-down and walk-outs are tagged with both too, but come before it), while ESPN still has it up.
+ * A fight's clip, from ESPN's videos: the first tagged with both fighters, or whose headline names both (`names`;
+ * ESPN's clips on a card's page can be tagged with the league only: "Fili secures a first-round KO against Kamaka
+ * III"), that came out after the result (their stare-down and walk-outs come before it), while ESPN still has it up.
  */
-export function fightClip(videos: any[], loserId: string, winnerId: string, since: number, now = ufcDeps.now()): Clip | null {
-  const both = (v: any) => { const ids = new Set((v?.categories ?? []).map((c: any) => String(c?.athleteId ?? ''))); return ids.has(loserId) && ids.has(winnerId); };
+export function fightClip(videos: any[], loserId: string, winnerId: string, since: number, now = ufcDeps.now(), names: string[] = []): Clip | null {
+  const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const last = (n: string) => plain(n).replace(/\s+(jr\.?|sr\.?|ii|iii|iv)$/, '').split(/\s+/).pop() ?? '';
+  const named = (v: any) => names.length === 2 && names.every((n) => last(n).length > 1 && new RegExp(`\\b${last(n).replace(/[^a-z]/g, '.')}\\b`).test(plain(String(v?.headline ?? ''))));
+  const both = (v: any) => { const ids = new Set((v?.categories ?? []).map((c: any) => String(c?.athleteId ?? ''))); return (ids.has(loserId) && ids.has(winnerId)) || named(v); };
   const out = (v: any) => Date.parse(v?.originalPublishDate ?? '') || 0;
   for (const v of videos.filter((v) => both(v) && out(v) >= since - CLIP_EARLY_MS).sort((a, b) => out(a) - out(b))) {
     const clip = clipFromVideo(v, now);
@@ -322,13 +355,13 @@ export function fightClip(videos: any[], loserId: string, winnerId: string, sinc
 export async function checkFightClip(job: ClipJob): Promise<boolean> {
   if (!flagOn('clips.loss.ufc')) return false;
   const [card, page] = await Promise.all([get(urls.ufcFightCenter(job.eventId)).catch(() => null), get(urls.mmaAthletePage(job.loserId)).catch(() => null)]);
-  const clip = fightClip([...(card?.videos ?? []), ...(page?.videos ?? [])], job.loserId, job.winnerId, job.since);
+  const clip = fightClip([...(card?.videos ?? []), ...(page?.videos ?? [])], job.loserId, job.winnerId, job.since, ufcDeps.now(), job.names);
   if (!clip) return false;
   for (const id of attachClips(job.fightId, new Map(), clip)) eventChanged(id);
   return true;
 }
 
-/** Every few minutes for three hours after the result, until the clip's found. */
+/** Every few minutes for six hours after the result, until the clip's found. */
 async function watchFightClip(job: ClipJob) {
   for (const end = ufcDeps.now() + CLIP_WAIT_MS; ufcDeps.now() < end;) {
     await new Promise((r) => setTimeout(r, CLIP_EVERY_MS).unref());

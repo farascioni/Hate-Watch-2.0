@@ -71,6 +71,19 @@ test("a loss's facts: each a line on it with its own switch (or the alert, with 
   assert.equal(U.lossAlerts(fight(), { name: 'kotko', display: 'KO/TKO', period: 1, clock: '0:23' }, { chance: 59 }, 0).length, 1, 'a 59% favorite: not "the favorite"');
 });
 
+test('a stoppage with no strike named (a retirement on the stool, a doctor\'s, or ESPN not saying yet) is "stopped"; a result clock ESPN gives as the time left, turned around', () => {
+  const title = (r: any) => U.lossAlerts(fight(), r, {}, 0)[0].title;
+  assert.equal(title({ name: 'kotko', display: 'KO/TKO', period: 1, clock: '5:00' }), 'Successful Hate Watch! Court McGee got stopped by Eric Nolan (KO/TKO R1 5:00)', 'Zhelezniakova, Oct 10 2026: ESPN said "Retirement" 12 minutes later');
+  assert.equal(title({ name: 'kotko', display: 'KO/TKO', desc: 'Retirement', target: 'Head', period: 1, clock: '5:00' }), 'Successful Hate Watch! Court McGee got stopped by Eric Nolan (KO/TKO R1 5:00)');
+  assert.equal(title({ name: 'kotko', display: 'KO/TKO', desc: 'Kick', target: 'Head', period: 2, clock: '2:39' }), 'Successful Hate Watch! Court McGee got knocked out by Eric Nolan (KO/TKO R2 2:39)');
+  // Where the round's clock stopped (time left) and ESPN's result clock, which flips between the two for minutes.
+  const stop = (period: number, clock: string) => ({ period, clock });
+  assert.deepEqual([
+    U.finishClock('2:01', stop(1, '2:01'), 1), U.finishClock('2:59', stop(1, '2:01'), 1), U.finishClock('1:25', stop(2, '1:24'), 2), U.finishClock('3:35', stop(2, '1:24'), 2),
+    U.finishClock('5:00', stop(1, '0:06'), 1), U.finishClock('-', stop(3, '0:10'), 3), U.finishClock('0:22', undefined, 2), U.finishClock('2:21', stop(1, '2:21'), 2),
+  ], ['2:59', '2:59', '3:35', '3:35', '5:00', '-', '0:22', '2:21'], "the time into the round either way; at the bell, unread or another round's stop: as ESPN says");
+});
+
 // ─── A card, poll by poll ─────────────────────────────────────────────────────────────────────
 const E = '600061182', F = '401907089';
 const S = { state: 'pre', period: 0, clock: '5:00', kd: { [mcgee.id]: 0, [nolan.id]: 0 } as Record<string, number>, winner: null as string | null, result: null as any, now: 0, types: [] as { text: string }[] };
@@ -138,7 +151,7 @@ test("attached mid-card (a restart): what already happened sends nothing; the fi
   assert.deepEqual(feed('restart-fan'), [], 'no late start, no old knockdown');
   Object.assign(S, { state: 'post', period: 2, clock: '4:07', winner: nolan.id, result: { name: 'submission', displayName: 'Submission', description: 'Rear Naked Choke' }, now: 10_000 });
   await card.poll(new Set([mcgee.id]));
-  assert.deepEqual(clipJobs.at(-1), { eventId: E, fightId: F, loserId: mcgee.id, winnerId: nolan.id, since: 10_000 }, 'its clip looked for, from the result');
+  assert.deepEqual(clipJobs.at(-1), { eventId: E, fightId: F, loserId: mcgee.id, winnerId: nolan.id, names: ['Court McGee', 'Eric Nolan'], since: 10_000 }, 'its clip looked for, from the result');
   assert.deepEqual(feed('restart-fan'), ['ufc.lost: Successful Hate Watch! Court McGee tapped out to Eric Nolan (Submission R2 4:07) | Lost the Welterweight title. Lost 2 straight. Submission (rear naked choke) at 4:07 of round 2. Welterweight, UFC 332: Silva vs. Wang.']);
   S.types = [];
   const over = new U.CardWatch(E, '20261003', 'UFC 332');
@@ -210,6 +223,11 @@ test("a card's watch ends: a draw, a no contest, a fight called off or taken off
     S.now = 12 * 3600_000;
     await forever.poll(tracked);
     assert.equal(forever.stopped, true, 'a card ESPN never finishes is let go after 12 hours');
+    S.now = 0;
+    const empty = new U.CardWatch('E2', '20261010', 'UFC Fight Night');
+    board = card([]);
+    await empty.poll(tracked);
+    assert.equal(empty.stopped, false, 'a read with no fights on it: not over');
   } finally { U.ufcDeps.getJson = getJson; }
 });
 
@@ -267,6 +285,12 @@ test("a lost fight's clip: ESPN's video tagged with both fighters, out after the
   assert.equal(U.fightClip(videos, mcgee.id, nolan.id, since, now)?.title, 'Eric Nolan knocks out Court McGee', 'the first one out after it, still up');
   assert.equal(U.fightClip(videos.slice(0, 3), mcgee.id, nolan.id, since, now), null, 'not yet');
   assert.equal(U.fightClip([video(6, '2026-10-04T03:14:00Z', [mcgee.id, nolan.id])], mcgee.id, nolan.id, since, now)?.title, 'Clip 6', "ESPN's result can lead ours by a minute");
+  // ESPN's clips on a card's page can be tagged with the league alone (Oct 10 2026, both of them): a headline naming both is the fight's.
+  const leagueOnly = [video(8, '2026-10-04T03:35:00Z', [], { headline: 'Nolan: I want a ranked opponent' }), video(9, '2026-10-04T03:50:00Z', [], { headline: 'Eric Nolan stops Court McGee in the third' })];
+  assert.equal(U.fightClip(leagueOnly, mcgee.id, nolan.id, since, now, [mcgee.name, nolan.name])?.title, 'Eric Nolan stops Court McGee in the third');
+  assert.equal(U.fightClip(leagueOnly, mcgee.id, nolan.id, since, now), null, 'without their names: tags only');
+  assert.equal(U.fightClip([video(10, '2026-10-04T03:50:00Z', [], { headline: 'Fili secures a first-round KO against Kamaka III' })], '4688447', '3074464', since, now, ['Kai Kamaka III', 'Andre Fili'])?.title,
+    'Fili secures a first-round KO against Kamaka III', 'a last name without its "III"');
 
   // The loss above (restart-fan's), and the job the card handed on for it.
   const job = clipJobs.at(-1)!;
@@ -297,4 +321,53 @@ test("a lost fight's clip: ESPN's video tagged with both fighters, out after the
     setFlag('clips.loss.ufc', true);
     assert.equal(clipOf()?.title, 'Eric Nolan knocks out Court McGee');
   } finally { U.ufcDeps.getJson = getJson; U.ufcDeps.now = nowWas; for (const f of ['clips.loss.ufc', 'clips.loss', 'clips'] as const) setFlag(f, true); }
+});
+
+test("a fight as ESPN gave it (Oct 10 2026, Tanzilovi vs Wellmaker): started at the walk-outs, one start for both; a knockdown held while it's stopped; the loss once ESPN names the winner, at the time into the round", async () => {
+  const E3 = 'E3', F3 = 'F3';
+  const B = { name: 'STATUS_SCHEDULED', state: 'pre', period: 0, clock: '-', kd: { [mcgee.id]: 0, [nolan.id]: 0 } as Record<string, number>, winner: undefined as string | undefined, result: null as any };
+  const getJson = U.ufcDeps.getJson, nowWas = U.ufcDeps.now;
+  let now = 0;
+  U.ufcDeps.now = () => now;
+  U.ufcDeps.getJson = async (url: string) => {
+    if (url === urls.scoreboard('ufc', '20261010')) return { events: [{ id: E3, name: 'UFC Fight Night', date: '2026-10-10T21:00Z', competitions: [{
+      id: F3, type: { abbreviation: 'Welterweight' }, format: { regulation: { periods: 3 } }, status: { type: { state: B.state, name: B.name, completed: B.state === 'post' }, period: B.period, displayClock: B.clock },
+      competitors: [mcgee, nolan].map((x) => ({ id: x.id, athlete: { displayName: x.name }, winner: B.winner === x.id })), // ESPN's winner: false for both until it names one
+    }] }] };
+    if (url === urls.ufcFight(E3, F3)) return { types: [], competitors: [mcgee, nolan].map((x) => ({ id: x.id, statistics: { $ref: `stats3:${x.id}` } })) };
+    if (url.startsWith('stats3:')) return { splits: { categories: [{ stats: [{ name: 'knockDowns', value: B.kd[url.slice(7)] }] }] } };
+    if (url === `${urls.ufcFight(E3, F3)}/status`) return { period: B.period, displayClock: B.clock, ...(B.result ? { result: B.result } : {}) };
+    if (url === `${urls.ufcFight(E3, F3)}/odds`) return { items: [] };
+    throw new Error(`unexpected ${url}`);
+  };
+  fan('night-mcgee', 'player:ufc:2504639');
+  fan('night-both', 'player:ufc:5290958');
+  db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 5)').run('night-both', 'player:ufc:2504639'); // Nolan first, McGee later
+  const card = new U.CardWatch(E3, '20261010', 'UFC Fight Night');
+  const tracked = new Set([mcgee.id, nolan.id]);
+  const poll = async (t: number, x: Partial<typeof B>) => { Object.assign(B, x); now = t * 1000; await card.poll(tracked); };
+  const titles = (dev: string) => pushed(dev).map((t) => t.replace(/^\S+ /, ''));
+  try {
+    await poll(0, {});
+    await poll(10, { state: 'in', name: 'STATUS_PRE_FIGHT' });                     // the fight before is over: ESPN says 'in'
+    assert.deepEqual(titles('night-mcgee'), [], 'not started: the walk-outs are 5 to 25 minutes away');
+    await poll(20, { name: 'STATUS_FIGHTERS_WALKING' });
+    assert.deepEqual(feed('night-mcgee'), ['ufc.fight_start: Hate Watch Starting: Court McGee vs Eric Nolan | Walking out now. Welterweight, 3 rounds. UFC Fight Night.']);
+    assert.deepEqual(titles('night-both'), ['Hate Watch Starting: Eric Nolan vs Court McGee'], 'tracking both: one start, the one followed first');
+    await poll(30, { name: 'STATUS_IN_PROGRESS_2', period: 1, clock: '4:48' });
+    await poll(40, { name: 'STATUS_IN_PROGRESS', period: 2, clock: '3:17', kd: { [mcgee.id]: 1, [nolan.id]: 0 } }); // McGee drops Nolan
+    await poll(80, { clock: '2:46' });                                              // and it goes on: Nolan's own alert
+    assert.deepEqual(titles('night-both').at(-1), 'Eric Nolan got knocked down by Court McGee in round 2');
+    await poll(90, { name: 'STATUS_END_OF_ROUND', clock: '2:21', kd: { [mcgee.id]: 1, [nolan.id]: 1 } }); // Nolan drops McGee: stopped there
+    await poll(130, {});
+    await poll(250, {});                                                            // ESPN takes minutes to post the result
+    assert.equal(titles('night-mcgee').length, 1, 'held: the fight is stopped, not going on');
+    const kick = { name: 'kotko', displayName: 'KO/TKO', description: 'Kick', target: { description: 'Head' } };
+    await poll(260, { state: 'post', name: 'STATUS_FINAL', result: kick });         // final, its clock the time left, no winner named yet
+    assert.equal(titles('night-mcgee').length, 1, 'nobody lost yet');
+    await poll(270, { winner: nolan.id });
+    assert.deepEqual(feed('night-mcgee').at(-1), 'ufc.lost: Successful Hate Watch! Court McGee got knocked out by Eric Nolan (KO/TKO R2 2:39) | Knocked down in round 2. KO/TKO (kick to the head) at 2:39 of round 2. Welterweight, UFC Fight Night.');
+    assert.deepEqual(titles('night-mcgee'), ['Hate Watch Starting: Court McGee vs Eric Nolan', 'Successful Hate Watch! Court McGee got knocked out by Eric Nolan (KO/TKO R2 2:39)'], 'the knockout is one alert');
+    assert.deepEqual(clipJobs.at(-1), { eventId: E3, fightId: F3, loserId: mcgee.id, winnerId: nolan.id, names: ['Court McGee', 'Eric Nolan'], since: 260_000 });
+  } finally { U.ufcDeps.getJson = getJson; U.ufcDeps.now = nowWas; }
 });

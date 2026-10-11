@@ -13,7 +13,7 @@ import { kvGet } from './db.ts';
 import { playerKey, urls } from './leagues.ts';
 import { lineChances } from './scores.ts';
 import { titleOf, weightName, type Belts } from './ufc-classes.ts';
-import { cardDay } from './ufc.ts';
+import { cardDay, finishClock } from './ufc.ts';
 
 /** Seam for tests (test/ufc-preview.test.ts). */
 export const ufcPreviewDeps = { getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => Promise<any>, now: () => Date.now() };
@@ -57,11 +57,14 @@ const num = (s: unknown) => (s == null || s === '' || !Number.isFinite(Number(s)
 const pct = (s: unknown) => (num(s) == null ? null : `${Math.round(num(s)!)}%`);
 const fixed = (s: unknown) => (num(s) == null ? null : num(s)!.toFixed(2));
 
+/** Each fight's round clock the last time it was read live (time left), to read its result's clock right (finishClock). */
+const stops = new Map<string, { period: number; clock: string }>();
+
 /** How a finished fight ended, from its status: "KO/TKO R1 2:09" (into the round, as the UFC says it), "Split decision". */
-export function resultLine(status: any): UfcBout['result'] | undefined {
+export function resultLine(status: any, stop?: { period: number; clock: string }): UfcBout['result'] | undefined {
   const r = status?.result;
   if (!r?.name) return undefined;
-  const when = Number(status.period) && status.displayClock ? ` R${Number(status.period)} ${status.displayClock}` : '';
+  const when = Number(status.period) && status.displayClock ? ` R${Number(status.period)} ${finishClock(String(status.displayClock), stop, Number(status.period))}` : '';
   const detail = [r.description, r.target?.description ? `to the ${String(r.target.description).toLowerCase()}` : ''].filter(Boolean).join(' ') || undefined;
   const kind = String(r.name).match(/^decision-+(\w+)/)?.[1];
   const line = r.name === 'kotko' ? `KO/TKO${when}` : r.name === 'submission' ? `Submission${when}`
@@ -69,7 +72,7 @@ export function resultLine(status: any): UfcBout['result'] | undefined {
   return { line, ...(detail && !kind ? { detail } : {}) };
 }
 
-/** `over`: ESPN's `winner` is false for both before a fight, so only an over fight's says who won. */
+/** `over`: ESPN's `winner` is false for both before a fight (and in a draw, and for a few seconds after it says final), so only a fight over with a winner named says who won. */
 function cornerOf(x: any, belts: Belts, weight: string | null, over: boolean): UfcCorner {
   const a = x.athlete ?? {}, id = String(x.id ?? a.id);
   const o = Object.fromEntries((x.bets?.odds ?? []).map((b: any) => [b.type, b.values?.[0]?.odds]).filter(([, v]: any) => v));
@@ -108,15 +111,18 @@ function tapeOf(xs: any[]): TapeRow[] {
 function boutOf(c: any, rounds: Map<string, number>, belts: Belts): UfcBout {
   const weight = weightName(c.type?.abbreviation) ?? c.type?.text ?? null;
   const t = (c.types ?? []).map((x: any) => titleOf(x?.text)).find(Boolean) as ReturnType<typeof titleOf>;
-  const state = (['pre', 'in', 'post'].includes(c.status?.type?.state) ? c.status.type.state : 'pre') as State;
+  // ESPN's "Pre-fight" is 'in', from the end of the fight before (up to half an hour before the bell): not live until the walk-outs.
+  const preFight = /PRE_FIGHT/.test(String(c.status?.type?.name ?? ''));
+  const state = (['pre', 'in', 'post'].includes(c.status?.type?.state) && !preFight ? c.status.type.state : 'pre') as State;
   const note = String(c.note ?? '');
   const billing = /co-main/i.test(note) ? 'Co-main event' : /main event/i.test(note) ? 'Main event' : null;
   const xs = [...(c.competitors ?? [])].sort((a, b) => Number(a.order) - Number(b.order));
   const canceled = /cancel|postpon/i.test(String(c.status?.type?.name ?? ''));
-  const corners = xs.map((x) => cornerOf(x, belts, weight, state === 'post' && !canceled)) as [UfcCorner, UfcCorner];
+  const corners = xs.map((x) => cornerOf(x, belts, weight, state === 'post' && !canceled && xs.some((y) => y.winner === true))) as [UfcCorner, UfcCorner];
   const chance = lineChances(corners[0]?.odds?.win, corners[1]?.odds?.win);
   if (chance) { corners[0].chance = chance.home; corners[1].chance = chance.away; }
-  const result = state === 'post' && !canceled ? resultLine(c.status) : undefined;
+  if (state === 'in' && Number(c.status?.period) >= 1 && /^\d+:\d\d$/.test(String(c.status?.displayClock ?? ''))) stops.set(String(c.id), { period: Number(c.status.period), clock: String(c.status.displayClock) });
+  const result = state === 'post' && !canceled ? resultLine(c.status, stops.get(String(c.id))) : undefined;
   return {
     id: String(c.id), weight, rounds: rounds.get(String(c.id)) ?? (t || billing === 'Main event' ? 5 : 3),
     title: t ? `${t.interim ? 'Interim ' : ''}${t.weight} title` : null, billing, state, canceled,
@@ -160,7 +166,7 @@ export function cardOf(fc: any, board: any): UfcCard | null {
 const cards = new Map<string, { at: number; live: boolean; value: Promise<UfcCard | null> }>();
 let calendar: { at: number; value: Promise<any[]> } | null = null;
 /** For tests: forget what was read. */
-export const forgetUfcPreview = () => { cards.clear(); calendar = null; };
+export const forgetUfcPreview = () => { cards.clear(); calendar = null; stops.clear(); };
 
 /** The night is under way: from just before its start until every fight is over or off. */
 export const underway = (card: UfcCard, now: number) => now >= card.event.startsAt - CARD_TTL_MS && card.segments.some((s) => s.bouts.some((b) => b.state !== 'post' && !b.canceled));

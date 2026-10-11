@@ -14,7 +14,7 @@ SCORES
 - On a game's screen, your alerts from it come after the box score, and you can minimize them.
 
 UFC
-- Track UFC fighters. A loss is a Successful Hate Watch that says how, with lines for losing as the favorite and a losing streak; also a knockdown (live) and their fight starting. (Server)
+- Track UFC fighters. A loss is a Successful Hate Watch that says how, with lines for losing as the favorite and a losing streak; also a knockdown (live) and their walk-out. (Server)
 - With the UFC chip on, Scores has the next card: All fights lists every fight with the odds, then the card after; My fights is yours. Results come in as fights end.
 - A card's preview, from Scores: one fight in full, with the odds your fighter loses, and how, the tale of the tape, and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
@@ -44,7 +44,7 @@ NBA AND WNBA
 
 EVERYWHERE
 - Fixes and screen changes can arrive without a new build (reopen the app once or twice).
-- Tracking both teams in a game, its start is one alert, not two. (Server)
+- Tracking both sides of a game or fight, its start is one alert, not two. (Server)
 - MLB: a homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert. (Server)
 - Filters say Athletes with All leagues on, else Players (F1: Drivers, UFC: Fighters).

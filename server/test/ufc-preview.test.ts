@@ -132,6 +132,27 @@ test('how a fight ended, each way ESPN says it', () => {
   assert.equal(U.resultLine({ result: {} }), undefined);
 });
 
+test("fight night as ESPN gave it (Oct 10 2026): Pre-fight not live yet, the walk-outs are; no W or L before ESPN names a winner, or in a draw; the finish's time when ESPN's clock flips", () => {
+  U.forgetUfcPreview();
+  const st = (state: string, name: string, period: number, displayClock: string, result: Record<string, unknown> = {}) => ({ period, displayClock, type: { state, name, completed: state === 'post' }, result });
+  const bout = (status: Record<string, unknown>, winner: '4025699' | null = null) => U.cardOf({ ...TONIGHT, cards: { main: { displayName: 'Main Card', competitions: [
+    { id: 'M1', matchNumber: 1, date: '2026-10-11T00:00Z', type: { abbreviation: 'Middleweight' }, note: 'Middleweight - Main Event', status,
+      competitors: [fighter('4025699', 'Brendan Allen', 1, { winner: winner === '4025699' }), fighter('4848674', 'Christian Leroy Duncan', 2)] },
+  ] } } }, TONIGHT_BOARD)!.segments[0].bouts[0];
+  assert.equal(bout(st('in', 'STATUS_PRE_FIGHT', 0, '-')).state, 'pre', "ESPN's 'in' from the end of the fight before, up to half an hour before the bell: not live");
+  assert.deepEqual([bout(st('in', 'STATUS_FIGHTERS_WALKING', 0, '-')).state, bout(st('in', 'STATUS_FIGHTERS_WALKING', 0, '-')).round], ['in', undefined], 'the walk-outs: live, no round yet');
+  assert.equal(bout(st('in', 'STATUS_IN_PROGRESS', 5, '2:16')).round, 5);
+  assert.equal(bout(st('in', 'STATUS_END_OF_ROUND', 5, '2:14')).round, 5, 'stopped with 2:14 left');
+  const choke = { name: 'submission', displayName: 'Submission', description: 'Rear Naked Choke' };
+  const first = bout(st('post', 'STATUS_FINAL', 5, '2:14', choke));
+  assert.deepEqual([first.result?.line, first.corners.map((c) => c.winner)], ['Submission R5 2:46', [null, null]], "ESPN's first final: the time left, and no winner named yet");
+  const settled = bout(st('post', 'STATUS_FINAL', 5, '2:46', choke), '4025699');
+  assert.deepEqual([settled.result?.line, settled.corners.map((c) => c.winner)], ['Submission R5 2:46', [true, false]]);
+  const draw = bout(st('post', 'STATUS_FINAL', 3, '5:00', { name: 'draw', displayName: 'Draw' }));
+  assert.deepEqual([draw.result?.line, draw.corners.map((c) => c.winner)], ['Draw', [null, null]], 'a draw: nobody lost');
+  U.forgetUfcPreview();
+});
+
 // ─── The calendar and the routes ──────────────────────────────────────────────────────────────
 const cal = (id: string, label: string, start: string, end: string) => ({ label, startDate: start, endDate: end, event: { $ref: `http://sports.core.api.espn.pvt/v2/sports/mma/leagues/ufc/events/${id}?lang=en` } });
 const CALENDAR = { leagues: [{ calendar: [
