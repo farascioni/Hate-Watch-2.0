@@ -52,7 +52,7 @@ EVERYWHERE
 - Card names and titles wrap at large text sizes instead of cutting off.
 - MLB: a homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
 - After a loss (F1: a race), a drop in the standings or being eliminated is a line on that alert. (Server)
-- Filters say Athletes with All leagues on, else Players (F1: Drivers, UFC: Fighters).
+- Filters (the leaderboard's too) say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
 - Filters too wide for one row put All on top, the rest evenly below.

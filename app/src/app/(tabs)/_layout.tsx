@@ -4,11 +4,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { colors, space } from '../../theme';
 
-/** Top left of every tab: the leaderboard (the most hated players and teams), instead of a sixth tab. */
+/** Top left of every tab: the leaderboard (the most hated athletes and teams), instead of a sixth tab. */
 function LeaderboardButton() {
   return (
     <Pressable onPress={() => router.push('/leaderboard')} hitSlop={10} style={({ pressed }) => [{ marginLeft: space(4), marginRight: space(2), padding: 2 }, pressed && { opacity: 0.6 }]}
-      accessibilityRole="button" accessibilityLabel="Leaderboard: the most hated players and teams">
+      accessibilityRole="button" accessibilityLabel="Leaderboard: the most hated athletes and teams">
       <Ionicons name="podium" size={22} color={colors.text} />
     </Pressable>
   );

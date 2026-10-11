@@ -81,7 +81,7 @@ const PAGES: Page[] = [
   },
   {
     key: 'leaderboard', icon: 'podium', where: 'Top left of every tab', title: 'See who\'s most hated',
-    body: 'The leaderboard ranks players and teams by how many people hate them. Filter it like your feed: players or teams, one sport or all of them.',
+    body: 'The leaderboard ranks athletes and teams by how many people hate them. Filter it like your feed: athletes or teams (drivers in F1, fighters in the UFC), one sport or all of them.',
     demo: () => (
       <View style={styles.demoCard}>
         {([['🥇', 'DAL', '#041E42', 'Dallas Cowboys', 'nfl', '1,204'], ['🥈', 'LAL', '#552583', 'Los Angeles Lakers', 'nba', '987'], ['🥉', 'NYY', '#0C2340', 'New York Yankees', 'mlb', '842']] as const)

@@ -10,8 +10,9 @@ import { colors, radius, space } from '../theme';
 import type { Leaderboard, LeaderboardEntry } from '../lib/types';
 
 /**
- * The most hated players and teams: how many people track each one. The same filter as the Feed and
- * Tracking tabs; "All" is every sport, so Teams + All is every team in every league. The top 100 of each
+ * The most hated athletes and teams: how many people track each one. The same filter as the Feed and
+ * Tracking tabs, in its words (Athletes with All, Players in a league, F1's Drivers, the UFC's Fighters alone,
+ * college football's Teams alone); "All" is every sport, so Teams + All is every team in every league. The top 100 of each
  * filter, ranked by the server within that filter. Opened from the button at the top left of every tab.
  */
 export default function LeaderboardScreen() {
