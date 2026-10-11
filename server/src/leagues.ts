@@ -25,11 +25,13 @@ export const FBS_GROUP = '80';
  * `color`: its chip and tag. `kinds`: what its filter offers (teams, players or both). `players`: what its people are
  * called ("drivers"). `groupPlayers`: lists of its people grouped (the UFC's by weight class). `game`, `events`: what
  * one of its events is and what the Scores tab's switch says ("race", "fights"). `football`: its cards' down and
- * distance, possession and timeouts. `divisions`: Search can sort its teams by division.
+ * distance, possession and timeouts. `divisions`: Search can sort its teams by division. `sportName`: the heading
+ * it's listed under in the filter's More sheet ("Basketball", "Combat sports"), and `fullName` what that sheet's
+ * search also finds it by ("English Premier League"): both filled in below, from SPORT_NAMES and LEAGUES.
  */
 export interface LeagueUi {
   color?: string; kinds: ('team' | 'player')[]; players: string; groupPlayers?: 'weightClass';
-  game: string; events: string; football?: boolean; divisions: boolean;
+  game: string; events: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
 }
 const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', divisions: true, ...x });
 
@@ -48,6 +50,13 @@ export const LEAGUES: Record<League, { sport: string; name: string; slug?: strin
   cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football', ui: UI({ color: '#B45309', kinds: ['team'], football: true }) },
   wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C' }) },
 };
+
+/** A sport's name for people, by ESPN's word for it (LEAGUES `sport`); one not here is its word, capitalized. */
+const SPORT_NAMES: Record<string, string> = { mma: 'Combat sports' };
+for (const l of Object.values(LEAGUES)) {
+  l.ui.sportName ??= SPORT_NAMES[l.sport] ?? l.sport.charAt(0).toUpperCase() + l.sport.slice(1);
+  if (l.fullName) l.ui.fullName ??= l.fullName;
+}
 
 /** The WNBA goes after every other league, wherever one is added in LEAGUES. */
 const LAST: League = 'wnba';

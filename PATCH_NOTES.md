@@ -55,7 +55,7 @@ EVERYWHERE
 - Filters (the leaderboard's too) say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
 - The Scores tab's switch says what it lists: events, games or fights.
-- Filters too wide for one row put All on top, the rest evenly below.
+- League filters show yours, then More: every league by sport.
 - Clips don't play on their own: open one, then press play.
 - Tapping an alert opens all of it on its own screen; its photo opens their page.
 - Buttons center their labels, and VoiceOver reads them as buttons.

@@ -7,18 +7,19 @@ import type { LeagueInfo } from './types';
  * sends none: then this build's own (FALLBACK), which match what it said when this build was made.
  * `kinds`: what its filter offers. `players`: what its people are called. `groupPlayers`: the UFC's by weight
  * class. `game` / `events`: one event, and the Scores switch's word. `football`: down and distance, possession and
- * timeouts on its cards. `divisions`: Search can sort its teams by division.
+ * timeouts on its cards. `divisions`: Search can sort its teams by division. `sportName`: its heading in the
+ * filter's More sheet ("Combat sports"); `fullName`: what that sheet's search also finds it by ("English Premier League").
  */
 export interface LeagueUi {
   color?: string; kinds: ('team' | 'player')[]; players: string; groupPlayers?: 'weightClass';
-  game: string; events: string; football?: boolean; divisions: boolean;
+  game: string; events: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
 }
 const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', divisions: true, ...x });
 const FALLBACK: Record<string, LeagueUi> = {
   nba: UI(), mlb: UI(), nhl: UI(), epl: UI(), wnba: UI(),
   nfl: UI({ football: true }),
   f1: UI({ players: 'drivers', game: 'race', events: 'races', divisions: false }),
-  ufc: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false }),
+  ufc: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false, sportName: 'Combat sports' }),
   cfb: UI({ kinds: ['team'], football: true }),
 };
 
@@ -34,4 +35,9 @@ export function leagueUi(id?: string): LeagueUi {
   return { ...(FALLBACK[id] ?? UI()), ...(leagueColors[id] ? { color: leagueColors[id] } : {}), ...fromServer.get(id) };
 }
 export const leagueColor = (id: string) => leagueUi(id).color;
+/** The sport a league is listed under (the filter's More sheet): the server's name for it, else ESPN's word, capitalized. */
+export const sportOf = (l: LeagueInfo) => {
+  const name = leagueUi(l.id).sportName ?? l.sport;
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Other';
+};
 export const isFootball = (id: string) => !!leagueUi(id).football;

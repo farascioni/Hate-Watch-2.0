@@ -9,7 +9,7 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { EVENT_TYPES } = await import('../src/event-types.ts');
-const { LEAGUE_IDS, urls } = await import('../src/leagues.ts');
+const { LEAGUE_IDS, LEAGUES, urls } = await import('../src/leagues.ts');
 const { PLAYER_DETECTORS, fromKeyEvents, keepers, observePlay, gameLostEvent, teamScoreEvents, START_WORD } = await import('../src/detectors.ts');
 const { GameTracker, liveDeps, parseStandings, dropBody } = await import('../src/live.ts');
 const { gameCard } = await import('../src/scores.ts');
@@ -46,6 +46,16 @@ test('the EPL is a league: ESPN files it as soccer/eng.1; the WNBA is always the
   for (const id of ['epl.goal_conceded', 'epl.own_goal', 'epl.penalty_missed', 'epl.yellow_card', 'epl.red_card', 'team.game_start', 'team.lost', 'team.opponent_scored', 'team.fell_behind', 'team.standings_drop', 'off_field', 'team.fine_suspension'])
     assert.ok(epl.includes(id), id);
   for (const id of ['player.injured', 'team.losing_streak', 'team.eliminated']) assert.ok(!epl.includes(id), `${id}: ESPN has no EPL data for it`);
+});
+
+test("each league's sport has a name for the filter's More sheet, and a league with a full name is found by it", () => {
+  for (const id of LEAGUE_IDS) assert.ok(LEAGUES[id].ui.sportName, id);
+  assert.equal(LEAGUES.nba.ui.sportName, 'Basketball');
+  assert.equal(LEAGUES.wnba.ui.sportName, 'Basketball');
+  assert.equal(LEAGUES.cfb.ui.sportName, LEAGUES.nfl.ui.sportName, 'college football is listed with the NFL');
+  assert.equal(LEAGUES.ufc.ui.sportName, 'Combat sports');
+  assert.equal(LEAGUES.epl.ui.fullName, 'English Premier League');
+  assert.equal(LEAGUES.cfb.ui.fullName, 'College Football');
 });
 
 test('key events as plays: the score counted from the goals (an own goal for the team it counts for), the minute in front', () => {

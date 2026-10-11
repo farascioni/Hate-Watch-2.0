@@ -8,16 +8,16 @@ import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
 import { leagueColor } from '../lib/leagueUi';
 
-export function Chip({ label, active, onPress, color, style }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle> }) {
+export function Chip({ label, active, onPress, color, style, accessibilityLabel }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }}>
+    <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }} accessibilityLabel={accessibilityLabel}>
       <Text style={[styles.chipText, active && { color: '#fff' }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
 
-/** One chip in a ChipRows: its label, whether it's picked, and its color when picked. */
-export interface ChipItem { key: string; label: string; active?: boolean; color?: string; onPress: () => void }
+/** One chip in a ChipRows: its label, whether it's picked, and its color when picked; what VoiceOver says, if not its label. */
+export interface ChipItem { key: string; label: string; active?: boolean; color?: string; onPress: () => void; accessibilityLabel?: string }
 
 /**
  * The rows a ChipRows lays its chips out in, as indexes: all on one row when they fit (`widths`: each chip's own
@@ -48,7 +48,7 @@ export function ChipRows({ items, gap, chipStyle, style, accessibilityLabel }: {
   const [width, setWidth] = useState(0); // the rows', inside `style`'s padding
   const [widths, setWidths] = useState<Record<string, number>>({});
   const rows = width > 0 && items.every((i) => widths[i.key] > 0) ? chipRows(items.map((i) => widths[i.key]), width, gap) : null;
-  const chip = (i: ChipItem) => <Chip label={i.label} active={i.active} color={i.color} onPress={i.onPress} style={chipStyle} />;
+  const chip = (i: ChipItem) => <Chip label={i.label} active={i.active} color={i.color} onPress={i.onPress} style={chipStyle} accessibilityLabel={i.accessibilityLabel} />;
   return (
     <View style={style} accessibilityLabel={accessibilityLabel}>
       {/* A hidden tab can lay out at 0 wide: keep the last real width. */}

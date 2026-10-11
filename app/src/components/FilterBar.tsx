@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChipRows } from './ui';
+import { LeagueSheet } from './LeagueSheet';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import { leagueColor, leagueUi } from '../lib/leagueUi';
@@ -66,16 +67,31 @@ export function describeFilter(f: Filter) {
   return f.league ? `${f.league.toUpperCase()} ${what}` : what;
 }
 
+/** With nothing tracked yet, the leagues on the filter's row: the first few in the server's order (NBA, MLB, NFL, NHL). */
+const FIRST_LEAGUES = 4;
+
 /**
- * Everything / Teams / Players (the UFC: Fighters alone), plus All and each league (NBA … WNBA, UFC). Two fixed rows rather than a
- * horizontal scroller, so every option is always visible (same on iOS, Android and web).
+ * Everything / Teams / Players (the UFC: Fighters alone), then the leagues: All, the leagues you track (the first
+ * few, until you track someone), one picked from More if it isn't one of those, and More, which opens every league
+ * by sport (LeagueSheet). So the row stays short however many leagues there are; it wraps, All on top, only when
+ * you track more than fit (ChipRows). No More when the row already has every league.
  */
 export function FilterBar({ filter, onChange, kinds = true, everything = true }: {
   filter: Filter; onChange: (f: Filter) => void;
   /** false: league chips only (Scores tab) */ kinds?: boolean;
   /** false: Teams / Players only, no Everything (Search, where the two are separate lists) */ everything?: boolean;
 }) {
-  const { leagues } = useStore();
+  const { leagues, follows } = useStore();
+  const [sheet, setSheet] = useState(false);
+  const yours = useMemo(() => {
+    const tracked = new Set([...follows.values()].map((t) => t.league));
+    return leagues.filter((l) => tracked.has(l.id)).map((l) => l.id);
+  }, [leagues, follows]);
+  const shown = yours.length ? yours : leagues.slice(0, FIRST_LEAGUES).map((l) => l.id);
+  const row = filter.league && !shown.includes(filter.league) ? [...shown, filter.league] : shown;
+  const more = leagues.some((l) => !row.includes(l.id));
+  const name = (id: League) => leagues.find((l) => l.id === id)?.name ?? id.toUpperCase();
+  const pick = (league: League | undefined) => onChange({ ...filter, league });
   const only = onlyKind(filter);
   const options = only ? KINDS.filter((k) => k.id === only) : KINDS.filter((k) => everything || k.id !== 'all');
   return (
@@ -91,12 +107,11 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
         })}
       </View> : null}
       <ChipRows style={styles.leagues} gap={space(1)} chipStyle={styles.leagueChip} items={[
-        { key: 'all', label: 'All', active: !filter.league, onPress: () => onChange({ ...filter, league: undefined }) },
-        ...leagues.map((l) => ({
-          key: l.id, label: l.name, active: filter.league === l.id, color: leagueColor(l.id),
-          onPress: () => onChange({ ...filter, league: filter.league === l.id ? undefined : l.id }),
-        })),
+        { key: 'all', label: 'All', active: !filter.league, onPress: () => pick(undefined) },
+        ...row.map((id) => ({ key: id, label: name(id), active: filter.league === id, color: leagueColor(id), onPress: () => pick(filter.league === id ? undefined : id) })),
+        ...(more ? [{ key: 'more', label: 'More', onPress: () => setSheet(true), accessibilityLabel: 'More leagues' }] : []),
       ]} />
+      <LeagueSheet open={sheet} onClose={() => setSheet(false)} leagues={leagues} yours={yours} picked={filter.league} onPick={pick} />
     </View>
   );
 }
@@ -107,7 +122,7 @@ const styles = StyleSheet.create({
   segOn: { backgroundColor: colors.surfaceHi },
   segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
   segTextOn: { color: colors.text },
-  // One row while every league fits (an iPhone SE, All to CFB); past that, All across the top and the leagues below (ChipRows).
+  // One row while the chips fit (All, yours, More); past that, All across the top and the rest below (ChipRows).
   leagues: { paddingHorizontal: space(3), paddingBottom: space(2) },
   leagueChip: { paddingHorizontal: 1 },
 });
