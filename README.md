@@ -14,13 +14,15 @@ Track the athletes and teams you can't stand. Get a push the moment something ba
 - **Nine leagues**, in the order the app lists them (`LEAGUE_IDS` in `server/src/leagues.ts`): the NBA, MLB, NFL, NHL, Formula 1, the Premier League (EPL), the UFC, college football (FBS teams only, no players) and the WNBA. The WNBA always goes last, wherever a league is added in `LEAGUES`. Each league's look in the app (its chip colour, its filter, what its people and events are called) is set by `ui` in `LEAGUES`, so it changes with a server deploy rather than an app build.
 
 ```
-ESPN (core plays + site summary, polled in parallel every 2s per live game)
+ESPN (core plays + site summary, polled in parallel every 2s per live game; college football: summary drives, every 5s)
    │
    ▼
 GameTracker ─► league detectors ─► publish() ─┬─► events table (deduped by deterministic id)
 scoreboard (10s) / standings (60s) /           ├─► per-follower prefs filter (type, league); push also skips muted + quiet hours
 injuries (30s)                                 ├─► feed rows ─► WebSocket frame to open apps (≈ms)
-                                               └─► Expo Push ─► APNs / FCM (app closed)
+college football: scoreboard (20s, 5 min       └─► Expo Push ─► APNs / FCM (app closed)
+  when no game is near) / standings (10 min),
+  no injuries or news
 ```
 
 How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
@@ -30,6 +32,32 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **`publish()` stores each alert once** in the `events` table. Its primary key is a deterministic id built from what happened (for example game, play, type and athlete), so reading the same play again never alerts twice.
 - **Each follower's settings decide what they get.** An alert type or league they switched off is skipped, unless they set that target's alerts on their own (a per-target setting beats the global switches, `typeEnabledFor`). Push also skips a target they muted (it still reaches their feed) and their quiet hours (default off, 23:00 to 08:00 America/New_York, `DEFAULT_PREFS` in `fanout.ts`).
 - **Open apps** get the alert as a WebSocket frame within milliseconds. **A closed app** gets it as a push.
+
+## Index
+
+**Summary:** this README is the reference for how Hate Watch works. Each section below opens with an "**In short:**" paragraph, then the full detail. Every alert in detail is in `docs/alerts.md`, how duplicate alerts are kept out in `docs/duplicate-alerts.md`, the Google Play release in `docs/android-release.md`, and the rules for working in this repo in `CLAUDE.md`.
+
+**Sections:**
+- **Run it**: Start the server with `cd server && npm ci && npm start`.
+- **Deploy**: Hate Watch reaches people in three ways.
+  - **Server → Fly.io**: the server is one Docker image (`server/Dockerfile`, Node 24 running the TypeScript directly) on one always-on Fly.io machine named `hate-watch-api` in `iad` (US East).
+  - **iOS / Android → EAS**: EAS builds the app in the cloud from `app/`, using one of three profiles in `app/eas.json`: `development`, `preview` and `production`.
+  - **App Store Connect answers**: these are the answers given in App Store Connect's privacy and app information forms.
+  - **Donations (in-app tips)**: Settings → **Support Hate Watch** has a Donate button that offers three tip sizes, sold as **consumable in-app purchases** through [`expo-iap`](https://openiap.dev/docs/setup/expo) (`app/src/lib/tips.ts`, `app/src/components/TipJar.tsx`, `TipJarStore.tsx`).
+  - **Icons and splash**: The artwork is an angry eye: a red iris with a black pupil and a white glint in a white eye, under a tapered red brow that bears down toward it, on a near-black background with a dark red glow.
+- **Data: rosters, duplicates, and images**: Every team and player comes from ESPN's public API.
+- **Real-time: how fast is it?**: An alert reaches an open app within milliseconds of the server seeing the play, and a closed phone typically 1-3 seconds later through Expo's push service.
+- **Notifications (76 types, all user-controllable)**: every alert type a user can switch is one entry in `EVENT_TYPES` (`server/src/event-types.ts`): 152 types today, 99 of them pushed by default, 37 feed only (on, in the feed, no notification) and 16 off.
+- **Scores tab**: The Scores tab lists games.
+- **Stats pages**: Every player and team page opens on a **Stats** tab (next to "Recent misery"): a player's season line, postseason and career, their last five games and their team's next game; a team's record and standing, its season line (the EPL's league table instead), its last five results and its next game; F1 drivers and constructors their championship season, and UFC fighters their record.
+- **Successful Hate Watch counter**: The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), with the teams that gave it the most.
+- **Leaderboard**: The podium button at the top left of every tab opens the most hated athletes and teams, ranked by how many people (devices) track them, filtered like the Feed: Everything, Teams or Players, in every sport or one league.
+- **Startup guide**: On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, and "You're all set".
+- **An alert on its own screen**: A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
+- **Developer notices**: A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
+- **Sharing an alert**: Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 314 tests in 49 files, offline, in about 4 seconds, all passing on October 11, 2026.
+- **Known limits**: Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
 ## Run it
 
