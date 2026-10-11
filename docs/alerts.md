@@ -2,7 +2,7 @@
 
 The long form of the README's "Notifications" table: one section per row of that table, in the same order and under the same label, then four sections for what the table has no row for. Each section says which alert types it covers, what in ESPN's data triggers them, step by step, the thresholds and timing, the default (push, feed only, or off), the exact title and body with real examples from the code and the tests, how it combines with other alerts, ESPN's later edits and other edge cases, the files and functions that do it, and the tests that cover it.
 
-Everything here was read from the code (`server/src/`) and the tests (`server/test/`) as of this commit. Where the code and this file disagree, the code is right and this file is out of date. Before changing alert code, read [docs/duplicate-alerts.md](duplicate-alerts.md) too.
+Everything here was read from the code (`server/src/`) and the tests (`server/test/`) as of this commit, except figures and examples marked as the README's (measurements from real games, and a few examples from README rows), which were carried over and not re-checked. Where the code and this file disagree, the code is right and this file is out of date. Before changing alert code, read [docs/duplicate-alerts.md](duplicate-alerts.md) too.
 
 ## Index
 
@@ -436,7 +436,7 @@ Every soccer alert, for every soccer league. The EPL is the only one today (`SOC
 | `epl.team.late_goal` | Concedes a late goal | team | Team | push |
 | `epl.team.relegation_zone` | Drops into the relegation zone | team | Team | push |
 
-The detector for key events is `soccer()` in `server/src/detectors.ts`; the commentary's are `soccerFoul()` and `soccerCommentaryEvents()`; the touch feed's `soccerTouch()`; the late goal is in `teamScoreEvents()`; the relegation zone in `scanStandings()` (`server/src/live.ts`). Every play alert's body is the event's text with its minute in front, a dash and the score ("57' Alexander Isak (Liverpool) right footed shot… — BOU 0, LIV 1"; `fromKeyEvents` drops ESPN's own "Goal! Bournemouth 0, Liverpool 1." from the text).
+The detector for key events is `soccer()` in `server/src/detectors.ts`; the commentary's are `soccerFoul()` and `soccerCommentaryEvents()`; the touch feed's `soccerTouch()`; the late goal is in `teamScoreEvents()`; the relegation zone in `scanStandings()` (`server/src/live.ts`). Every play alert's body is the event's text with its minute in front, a dash and the score (`fromKeyEvents` puts the minute in front, "57' Alexander Isak (Liverpool) right footed shot…", and drops ESPN's own "Goal! Bournemouth 0, Liverpool 1." from the text; the score is added as `AWAY n, HOME n`).
 
 ### Keeper concedes a goal (goalkeepers only)
 
@@ -1074,7 +1074,7 @@ One alert type, one switch, for a runner thrown out stealing or picked off (`run
   3. A read missing the "End Inning" play is a stale copy and waits. After 20 seconds (`HALF_END_WAIT_MS`, `HW_HALF_END_WAIT_MS`) it's judged as it stands.
   4. An at-bat result posted before its batter is on it isn't judged until he is (up to the same 20 seconds).
   5. The log says when the plays as first seen would have made something else of the half.
-  This is why three end-of-inning alerts went missing on the two live servers in ALDS Game 5 (October 10 2026, at different innings) and why the replay of the same plays sent all of them.
+  Judging each play as first seen is what lost three end-of-inning alerts on the two live servers in ALDS Game 5 (October 10 2026, at different innings); a replay of the same plays sent all of them, and judging the half from a read with its third out is the fix.
 - **The game's last half-inning** has no "End Inning" play: `mlbFinalHalfInning` judges it at the final, from every play (a walk-off ends with fewer than 3 outs, so it isn't judged). When it's about the team that lost, it's a line on the loss, "Struck out in order in the 9th." (`finalHalfOnLoss`; ALDS Game 5: "Successful Hate Watch! White Sox are ELIMINATED ⚰️" with "Shut out. Struck out in order in the 9th. …"), and its own alert only for a device with the loss off.
 - **With players:** it's on the half's last result, so it shares that play's moment: "Aaron Judge struck out swinging" with "Yankees went down in order." as a line (`test/bundling.test.ts`).
 - **Feed only by default.** The README row counts 41 of the 108 half-innings in six October 2026 playoff games, 2 of them all strikeouts.
@@ -1279,7 +1279,7 @@ College football (FBS, ESPN's group 80) has teams only, no players (`TEAMS_ONLY`
 - **Quarterback pulled:** "Georgia pulled G.Stockton: R.Puglisi is in at quarterback", the NFL's rule on the names in the text (after the starter's 5th pass, another throws twice in a row, in the first three quarters, once a game).
 - **Drives, onside kicks, safeties, revisions:** as the NFL's ([NFL](#nfl), [NFL onside kick](#nfl-onside-kick), [NFL delay of game / safety](#nfl-delay-of-game--safety)). Revisions came from October 10 2026's twelve noon college games, where ESPN edited 49 plays in place and took out or re-posted 31 ([revisions](#revisions-espn-changes-a-football-play-after-its-alert)).
 - **Losses:** "Successful Hate Watch! Georgia lost to Vanderbilt"; a blowout at 42 points; "Held scoreless."; elimination only in the College Football Playoff.
-- **Loses to an unranked team** (`cfb.upset_loss`): a team ranked in the top 25 going in (`readPregame`: the scoreboard's rank, ESPN's, which is the AP's and later the playoff committee's) loses to an unranked one. "Successful Hate Watch! No. 2 Georgia lost to unranked Vanderbilt", fold "Lost to unranked Vanderbilt as the No. 2 team.".
+- **Loses to an unranked team** (`cfb.upset_loss`): a team ranked in the top 25 going in (`readPregame`: the rank on each competitor in the game summary's header, ESPN's, which is the AP's and later the playoff committee's) loses to an unranked one. "Successful Hate Watch! No. 2 Georgia lost to unranked Vanderbilt", fold "Lost to unranked Vanderbilt as the No. 2 team.".
 - **The AP poll** (`server/src/cfb-poll.ts`, every 30 minutes, `POLL_MS`): when a new AP Top 25 comes out, a tracked team lower than last week, "<Team> fell to No. <rank> in the AP poll" (body "Down from No. <old rank> · <ESPN's name for the poll week>"), or out of it, "<Team> dropped out of the AP Top 25" (body "Was No. <old rank> · <week>"). The week last seen (kv `cfb:ap:week`) keeps a restart from announcing a poll already out; the first read is a baseline. Ids `cfbap:${week}:${type}:${teamId}`.
 - **Scoring:** "Vanderbilt scored 7 on Georgia", "Vanderbilt scored 7 to take the lead over Georgia" (schools take "has", "is" and no "the").
 - **Game starts:** "Hate Watch Starting: Georgia vs Vanderbilt".
