@@ -12,6 +12,7 @@ Server updates already work on every build.
 SCORES
 - Before a game, its Box score previews leaders, last five games, injuries, the predictor.
 - A game's screen puts your alerts, minimizable, after the box score.
+- A team's page (and its players') shows the live score card above "Next game" while they are playing.
 
 UFC
 - Track UFC fighters: a loss says how and when (KO/TKO R1 1:20), a lost title, losing as favorite or a streak; also live knockdowns and the walk-out.

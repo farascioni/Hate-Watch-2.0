@@ -1,13 +1,15 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { GameCardView } from './GameCard';
 import { UpNextRow } from './UpNextRow';
 import { Empty, SectionHeader } from './ui';
 import { colors, radius, space } from '../theme';
 import type { GameLine, StatGroup, StatsPage, Target } from '../lib/types';
 import { leagueUi } from '../lib/leagueUi';
+import { useLiveGame } from '../lib/liveGame';
 
 /**
  * A player's or team's stats, from ESPN through the server. Players: the season line ESPN picks for their
- * position, postseason and career, their last five games, and their team's next game. Teams: record and
+ * position, postseason and career, their last five games, and their team's next game (with a live card above it while they're playing). Teams: record and
  * standing, the season line, their last five results, and the next game. F1 drivers and constructors: the
  * championship, their season (wins to DNFs), their last five races. A fighter: their record and last fights. What a hater
  * wants to see (a hitter's strikeouts, a team's turnovers) is in red, and their losses are the good news.
@@ -16,6 +18,7 @@ import { leagueUi } from '../lib/leagueUi';
 export function StatsView({ page, target, now }: { page: StatsPage; target: Target; now: number }) {
   const game = leagueUi(target.league).game; // "game", F1's "race", the UFC's "fight" (the server's)
   const f1 = target.league === 'f1';
+  const live = useLiveGame(target); // their game in progress, with the score
   return (
     <View>
       {page.record ? (
@@ -33,6 +36,13 @@ export function StatsView({ page, target, now }: { page: StatsPage; target: Targ
           <SectionHeader>Last {page.recent.length} {game}{page.recent.length === 1 ? '' : 's'}</SectionHeader>
           {target.kind === 'team' && !f1 ? <Form games={page.recent} /> : null}
           <View style={styles.list}>{page.recent.map((g, i) => <GameRow key={g.id} game={g} last={i === page.recent.length - 1} f1={f1} />)}</View>
+        </>
+      ) : null}
+
+      {live ? (
+        <>
+          <SectionHeader>Live now</SectionHeader>
+          <GameCardView game={live} now={now} />
         </>
       ) : null}
 
