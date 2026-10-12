@@ -10,63 +10,63 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 Server updates already work on every build.
 
 SCORES
-- Before a game, its Box score previews leaders, last five games, injuries and ESPN's predictor. (Server)
+- Before a game, its Box score previews leaders, last five games, injuries and ESPN's predictor.
 - A game's screen puts your alerts, minimizable, after the box score.
 
 UFC
-- Track UFC fighters: a loss says how, with lines for losing as favorite or a streak; also live knockdowns and the walk-out. (Server)
+- Track UFC fighters: a loss says how, with lines for losing as favorite or a streak; also live knockdowns and the walk-out.
 - Scores' UFC chip: the next card (All fights with odds, or My fights), results as fights end.
 - A card's preview: each fight's odds, the tale of the tape and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
-- A loss by a finish says how and when (KO/TKO R1 1:20), and a lost title. (Server)
-- A loss gets ESPN's clip of the fight, when there is one. (Server)
+- A loss by a finish says how and when (KO/TKO R1 1:20), and a lost title.
+- A loss gets ESPN's clip of the fight, when there is one.
 
 F1
-- Sprints get alerts; a driver's teammate is whoever drove the other car that weekend. (Server)
-- Lights out is one alert naming yours; a double DNF or no points takes in its drivers' alerts. (Server)
-- Race, sprint and qualifying results come as the session ends; a later penalty corrects them. (Server)
-- Championship drops come with the result, not 20 minutes later. (Server)
+- Sprints get alerts; a driver's teammate is whoever drove the other car that weekend.
+- Lights out is one alert naming yours; a double DNF or no points takes in its drivers' alerts.
+- Race, sprint and qualifying results come as the session ends; a later penalty corrects them.
+- Championship drops come with the result, not 20 minutes later.
 - Drivers and constructors have a Stats tab.
 - Search lists F1's constructors A to Z, and drivers by constructor.
 - Before an F1 session, its screen previews the weekend.
 - With the F1 chip on, Scores has Live and Upcoming races.
-- A live race shows the lap and any flag but green. (Server)
+- A live race shows the lap and any flag but green.
 - A race's running order shows each car's gap, places from the grid and stops; its card, your drivers'.
-- Live: your driver lapped or 3+ places down from the grid; pit stops in the feed. (Server)
+- Live: your driver lapped or 3+ places down from the grid; pit stops in the feed.
 
 FOOTBALL
-- A CFB chip: the FBS's 138 teams by conference, with games, scores, box scores, standings and Top-25 ranks. (Server)
-- Alerts: interceptions, lost fumbles, missed field goals, ejections, the QB pulled, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
-- A football play or flag ESPN changes, even after the final, gets a line, no second alert; the new play alerts. (Server)
-- More teams' flags go out, with the team and foul named right. (Server)
-- NFL: a wiped-out play alerts only its flag; every sack, strip-sack and muffed punt counts; ties and new installs' flags are feed only. (Server)
+- A CFB chip: the FBS's 138 teams by conference, with games, scores, box scores, standings and Top-25 ranks.
+- Alerts: interceptions, lost fumbles, missed field goals, ejections, the QB pulled, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed.
+- A football play or flag ESPN changes, even after the final, gets a line, no second alert; the new play alerts.
+- More teams' flags go out, with the team and foul named right.
+- NFL: a wiped-out play alerts only its flag; every sack, strip-sack and muffed punt counts; ties and new installs' flags are feed only.
 
 MLB
-- A homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
-- Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught better. (Server)
-- Playoff exits say ELIMINATED on players' alerts too; the loss's facts and losing pitcher are lines. (Server)
-- No quality start needs 2+ earned runs when pulled early; errors by "C. Montgomery" reach Colson. (Server)
+- A homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double").
+- Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught better.
+- Playoff exits say ELIMINATED on players' alerts too; the loss's facts and losing pitcher are lines.
+- No quality start needs 2+ earned runs when pulled early; errors by "C. Montgomery" reach Colson.
 
 NBA AND WNBA
-- Misses name the shot and distance, not heaves. WNBA: rival gets the top seed. (Server)
+- Misses name the shot and distance, not heaves. WNBA: rival gets the top seed.
 
 EVERYWHERE
 - Fixes can arrive without a new build.
-- Tracking both sides: one start alert. (Server)
-- Standings drops name the division in MLB, the NFL and the NHL. (Server)
+- Tracking both sides: one start alert.
+- Standings drops name the division in MLB, the NFL and the NHL.
 - Card names and titles wrap at large text sizes.
-- After a loss (F1: a race), a standings drop or elimination is a line on it. (Server)
+- After a loss (F1: a race), a standings drop or elimination is a line on it.
 - Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
-- The WNBA is the last league everywhere. (Server)
+- The WNBA is the last league everywhere.
 - The Scores switch says what it lists: events, games, fights.
 - League filters show yours, then More by sport.
 - Clips play only when you press play.
 - An alert opens in full; its photo opens their page.
 - Buttons center their labels and read as buttons.
-- No alert repeats a later line or loses one. (Server)
-- After a deploy, plays from the minutes before still alert, once. (Server)
-- Following a team mid-game starts tracking it at once. (Server)
-- Notices from Hate Watch come in the feed, never pushed. (Server)
+- No alert repeats a later line or loses one.
+- After a deploy, plays from the minutes before still alert, once.
+- Following a team mid-game starts tracking it at once.
+- Notices from Hate Watch come in the feed, never pushed.
 - Settings has no Leagues section.
 - The guide lists every league; the counter says team or fighter.
 
@@ -88,15 +88,15 @@ PLAYER AND TEAM PAGES
 - Search opens on Teams (no Everything filter) and its box says what it searches ("Search F1 drivers"). Teams come before Players in every filter.
 
 ONE ALERT AT A TIME
-- A team's alert and its players' alerts on one play are one alert: "Gerrit Cole gave up a solo homer", with "Rays took the lead." in it. (Server)
-- A fact that comes a moment later (the inning ending on that strikeout, how the drive ended) is added to the alert you already have, with no second notification. (Server) This build updates the alert on screen right away; older builds show it after a refresh.
+- A team's alert and its players' alerts on one play are one alert: "Gerrit Cole gave up a solo homer", with "Rays took the lead." in it.
+- A fact that comes a moment later (the inning ending on that strikeout, how the drive ended) is added to the alert you already have, with no second notification. This build updates the alert on screen right away; older builds show it after a refresh.
 
-HOW THEY LOST (Server)
+HOW THEY LOST
 - Lines on the loss alert, each with its own switch under Team alerts: a walk-off or last-second loss, blowing a big lead, losing as the favorite, a shutout, a sweep, losing to a much worse team, falling below .500, the losing streak, being no-hit, the other team's star going off (NBA 40 points, WNBA 30), a dead power play (NHL 0-for-4). With "Loses a game" off, the first one you have on is the alert.
 - Blows a big lead, live, in place of "Falls behind". Gets ejected. Rival clinches the division.
 - Your Hate Watch streak on a loss, and a weekly misery recap, Mondays at 9 am.
 
-NEW ALERTS (Server)
+NEW ALERTS
 - MLB: strikes out 3 or 4 times, hands over a run (wild pitch, balk, passed ball, bases-loaded walk), back-to-back homers allowed, thrown out on the bases, a starter chased in under 3 innings, no-hit through 6, 0-for-4 or worse, a position player pitching. Crew chief reviews count as lost challenges, and an overturned home run says so. Runners in scoring position adds "Bases loaded now" when the bases load.
 - NFL: the starting QB pulled, a touchdown wiped out by a penalty, a three-and-out, turned over on downs, empty from the red zone.
 - NBA and WNBA: fouls out, scoreless at the half, a brick night, an opponent's 14-0 run (WNBA 12-0).
@@ -106,8 +106,8 @@ NEW ALERTS (Server)
 - Some start in your feed only, with no notification: each alert's bell in Settings changes that.
 
 FIXES
-- ABS challenge alerts wait until the review is over, so a won challenge no longer sends "lost an ABS challenge". (Server)
-- A called third strike or ball four whose challenge was upheld is labeled an ABS challenge, not a replay challenge. (Server)
+- ABS challenge alerts wait until the review is over, so a won challenge no longer sends "lost an ABS challenge".
+- A called third strike or ball four whose challenge was upheld is labeled an ABS challenge, not a replay challenge.
 - A team's or player's alert settings no longer list the streak and recap switches, and a team's Recent misery leaves out the recap.
 
 ## Build 11 (October 7, 2026)
@@ -115,14 +115,14 @@ FIXES
 Changes since build 10. Server updates already work on every build.
 
 FEWER NOTIFICATIONS BY DEFAULT
-- New installs start with quieter alerts: results and big failures notify you, the play-by-play goes to your feed, and the noisiest alerts start off. About 88% fewer notifications. Existing installs keep their settings. (Server)
+- New installs start with quieter alerts: results and big failures notify you, the play-by-play goes to your feed, and the noisiest alerts start off. About 88% fewer notifications. Existing installs keep their settings.
 - "Reset alerts to defaults" also resets each alert's notify-or-feed bell.
 
 NEW AND BETTER ALERTS
-- Blowout losses say so: "Bears got BLOWN OUT by the Eagles." About 1 in 8 losses: MLB 7+ runs, NFL 21+, NBA 25+, WNBA 20+, NHL 4+ goals, soccer 3+. (Server)
-- MLB: new "Goes down in order" when your team goes 1-2-3, and "Struck out in order" when all three strike out. Feed only. (Server)
-- MLB outs say what kind: grounded out, flied out, fielder's choice. Double and triple plays say so (triple plays are new). A runner thrown out on a hit isn't the batter's out. (Server)
-- MLB stranded runners include the runner on first: "Brewers stranded runners on first and second." (Server)
+- Blowout losses say so: "Bears got BLOWN OUT by the Eagles." About 1 in 8 losses: MLB 7+ runs, NFL 21+, NBA 25+, WNBA 20+, NHL 4+ goals, soccer 3+.
+- MLB: new "Goes down in order" when your team goes 1-2-3, and "Struck out in order" when all three strike out. Feed only.
+- MLB outs say what kind: grounded out, flied out, fielder's choice. Double and triple plays say so (triple plays are new). A runner thrown out on a hit isn't the batter's out.
+- MLB stranded runners include the runner on first: "Brewers stranded runners on first and second."
 
 SETTINGS
 - Alerts are grouped under headings: offense, defense, pitching or goaltending, then the team's, with the alerts that notify you first. No more explanation text under each alert.
@@ -143,9 +143,9 @@ NEW LEAGUE
 - The Premier League: track clubs and players, live alerts from every match, table drops (and the relegation zone), and EPL games on the Scores tab.
 
 NEW AND BETTER ALERTS
-- Playoff eliminations: a playoff knockout now sends the alert inside that game's Successful Hate Watch, and sweeps say so. (Server)
-- "Their team loses" for tracked players: a Successful Hate Watch named for them when their team loses, counted for the team. One alert per loss. Every league but F1. (Server)
-- More soccer alerts: commits a foul, gives away a penalty, loses the ball, gives the ball away, and teams losing by 3+ goals. (Server)
+- Playoff eliminations: a playoff knockout now sends the alert inside that game's Successful Hate Watch, and sweeps say so.
+- "Their team loses" for tracked players: a Successful Hate Watch named for them when their team loses, counted for the team. One alert per loss. Every league but F1.
+- More soccer alerts: commits a foul, gives away a penalty, loses the ball, gives the ball away, and teams losing by 3+ goals.
 
 SCORES AND STATS
 - "Up next" on the Scores tab: each tracked team's next game, with the channel and the kind of game. It fills the screen on days with no games.
