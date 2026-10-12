@@ -239,31 +239,86 @@ const driveOf = (ref: unknown) => { const id = String(ref ?? '').match(/\/drives
  */
 export function fromKeyEvents(summary: any, homeId: string, awayId: string): NPlay[] {
   const score = { home: 0, away: 0 };
-  return (summary?.keyEvents ?? []).map((k: any): NPlay => {
-    const teamId = k.team?.id != null ? String(k.team.id) : undefined;
-    const scoring = !!k.scoringPlay && !k.shootout;
-    if (scoring && teamId === homeId) score.home++;
-    if (scoring && teamId === awayId) score.away++;
-    const type = String(k.type?.text ?? ''), slug = String(k.type?.type ?? '');
-    const roles = slug === 'substitution' ? ['on', 'off'] : scoring ? ['scorer', 'assist'] : [];
-    let said = String(k.text ?? '');
-    if (/^Goal!/.test(said)) said = said.replace(/^Goal!\s.*?\d+,\s.*?\d+\.\s*/, '');
-    if (/^own goal/i.test(type)) said = said.replace(/\s+[^.]*?\s\d+,\s[^.]*?\s\d+\.$/, ''); // "… Fulham 1, Manchester United 0."
-    return {
-      id: String(k.id), type, typeSlug: slug,
-      text: [k.clock?.displayValue, said].filter(Boolean).join(' '),
-      teamId,
-      participants: (k.participants ?? []).map((x: any, i: number) => ({ id: String(x.athlete?.id), ...(roles[i] ? { role: roles[i] } : {}) }))
-        .filter((x: { id: string }) => x.id !== 'undefined'),
-      scoring,
-      scoreValue: scoring ? 1 : 0,
-      home: score.home,
-      away: score.away,
-      at: k.wallclock ? Date.parse(k.wallclock) : Date.now(),
-      shooting: false,
-      ...(k.clock?.displayValue ? { clock: String(k.clock.displayValue) } : {}),
-    };
-  });
+  return (summary?.keyEvents ?? []).map((k: any): NPlay => keyEventPlay(k, homeId, awayId, score, true));
+}
+
+/** One key event as a play. `count`: the running score `score` takes its goal (the summary's); else it is the play's own score (the touch feed's). */
+function keyEventPlay(k: any, homeId: string, awayId: string, score: { home: number; away: number }, count: boolean): NPlay {
+  const teamId = k.team?.id != null ? String(k.team.id) : undefined;
+  const scoring = !!k.scoringPlay && !k.shootout;
+  if (count && scoring && teamId === homeId) score.home++;
+  if (count && scoring && teamId === awayId) score.away++;
+  const type = String(k.type?.text ?? ''), slug = String(k.type?.type ?? '');
+  const roles = slug === 'substitution' ? ['on', 'off'] : scoring ? ['scorer', 'assist'] : [];
+  let said = String(k.text ?? '');
+  if (/^Goal!/.test(said)) said = said.replace(/^Goal!\s.*?\d+,\s.*?\d+\.\s*/, '');
+  if (/^own goal/i.test(type)) said = said.replace(/\s+[^.]*?\s\d+,\s[^.]*?\s\d+\.$/, ''); // "… Fulham 1, Manchester United 0."
+  return {
+    id: String(k.id), type, typeSlug: slug,
+    text: [k.clock?.displayValue, said].filter(Boolean).join(' '),
+    teamId,
+    participants: (k.participants ?? []).map((x: any, i: number) => ({ id: String(x.athlete?.id), ...(roles[i] ? { role: roles[i] } : {}) }))
+      .filter((x: { id: string }) => x.id !== 'undefined'),
+    scoring,
+    scoreValue: scoring ? 1 : 0,
+    home: score.home,
+    away: score.away,
+    at: k.wallclock ? Date.parse(k.wallclock) : Date.now(),
+    shooting: false,
+    ...(k.clock?.displayValue ? { clock: String(k.clock.displayValue) } : {}),
+  };
+}
+
+/**
+ * Soccer: a goal, a card or a substitution from the touch-by-touch feed, as the play the summary will have for it. ESPN's
+ * core feed has them 5 to 20 seconds before the summary's key events do (Man City at Liverpool, 2026-10-11), with the same
+ * play id; this makes them the same play, with the same wording and roles, so an alert can go out first and the summary's
+ * version is the same play again. The feed names the roles (scorer, assister; subbed-in, subbed-out; carded) and carries the
+ * score after a goal. Left to the summary: a goal still typed "Temp Goal" (not scoring yet), own goals and penalties (their
+ * team and roles aren't checked here), and a shootout.
+ */
+export function fromTouchKeyPlay(item: any, homeId: string, awayId: string): NPlay | undefined {
+  const slug = String(item?.type?.type ?? ''), type = String(item?.type?.text ?? '');
+  const scoring = !!item?.scoringPlay && !item?.shootout;
+  const key = scoring ? !/^(own goal|penalty)/i.test(type) : slug === 'yellow-card' || slug === 'red-card' || slug === 'substitution';
+  const teamId = teamIdFromRef(item?.team?.$ref);
+  if (!key || !teamId || item?.id == null) return undefined;
+  const parts: any[] = item.participants ?? [];
+  const order = slug === 'substitution' ? ['subbed-in', 'subbed-out'] : scoring ? ['scorer', 'assister'] : ['carded'];
+  const named = order.map((r) => parts.find((x) => x.type === r)).filter(Boolean);
+  // Not a play yet until its player is on it (two for a substitution): a play is judged once, and the summary's copy is the same play.
+  if (named.length < (slug === 'substitution' ? 2 : 1)) return undefined;
+  const ordered = named;
+  const k = {
+    id: item.id, type: item.type, text: item.text, clock: item.clock, scoringPlay: scoring, shootout: !!item.shootout, wallclock: item.wallclock,
+    team: { id: teamId }, participants: ordered.map((x) => ({ athlete: { id: athleteIdFromRef(x.athlete?.$ref) } })),
+  };
+  return keyEventPlay(k, homeId, awayId, { home: Number(item.homeScore ?? 0), away: Number(item.awayScore ?? 0) }, false);
+}
+
+/**
+ * Soccer: a foul or a handball from the touch-by-touch feed, as fromCommentary makes it ("Foul by Name (Club)." with the
+ * minute in front, the fouler first). The feed has the foul as soon as the commentary line does, and the commentary line has
+ * no play id until ESPN attaches the play to it, 9 to 35 seconds later (2026-10-11). A foul's touch is either "Foul by X"
+ * or "Y wins a free kick" (both with the fouler's team and the fouler first); a handball names only its player.
+ */
+export function fromTouchFoul(league: League, item: any): NPlay | undefined {
+  const slug = String(item?.type?.type ?? '');
+  if ((slug !== 'foul' && slug !== 'handball') || item?.id == null) return undefined;
+  const parts: any[] = item.participants ?? [];
+  const fouler = athleteIdFromRef((parts.find((x) => x.type === 'fouler') ?? (slug === 'handball' ? parts[0] : undefined))?.athlete?.$ref);
+  const fouled = athleteIdFromRef(parts.find((x) => x.type === 'fouled')?.athlete?.$ref);
+  const teamId = teamIdFromRef(item.team?.$ref);
+  if (!fouler || !teamId) return undefined;
+  const text = String(item.text ?? '').replace(/\n/g, ' ');
+  const said = /^(?:foul|handball) by /i.test(text) ? text : `${slug === 'handball' ? 'Handball' : 'Foul'} by ${nameOf(league, fouler)} (${catalog.teamByEspn(league, teamId)?.name ?? teamName(league, teamId)}).`;
+  const clock = String(item.clock?.displayValue ?? '');
+  return {
+    id: String(item.id), type: slug === 'handball' ? 'Handball' : 'Foul', typeSlug: slug, text: [clock, said].filter(Boolean).join(' '), teamId,
+    participants: [{ id: fouler, role: 'fouler' }, ...(fouled ? [{ id: fouled, role: 'fouled' }] : [])],
+    scoring: false, scoreValue: 0, home: Number(item.homeScore ?? 0), away: Number(item.awayScore ?? 0),
+    at: item.wallclock ? Date.parse(item.wallclock) : Date.now(), shooting: false, ...(clock ? { clock } : {}),
+  };
 }
 
 /**
@@ -1581,6 +1636,15 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
   return out;
 }
 
+/** A sent-off player's alert title; it says "(second yellow)" when ESPN's text for the card does (ESPN first writes only "Red Card"). */
+export const sentOffTitle = (name: string, text: string) => `${name} was sent off${/second yellow/i.test(text) ? ' (second yellow)' : ''} 🟥`;
+
+/**
+ * A card or foul alert's play and minute ("58'"), so a card and the foul behind it (the same player, the same minute) can
+ * be told apart from other fouls and linked: the tracker gives them one moment (live.ts linkFoulsToCards).
+ */
+const withClock = (g: GameCtx, p: NPlay, athleteId: string) => ({ meta: { gameId: g.gameId, playId: p.id, athleteId, ...(p.clock ? { clock: p.clock } : {}) } });
+
 /**
  * Soccer, from the key events (fromKeyEvents). Alerts are `<league>.*` (the EPL's are `epl.*`), so another
  * league can share these the way the WNBA shares the NBA's. g.goalies and g.sentOff are kept by observePlay().
@@ -1608,13 +1672,13 @@ function soccer(g: GameCtx, p: NPlay): Detected[] {
     out.push(mk(g, p, type, who, `${nameOf(lg, who)} ${what} 😬`, { moment }));
     out.push(forTeam(type, `${teamName(lg, p.teamId)} ${what} 😬`, moment));
   } else if (who && /^yellow card/i.test(p.type)) {
-    out.push(mk(g, p, `${lg}.yellow_card`, who, `${nameOf(lg, who)} was booked 🟨`));
+    out.push(mk(g, p, `${lg}.yellow_card`, who, `${nameOf(lg, who)} was booked 🟨`, withClock(g, p, who)));
   } else if (p.typeSlug === 'substitution') {
     out.push(...earlySub(g, p));
   } else if (who && p.teamId && /^red card/i.test(p.type)) {
     const type = `${lg}.red_card`, moment = `${g.gameId}:${p.id}:red`;
     const left = 11 - ((g.sentOff?.[p.teamId] ?? 0) + 1); // observePlay counts this one after the detectors run
-    out.push(mk(g, p, type, who, `${nameOf(lg, who)} was sent off${/second yellow/i.test(p.text) ? ' (second yellow)' : ''} 🟥`, { moment }));
+    out.push(mk(g, p, type, who, sentOffTitle(nameOf(lg, who), p.text), { moment, ...withClock(g, p, who) }));
     out.push(forTeam(type, `${teamName(lg, p.teamId)} are down to ${left} men 🟥`, moment));
   }
   return out;
@@ -1637,7 +1701,7 @@ export function soccerFoul(g: GameCtx, p: NPlay): Detected[] {
     ];
   }
   const what = p.typeSlug === 'handball' ? 'was called for a handball' : p.typeSlug === 'simulation' ? 'went down, and the referee called it a dive 🤿' : 'committed a foul';
-  return [mk(g, p, `${lg}.foul`, fouler, `${nameOf(lg, fouler)} ${what}`)];
+  return [mk(g, p, `${lg}.foul`, fouler, `${nameOf(lg, fouler)} ${what}`, withClock(g, p, fouler))];
 }
 
 /** Whoever made a play: the catalog's name, or the one in its text ("Lisandro Martínez (Manchester United) Interception at 2'"). */

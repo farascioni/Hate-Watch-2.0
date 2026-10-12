@@ -9,11 +9,11 @@ import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
-  bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
   awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent,
 } from './detectors.ts';
-import { eventChanged, publish } from './fanout.ts';
+import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
 import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
 import { flagOn } from './flags.ts';
@@ -58,15 +58,22 @@ const BACKFILL_WINDOW_MS = 90_000;
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
 const DECISION_RETRY_MS = Number(process.env.HW_DECISION_RETRY_MS ?? 15_000);
 const DECISION_TRIES = 20;
-/** Soccer: how often to read the touch-by-touch feed (passes, dribbles), only while someone tracks a player in the match. */
+/** Soccer: how often the touch-by-touch feed is read deep (TOUCH_DEEP touches back; the newest page is read every poll). */
 const TOUCH_MS = Number(process.env.HW_TOUCH_MS ?? 10_000);
 const TOUCH_PAGE = 100;
+/** Soccer: every poll reads the touches back this far (new ones, and ESPN's quick changes to the last few), every TOUCH_MS this far (its retyping of a touch, and taking one out, over a minute or two). */
+const TOUCH_SHALLOW = 40;
+const TOUCH_DEEP = 250;
+/** Soccer: a touch pair is judged again, when either touch changed, for this long after the first of them happened. */
+const TOUCH_REJUDGE_MS = 6 * 60_000;
 /** A playoff final waits for the scoreboard (the series: is this the end of their season?), but not forever. */
 const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
 /** How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). */
 const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
 /** MLB: how long a half-inning's end waits for a read with its third out (halfInningEnds), and an at-bat's result for its batter. */
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
+/** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
+const KEY_REVISE_MS = 5 * 60_000;
 /** A read of ESPN slower than this is logged, with which feed (poll). */
 const SLOW_READ_MS = 3000;
 /** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
@@ -147,11 +154,21 @@ export class GameTracker {
   private resultTexts = new Map<string, string>();
   /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
   private touches: (NPlay | undefined)[] = [];
+  /** Soccer: the same feed as ESPN sent it, by the same positions (fromTouchKeyPlay and fromTouchFoul read these). */
+  private touchItems: any[] = [];
+  /** Soccer: the first position held (earlier pages were never read: history). */
+  private touchBase = 0;
   private touchNext = 0;
+  /** Soccer: each judged pair, by its first touch's position: what it was made of, and the alerts it made (judgeTouches). */
+  private touchSigs = new Map<number, { sig: string; ids: string[] }>();
   private touchesAt = 0;
   private touchesFrom = 0; // touches before this (less a margin) are history
   private playersAt = 0;
   private hasPlayers = false;
+  /** Soccer: each key event's text as first seen (then as last rewritten) and when, to carry ESPN's rewrite onto its alerts (reviseKeyText). */
+  private keyTexts = new Map<string, { text: string; at: number }>();
+  /** Soccer: each card alert's moment, by player and minute ("274632@62'"), so the foul behind it is that moment's (linkFoulsToCards). */
+  private cardMoments = new Map<string, string>();
   /** A postseason game (ESPN season type 3): its final waits for the scoreboard's series (see finish). */
   private postseason = false;
   private finalSeenAt = 0;
@@ -312,7 +329,8 @@ export class GameTracker {
    * Polls BOTH ESPN sources in parallel and merges by play id (ids are identical across them).
    * Measured live: the core API publishes plays ~15-20s before the site summary does, while the
    * summary carries game status, boxscore goalies, and is a fallback if core hiccups.
-   * Soccer is the summary alone: its key events are the plays (the core API has every touch, thousands a match).
+   * Soccer: the summary's key events are the plays, and the touch feed (every touch, thousands a match; read a page at a time:
+   * refreshTouches) has its goals, cards, substitutions and fouls a few seconds before the summary does (touchKeyPlays).
    */
   /**
    * Lost ABS challenges wait until the review is over. ESPN posts a challenged pitch as its call
@@ -492,9 +510,11 @@ export class GameTracker {
       } catch (e) { log(`[${league} ${gameId}] ${feed} read failed after ${ms()} ms: ${String(e)}`); throw e; }
     };
     // Soccer's plays are its summary's key events; a teams-only league's (college football) its drives': one read.
+    // Soccer also reads its touch feed (refreshTouches: the newest page each poll, never a reason for the poll to fail).
     const [core, summary] = await Promise.allSettled([
       soccer || teamsOnly ? Promise.resolve({ items: [] }) : read('plays', urls.corePlays(league, gameId)),
       read('summary', urls.summary(league, gameId)),
+      soccer ? this.refreshTouches() : Promise.resolve(),
     ]);
     if (summary.status === 'rejected' && (soccer || teamsOnly || core.status === 'rejected')) throw summary.reason;
 
@@ -503,8 +523,12 @@ export class GameTracker {
     const sitePlays: NPlay[] = summary.status !== 'fulfilled' || league === 'nfl' ? []
       : teamsOnly ? fromDrivePlays(summary.value)
       : soccer ? fromKeyEvents(summary.value, homeId, awayId) : (summary.value.plays ?? []).map(fromSitePlay);
-    const plays = mergePlays(corePlays, sitePlays);
+    // Soccer: the touch feed has a goal, card or substitution before the summary's key events do (the same play id): the summary's
+    // version is the play once it is there, the touch feed's until then.
+    const touchPlays = soccer ? this.touchKeyPlays() : [];
+    const plays = mergePlays(corePlays, soccer ? mergePlays(sitePlays, touchPlays) : sitePlays);
     if (plays.length) this.plays = plays;
+    if (soccer) this.reviseKeyText([...sitePlays, ...touchPlays], Date.now());
 
     const events: Detected[] = [];
     const now = Date.now();
@@ -631,18 +655,26 @@ export class GameTracker {
     }
     this.score = score;
     if (league === 'mlb') events.push(...this.halfInningEnds(plays, now));
-    if (soccer && summary.status === 'fulfilled') {
-      // Fouls and penalties conceded, from the commentary. A foul's penalty can be written a moment later.
-      for (const p of fromCommentary(summary.value, score)) {
+    if (soccer) {
+      // Fouls, handballs and penalties conceded: from the touch feed as soon as it has the foul, and from the commentary (whose
+      // line has no play until ESPN attaches it). A foul's penalty can be written a moment later.
+      const fouls = [...this.touchFouls(), ...(summary.status === 'fulfilled' ? fromCommentary(summary.value, score) : [])];
+      for (const p of fouls) {
         const was = this.fouls.get(p.id);
         if (was === p.typeSlug || was === 'penalty-conceded') continue;
         this.fouls.set(p.id, p.typeSlug);
         if (!(this.first && p.at < cutoff)) events.push(...(p.typeSlug === 'woodwork' || p.typeSlug === 'var-no-goal' ? soccerCommentaryEvents(this.ctx, p) : soccerFoul(this.ctx, p)));
       }
       // Passes and dribbles, from the touch-by-touch feed, if anyone tracks a player in the match.
-      if (Date.now() - this.touchesAt >= TOUCH_MS && this.tracksPlayers()) {
-        this.touchesAt = Date.now();
-        events.push(...await this.readTouches().catch((e) => { log(`[${league} ${gameId}] touches`, String(e)); return [] as Detected[]; }));
+      if (this.touchesFrom && this.tracksPlayers()) {
+        const judged = this.judgeTouches(now);
+        events.push(...judged.fresh);
+        // A pair judged again because a touch changed: a new alert is sent; one already sent takes the new words.
+        for (const e of judged.again) {
+          const row = db.prepare('SELECT type, title, body, meta FROM events WHERE id = ?').get(e.id) as { type: string; title: string; body: string; meta: string | null } | undefined;
+          if (!row) events.push(e);
+          else if (row.title !== e.title || row.body !== e.body) reviseEvent(e.id, { type: row.type, aliases: row.meta ? JSON.parse(row.meta).aliases : undefined, title: e.title, body: e.body, meta: {} });
+        }
       }
     }
     // MLB pitchers' lines: a blown save, no quality start. The loss waits for the final (finalPitching).
@@ -678,7 +710,7 @@ export class GameTracker {
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
     if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
-    if (events.length) { publish(bundleByPlay(events), league); this.newAlerts = true; }
+    if (events.length) { publish(soccer ? this.linkFoulsToCards(bundleByPlay(events)) : bundleByPlay(events), league); this.newAlerts = true; }
     if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
@@ -696,6 +728,48 @@ export class GameTracker {
     } else if (final) this.finish(final);
   }
 
+  /**
+   * Soccer: ESPN posts a card, goal or substitution in a short form ("Erling Haaland (Manchester City) Goal at 65'") and
+   * rewrites it a minute or less later ("Goal! … left footed shot … Assisted by …", "Second yellow card to …"). The alerts
+   * were made from the first words; each takes the rewrite on its feed rows, with no second push, when the new text is
+   * longer than the last (it never goes back to a shorter one) and within KEY_REVISE_MS of first seeing the play. The body
+   * is the text plus the score, so only the text changes; a sent-off title gains "(second yellow)". The detectors are not
+   * run again: they count (a red card's men left) as they go.
+   */
+  private reviseKeyText(plays: NPlay[], now: number) {
+    const { league, gameId } = this.ctx;
+    for (const p of plays) {
+      if (!p.text) continue;
+      const was = this.keyTexts.get(p.id);
+      if (!was) { this.keyTexts.set(p.id, { text: p.text, at: now }); continue; }
+      if (p.text === was.text || p.text.length <= was.text.length || now - was.at > KEY_REVISE_MS) continue;
+      const prefix = `${gameId}:${p.id}:`;
+      const rows = db.prepare('SELECT id, type, title, body, meta FROM events WHERE id >= ? AND id < ?').all(prefix, `${prefix}\uffff`) as { id: string; type: string; title: string; body: string; meta: string | null }[];
+      for (const r of rows) {
+        if (!r.body.startsWith(`${was.text} — `)) continue;
+        const meta = r.meta ? JSON.parse(r.meta) : {};
+        const title = r.type === soccerType(league, 'red_card') && / was sent off/.test(r.title) ? sentOffTitle(r.title.replace(/ was sent off.*$/, ''), p.text) : r.title;
+        reviseEvent(r.id, { type: r.type, aliases: meta.aliases, title, body: `${p.text}${r.body.slice(was.text.length)}`, meta: {} });
+        log(`[${league} ${gameId}] ${r.id} takes ESPN's rewrite of play ${p.id}: "${was.text}" → "${p.text}"`);
+      }
+      this.keyTexts.set(p.id, { text: p.text, at: was.at });
+    }
+  }
+
+  /**
+   * Soccer: a card and the foul behind it (the same player, the same minute) are one thing happening. A foul that comes
+   * with its card in a poll, or after it, takes the card's moment: a device that gets the card doesn't get the foul too,
+   * and one that has cards off still gets the foul. A foul that came first stays its own alert (the card, which pushes by
+   * default, must never become a line on a feed-only foul), and the card goes before the fouls that joined it.
+   */
+  private linkFoulsToCards(events: Detected[]): Detected[] {
+    const key = (e: Detected) => (e.meta?.athleteId && e.meta?.clock ? `${e.meta.athleteId}@${e.meta.clock}` : '');
+    for (const e of events) if (/\.(yellow|red)_card$/.test(e.type) && e.targetKey.startsWith('player:') && e.moment && key(e)) this.cardMoments.set(key(e), e.moment);
+    const joins = (e: Detected) => /\.foul$/.test(e.type) && !!key(e) && this.cardMoments.has(key(e));
+    // No line of its own on the card's alert either: the card says what happened. (bundleByPlay has already given it its play's moment and line.)
+    return [...events.filter((e) => !joins(e)), ...events.filter(joins).map((e) => ({ ...e, moment: this.cardMoments.get(key(e))!, fold: undefined }))];
+  }
+
   /** Soccer: someone tracks a player on either side (checked every 30s). */
   private tracksPlayers() {
     if (Date.now() - this.playersAt > 30_000) {
@@ -706,31 +780,98 @@ export class GameTracker {
   }
 
   /**
-   * Soccer: the touches since the last read, a page of 100 at a time from the one we stopped in. The
-   * first read starts at the newest page (what came before is history). A touch is judged once the
-   * next one is in (soccerTouch), so the latest waits for the next read.
+   * Soccer: bring the touch feed up to date, a page of 100 at a time, held by position. The first read starts at the newest page
+   * (what came before is history). Each poll after reads back TOUCH_SHALLOW touches; every TOUCH_MS, TOUCH_DEEP: ESPN retypes a
+   * touch, and takes one out, for a minute or two after posting it. Read through the last page, the feed is cut to ESPN's count,
+   * so a touch it took out leaves no stale one at the end. A failed read is logged and leaves what is held.
    */
-  async readTouches(): Promise<Detected[]> {
+  private async refreshTouches() {
     const { league, gameId } = this.ctx;
     const get = (page: number) => liveDeps.getJson(urls.corePlays(league, gameId, { limit: TOUCH_PAGE, page }), { bust: true, timeoutMs: 6000 });
-    let page = Math.floor(this.touches.length / TOUCH_PAGE) + 1;
-    let res = await get(page);
-    if (!this.touchesFrom) {
-      this.touchesFrom = Date.now();
-      const last = Math.max(1, Math.ceil(Number(res.count ?? 0) / TOUCH_PAGE));
-      if (last > page) { page = last; this.touches.length = this.touchNext = (last - 1) * TOUCH_PAGE; res = await get(page); }
-    }
-    for (let reads = 0; reads < 20; reads++) {
-      (res.items ?? []).forEach((it: any, i: number) => { this.touches[(page - 1) * TOUCH_PAGE + i] = fromCorePlay(it); });
-      if (!(res.items ?? []).length || page >= Number(res.pageCount ?? 1)) break;
-      res = await get(++page);
-    }
-    const out: Detected[] = [], cutoff = this.touchesFrom - BACKFILL_WINDOW_MS;
-    for (; this.touchNext < this.touches.length - 1; this.touchNext++) {
-      const p = this.touches[this.touchNext], next = this.touches[this.touchNext + 1];
-      if (p && next && p.at >= cutoff) out.push(...soccerTouch(this.ctx, p, next));
+    try {
+      const now = Date.now();
+      let page: number, res: any;
+      if (!this.touchesFrom) {
+        page = 1;
+        res = await get(page);
+        this.touchesFrom = now;
+        this.touchesAt = now;
+        const last = Math.max(1, Math.ceil(Number(res.count ?? 0) / TOUCH_PAGE));
+        if (last > page) {
+          page = last;
+          this.touchBase = (last - 1) * TOUCH_PAGE;
+          this.touches.length = this.touchItems.length = this.touchNext = this.touchBase;
+          res = await get(page);
+        }
+      } else {
+        const deep = now - this.touchesAt >= TOUCH_MS;
+        if (deep) this.touchesAt = now;
+        page = Math.floor(Math.max(this.touchBase, this.touches.length - (deep ? TOUCH_DEEP : TOUCH_SHALLOW)) / TOUCH_PAGE) + 1;
+        res = await get(page);
+      }
+      let count = Number(res.count ?? 0);
+      for (let reads = 0; reads < 20; reads++) {
+        (res.items ?? []).forEach((it: any, i: number) => { const at = (page - 1) * TOUCH_PAGE + i; this.touchItems[at] = it; this.touches[at] = fromCorePlay(it); });
+        count = Number(res.count ?? count);
+        if (!(res.items ?? []).length || page >= Number(res.pageCount ?? 1)) break;
+        res = await get(++page);
+      }
+      if (page >= Number(res.pageCount ?? 1) && count >= this.touchBase && count < this.touches.length) {
+        log(`[${league} ${gameId}] the touch feed is ${this.touches.length - count} shorter: ESPN took a touch out`);
+        this.touches.length = this.touchItems.length = count;
+      }
+    } catch (e) { log(`[${league} ${gameId}] touches`, String(e)); }
+  }
+
+  /** Soccer: the goals, cards and substitutions in the newest touches, as plays (fromTouchKeyPlay). */
+  private touchKeyPlays(): NPlay[] {
+    const { homeId, awayId } = this.ctx, out: NPlay[] = [];
+    for (let i = Math.max(this.touchBase, this.touchItems.length - 2 * TOUCH_DEEP); i < this.touchItems.length; i++) {
+      const p = this.touchItems[i] ? fromTouchKeyPlay(this.touchItems[i], homeId, awayId) : undefined;
+      if (p) out.push(p);
     }
     return out;
+  }
+
+  /** Soccer: the fouls and handballs in the newest touches, as plays (fromTouchFoul). */
+  private touchFouls(): NPlay[] {
+    const out: NPlay[] = [];
+    for (let i = Math.max(this.touchBase, this.touchItems.length - 2 * TOUCH_DEEP); i < this.touchItems.length; i++) {
+      const p = this.touchItems[i] ? fromTouchFoul(this.ctx.league, this.touchItems[i]) : undefined;
+      if (p) out.push(p);
+    }
+    return out;
+  }
+
+  /**
+   * Soccer: passes and dribbles from the touches, each pair judged once the next touch is in (soccerTouch), so the latest touch
+   * waits for the next read. A pair is judged again, while its first touch is under TOUCH_REJUDGE_MS old, when either touch has
+   * since changed (its type, team or player, or a different touch beside it): `again` holds those alerts, to be sent if new or
+   * to take the new words if already out. One that no longer holds can't be unsent, so it is logged.
+   */
+  private judgeTouches(now: number): { fresh: Detected[]; again: Detected[] } {
+    const { league, gameId } = this.ctx;
+    const fresh: Detected[] = [], again: Detected[] = [], before = new Set<string>(), cutoff = this.touchesFrom - BACKFILL_WINDOW_MS;
+    const sig = (p: NPlay, next: NPlay) => [p, next].map((x) => `${x.id}/${x.typeSlug}/${x.teamId}/${x.participants[0]?.id}`).join('>');
+    for (let i = Math.min(this.touchNext, Math.max(this.touchBase, this.touches.length - TOUCH_DEEP)); i < this.touches.length - 1; i++) {
+      const p = this.touches[i], next = this.touches[i + 1];
+      if (!p || !next || p.at < cutoff) continue;
+      const s = sig(p, next), was = this.touchSigs.get(i);
+      if (i >= this.touchNext) {
+        const es = soccerTouch(this.ctx, p, next);
+        fresh.push(...es);
+        this.touchSigs.set(i, { sig: s, ids: es.map((e) => e.id) });
+      } else if (was && was.sig !== s && now - p.at < TOUCH_REJUDGE_MS) {
+        const es = soccerTouch(this.ctx, p, next);
+        again.push(...es);
+        for (const id of was.ids) before.add(id);
+        this.touchSigs.set(i, { sig: s, ids: es.map((e) => e.id) });
+      }
+    }
+    // A touch ESPN took out moves every pair after it one place: an alert only no longer holds if no pair makes it now.
+    for (const id of before) if (!again.some((e) => e.id === id) && !fresh.some((e) => e.id === id)) log(`[${league} ${gameId}] alert ${id} no longer holds: the touches beside its play changed after it went out`);
+    this.touchNext = Math.max(this.touchNext, this.touches.length - 1);
+    return { fresh, again };
   }
 
   private seedGoalies(s: any) {

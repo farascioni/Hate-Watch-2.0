@@ -192,7 +192,7 @@ test('a live match end to end: key events from the summary, alerts to whoever tr
   keyEvents.push({ ...OWN_GOAL, id: 'late', clock: { displayValue: "90'+3'" }, wallclock: new Date().toISOString() });
   state = 'post'; score = { home: '2', away: '1' };
   await game.poll();
-  assert.equal(fetched.filter((u) => u.includes('sports.core.api')).length, 1, 'the touch feed (players are tracked here): at most every 10s, not every poll');
+  assert.equal(fetched.filter((u) => u.includes('sports.core.api')).length, 5, 'the touch feed: its newest page on every poll (a goal, card or substitution is there before the summary has it)');
   assert.deepEqual(feed('united-hater'), [
     'Fulham scored to take the lead over Man United',
     "Fulham took the lead against Man United in stoppage time (90'+3')", // a late goal: in place of "falls behind" for that play
