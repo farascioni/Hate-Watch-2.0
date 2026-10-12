@@ -69,8 +69,8 @@ To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, cata
 | `HW_DECISION_RETRY_MS` | 15000 | MLB: how often to look again for the winning and losing pitchers after a final, up to 20 times. |
 | `HW_TOUCH_MS` | 10000 | Soccer: the touch-by-touch feed, read only while someone tracks a player in the match. |
 | `HW_PLAYOFF_FINAL_WAIT_MS` | 120000 | How long a playoff final waits for the scoreboard to say whether the season is over. |
-| `HW_ABS_SETTLE_MS` | 60000 | How long a lost ABS challenge waits in case ESPN overturns it. |
-| `HW_HALF_END_WAIT_MS` | 20000 | MLB: how long the end of a half-inning waits for a read that has its third out. |
+| `HW_ABS_SETTLE_MS` | 30000 | How long a lost ABS challenge waits in case ESPN overturns it. |
+| `HW_HALF_END_WAIT_MS` | 20000 | MLB: how long the end of a half-inning waits for a read that has its third out, and a final for plays that are behind it (the last out). |
 | `HW_RECAP_MS` | 900000 | How often to check for weekly recaps to send. |
 | `HW_F1_SCAN_MS` | 30000 | F1's scoreboard: sessions starting and finishing (`f1.ts`). |
 | `HW_F1_STATUS_MS` | 15000 | F1: tracked drivers' race status. |

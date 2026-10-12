@@ -14,11 +14,10 @@ SCORES
 - A game's screen puts your alerts, minimizable, after the box score.
 
 UFC
-- Track UFC fighters: a loss says how, with lines for losing as favorite or a streak; also live knockdowns and the walk-out.
+- Track UFC fighters: a loss says how and when (KO/TKO R1 1:20), a lost title, losing as favorite or a streak; also live knockdowns and the walk-out.
 - Scores' UFC chip: the next card (All fights with odds, or My fights), results as fights end.
 - A card's preview: each fight's odds, the tale of the tape and both fighters' last five.
 - With the UFC chip on, Search lists each weight class's top five fighters.
-- A loss by a finish says how and when (KO/TKO R1 1:20), and a lost title.
 - A loss gets ESPN's clip of the fight, if any.
 
 F1
@@ -26,12 +25,9 @@ F1
 - Lights out is one alert naming yours; a double DNF or no points takes in its drivers' alerts.
 - Race, sprint and qualifying results come as the session ends; a later penalty corrects them.
 - Championship drops come with the result, not 20 minutes later.
-- Drivers and constructors have a Stats tab.
-- Search lists F1's constructors A to Z, and drivers by constructor.
-- Before an F1 session, its screen previews the weekend.
-- With the F1 chip on, Scores has Live and Upcoming races.
-- A live race shows the lap and any flag but green.
-- A race's running order shows each car's gap, places from the grid and stops; its card, yours.
+- Drivers and constructors have a Stats tab; Search lists constructors A to Z, drivers by constructor.
+- Before an F1 session, its screen previews the weekend; Scores has Live and Upcoming races.
+- A live race shows the lap, any flag but green, each car's gap, places from the grid and stops; its card, yours.
 - Live: your driver lapped or 3+ places down from the grid; pit stops in the feed.
 
 FOOTBALL
@@ -46,6 +42,7 @@ MLB
 - Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught better.
 - Playoff exits say ELIMINATED on players' alerts too; the loss's facts and losing pitcher are lines.
 - No quality start needs 2+ earned runs when pulled early; errors by "C. Montgomery" reach Colson.
+- Lost ABS challenges alert in 30 seconds. A slow ESPN no longer loses the last inning.
 
 NBA AND WNBA
 - Misses name the shot and distance, not heaves. WNBA: rival gets the top seed.
@@ -54,17 +51,15 @@ NBA AND WNBA
 - Falling behind again within 2 minutes is a line on the earlier alert.
 
 EVERYWHERE
-- Fixes can arrive without a new build.
 - Soccer goals, cards, fouls come sooner, in ESPN's fuller words.
 - Tracking both sides: one start alert.
+- A tying run says so; playoff starts name the round, losses the series score.
 - Standings drops name the division in MLB, the NFL and the NHL.
 - Card names and titles wrap at large text.
 - After a loss (F1: a race), a standings drop or elimination is a line on it.
 - Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
-- The WNBA is the last league everywhere.
-- No standings drops in the preseason.
 - The Scores switch says what it lists: events, games, fights.
-- League filters show yours, then More by sport.
+- League filters show yours, then More by sport; the WNBA is last everywhere.
 - Clips play only when you press play.
 - An alert opens in full; its photo opens their page.
 - Buttons center their labels and read as buttons.

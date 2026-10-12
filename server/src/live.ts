@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent,
+  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -82,8 +82,11 @@ const TOUCH_DEEP = 250;
 const TOUCH_REJUDGE_MS = 6 * 60_000;
 /** A playoff final waits for the scoreboard (the series: is this the end of their season?), but not forever. */
 const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120_000);
-/** How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). */
-const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 60_000);
+/**
+ * How long a lost ABS challenge waits for ESPN to say it was overturned after all (holdAbs). 30 s: ESPN has swapped in the
+ * "Overturned" pitch within 10 to 15 s every time it was timed (six reversals, ALDS Game 5 and NLCS Game 1, October 2026).
+ */
+export const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 30_000);
 /** MLB: how long a half-inning's end waits for a read with its third out (halfInningEnds), and an at-bat's result for its batter. */
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
@@ -135,6 +138,8 @@ export interface GameInfo {
   sawPre?: boolean;
   venue?: string;
   tv?: string;
+  /** A postseason game's round and game, as the scoreboard's note has it ("NLCS - Game 1"): the start alert's body (roundLabel). */
+  note?: string;
   /** Attached on the server's first scoreboard read of its league (a restart): plays up to BOOT_BACKFILL_MS old are news. */
   atBoot?: boolean;
 }
@@ -188,6 +193,11 @@ export class GameTracker {
   /** A postseason game (ESPN season type 3): its final waits for the scoreboard's series (see finish). */
   private postseason = false;
   private finalSeenAt = 0;
+  /**
+   * MLB: a final reported while this tracker's plays were still behind it (playsBehindFinal): held for a read that
+   * catches up, HALF_END_WAIT_MS at most, so the last half-inning is judged and the last out goes out before the loss.
+   */
+  private heldFinal: { final: { home: number; away: number }; ev?: any; since: number } | null = null;
   private readonly info: GameInfo;
   /** Every play as of the last poll, for the facts of a loss (how it ended, the biggest leads: lossFacts). */
   private plays: NPlay[] = [];
@@ -586,7 +596,9 @@ export class GameTracker {
       if (state === 'pre') this.sawPre = true;
       else if (state === 'in' && this.sawPre && !this.started) {
         this.started = true;
-        events.push(...gameStartEvents(this.ctx, this.info, Date.now()));
+        // A postseason game says its round and game ("NLCS Game 1 · First pitch at …"), from the summary's note, else the scoreboard's.
+        const round = this.postseason ? roundLabel(s.header?.gameNote ?? comp?.notes?.[0]?.headline ?? this.info.note) : undefined;
+        events.push(...gameStartEvents(this.ctx, { ...this.info, round }, Date.now()));
       }
       const c = (side: string) => Number(comp.competitors.find((x: any) => x.homeAway === side)?.score ?? 0);
       if (comp?.status?.type?.completed) final = { home: c('home'), away: c('away') };
@@ -752,12 +764,38 @@ export class GameTracker {
       goalies: league === 'nhl' && summary.status === 'fulfilled' ? boxGoalies(summary.value, this.ctx.goalies) : undefined,
       passers: FOOTBALL.has(league) && summary.status === 'fulfilled' ? boxPassers(summary.value, league) : undefined,
     });
-    if (final && this.postseason) {
+    if (this.heldFinal) this.finishWhenCurrent(this.heldFinal.final); // the scoreboard's final waits for a read that catches up: has this one?
+    else if (final && this.postseason) {
       // The scoreboard's read (every 10s) finishes it with the series; this is the fallback.
       this.finalSeenAt ||= Date.now();
       // Without it, the summary's own series says whether it's the end of their season (summaryEvent).
-      if (Date.now() - this.finalSeenAt >= PLAYOFF_FINAL_WAIT_MS) { log(`[${league} ${gameId}] playoff final without the scoreboard's series after ${PLAYOFF_FINAL_WAIT_MS / 1000}s: the summary's`); this.finish(final, summaryEvent(this.box)); }
-    } else if (final) this.finish(final);
+      if (Date.now() - this.finalSeenAt >= PLAYOFF_FINAL_WAIT_MS) { log(`[${league} ${gameId}] playoff final without the scoreboard's series after ${PLAYOFF_FINAL_WAIT_MS / 1000}s: the summary's`); this.finishWhenCurrent(final, summaryEvent(this.box)); }
+    } else if (final) this.finishWhenCurrent(final);
+  }
+
+  /**
+   * Finish the game, but not on plays that are still behind its final (playsBehindFinal): hold it for a read that catches
+   * up, HALF_END_WAIT_MS at most, so the last half-inning is judged and the last out's alert goes out before the loss.
+   * The held final is tried again at the end of every poll and by the scoreboard's next scans; it is in memory only.
+   * Only an MLB tracker that has plays; every other game, and a tracker that never started (the scoreboard's backstop for a
+   * final nobody tracked), finishes at once. `ev`: the scoreboard's event, which a held final keeps over the summary's.
+   */
+  finishWhenCurrent(final: { home: number; away: number }, ev?: any) {
+    if (this.finished) return;
+    const why = this.ctx.league === 'mlb' ? playsBehindFinal(this.plays, this.score, final) : null;
+    if (why) {
+      if (!this.heldFinal) { this.heldFinal = { final, ev, since: Date.now() }; log(`[mlb ${this.ctx.gameId}] final held for a read that catches up (${why}), ${HALF_END_WAIT_MS / 1000}s at most`); }
+      else this.heldFinal.ev ??= ev;
+      if (Date.now() - this.heldFinal.since < HALF_END_WAIT_MS) return;
+      log(`[mlb ${this.ctx.gameId}] final released after ${HALF_END_WAIT_MS / 1000}s without catching up (${why}): finished as the plays stand`);
+    } else if (this.heldFinal) log(`[mlb ${this.ctx.gameId}] final released after ${Math.round((Date.now() - this.heldFinal.since) / 1000)}s: the plays caught up`);
+    this.finish(this.heldFinal?.final ?? final, this.heldFinal?.ev ?? ev);
+  }
+
+  /** The scoreboard's final, with the series (a playoff loss can end a season): finished now, or held (finishWhenCurrent) and stopped once it is. */
+  finishFromScoreboard(final: { home: number; away: number }, ev: any) {
+    this.finishWhenCurrent(final, ev);
+    if (this.finished) this.stop();
   }
 
   /**
@@ -921,7 +959,8 @@ export class GameTracker {
     // The final half-inning gets no "End Inning" play: judged here, from every play. Its alerts about the team that lost
     // are lines on the loss (finalHalfOnLoss); any others go out like any half-inning's, on the last out's alert.
     const lastHalf = this.ctx.league === 'mlb' ? mlbFinalHalfInning(this.ctx, this.plays) : [];
-    const lost = gameLostEvent(this.ctx, final, Date.now(), ev ? eliminationOf(this.ctx.league, ev) : null);
+    const out = ev ? eliminationOf(this.ctx.league, ev) : null;
+    const lost = gameLostEvent(this.ctx, final, Date.now(), out, ev && !out ? seriesStanding(ev) : null);
     const half = lost ? finalHalfOnLoss(this.ctx, lastHalf, lost) : { lines: [], rest: lastHalf };
     if (half.rest.length) publish(bundleByPlay(half.rest), this.ctx.league);
     if (this.ctx.league === 'mlb') void this.finalPitching(final);
@@ -1054,7 +1093,7 @@ class LiveEngine {
 
       if (relevant && !tr && (state === 'in' || (state === 'pre' && startsIn < 3 * 60_000))) {
         const tv = comp.broadcasts?.find((b: any) => b.market === 'national')?.names?.[0] ?? comp.broadcasts?.[0]?.names?.[0];
-        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv, atBoot: !this.scanned.has(lg) });
+        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv, note: ev.season?.type === 3 ? comp.notes?.[0]?.headline : undefined, atBoot: !this.scanned.has(lg) });
         this.trackers.set(key, tr);
         log(`[${lg}] tracking ${ev.shortName ?? ev.name} (${ev.id})`);
         tr.start();
@@ -1066,8 +1105,7 @@ class LiveEngine {
           tr = new GameTracker(lg, ev.id, home.id, away.id);
           this.trackers.set(key, tr);
         }
-        tr?.finish({ home: Number(home.score), away: Number(away.score) }, ev); // with the series: a playoff loss can end their season
-        tr?.stop();
+        tr?.finishFromScoreboard({ home: Number(home.score), away: Number(away.score) }, ev); // with the series: a playoff loss can end their season
       }
       if (tr && !relevant && !tr.finished) {
         tr.stop(); this.trackers.delete(key);

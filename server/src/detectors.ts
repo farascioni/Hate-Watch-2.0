@@ -805,6 +805,26 @@ export function mlbFinalHalfInning(g: GameCtx, plays: NPlay[]): Detected[] {
 }
 
 /**
+ * MLB: why a tracker's plays are still behind the final the scoreboard (or the summary) reported, or null when they have
+ * caught up. NLCS Game 1 (Dodgers at Brewers, October 11 2026): production's ESPN reads timed out for 80 seconds around
+ * the last out, the scoreboard's final came first, the list ended on a walk with two out, and mlbFinalHalfInning took
+ * that for a walk-off: the last half-inning was never judged and the last out's alert followed the loss. A game ends short
+ * of three outs only on a walk-off (the home team winning in the bottom half), and the visiting team's win ends with the
+ * home team's half, so a list that ends otherwise is behind. So is one whose score isn't the final's.
+ */
+export function playsBehindFinal(plays: NPlay[], score: { home: number; away: number }, final: { home: number; away: number }): string | null {
+  if (!plays.length) return null;
+  if (score.home !== final.home || score.away !== final.away) return `the plays' score is ${score.away}-${score.home}, the final ${final.away}-${final.home}`;
+  const last = [...plays].reverse().find((p) => p.typeSlug === 'play-result' && halfKey(p) && pitchNumber(p.id) !== '00');
+  const key = last && halfKey(last);
+  if (!last || !key) return null;
+  const top = key.startsWith('Top');
+  if (top && final.away > final.home) return `the visiting team won but the plays end in the ${key}, with the home team's half unread`;
+  if ((last.outs ?? 0) < 3 && !(!top && final.home > final.away)) return `the plays end in the ${key} with ${last.outs ?? 0} out and no walk-off`;
+  return null;
+}
+
+/**
  * At the final, the last half-inning's alerts about the team that lost (it made the last three outs, so it's the loser,
  * but for a game called early) are lines on its loss: "Struck out in order in the 9th." (ALDS Game 5: it went out in the
  * same second as "White Sox are ELIMINATED", as an alert of its own). With the loss off, each is still an alert. The
@@ -1803,8 +1823,8 @@ const the = (lg: League, team: string) => (SOCCER.has(lg) || TEAMS_ONLY.has(lg) 
  * "Hate Watch Starting" for both teams, each from its own side ("Eagles vs Bears" / "Bears vs Eagles"). One game is one
  * start for a device tracking both teams: they share a moment, and it gets the one about the team it followed first.
  */
-export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string }, at: number): Detected[] {
-  const body = [`${START_WORD[g.league]}${info.venue ? ` at ${info.venue}` : ''}`, info.tv].filter(Boolean).join(' · ');
+export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, info: { venue?: string; tv?: string; round?: string }, at: number): Detected[] {
+  const body = [info.round, `${START_WORD[g.league]}${info.venue ? ` at ${info.venue}` : ''}`, info.tv].filter(Boolean).join(' · ');
   return [[g.homeId, g.awayId], [g.awayId, g.homeId]].map(([teamId, oppId]) => ({
     id: `${g.gameId}:team.game_start:${teamId}`,
     type: 'team.game_start',
@@ -1820,6 +1840,29 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
 
 /** ESPN's short names for rounds that aren't household words. */
 const ROUND_NAMES: Record<string, string> = { ALWC: 'AL Wild Card Series', NLWC: 'NL Wild Card Series' };
+
+/**
+ * A postseason game's round and game number for its start alert, from ESPN's note ("NLCS - Game 1" → "NLCS Game 1",
+ * "Super Bowl LX" as it is). Nothing for no note, or one over 40 characters (a long sponsored bowl name).
+ */
+export function roundLabel(note: unknown): string | undefined {
+  const headline = String(note ?? '').trim();
+  const game = headline.match(/\s*-\s*Game (\d+)$/i)?.[1];
+  const said = headline.replace(/\s*-\s*Game \d+$/i, '').trim();
+  const round = ROUND_NAMES[said] ?? said;
+  const label = game ? `${round} Game ${game}` : round;
+  return label && label.length <= 40 ? label : undefined;
+}
+
+/** A playoff series as the scoreboard has it for this final: each side's wins with this game counted, and the wins it takes. */
+function seriesWins(c: any, headline: string, gameWinner: string): { sides: { id: string; wins: number }[]; need: number } | null {
+  const sides: { id: string; wins: number }[] = (c.series.competitors ?? []).map((t: any) => ({ id: String(t.id), wins: Number(t.wins) || 0 }));
+  if (sides.length !== 2) return null;
+  const game = Number(headline.match(/\bGame (\d+)$/i)?.[1]);
+  const counted = !game || sides[0].wins + sides[1].wins >= game;
+  if (!counted) { const w = sides.find((t) => t.id === gameWinner); if (w) w.wins++; }
+  return { sides, need: Math.floor(Number(c.series.totalCompetitions) / 2) + 1 };
+}
 
 /** A playoff loss that ends a team's season: who, whether it was a sweep, and the line that says so. */
 export interface Elimination { loserId: string; winnerId: string; sweep: boolean; line: string }
@@ -1855,12 +1898,9 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
   if (!x || !y || Number(x.score) === Number(y.score)) return null;
   const gameWinner = String(Number(x.score) > Number(y.score) ? x.id : y.id);
   if (c.series?.type === 'playoff') {
-    const sides: { id: string; wins: number }[] = (c.series.competitors ?? []).map((t: any) => ({ id: String(t.id), wins: Number(t.wins) || 0 }));
-    if (sides.length !== 2) return null;
-    const game = Number(headline.match(/\bGame (\d+)$/i)?.[1]);
-    const counted = !game || sides[0].wins + sides[1].wins >= game;
-    if (!counted) { const w = sides.find((t) => t.id === gameWinner); if (w) w.wins++; }
-    const need = Math.floor(Number(c.series.totalCompetitions) / 2) + 1;
+    const s = seriesWins(c, headline, gameWinner);
+    if (!s) return null;
+    const { sides, need } = s;
     const [lose, win] = sides[0].wins < sides[1].wins ? [sides[0], sides[1]] : [sides[1], sides[0]];
     if (lose.wins === win.wins || (!c.series.completed && win.wins < need)) return null;
     const winner = the(lg, teamName(lg, win.id)), score = `${win.wins}-${lose.wins}`, sweep = lose.wins === 0;
@@ -1871,6 +1911,28 @@ export function eliminationOf(lg: League, ev: any): Elimination | null {
   if (TEAMS_ONLY.has(lg) && !/playoff/i.test(headline)) return null;
   const loserId = String(gameWinner === String(x.id) ? y.id : x.id), winner = the(lg, teamName(lg, gameWinner));
   return { loserId, winnerId: gameWinner, sweep: false, line: /super bowl/i.test(round) ? `Lost ${round} to ${winner}` : `Lost to ${winner}${round ? ` in the ${round}` : ''}` };
+}
+
+/**
+ * A series game that doesn't end the series: where its loser stands now, a line on the loss ("Down 0-1 in the NLCS.",
+ * "Series tied 2-2.", "Still up 3-2 in the ALDS."). Read like eliminationOf (the scoreboard's wins can be one short of
+ * "Game 1": this game's winner gets it), from the same event, and null for the game that ends a series (that is
+ * eliminationOf's) and for anything but a playoff series.
+ */
+export function seriesStanding(ev: any): { loserId: string; line: string } | null {
+  const c = ev?.competitions?.[0];
+  if (ev?.season?.type !== 3 || !ev.status?.type?.completed || !c || c.series?.type !== 'playoff') return null;
+  const headline = String(c.notes?.[0]?.headline ?? '');
+  const [x, y] = c.competitors ?? [];
+  if (!x || !y || Number(x.score) === Number(y.score)) return null;
+  const [winnerId, loserId] = Number(x.score) > Number(y.score) ? [String(x.id), String(y.id)] : [String(y.id), String(x.id)];
+  const s = seriesWins(c, headline, winnerId);
+  const win = s?.sides.find((t) => t.id === winnerId), lose = s?.sides.find((t) => t.id === loserId);
+  if (!s || !win || !lose || c.series.completed || win.wins >= s.need) return null;
+  const said = headline.replace(/\s*-\s*Game \d+$/i, '').trim();
+  const where = `the ${ROUND_NAMES[said] ?? (said || 'series')}`;
+  const [a, b] = [lose.wins, win.wins];
+  return { loserId, line: a < b ? `Down ${a}-${b} in ${where}.` : a === b ? `Series tied ${a}-${b}.` : `Still up ${a}-${b} in ${where}.` };
 }
 
 /**
@@ -1892,14 +1954,18 @@ export const isBlowout = (lg: League, margin: number) => BLOWOUT_MARGIN[lg] != n
  * A playoff loss that ends their season (`out`, from eliminationOf) says so, in the same alert:
  * "Successful Hate Watch! Yankees got SWEPT 🧹 and are ELIMINATED ⚰️", "Swept 3-0 by the Rays in the
  * ALDS. Final Score: 5 to 2". It counts for "Loses a game" and for "Eliminated from playoffs" (aliases):
- * one alert, for anyone who wants either.
+ * one alert, for anyone who wants either. A series game that ends nothing says where the series stands (`series`, from
+ * seriesStanding): "Down 0-1 in the NLCS. Final Score: 2 to 1".
  */
-export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number, out?: Elimination | null): Detected | null {
+export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number, out?: Elimination | null,
+  series?: { loserId: string; line: string } | null): Detected | null {
   if (final.home === final.away) return null;
   const [loserId, winnerId] = final.home < final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
   const [w, l] = [Math.max(final.home, final.away), Math.min(final.home, final.away)];
   const team = teamName(g.league, loserId), winner = the(g.league, teamName(g.league, winnerId));
   const elim = out?.loserId === loserId ? out : null;
+  // A series game that ends nothing says where the series stands for the loser: "Down 0-1 in the NLCS. Final Score: 2 to 1".
+  const standing = !elim && series?.loserId === loserId ? series.line : null;
   const blowout = isBlowout(g.league, w - l);
   // "Final Score: 12 to 2. A 10-run blowout." (soccer's "thrashed" title says it already).
   const by = w - l, an = aOrAn(by) === 'an' ? 'An' : 'A'; // "An 8-run", "An 11-point"
@@ -1912,7 +1978,7 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
     type: 'team.lost',
     targetKey: teamKey(g.league, loserId),
     title: `Successful Hate Watch! ${what}`,
-    body: elim ? `${elim.line}. ${score}` : score,
+    body: elim ? `${elim.line}. ${score}` : standing ? `${standing} ${score}` : score,
     at,
     meta: { gameId: g.gameId, winnerId, margin: w - l, score: `${w}-${l}`, ...(blowout ? { blowout: true } : {}), ...(elim ? { eliminated: true, sweep: elim.sweep } : {}) },
     ...(elim ? { aliases: ['team.eliminated'] } : {}),
@@ -2104,8 +2170,10 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
       // MLB, batted in: "Guardians tied the White Sox on Kwan's RBI single", "Guardians scored on Naylor's 2-run double against the White Sox".
       const batted = rbi ? (p[side] === p[opp] ? `${oppName} tied ${the(g.league, team)} on ${rbi}` : `${oppName} scored on ${rbi} against ${the(g.league, team)}`) : null;
+      // A score that levels the game says so in its line ("Brewers tied the game."), as a go-ahead one does ("took the lead").
+      const tied = p[side] === p[opp];
       out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : batted ?? `${oppName} ${what} on ${the(g.league, team)}`, ...base, ...unlessBehind, ...moment,
-        fold: `${oppName} ${what}.` });
+        fold: `${oppName} ${tied ? (SOCCER.has(g.league) ? 'equalized' : 'tied the game') : what}.` });
     }
     // Basketball: the other side's run reached RUN_POINTS on this play (once a run). A line on that play's
     // alert, not an alternative to it: "Knicks took the lead." and "It's a 14-0 Knicks run."

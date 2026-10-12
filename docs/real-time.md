@@ -67,8 +67,9 @@ The README's "Real-time: how fast is it?" has the summary; this is the full deta
 
 | Alert | Waits | Setting | Why |
 |---|---|---|---|
-| MLB: a lost ABS challenge | until a later play exists and 60s have passed (at the final, at once); a pitch missing from the feed must be missing two reads in a row | `HW_ABS_SETTLE_MS` | ESPN posts every challenged pitch "Confirmed" first and swaps in "Overturned" later (three wrong alerts on October 7, 2026; overturns took 10 and 15s in ALDS Game 5). `holdAbs`, `test/abs-settle.test.ts` |
+| MLB: a lost ABS challenge | until a later play exists and 30s have passed (at the final, at once); a pitch missing from the feed must be missing two reads in a row | `HW_ABS_SETTLE_MS` | ESPN posts every challenged pitch "Confirmed" first and swaps in "Overturned" later (three wrong alerts on October 7, 2026; overturns took 10 and 15s in ALDS Game 5, 10 and 10s in NLCS Game 1: the wait is 30s since October 12, 2026). `holdAbs`, `test/abs-settle.test.ts` |
 | MLB: a half-inning's end (down in order, stranded runners, NOBLETIGER) | the first read with the "End of the inning" play and the third out, 20s at most | `HW_HALF_END_WAIT_MS` | a stale read can have one without the other (`halfInningEnds`, `test/half-end-wait.test.ts`) |
+| MLB: a final the plays are behind (the list ends short of three outs without a walk-off, or its score isn't the final's) | a read that has the last out, 20s at most | `HW_HALF_END_WAIT_MS` | the scoreboard's final can come while reads time out (NLCS Game 1: 80s of timeouts around the last out); judged at once, the last half-inning is lost and the out follows the loss (`finishWhenCurrent`, `test/nlcs-game1.test.ts`) |
 | MLB: an at-bat's result posted without its batter | until the batter is on it, 20s at most | `HW_HALF_END_WAIT_MS` | it can't be pinned on anyone yet (`waitForBatter`) |
 | MLB: being no-hit through 6 | until the box score agrees on zero hits | | the core feed's hit count can run ahead |
 | MLB: the pitcher's loss | the summary every 15s, up to 20 times (5 minutes), until ESPN posts the W/L | `HW_DECISION_RETRY_MS` | the decisions trail the last out (`finalPitching`) |

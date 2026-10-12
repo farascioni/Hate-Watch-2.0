@@ -197,7 +197,8 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
   pulled) and each pitcher's alerts already sent (a blown save, no quality start, the loss), or baselined.
 - **`fouls`** (soccer fouls, by play id, from the touch feed or the commentary: whichever has a foul first judges it, and
   the penalty written onto it a moment later is judged once more), **`halfEnds`** (MLB: a half-inning is judged once, on a read with its third out), **`absHeld`** (a lost ABS
-  challenge is held until the review settles, then sent once or dropped).
+  challenge is held until the review settles, then sent once or dropped), **`heldFinal`** (MLB: the scoreboard's final
+  waits for plays that are behind it, 20 seconds at most; the loss is stored once, after the last out's alert).
 - **Soccer's touch feed** (`touches`, `touchItems`, `touchSigs`, `keyTexts`, `cardMoments`; `refreshTouches`, `judgeTouches`,
   `reviseKeyText`, `linkFoulsToCards`): the feed as ESPN sent it, held by position and cut to ESPN's count after a removal; each
   judged pair's makeup and alert ids; each key event's text and when it was first seen; each card alert's moment by player and
@@ -399,7 +400,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   pair for 6 minutes: an alert it newly makes goes out, one already out takes the new words, one it no longer makes stays and
   is logged. Details: docs/alerts.md, "EPL how" and "Soccer passes and dribbles".
 - **MLB:** a changed at-bat result is logged, not judged again (Layer 1). A lost ABS challenge waits for the review
-  (`holdAbs`): it goes out once a later play exists and `HW_ABS_SETTLE_MS` (60 seconds) have passed (at the final, at
+  (`holdAbs`): it goes out once a later play exists and `HW_ABS_SETTLE_MS` (30 seconds) have passed (at the final, at
   once), and only if the pitch still reads Confirmed and, on an at-bat's last pitch, the result doesn't say the call
   was overturned. A pitch missing from one read isn't taken back, because ESPN serves stale copies that drop the
   latest plays for a read (six times in ALDS Game 5, October 10 2026): it takes two reads in a row
@@ -469,7 +470,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 
 | Kept (database) | Forgotten (memory) |
 |---|---|
-| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `noBatter`, `resultSigs`, `resultTexts`, soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
+| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `resultSigs`, `resultTexts`, soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football and basketball revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen` |
 
