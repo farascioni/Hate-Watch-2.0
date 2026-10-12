@@ -15,9 +15,7 @@ SCORES
 
 UFC
 - Track UFC fighters: a loss says how and when (KO/TKO R1 1:20), a lost title, losing as favorite or a streak; also live knockdowns and the walk-out.
-- Scores' UFC chip: the next card (All fights with odds, or My fights), results as fights end.
-- A card's preview: each fight's odds, the tale of the tape and both fighters' last five.
-- With the UFC chip on, Search lists each weight class's top five fighters.
+- UFC chip on Scores: the next card (All fights with odds, or My fights) with each fight's odds, tale of the tape and last five; results as fights end. Search lists each weight class's top five.
 - A loss gets ESPN's clip of the fight, if any.
 
 F1
@@ -55,20 +53,15 @@ EVERYWHERE
 - Tracking both sides: one start alert.
 - A tying run says so; playoff starts name the round, losses the series score.
 - Standings drops name the division in MLB, the NFL and the NHL.
-- Card names and titles wrap at large text.
+- Card names and titles wrap at large text; buttons center their labels.
 - After a loss (F1: a race), a standings drop or elimination is a line on it.
-- Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
-- The Scores switch says what it lists: events, games, fights.
+- Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters); the Scores switch says events, games or fights.
 - League filters show yours, then More by sport; the WNBA is last everywhere.
-- Clips play only when you press play.
-- An alert opens in full; its photo opens their page.
-- Buttons center their labels and read as buttons.
-- No alert repeats a later line or loses one.
-- After a deploy, plays from the minutes before still alert, once.
+- Clips play only when you press play; an alert opens in full, its photo opens their page.
+- No alert repeats a line or loses one; after a deploy, the minutes before still alert, once.
 - Following a team mid-game starts tracking it at once.
 - Notices from Hate Watch come in the feed, never pushed.
-- Settings has no Leagues section.
-- The guide lists every league; the counter says team or fighter.
+- Settings has no Leagues section; the guide lists every league; the counter says team or fighter.
 
 ## Build 12 (October 9, 2026)
 
