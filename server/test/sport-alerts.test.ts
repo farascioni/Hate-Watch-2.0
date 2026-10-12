@@ -18,7 +18,7 @@ for (const [lg, id, name, short, abbr] of [
   ['nhl', '5', 'Pittsburgh Penguins', 'Penguins', 'PIT'], ['nhl', '13', 'New York Rangers', 'Rangers', 'NYR'],
   ['nfl', '9', 'Green Bay Packers', 'Packers', 'GB'], ['nfl', '28', 'Washington Commanders', 'Commanders', 'WSH'],
   ['nfl', '23', 'Pittsburgh Steelers', 'Steelers', 'PIT'], ['nfl', '17', 'New England Patriots', 'Patriots', 'NE'], ['nfl', '10', 'Tennessee Titans', 'Titans', 'TEN'], ['nfl', '20', 'New York Jets', 'Jets', 'NYJ'],
-  ['nfl', '1', 'Atlanta Falcons', 'Falcons', 'ATL'],
+  ['nfl', '1', 'Atlanta Falcons', 'Falcons', 'ATL'], ['nfl', '30', 'Jacksonville Jaguars', 'Jaguars', 'JAX'], ['nfl', '21', 'Philadelphia Eagles', 'Eagles', 'PHI'],
   ['epl', '371', 'West Ham United', 'West Ham', 'WHU'], ['epl', '363', 'Chelsea', 'Chelsea', 'CHE'],
   ['f1', 'mclaren', 'McLaren', 'McLaren', 'MCL'], ['f1', 'aston', 'Aston Martin', 'Aston Martin', 'AMR'],
 ]) team.run(`team:${lg}:${id}`, lg, id, name, short, abbr);
@@ -31,6 +31,7 @@ for (const [lg, id, name, pos, t] of [
   ['nfl', '3139477', 'Jordan Love', 'QB', '9'], ['nfl', '4000400', 'Malik Willis', 'QB', '9'], ['nfl', '4362921', 'Josh Jacobs', 'RB', '9'], ['nfl', '3054211', 'Aaron Banks', 'G', '9'],
   ['nfl', '8439', 'Aaron Rodgers', 'QB', '23'], ['nfl', '4372030', 'Christian Barmore', 'DT', '17'], ['nfl', '4688432', 'Elijah Ponder', 'LB', '17'], ['nfl', '4431268', 'Chimere Dike', 'WR', '10'],
   ['nfl', '5208977', "Qwan'tez Stiggers", 'CB', '20'], ['nfl', '4045299', 'Marcelino McCrary-Ball', 'LB', '20'], ['nfl', '4430807', 'Bijan Robinson', 'RB', '1'], ['nfl', '4361409', 'Jahan Dotson', 'WR', '1'], ['nfl', '3045373', 'Jalen Ramsey', 'CB', '23'],
+  ['nfl', '4360310', 'Trevor Lawrence', 'QB', '30'], ['nfl', '4040715', 'Jalen Hurts', 'QB', '21'],
   ['epl', '170376', 'Niclas Füllkrug', 'F', '371'], ['epl', '228102', 'Callum Wilson', 'F', '371'],
   ['f1', '5579', 'Lando Norris', '', 'mclaren'], ['f1', '5752', 'Oscar Piastri', '', 'mclaren'], ['f1', '4396', 'Lance Stroll', '', 'aston'], ['f1', '348', 'Fernando Alonso', '', 'aston'],
 ]) player.run(`player:${lg}:${id}`, lg, id, name, pos, `team:${lg}:${t}`);
@@ -343,6 +344,33 @@ test('NFL: a fumble is lost when the other team takes the ball ("RECOVERED by"),
   const own = snap('4018726583192', 'Fumble Recovery (Own)', 'C.Rush pass short left to Bi.Robinson to PIT 31 for 24 yards (J.Ramsey). FUMBLES (J.Ramsey), recovered by ATL-J.Dotson at PIT 28.',
     roles(['receiver', '4430807'], ['fumbler', '4430807'], ['forcedBy', '3045373'], ['recoverer', '4361409']), { teamId: '1' });
   assert.deepEqual(nf({ ...nflCtx(), homeId: '23', awayId: '1' }, own).map((e) => [e.type, e.title]), [['nfl.fumble', 'Bijan Robinson fumbled']]);
+});
+
+test("NFL: a sack is a sack whatever ESPN types the play; a review's call that stands decides (Eagles at Jaguars, October 11 2026)", () => {
+  const roles = (...rs: [string, string][]) => rs.map(([role, id]) => ({ id, role }));
+  const g = { ...nflCtx(), gameId: '401872981', homeId: '30', awayId: '21' };
+  // Lawrence fumbled on the sack and the Jaguars kept the ball: ESPN types it "Fumble Recovery (Own)".
+  const sack = snap('401872981191', 'Fumble Recovery (Own)', '(Shotgun) T.Lawrence sacked at JAX 19 for -9 yards (J.Carter). FUMBLES (J.Carter), recovered by JAX-R.Hainsey at JAX 13.',
+    roles(['passer', '4360310'], ['fumbler', '4360310'], ['forcedBy', '4426361'], ['sackedBy', '4426361'], ['recoverer', '4242391']), { teamId: '30', home: 0, away: 0 });
+  assert.deepEqual(nf(g, sack).map((e) => `${e.type}: ${e.title}`), ['nfl.qb.sacked: Trevor Lawrence got sacked', 'nfl.fumble: Trevor Lawrence fumbled']);
+  // Hurts's strip-sack, reversed on review before ESPN posted it: he recovered his fumble and threw incomplete. No sack.
+  const reversed = snap('4018729812311', 'Fumble Recovery (Own)', '(Shotgun) J.Hurts to PHI 32 for -5 yards. FUMBLES, and recovers at PHI 31. J.Hurts sacked at PHI 30 for -7 yards (T.Walker). FUMBLES (T.Walker) [T.Walker], touched at PHI 33, RECOVERED by JAX-T.Walker at PHI 30.The Replay Official reviewed the fumble ruling, and the play was REVERSED.(Shotgun) J.Hurts to PHI 32 for -5 yards. FUMBLES, and recovers at PHI 31. J.Hurts pass incomplete short left to D.Pierce (J.Hines-Allen) [T.Walker].',
+    roles(['passer', '4040715'], ['recoverer', '4040715'], ['fumbler', '4040715']), { teamId: '21', home: 7, away: 14 });
+  assert.deepEqual(nf(g, reversed).map((e) => `${e.type}: ${e.title}`), ['nfl.fumble: Jalen Hurts fumbled']);
+});
+
+test("NFL flags are feed only on a new install (October 11 2026); a touchdown wiped out, an ejection and the QB's delay of game still push", () => {
+  fan('new-gb', ['player:nfl:3054211', 'player:nfl:3139477']);
+  const mine = () => pushes.filter((x) => x.to === 'tok-new-gb').map((x) => x.title);
+  const g = nflCtx(), banks = [{ id: '3054211', role: 'penalized' }];
+  publish(bundleByPlay(nf(g, snap('f1', 'Penalty', 'PENALTY on GB-A.Banks, Offensive Holding, 10 yards, enforced at GB 30 - No Play.', banks))), 'nfl');
+  assert.deepEqual(mine(), [], 'a plain flag: the feed');
+  assert.match(got('new-gb')[0], /^nfl\.penalty: Aaron Banks was flagged/);
+  publish(bundleByPlay(nf(g, snap('f2', 'Penalty', 'J.Love pass short right to J.Jacobs for 12 yards, TOUCHDOWN NULLIFIED by Penalty. PENALTY on GB-A.Banks, Offensive Holding, 10 yards, enforced at WSH 22 - No Play.', [{ id: '3139477', role: 'passer' }, ...banks]))), 'nfl');
+  publish(bundleByPlay(nf(g, snap('f3', 'Penalty', 'PENALTY on GB-A.Banks, Disqualification, 15 yards, enforced at WSH 40.', banks))), 'nfl');
+  nf(g, snap('f4', 'Pass Reception', 'J.Love pass short left to J.Jacobs for 5 yards.', [{ id: '3139477', role: 'passer' }]));
+  publish(bundleByPlay(nf(g, snap('f5', 'Penalty', '(Shotgun) PENALTY on GB, Delay of Game, 5 yards, enforced at GB 30 - No Play.', []))), 'nfl');
+  assert.deepEqual(mine().map((t) => t.replace(/^\S+ /, '')), ["Aaron Banks's penalty wiped out a touchdown", 'Aaron Banks got ejected', 'Jordan Love took a delay of game penalty']);
 });
 
 test("NFL drives: three-and-out, on downs, empty in the red zone; the drive's result goes on the QB's alert for that play", () => {

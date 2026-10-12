@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
   awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent,
 } from './detectors.ts';
@@ -42,6 +42,13 @@ const CLIP_READS = 4;
 const CLIP_TRIES = 3; // a clip whose record won't load is skipped after this many reads
 const CLIPS_POLL_MS = 60_000;
 const CLIPS_AFTER_FINAL_MS = 60 * 60_000;
+/**
+ * ESPN corrects football plays after posting END GAME: a lost fumble became the offense's own recovery 24 s after it, and
+ * an overtime's last play a sack 36 s after (Browns at Jets, Giants at Commanders, October 11 2026; 4 of 12 games had
+ * a change that matters within two minutes). The play ledger revises them, so the tracker goes on reading for this long.
+ */
+const FINAL_CORRECTIONS_MS = Number(process.env.HW_FINAL_CORRECTIONS_MS ?? 3 * 60_000);
+const FINAL_CORRECTIONS_POLL_MS = Number(process.env.HW_FINAL_CORRECTIONS_POLL_MS ?? 10_000);
 const CLIP_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']); // the leagues ESPN has clips for (none for the NFL or soccer in October 2026)
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
@@ -55,6 +62,13 @@ const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yest
 const NEWS_MS = Number(process.env.HW_NEWS_MS ?? 3 * 60_000); // off-field trouble, fines and suspensions (news.ts)
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
+/**
+ * A game attached on the server's first scoreboard read of its league (a restart, a deploy): plays this old are still
+ * news. ESPN posts plays 80-105 s after they happen, so with 90 s a play the old server never read could already be
+ * history. Safe because everything the old server did send is in the database, and the same ids stop at the insert
+ * (docs/duplicate-alerts.md, "What survives a restart"). A game followed later keeps 90 s: its old plays went to nobody.
+ */
+const BOOT_BACKFILL_MS = Number(process.env.HW_BOOT_BACKFILL_MS ?? 5 * 60_000);
 /** MLB: after the final, how often and how many times to look for the pitching decisions (W/L), which can trail the last out. */
 const DECISION_RETRY_MS = Number(process.env.HW_DECISION_RETRY_MS ?? 15_000);
 const DECISION_TRIES = 20;
@@ -121,6 +135,8 @@ export interface GameInfo {
   sawPre?: boolean;
   venue?: string;
   tv?: string;
+  /** Attached on the server's first scoreboard read of its league (a restart): plays up to BOOT_BACKFILL_MS old are news. */
+  atBoot?: boolean;
 }
 
 export class GameTracker {
@@ -311,6 +327,14 @@ export class GameTracker {
       if (!flagOn('clips.feed') && !flagOn('clips.loss')) continue; // switched off: nothing to read for
       const s = await liveDeps.getJson(urls.summary(this.ctx.league, this.ctx.gameId), { bust: true, timeoutMs: 6000 }).catch(() => null);
       if (s) await this.readClips(s).catch((e) => log(`[${this.ctx.league} ${this.ctx.gameId}] clips`, String(e)));
+    }
+  }
+
+  /** Football, after the final: the plays and drives again for FINAL_CORRECTIONS_MS, for ESPN's corrections (revisions.ts). */
+  private async correctionsAfterFinal() {
+    for (let reads = Math.ceil(FINAL_CORRECTIONS_MS / FINAL_CORRECTIONS_POLL_MS); reads > 0; reads--) {
+      await new Promise((r) => setTimeout(r, FINAL_CORRECTIONS_POLL_MS).unref());
+      try { await this.poll(); } catch (e) { log(`[${this.ctx.league} ${this.ctx.gameId}] read after the final failed`, String(e)); }
     }
   }
 
@@ -536,7 +560,10 @@ export class GameTracker {
     // summary's drives for college, the core feed for the NFL). `changed`: lines on alerts already sent, no push.
     const football = FOOTBALL.has(league) && plays.length > 0 && (teamsOnly ? summary.status === 'fulfilled' : core.status === 'fulfilled');
     const changed: Detected[] = [];
-    if (football) this.ledger.read(new Set(plays.map((p) => p.id)), now);
+    // Basketball: the same ledger, from a read that has the core feed (revisions.ts): ESPN posts its plays half-finished
+    // and edits them (35 to 49% of October 11 2026's preseason plays), so a changed play is judged again.
+    const ledgered = football || (BASKETBALL.has(league) && plays.length > 0 && core.status === 'fulfilled');
+    if (ledgered) this.ledger.read(new Set(plays.map((p) => p.id)), now);
     let header: Header | undefined; // football: the summary header's score while the game is on
     let final: { home: number; away: number } | null = null;
     if (summary.status === 'fulfilled') {
@@ -575,7 +602,7 @@ export class GameTracker {
       final = { home: Math.max(...plays.map((p) => p.home)), away: Math.max(...plays.map((p) => p.away)) };
     }
 
-    const cutoff = Date.now() - BACKFILL_WINDOW_MS;
+    const cutoff = Date.now() - (this.info.atBoot ? BOOT_BACKFILL_MS : BACKFILL_WINDOW_MS);
     // The score is re-derived from every play on every poll, not kept as a running total, because
     // ESPN edits plays after publishing them: a goal can be marked as scoring only later, and a
     // disallowed goal is taken back. A running total would miss the first and, after the second,
@@ -593,8 +620,8 @@ export class GameTracker {
       const fresh = !waiting && !this.seen.has(p.id);
       if (fresh) {
         this.seen.add(p.id);
-        // Football: a play ESPN took out and re-posted under a new id is that play again, revised (already counted).
-        const was = football && !history ? this.ledger.repost(p, now) : undefined;
+        // A play ESPN took out and re-posted under a new id is that play again, revised (already counted).
+        const was = ledgered && !history ? this.ledger.repost(p, now) : undefined;
         if (was) {
           const r = this.ledger.revise(was, p, now);
           events.push(...r.fresh);
@@ -609,9 +636,9 @@ export class GameTracker {
             this.halfEnds.set(ended, { playId: p.id, since: now, seen: `${r?.id} pas=${h?.key === ended ? h.pas.length : 0} reached=${h?.key === ended && h.reached}` });
           }
           observePlay(this.ctx, p);
-          if (football) this.ledger.add(p, es, { history }, now);
+          if (ledgered) this.ledger.add(p, es, { history }, now);
         }
-      } else if (football) {
+      } else if (ledgered) {
         const r = this.ledger.changed(p, now);
         if (r) { events.push(...r.fresh); changed.push(...r.lines); }
       }
@@ -649,7 +676,10 @@ export class GameTracker {
       bump(led, score);
       changed.push(...this.ledger.sweep(now), ...this.footballTakeBack(score, plays, header, now));
       events.push(...this.headerAhead(score, plays, header, led, now));
-    } else if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
+    } else if (ledgered) {
+      changed.push(...this.ledger.sweep(now)); // plays ESPN took out
+    }
+    if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
       log(`[${league} ${gameId}] score went down to ${score.away}-${score.home} (a goal taken back?); the next one is news again`);
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
@@ -710,6 +740,8 @@ export class GameTracker {
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
     if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
+    // After the final ESPN's data can still flip back (a drive FUMBLE, DOWNS, FUMBLE in 36 s: Browns at Jets): what the reads then find goes to the feed, never a push.
+    if (this.finished) for (const e of events) e.noPush = true;
     if (events.length) { publish(soccer ? this.linkFoulsToCards(bundleByPlay(events)) : bundleByPlay(events), league); this.newAlerts = true; }
     if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
@@ -898,7 +930,12 @@ export class GameTracker {
     const seasonType = Number(this.box?.header?.season?.type ?? this.pre.seasonType ?? 2);
     const players = this.box && seasonType !== 1 ? playerFinalEvents(this.ctx, boxPlayerFacts(this.ctx.league, this.box), final, Date.now(), lost) : [];
     if (CLIP_LEAGUES.has(this.ctx.league)) void this.clipsAfterFinal();
-    if (!lost) { if (players.length) publish(players, this.ctx.league); return; } // a tie
+    if (FOOTBALL.has(this.ctx.league)) void this.correctionsAfterFinal();
+    if (!lost) { // a tie: the NFL's says so, feed only
+      const tied = [...gameTiedEvents(this.ctx, final, Date.now()), ...players];
+      if (tied.length) publish(tied, this.ctx.league);
+      return;
+    }
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
     // (3+ goals), then the team's loss, then its facts (a walk-off, losing as the favorite…: each a line on
     // the loss, or the alert itself for a device with the loss off), then "their team lost" for its players.
@@ -946,6 +983,8 @@ class LiveEngine {
   private trackers = new Map<string, GameTracker>();
   /** Watched games seen before their start but not tracked yet (a tracker attaches 3 min out; a doubleheader nightcap can start early). */
   private preSeen = new Set<string>();
+  /** Leagues whose scoreboard has been read since the server started: a game attached before that was live at boot. */
+  private scanned = new Set<League>();
   private kickers: Partial<Record<League, () => void>> = {};
   private standingsKick: Partial<Record<League, () => void>> = {};
   private upNextKick?: () => void;
@@ -1015,7 +1054,7 @@ class LiveEngine {
 
       if (relevant && !tr && (state === 'in' || (state === 'pre' && startsIn < 3 * 60_000))) {
         const tv = comp.broadcasts?.find((b: any) => b.market === 'national')?.names?.[0] ?? comp.broadcasts?.[0]?.names?.[0];
-        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv });
+        tr = new GameTracker(lg, ev.id, home.id, away.id, { sawPre: this.preSeen.delete(key), venue: comp.venue?.fullName, tv, atBoot: !this.scanned.has(lg) });
         this.trackers.set(key, tr);
         log(`[${lg}] tracking ${ev.shortName ?? ev.name} (${ev.id})`);
         tr.start();
@@ -1036,6 +1075,7 @@ class LiveEngine {
       }
     }
     for (const [k, t] of this.trackers) if (t.finished && !(sb.events ?? []).some((e: any) => `${lg}:${e.id}` === k) && k.startsWith(lg)) this.trackers.delete(k);
+    this.scanned.add(lg); // games attached from now on are new follows: 90 s of history (BOOT_BACKFILL_MS)
   }
 }
 
@@ -1056,16 +1096,23 @@ export async function scanYesterday(lg: League, now = Date.now()) {
   }
 }
 
-function every(ms: number, fn: () => Promise<void>): () => void {
-  let running = false;
+/**
+ * Runs `fn` now and then `ms` after each run ends, never two at once. The function it returns runs it at once (a new
+ * follow: LiveEngine.kick). A kick that comes while a run is under way runs it again as soon as that one ends: that run
+ * may have read the follows before the new one, and waiting for the next turn left a game untracked for up to `ms`.
+ */
+export function every(ms: number, fn: () => Promise<void>, opts: { unref?: boolean } = {}): () => void {
+  let running = false, again = false;
   let timer: NodeJS.Timeout;
   const run = async () => {
     clearTimeout(timer);
-    if (running) return;
+    if (running) { again = true; return; }
     running = true;
+    again = false;
     try { await fn(); } catch (e) { log('loop error', String(e)); }
     running = false;
-    timer = setTimeout(run, ms);
+    timer = setTimeout(run, again ? 0 : ms);
+    if (opts.unref) timer.unref?.(); // a test's loop, so the test can end (the server's keep the process up, as recorders need)
   };
   void run();
   return () => void run();
@@ -1075,6 +1122,20 @@ function every(ms: number, fn: () => Promise<void>): () => void {
 /** `note`: the zone a table position is in, where ESPN marks it (EPL: "Champions League", "Relegation"). */
 /** `division`: its place in its division (DIVISION_STANDINGS), when the standings were read by division. */
 interface StandingSnap { rank: number; group: string; clincher: string; streak: string; note?: string; division?: { name: string; rank: number } }
+
+/** ESPN's season type for a table (1 preseason, 2 regular season, 3 postseason): the first group's `standings.seasonType`. */
+const PRESEASON = 1;
+export function standingsSeasonType(res: any): number | undefined {
+  let found: number | undefined;
+  const walk = (node: any) => {
+    if (found != null || !node) return;
+    const t = Number(node.standings?.seasonType);
+    if (t) { found = t; return; }
+    for (const c of node.children ?? []) walk(c);
+  };
+  walk(res);
+  return found;
+}
 
 /** Leagues whose divisions decide the playoffs: their standings are read by division, and a drop names it ("2nd in the AL Central"). */
 const DIVISION_STANDINGS = new Set<League>(['mlb', 'nfl', 'nhl']);
@@ -1124,6 +1185,11 @@ export function dropBody(was: StandingSnap, cur: StandingSnap, from = was.rank, 
 
 /** ESPN's clincher marks that mean a division title: y, and the ones that include it (z: the conference or league's best, *: home field, p: Presidents' Trophy). */
 const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
+/**
+ * The WNBA has no divisions, and its playoffs are seeded league-wide, so ESPN marks no conference title (2026's final
+ * standings: the East's 1st had only "x"). Its clinch is ESPN's "*", the league's best record, for the conference rivals.
+ */
+const WNBA_TOP_SEED = new Set(['*']);
 
 /**
  * Standings news, one alert per team per read: being eliminated, a division rival clinching the division,
@@ -1135,16 +1201,28 @@ const DIVISION_TITLE = new Set(['y', 'z', '*', 'p']);
  */
 export async function scanStandings(lg: League) {
   const byDivision = DIVISION_STANDINGS.has(lg);
-  const now = parseStandings(await liveDeps.getJson(byDivision ? `${urls.standings(lg)}?level=3` : urls.standings(lg), { timeoutMs: 8000 }), byDivision);
+  const res = await liveDeps.getJson(byDivision ? `${urls.standings(lg)}?level=3` : urls.standings(lg), { timeoutMs: 8000 });
+  const now = parseStandings(res, byDivision);
   if (!now.size) return;
   const prev = new Map(Object.entries(kvGet<Record<string, StandingSnap>>(`standings:${lg}`) ?? {}));
   kvSet(`standings:${lg}`, Object.fromEntries(now));
   if (!prev.size) return; // first snapshot is the baseline
+  // The preseason's table counts its games as wins and losses (the Magic went from 4th to 10th in the East on one
+  // October 11 2026 game): no standings news until the regular season, and a table of another season type than the
+  // last is a new baseline (its order starts over). Not soccer: ESPN calls the Premier League's regular season type 1.
+  // Only the preseason's end: the regular season's own end (the playoffs) is where eliminations and clinches land.
+  if (!SOCCER.has(lg)) {
+    const season = standingsSeasonType(res), was = kvGet<number>(`standings-season:${lg}`);
+    if (season != null) kvSet(`standings-season:${lg}`, season);
+    if (season === PRESEASON || (was === PRESEASON && season != null)) return;
+  }
   const day = new Date().toISOString().slice(0, 10), year = new Date().getFullYear(), at = Date.now();
   const onLoss = (key: string, line: string) => ({ lateOn: { targetKey: key, since: at - DROP_ON_LOSS_MS, types: [], loss: true, line } });
-  // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions).
-  const clinched = [...now].filter(([id, cur]) => DIVISION_TITLE.has(cur.clincher) && !DIVISION_TITLE.has(prev.get(id)?.clincher ?? ''));
-  const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
+  // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions); in the WNBA, a
+  // conference rival that just clinched the league's best record (divisionsOf gives the WNBA's conferences).
+  const titles = lg === 'wnba' ? WNBA_TOP_SEED : DIVISION_TITLE;
+  const clinched = [...now].filter(([id, cur]) => titles.has(cur.clincher) && !titles.has(prev.get(id)?.clincher ?? ''));
+  const divisions = clinched.length && ['mlb', 'nfl', 'nba', 'nhl', 'wnba'].includes(lg) ? await divisionsOf(lg).catch(() => new Map()) : new Map();
   const events: Detected[] = [];
   for (const [teamId, cur] of now) {
     const was = prev.get(teamId);
@@ -1159,7 +1237,9 @@ export async function scanStandings(lg: League) {
       const div = divisions.get(teamId)?.name;
       if (rivalId === teamId || !div || divisions.get(rivalId)?.name !== div) continue;
       const rival = catalog.teamByEspn(lg, rivalId)?.shortName ?? 'A rival';
-      events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched the ${div}`, body: `${team.shortName} won't win the division.`, fold: `The ${rival} clinched the ${div}.`, meta: { teamId, rivalId } });
+      const won = lg === 'wnba' ? "the WNBA's best record" : `the ${div}`;
+      events.push({ ...base, id: `clinch:${lg}:${rivalId}:${year}:${teamId}`, type: 'team.rival_clinched', title: `The ${rival} clinched ${won}`,
+        body: lg === 'wnba' ? `${team.shortName} won't be the top seed.` : `${team.shortName} won't win the division.`, fold: `The ${rival} clinched ${won}.`, meta: { teamId, rivalId } });
     }
     // Soccer: into the relegation zone (ESPN's table note), before the drop that put them there.
     const relegation = (x: StandingSnap) => /relegation/i.test(x.note ?? '');

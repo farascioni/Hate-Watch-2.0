@@ -70,6 +70,15 @@ function readableOn(hex: string) {
   return lum > 0.6 ? '#111' : '#fff';
 }
 
+/** Hate Watch itself, as the sender of a developer notice: the app's icon in the avatar's circle. */
+export function AppAvatar({ size = 48 }: { size?: number }) {
+  return (
+    <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: colors.hate, overflow: 'hidden' }]} accessibilityLabel="Hate Watch">
+      <Image source={require('../../assets/icon.png')} style={{ width: size, height: size }} contentFit="cover" />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: { borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceHi, overflow: 'visible' },
   badge: { position: 'absolute', right: -4, bottom: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },

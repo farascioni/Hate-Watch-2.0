@@ -48,7 +48,7 @@ export function hateTag(g: GameCard, side: Side | undefined): { text: string; to
 }
 
 /**
- * Chance the side you track doesn't win: live, ESPN's win probability (NFL and MLB publish it); before the
+ * Chance the side you track doesn't win: live, ESPN's win probability (where ESPN publishes it: the server reads it for any league); before the
  * start, the other side's chance from the betting line (a soccer draw isn't a loss).
  */
 export function loseChance(g: GameCard, side: Side | undefined) {
@@ -103,7 +103,7 @@ export function statusLine(g: GameCard, now = Date.now()) {
 }
 
 /** A typical game, start to final (the server's GAME_LENGTH_MS), for a final without an end time. */
-const GAME_LENGTH_MS: Partial<Record<string, number>> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, epl: 2 * 3600_000, f1: 2 * 3600_000 };
+const GAME_LENGTH_MS: Partial<Record<string, number>> = { mlb: 3 * 3600_000, nfl: 3.25 * 3600_000, cfb: 3.5 * 3600_000, nba: 2.25 * 3600_000, wnba: 2 * 3600_000, nhl: 2.5 * 3600_000, epl: 2 * 3600_000, f1: 2 * 3600_000 };
 const gameLength = (league: string) => GAME_LENGTH_MS[league] ?? 2 * 3600_000; // a league this build doesn't know: a soccer match's
 /** Same window as the server: live, starting within a day, or finished in the last 24 hours. */
 export const inWindow = (g: GameCard, now = Date.now()) =>

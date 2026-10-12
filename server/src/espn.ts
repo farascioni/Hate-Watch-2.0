@@ -1,5 +1,6 @@
-// Thin ESPN client. Uses conditional requests so an unchanged live game costs a 304
-// (answered from our cached body), and a hard timeout so one slow response never stalls a poll loop.
+// Thin ESPN client: a hard timeout so one slow response never stalls a poll loop, and, for reads that ask for it
+// (`conditional`: the injury reports), a conditional request, so an unchanged one costs a 304 answered from our cached
+// body. Live game polls don't: they `bust` ESPN's CDN cache with a unique URL, which makes every read a full 200.
 
 const etags = new Map<string, { etag: string; body: unknown }>();
 

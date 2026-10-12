@@ -33,7 +33,7 @@ const ins = () => db.prepare('INSERT INTO hate_watches (device_id, event_id, tar
 
 /**
  * What a hate watch counts as. A player's "their team lost", or soccer's 3+ goal loss, counts for the
- * team (the counter lists teams, never players), under the team loss's own id (`lostId`): one row per
+ * team (the counter lists teams, and UFC fighters, who have no team: `ufc.lost` counts under the fighter), under the team loss's own id (`lostId`): one row per
  * device and loss, so tracking the team and a player on it, or two of its players, counts once.
  */
 export function hateWatchOf(e: Pick<Detected, 'id' | 'type' | 'targetKey' | 'at' | 'meta'>): Pick<Detected, 'id' | 'targetKey' | 'at'> {

@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { db } from './db.ts';
 import { catalog } from './catalog.ts';
-import { getPrefs, publishTo, typeEnabled } from './fanout.ts';
+import { getPrefs, publishTo, typeEnabled, NOTICE_TYPE } from './fanout.ts';
 import type { League } from './leagues.ts';
 
 export const RECAP_TYPE = 'app.weekly_recap';
@@ -34,7 +34,7 @@ export function recapFor(deviceId: string, now = Date.now()) {
   const watches = db.prepare(`SELECT target_key, COUNT(*) AS n FROM hate_watches WHERE device_id = ? AND occurred_at >= ? AND occurred_at < ?
     GROUP BY target_key ORDER BY n DESC, MAX(occurred_at) DESC`).all(deviceId, start, end) as { target_key: string; n: number }[];
   const alerts = (db.prepare(`SELECT COUNT(*) AS n FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
-    AND e.type != '${RECAP_TYPE}'`).get(deviceId, start, end) as { n: number }).n;
+    AND e.type NOT IN ('${RECAP_TYPE}', '${NOTICE_TYPE}')`).get(deviceId, start, end) as { n: number }).n;
   const total = watches.reduce((s, w) => s + w.n, 0);
   if (!total && alerts < MIN_ALERTS) return null;
   // The worst loss they got, whichever of its alerts it was (the team's, "their team lost", a fact in its place: its
@@ -44,7 +44,7 @@ export function recapFor(deviceId: string, now = Date.now()) {
     ORDER BY COALESCE(json_extract(e.meta, '$.eliminated'), json_extract(l.meta, '$.eliminated'), 0) DESC,
       CAST(COALESCE(json_extract(e.meta, '$.margin'), json_extract(l.meta, '$.margin')) AS INTEGER) DESC LIMIT 1`).get(deviceId, start, end) as { title: string } | undefined;
   const top = watches[0]?.target_key ?? (db.prepare(`SELECT e.target_key FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
-    GROUP BY e.target_key ORDER BY COUNT(*) DESC LIMIT 1`).get(deviceId, start, end) as { target_key: string } | undefined)?.target_key;
+    AND e.type != '${NOTICE_TYPE}' GROUP BY e.target_key ORDER BY COUNT(*) DESC LIMIT 1`).get(deviceId, start, end) as { target_key: string } | undefined)?.target_key;
   if (!top) return null;
   const name = (key: string) => catalog.team(key)?.shortName ?? catalog.player(key)?.name ?? key;
   const body = [

@@ -1,0 +1,326 @@
+// Basketball plays ESPN changes after it posts them (revisions.ts, live.ts, detectors.ts), with the plays and wording of
+// October 11 2026's three preseason games (Magic at Cavaliers, Bucks at Hornets, Bulls at Nuggets): ESPN posts a shot
+// as "No Shot (Default Shot)" and types it minutes later, a free throw with no shooter or as "misses" before it flips to
+// "makes", a block names the wrong shooter for 4 seconds, and a foul or shot is taken out and re-posted under a new id.
+// A play is judged again on its latest version: a line (no push) on an alert it no longer has, the right player's alert,
+// a re-post is one alert, a removed play is taken back, fouls are recounted. Also: a shot not yet typed is an unknown
+// shot, a block never goes to the blocker, a lead changing hands again within 2 minutes is a line, and the
+// preseason's standings table says nothing.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+process.env.HW_DB = ':memory:';
+let NOW = Date.parse('2026-10-11T22:43:00Z');
+Date.now = () => NOW;
+const { db, kvGet } = await import('../src/db.ts');
+const { loadCatalog } = await import('../src/catalog.ts');
+const { DEFAULT_PREFS, setPushSender } = await import('../src/fanout.ts');
+const { EVENT_TYPES } = await import('../src/event-types.ts');
+const { GameTracker, liveDeps, scanStandings, standingsSeasonType } = await import('../src/live.ts');
+const { urls } = await import('../src/leagues.ts');
+const D = await import('../src/detectors.ts');
+const R = await import('../src/revisions.ts');
+
+const CLE = '5', ORL = '19';
+const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES (?, 'nba', ?, ?, ?, ?, ?, 'x', 500, 500, 0)`);
+team.run(`team:nba:${CLE}`, CLE, 'Cleveland Cavaliers', 'Cavaliers', 'CLE', 'Cleveland');
+team.run(`team:nba:${ORL}`, ORL, 'Orlando Magic', 'Magic', 'ORL', 'Orlando');
+const player = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES (?, 'nba', ?, ?, ?, 'G', 'x', 1, 1, 'headshot', 0)`);
+const PEOPLE = { banchero: ['4432573', 'Paolo Banchero', ORL], bane: ['4066320', 'Desmond Bane', ORL], dasilva: ['4702382', 'Tristan da Silva', ORL], cain: ['4278572', 'Jamal Cain', ORL],
+  harden: ['3992', 'James Harden', CLE], mobley: ['4432158', 'Evan Mobley', CLE], hezonja: ['3155526', 'Mario Hezonja', CLE] } as const;
+for (const [id, name, teamId] of Object.values(PEOPLE)) player.run(`player:nba:${id}`, id, name, `team:nba:${teamId}`);
+const GHOST = '999999'; // a player ESPN lists who isn't in the catalog
+loadCatalog();
+
+const pushes: { to: string }[] = [];
+setPushSender((m) => pushes.push(...m));
+const everything = { ...DEFAULT_PREFS, types: Object.fromEntries(EVENT_TYPES.map((t) => [t.id, true])), pushTypes: Object.fromEntries(EVENT_TYPES.map((t) => [t.id, true])) };
+const device = (id: string, targets: string[], prefs: any = DEFAULT_PREFS) => {
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run(id, 's', 'ios', `tok-${id}`, JSON.stringify(prefs));
+  targets.forEach((t, i) => db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, ?)').run(id, t, i + 1));
+};
+/** A device's feed: each alert's type, title and the lines on it. */
+const feed = (id: string) => (db.prepare('SELECT e.type, e.title, f.extra FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? ORDER BY f.rowid').all(id) as any[])
+  .map((r) => [r.type, r.title, r.extra ? JSON.parse(r.extra) : []]);
+const pushed = (id: string) => pushes.filter((p) => p.to === `tok-${id}`).length;
+const P = (who: keyof typeof PEOPLE) => `player:nba:${PEOPLE[who][0]}`;
+
+/** A play as ESPN's core feed posts it. `parts`: [athlete id, role]. */
+let seq = 0;
+const core = (id: string, type: string, text: string, teamId: string | undefined, parts: [string, string][], x: Record<string, any> = {}) => ({
+  id, type: { text: type }, text, ...(teamId ? { team: { $ref: `http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2027/teams/${teamId}?lang=en&region=us` } } : {}),
+  participants: parts.map(([a, role]) => ({ athlete: { $ref: `http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2027/athletes/${a}?lang=en&region=us` }, type: role })),
+  awayScore: x.away ?? 0, homeScore: x.home ?? 0, scoringPlay: !!x.scoring, shootingPlay: !!x.shooting, scoreValue: x.value ?? 0,
+  period: { number: x.period ?? 1 }, clock: { value: x.clock ?? 600 - seq++, displayValue: '10:00' }, wallclock: new Date(x.at ?? NOW).toISOString(),
+  ...(x.coordinate ? { coordinate: x.coordinate, pointsAttempted: x.points } : {}),
+});
+
+/** A game read live: its core plays as `f.plays` says, polled every 5 seconds of the fake clock. */
+function game(id: string) {
+  const f = { plays: [] as any[] };
+  liveDeps.getJson = async (url: string) => {
+    if (url.startsWith(urls.corePlays('nba', id))) return { items: f.plays };
+    if (url.startsWith(urls.summary('nba', id))) return {
+      header: { competitions: [{ status: { type: { state: 'in', completed: false } }, competitors: [{ homeAway: 'home', id: CLE, score: '0' }, { homeAway: 'away', id: ORL, score: '0' }] }] }, plays: [],
+    };
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  const tracker = new GameTracker('nba', id, CLE, ORL, { sawPre: true });
+  const poll = async (n = 1) => { for (let i = 0; i < n; i++) { NOW += 5000; await tracker.poll(); } };
+  const put = (p: any) => { const i = f.plays.findIndex((x) => x.id === p.id); if (i >= 0) f.plays[i] = p; else f.plays.push(p); };
+  const take = (pid: string) => { f.plays = f.plays.filter((x) => x.id !== pid); };
+  return { f, tracker, poll, put, take };
+}
+const missPlay = (id: string, who: keyof typeof PEOPLE, text: string, type = 'Jump Shot', x: Record<string, any> = {}) =>
+  core(id, type, text, PEOPLE[who][2], [[PEOPLE[who][0], 'shooter']], { shooting: true, ...x });
+
+// ─── The wording and the block ───
+
+test('a shot ESPN has not typed yet is an unknown shot: its distance and "three", never "no shot (default shot)"', () => {
+  const ctx: any = { league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() };
+  const miss = (x: Record<string, any>, type = 'No Shot (Default Shot)', text = 'Donovan Mitchell misses shot') =>
+    D.missedShot(ctx, D.fromCorePlay(core('m', type, text, CLE, [['3908809', 'shooter']], { shooting: true, ...x })), 'Donovan Mitchell');
+  assert.equal(miss({ coordinate: { x: 25, y: 30 }, points: 3 }), 'Donovan Mitchell missed a 29-foot three');
+  assert.equal(miss({ coordinate: { x: 25, y: 10 }, points: 2 }), 'Donovan Mitchell missed a 9-foot shot');
+  assert.equal(miss({ coordinate: { x: 25, y: 4 }, points: 2 }), 'Donovan Mitchell missed a shot', 'inside 5 feet: no distance');
+  assert.equal(miss({}), 'Donovan Mitchell missed a shot', 'nothing known');
+  assert.equal(miss({}, 'No Shot (Default Shot)', 'Donovan Mitchell misses 24-foot three point jumper'), 'Donovan Mitchell missed a 24-foot three', 'ESPN\'s own distance and three');
+  assert.equal(miss({}, 'Jump Shot', 'Donovan Mitchell misses 24-foot three point jumper'), 'Donovan Mitchell missed a 24-foot three', 'a typed shot reads as before');
+  assert.equal(miss({}, 'Pullup Jump Shot', 'Donovan Mitchell misses 26-foot three point pullup jump shot'), 'Donovan Mitchell missed a 26-foot pull-up three');
+  assert.equal(miss({ coordinate: { x: 25, y: 45 }, points: 3 }), null, 'a heave is still no alert');
+});
+
+test('a block goes to the shooter, never to the blocker: a shooter missing from the catalog gets nothing', () => {
+  const ctx: any = { league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() };
+  const block = (shooter: string) => D.PLAYER_DETECTORS.nba(ctx, D.fromCorePlay(core('b1', 'Layup Shot', 'Paolo Banchero blocks the shot', CLE, [[shooter, 'shooter'], [PEOPLE.banchero[0], 'blocker']], { shooting: true })));
+  assert.deepEqual(block(PEOPLE.harden[0]).map((e) => [e.type, e.targetKey, e.title]), [['nba.got_blocked', P('harden'), 'James Harden got sent back ✋']]);
+  assert.deepEqual(block(GHOST).filter((e) => e.targetKey === P('banchero')), [], 'Dallas at Houston: the blocker got "got sent back" when his shooter was not in the catalog');
+  // Without ESPN's roles (the site feed's plays) and the shooter off the catalog: nothing, not the second player listed.
+  const bare = D.fromCorePlay({ ...core('b2', 'Layup Shot', 'Paolo Banchero blocks the shot', CLE, [], { shooting: true }),
+    participants: [{ athlete: { $ref: '.../athletes/999999?x' } }, { athlete: { $ref: '.../athletes/4432573?x' } }] });
+  assert.deepEqual(D.PLAYER_DETECTORS.nba(ctx, bare), []);
+});
+
+// ─── A play judged again ───
+
+test('a free throw posted with no shooter alerts nothing until ESPN names one, then it goes out', async () => {
+  device('ft-dasilva', [P('dasilva')]);
+  const x = game('G-FT1');
+  await x.poll();
+  x.put(core('ft1', 'Free Throw - 2 of 2', 'misses free throw 2 of 2', undefined, [], { shooting: true }));
+  await x.poll();
+  assert.deepEqual(feed('ft-dasilva'), [], 'no shooter: nothing');
+  x.put(core('ft1', 'Free Throw - 2 of 2', 'Tristan da Silva misses free throw 2 of 2', ORL, [[PEOPLE.dasilva[0], 'shooter']], { shooting: true }));
+  await x.poll();
+  assert.deepEqual(feed('ft-dasilva'), [['nba.missed_free_throw', 'Tristan da Silva missed a free throw', []]]);
+});
+
+test('a free throw ESPN flips from "misses" to "makes": a line on the alert, no push, no second alert', async () => {
+  device('ft-harden', [P('harden')], everything);
+  const x = game('G-FT2');
+  await x.poll();
+  const base = pushed('ft-harden');
+  x.put(core('ft2', 'Free Throw - 1 of 3', 'James Harden misses free throw 1 of 3', CLE, [[PEOPLE.harden[0], 'shooter']], { shooting: true }));
+  await x.poll();
+  assert.deepEqual(feed('ft-harden'), [['nba.missed_free_throw', 'James Harden missed a free throw', []]]);
+  assert.equal(pushed('ft-harden'), base + 1);
+  x.put(core('ft2', 'Free Throw - 1 of 3', 'James Harden makes free throw 1 of 3', CLE, [[PEOPLE.harden[0], 'shooter']], { shooting: true, scoring: true, value: 1, home: 1 }));
+  await x.poll();
+  assert.deepEqual(feed('ft-harden'), [['nba.missed_free_throw', 'James Harden missed a free throw', ['ESPN has since changed this: the free throw was made.']]]);
+  assert.equal(pushed('ft-harden'), base + 1, 'the correction never pushes');
+});
+
+test('a shot first credited to Desmond Bane and typed later is Paolo Banchero\'s: Bane\'s alert gets a line, Banchero\'s goes out', async () => {
+  device('shot-bane', [P('bane')], everything);
+  device('shot-banchero', [P('banchero')], everything);
+  const x = game('G-SHOT1');
+  await x.poll();
+  x.put(missPlay('s1', 'bane', 'Desmond Bane misses shot', 'No Shot (Default Shot)', { coordinate: { x: 25, y: 30 }, points: 3 }));
+  await x.poll();
+  assert.deepEqual(feed('shot-bane'), [['nba.missed_shot', 'Desmond Bane missed a 29-foot three', []]], 'the unknown shot, worded as one');
+  assert.deepEqual(feed('shot-banchero'), []);
+  x.put(missPlay('s1', 'banchero', 'Paolo Banchero misses driving layup', 'Driving Layup Shot'));
+  await x.poll();
+  assert.deepEqual(feed('shot-bane'), [['nba.missed_shot', 'Desmond Bane missed a 29-foot three', ['ESPN has since credited this play to Paolo Banchero.']]]);
+  assert.deepEqual(feed('shot-banchero'), [['nba.missed_shot', 'Paolo Banchero missed a driving layup', []]]);
+});
+
+test('a miss that was a block: a line on the "missed" alert, and the shooter\'s "got sent back" for a device that never had the first', async () => {
+  device('blk-cain-all', [P('cain')], everything);
+  device('blk-cain-default', [P('cain')]); // misses are off by default; blocks are on and pushed
+  const x = game('G-BLK1');
+  await x.poll();
+  x.put(missPlay('c1', 'cain', 'Jamal Cain misses tip shot', 'Tip Shot'));
+  await x.poll();
+  assert.deepEqual(feed('blk-cain-default'), []);
+  x.put(core('c1', 'Tip Shot', "Mario Hezonja blocks Jamal Cain's tip shot", ORL, [[PEOPLE.cain[0], 'shooter'], [PEOPLE.hezonja[0], 'blocker']], { shooting: true }));
+  await x.poll();
+  assert.deepEqual(feed('blk-cain-default'), [['nba.got_blocked', 'Jamal Cain got sent back ✋', []]]);
+  assert.equal(pushed('blk-cain-default'), 1, '"got sent back" is pushed by default');
+  const all = feed('blk-cain-all');
+  assert.equal(all.length, 1, 'one alert for one play (the moment)');
+  assert.ok(all[0][2].includes('ESPN has since changed this: the shot was blocked.'), all[0][2].join(' | '));
+});
+
+test('a play re-posted under a new id at the same moment is the same play: one alert, not two', async () => {
+  device('repost-dasilva', [P('dasilva')], everything);
+  const x = game('G-RP1');
+  await x.poll();
+  const foul = (id: string) => core(id, 'Shooting Foul', 'Tristan da Silva shooting foul', ORL, [[PEOPLE.dasilva[0], 'fouler']], { clock: 695 });
+  x.put(foul('f1'));
+  await x.poll();
+  assert.equal(feed('repost-dasilva').length, 1);
+  x.take('f1');
+  x.put(foul('f1-again'));
+  await x.poll();
+  await x.poll(8);
+  assert.deepEqual(feed('repost-dasilva'), [['nba.foul', 'Tristan da Silva committed a foul', []]], 'the same foul, once, with nothing to correct');
+});
+
+test('a play ESPN takes out for good: a line on its alert after 30 seconds, not before', async () => {
+  device('gone-banchero', [P('banchero')], everything);
+  const x = game('G-GONE1');
+  await x.poll();
+  x.put(missPlay('g1', 'banchero', 'Paolo Banchero misses 25-foot three point jumper'));
+  x.put(core('g2', 'Defensive Rebound', 'Evan Mobley defensive rebound', CLE, [[PEOPLE.mobley[0], 'rebounder']])); // a read that has plays: an empty one is a failed read
+  await x.poll();
+  x.take('g1');
+  await x.poll(3);
+  assert.deepEqual(feed('gone-banchero')[0][2], [], 'one short read is nothing');
+  await x.poll(5);
+  assert.deepEqual(feed('gone-banchero')[0][2], ['ESPN has since taken this play out.']);
+  assert.equal(feed('gone-banchero').length, 1);
+});
+
+test('a turnover ESPN makes a team turnover: a line on the player\'s alert', async () => {
+  device('to-mobley', [P('mobley')], everything);
+  const x = game('G-TO1');
+  await x.poll();
+  x.put(core('t1', 'No Turnover', 'Evan Mobley turnover', CLE, [[PEOPLE.mobley[0], 'offense']]));
+  await x.poll();
+  assert.equal(feed('to-mobley').length, 1);
+  x.put(core('t1', '5-Second Inbound Turnover', '5 sec inbound turnover', CLE, []));
+  await x.poll();
+  assert.deepEqual(feed('to-mobley')[0][2], ['ESPN has since made this a team turnover.']);
+});
+
+// ─── Fouls are recounted with each version ───
+
+test('fouling out: a foul ESPN re-posts is counted once, and a 6th foul named late is still the 6th', async () => {
+  device('fo-dasilva', [P('dasilva')], everything);
+  const x = game('G-FO1');
+  await x.poll();
+  const foul = (id: string, clock: number, named = true, text = 'Tristan da Silva personal foul') =>
+    core(id, 'Personal Foul', text, ORL, named ? [[PEOPLE.dasilva[0], 'fouler']] : [], { clock });
+  for (let i = 0; i < 5; i++) { x.put(foul(`pf${i}`, 600 - i * 60)); await x.poll(); }
+  assert.equal(feed('fo-dasilva').filter((r) => r[0] === 'nba.foul').length, 5);
+  // ESPN re-posts the 5th under a new id: still 5 fouls.
+  x.take('pf4');
+  x.put(foul('pf4-again', 600 - 4 * 60));
+  await x.poll(2);
+  // The 6th comes without its fouler, then with him.
+  x.put(foul('pf5', 100, false, 'personal foul'));
+  await x.poll();
+  assert.deepEqual(feed('fo-dasilva').filter((r) => r[0] === 'nba.fouled_out'), []);
+  x.put(foul('pf5', 100));
+  await x.poll();
+  assert.deepEqual(feed('fo-dasilva').filter((r) => r[0] === 'nba.fouled_out').map((r) => r[1]), ['Tristan da Silva fouled out']);
+  assert.equal(feed('fo-dasilva').filter((r) => r[0] === 'nba.foul').length, 5, 'the 6th foul is fouled out, not a sixth "committed a foul"');
+});
+
+test('un-counting a foul: a foul and its turnover are one foul, and it stays counted while either play stands', () => {
+  const g: any = { league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() };
+  const foul = D.fromCorePlay(core('o1', 'Offensive Foul', 'Evan Mobley offensive foul', CLE, [[PEOPLE.mobley[0], 'fouler']], { clock: 300 }));
+  const turnover = D.fromCorePlay(core('o2', 'Offensive Foul Turnover', 'Evan Mobley offensive foul turnover', CLE, [[PEOPLE.mobley[0], 'offense']], { clock: 300 }));
+  D.observePlay(g, foul); D.observePlay(g, turnover);
+  assert.equal(g.fouls[PEOPLE.mobley[0]], 1);
+  D.unobservePlay(g, turnover);
+  assert.equal(g.fouls[PEOPLE.mobley[0]], 1, 'the foul play still vouches for it');
+  D.unobservePlay(g, foul);
+  assert.equal(g.fouls[PEOPLE.mobley[0]], 0);
+  D.unobservePlay(g, foul);
+  assert.equal(g.fouls[PEOPLE.mobley[0]], 0, 'never below zero, nor twice');
+});
+
+test('samePlay for basketball: the same player and kind of play within 10 seconds of the clock', () => {
+  const p = (type: string, who: string | undefined, clock: number, extra: Record<string, any> = {}) =>
+    D.fromCorePlay(core('x', type, 'x', ORL, who ? [[who, 'shooter']] : [], { clock, shooting: /shot/i.test(type), ...extra }));
+  assert.equal(R.samePlay(p('Jump Shot', '1', 684), p('Pullup Jump Shot', '1', 686), true), true, 'Banchero\'s three at 11:24 and 11:26');
+  assert.equal(R.samePlay(p('Jump Shot', '1', 684), p('Jump Shot', '2', 684), true), false, 'another player');
+  assert.equal(R.samePlay(p('Jump Shot', '1', 684), p('Jump Shot', '1', 660), true), false, '24 seconds apart');
+  assert.equal(R.samePlay(p('Jump Shot', '1', 684), p('Shooting Foul', '1', 684), true), false, 'a shot and a foul by the same player');
+  assert.equal(R.samePlay(p('Free Throw - 1 of 2', '1', 300), p('Free Throw - 2 of 2', '1', 300), true), false, 'free throws 1 and 2 are two plays');
+  assert.equal(R.samePlay(p('Delay of Game', undefined, 300), p('Delay of Game', undefined, 298), true), true, 'no players: the same type');
+});
+
+// ─── A lead that keeps changing hands ───
+
+test('falling behind again within 2 minutes is a line on the earlier alert; after 2 minutes it is an alert', async () => {
+  device('lead-magic', [`team:nba:${ORL}`]);
+  const x = game('G-LEAD1');
+  await x.poll();
+  const bucket = (id: string, who: 'home' | 'away', away: number, home: number, text: string) =>
+    core(id, 'Layup Shot', text, who === 'home' ? CLE : ORL, [[who === 'home' ? PEOPLE.harden[0] : PEOPLE.banchero[0], 'shooter']], { shooting: true, scoring: true, value: 2, away, home });
+  x.put(bucket('l1', 'home', 0, 2, 'James Harden makes layup'));      // Cavaliers lead: the Magic fall behind
+  await x.poll();
+  x.put(bucket('l2', 'away', 3, 2, 'Paolo Banchero makes three'));     // Magic lead
+  await x.poll(4);
+  x.put(bucket('l3', 'home', 3, 4, 'James Harden makes layup'));       // Cavaliers lead again, 30 seconds later
+  await x.poll();
+  const first = feed('lead-magic').filter((r) => r[0] === 'team.fell_behind');
+  assert.equal(first.length, 1, 'one card');
+  assert.deepEqual(first[0][2], ['Cavaliers took the lead again: ORL 3, CLE 4.']);
+  x.put(bucket('l4', 'away', 5, 4, 'Paolo Banchero makes layup'));
+  await x.poll(30);
+  NOW += 3 * 60_000; // three minutes on
+  x.put(bucket('l5', 'home', 5, 6, 'James Harden makes layup'));
+  await x.poll();
+  assert.equal(feed('lead-magic').filter((r) => r[0] === 'team.fell_behind').length, 2, 'a card of its own once 2 minutes have passed');
+});
+
+// ─── The preseason's standings ───
+
+test('the preseason table says nothing: no drop, no clinch, no streak, and the season starting is a new baseline', async () => {
+  device('pre-magic', [`team:nba:${ORL}`], everything);
+  const entry = (id: string, seed: number, streak = '') => ({ team: { id }, stats: [{ name: 'playoffSeed', value: seed }, { name: 'clincher', displayValue: '' }, { name: 'streak', displayValue: streak }] });
+  const table = (seasonType: number | undefined, magicSeed: number, streak = '') => ({ children: [{ abbreviation: 'East', standings: { ...(seasonType ? { seasonType } : {}), entries: [entry(CLE, 5 - (magicSeed > 4 ? 1 : 0)), entry(ORL, magicSeed, streak)] } }] });
+  assert.equal(standingsSeasonType(table(1, 4)), 1);
+  assert.equal(standingsSeasonType(table(undefined, 4)), undefined);
+  const prev = liveDeps.getJson;
+  try {
+    liveDeps.getJson = async () => table(1, 4); await scanStandings('nba');          // the baseline, in the preseason
+    liveDeps.getJson = async () => table(1, 10, 'L3'); await scanStandings('nba');   // a loss moves the preseason table
+    assert.deepEqual(feed('pre-magic'), [], 'no drop and no losing streak in the preseason');
+    assert.equal(kvGet('standings-season:nba'), 1);
+    liveDeps.getJson = async () => table(2, 1); await scanStandings('nba');          // the regular season: a new table, a baseline
+    liveDeps.getJson = async () => table(2, 3); await scanStandings('nba');          // and then a drop is news
+    assert.deepEqual(feed('pre-magic').map((r) => r[0]), ['team.standings_drop']);
+  } finally { liveDeps.getJson = prev; }
+});
+
+test('the regular season ending (the playoffs begin) is no baseline reset: a drop and an elimination in a type 3 table still alert', async () => {
+  device('post-cavs', [`team:nba:${CLE}`], everything);
+  const entry = (id: string, seed: number, clincher = '') => ({ team: { id }, stats: [{ name: 'playoffSeed', value: seed }, { name: 'clincher', displayValue: clincher }, { name: 'streak', displayValue: '' }] });
+  const table = (seasonType: number, cleSeed: number, clincher = '') => ({ children: [{ abbreviation: 'East', standings: { seasonType, entries: [entry(ORL, 1), entry(CLE, cleSeed, clincher)] } }] });
+  const prev = liveDeps.getJson;
+  try {
+    liveDeps.getJson = async () => table(2, 3); await scanStandings('nba');          // the regular season's last table: a baseline
+    liveDeps.getJson = async () => table(3, 6, 'e'); await scanStandings('nba');     // the postseason's first: a drop, and out
+  } finally { liveDeps.getJson = prev; }
+  const rows = feed('post-cavs');
+  assert.deepEqual(rows.map((r) => r[0]), ['team.eliminated'], 'the standings read shares one moment: the elimination, with the drop as a line');
+  assert.ok(rows[0][2].some((l: string) => /^Down to/.test(l)), rows[0][2].join(' | '));
+});
+
+test('the preseason gate is for the sports whose type 1 is the preseason: the Premier League\'s regular season is type 1 and still drops', async () => {
+  db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, location, logo, logo_w, logo_h, updated_at) VALUES ('team:epl:364', 'epl', '364', 'Liverpool', 'Liverpool', 'LIV', 'Liverpool', 'x', 1, 1, 0)`).run();
+  loadCatalog();
+  device('pre-liverpool', ['team:epl:364']);
+  const table = (rank: number) => ({ children: [{ abbreviation: 'EPL', standings: { seasonType: 1, entries: [{ team: { id: '364' }, stats: [{ name: 'rank', value: rank }, { name: 'clincher', displayValue: '' }, { name: 'streak', displayValue: '' }] }] } }] });
+  const prev = liveDeps.getJson;
+  try {
+    liveDeps.getJson = async () => table(2); await scanStandings('epl');
+    liveDeps.getJson = async () => table(5); await scanStandings('epl');
+  } finally { liveDeps.getJson = prev; }
+  assert.deepEqual(feed('pre-liverpool').map((r) => [r[0], r[1]]), [['team.standings_drop', 'Liverpool dropped to 5th in the EPL']]);
+});

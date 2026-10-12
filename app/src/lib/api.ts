@@ -64,7 +64,7 @@ export const api = {
   /** The UFC's weight classes, heaviest first, each its champion and top five fighters. */
   weightClasses: () => request<{ classes: WeightClass[] }>('GET', '/ufc/weight-classes', undefined, false),
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
-  /** A player's or team's stats page (not F1). */
+  /** A player's or team's stats page (every league: F1's from f1-stats.ts, the UFC's from ufc.ts). */
   stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
   /** The alert behind a share link (/a/<code>), for the screen that link opens in the app. */
   /** The most hated players and teams. No kind = both; no league = every sport. */

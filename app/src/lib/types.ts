@@ -43,6 +43,8 @@ export interface FeedItem {
   gameId?: string | null;
   /** A Successful Hate Watch: how many other people got this alert too. */
   alsoGot?: number;
+  /** A developer notice marked important (newer servers; lib/alerts.ts isNotice). */
+  urgent?: boolean;
   /** ESPN's clip of its play (a loss: of the winning play, or the recap), once it's out, while the server's switch is on. */
   clip?: Clip;
 }
@@ -200,7 +202,7 @@ export interface Clip { id: string; title: string; seconds: number; thumb: strin
 export interface KeyPlay extends PlayLine { score?: string; tag?: string; alerted?: boolean }
 export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLine[]; box?: BoxScore | null; clips?: Clip[]; keyPlays?: KeyPlay[] }
 
-/** Settings counter: each time a team you track lost (F1: your constructor scored no points), and per team (most first). */
+/** Settings counter: each time a team or UFC fighter you track lost (F1: your constructor scored no points), and per team (most first). */
 export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }
 
 /** The leaderboard: a player or team and how many people track them. `rank` is within the filter; ties share it (`tied`: shown "T-2"). */

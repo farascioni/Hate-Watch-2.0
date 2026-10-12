@@ -11,7 +11,7 @@ const SHOWN = 3; // teams with a chip; "Show all" lists every one
 
 /**
  * The top of Settings: how many Successful Hate Watches you've had (a team you track lost, or a tracked
- * player's team, counted under the team; F1, your constructor scored no points), and the teams that gave you the most. With more than three teams,
+ * player's team, counted under the team; F1, your constructor scored no points; a UFC fighter you track lost, under the fighter), and the teams that gave you the most. With more than three teams,
  * "+N more" expands it into the full list, most first. Counted on the server whatever your alert
  * settings are, so turning "Loses a game" off or clearing the feed doesn't reset it.
  */
@@ -31,7 +31,7 @@ export function HateWatchCounter() {
         <Text style={styles.count}>{total == null ? '–' : total.toLocaleString()}</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{label}</Text>
-          <Text style={styles.sub}>{total ? 'Each time a team you track lost.' : 'Your first one lands when a team you track loses.'}</Text>
+          <Text style={styles.sub}>{total ? 'Each time a team or fighter you track lost.' : 'Your first one lands when a team or fighter you track loses.'}</Text>
         </View>
       </View>
 

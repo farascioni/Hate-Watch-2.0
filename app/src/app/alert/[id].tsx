@@ -3,9 +3,9 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
-import { openedAlert, targetHref } from '../../lib/alerts';
+import { isNotice, openedAlert, targetHref } from '../../lib/alerts';
 import { shareAlert } from '../../lib/share';
-import { Avatar } from '../../components/Avatar';
+import { AppAvatar, Avatar } from '../../components/Avatar';
 import { AlertClip } from '../../components/FeedCard';
 import { AlsoGot, LeagueTag, ago, subtitle, useNow } from '../../components/ui';
 import { colors, radius, space } from '../../theme';
@@ -39,8 +39,10 @@ export default function AlertScreen() {
       </View>
     );
   }
-  // The server sends a bare { kind, key } if the team or player has left the catalog.
-  const target = 'name' in item.target ? item.target : null;
+  // The server sends a bare { kind, key } if the team or player has left the catalog. A developer notice is from
+  // Hate Watch itself: no page to open, no league, nothing to share.
+  const notice = isNotice(item);
+  const target = !notice && 'name' in item.target ? item.target : null;
   const share = async () => {
     if ((await shareAlert(item)) === 'copied') {
       setCopied(true);
@@ -52,7 +54,15 @@ export default function AlertScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {header}
-      {target ? (
+      {notice ? (
+        <View style={styles.who}>
+          <AppAvatar size={48} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.name}>Hate Watch</Text>
+            <Text style={styles.sub}>From the developer</Text>
+          </View>
+        </View>
+      ) : target ? (
         <Pressable onPress={() => router.push(targetHref(target))} style={({ pressed }) => [styles.who, pressed && { backgroundColor: colors.surfaceHi }]}
           accessibilityRole="button" accessibilityLabel={`${target.name}'s page`}>
           <Avatar target={target} size={48} />
@@ -67,17 +77,19 @@ export default function AlertScreen() {
       <Text style={styles.body} selectable>{item.body}</Text>
       {item.alsoGot != null ? <AlsoGot n={item.alsoGot} /> : null}
       <View style={styles.meta}>
-        <LeagueTag league={item.league} />
+        {notice ? null : <LeagueTag league={item.league} />}
         <Text style={styles.metaText}>{item.typeLabel}</Text>
         <Text style={styles.metaText}>•</Text>
         <Text style={styles.metaText}>{when}{now - item.occurredAt < DAY ? ` (${ago(item.occurredAt, now)})` : ''}</Text>
       </View>
       {item.clip ? <AlertClip clip={item.clip} style={styles.clip} /> : null}
-      <Pressable onPress={share} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button"
-        accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
-        <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={copied ? colors.live : colors.text} />
-        <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? 'Copied' : 'Share this alert'}</Text>
-      </Pressable>
+      {notice ? null : (
+        <Pressable onPress={share} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button"
+          accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
+          <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={copied ? colors.live : colors.text} />
+          <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? 'Copied' : 'Share this alert'}</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }

@@ -113,6 +113,9 @@ test('the running order has the timing; followed drivers get their pit stops, ge
 
   // Lap 20: the others have stopped and Leclerc is still P5: three of those who started behind him are ahead,
   // having stopped as often. Norris's and Stroll's stops are told a read later.
+  // (Three of the field stop first, a read of their own: a stop for nearly every car in one read is the field being counted.)
+  timing(16, [['VER', '', 1], ['NOR', '+1.2', 0], ['PIA', '+3.0', 1], ['HAM', '+5.0', 1], ['LEC', '+8.0', 1], ['STR', '1L', 0]]);
+  await read();
   for (const l of [20, 21, 22]) {
     timing(l, [['VER', '', 1], ['PIA', '+3.0', 1], ['HAM', '+5.0', 1], ['NOR', '+6.0', 1], ['LEC', '+8.0', 1], ['STR', '1L', 1]]);
     await read();
@@ -157,7 +160,8 @@ test('a finish alert leaves out what was told live, but still says it', () => {
   assert.deepEqual(before, ['f1.driver.out_of_points+f1.driver.lost_places+f1.driver.beaten_by_teammate', 'f1.driver.lapped']);
   const after = F.f1SessionResults(meta, rows, { lapped: new Set(['STR']), lost: new Set(['LEC']) });
   assert.deepEqual(after.map((e) => [e.type, ...(e.aliases ?? [])].join('+')), ['f1.driver.out_of_points+f1.driver.beaten_by_teammate']);
-  assert.equal(after[0].title, 'Charles Leclerc finished P12 from P2 on the grid: no points, behind teammate Lewis Hamilton (P3)');
+  assert.equal(after[0].title, 'Charles Leclerc finished P12: no points, behind teammate Lewis Hamilton (P3)', 'the places lost were told live: not said again');
+  assert.equal(before[0] && F.f1SessionResults(meta, rows)[0].title, 'Charles Leclerc finished P12 from P2 on the grid: no points, behind teammate Lewis Hamilton (P3)', 'told here when they were not told live');
 });
 
 test('places lost: not for a pit cycle', () => {

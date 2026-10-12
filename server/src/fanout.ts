@@ -220,6 +220,29 @@ export function lossFactsFollowLoss() {
 lossFactsFollowLoss();
 
 /**
+ * October 11 2026: an NFL player's flag is feed only for new installs (the Jaguars, team and players, got 14 pushes
+ * for flags of 19 in London). A touchdown wiped out, an ejection and the quarterback's delay of game still push. Installs
+ * from before keep flags pushed, once, wherever they hadn't chosen.
+ */
+export const FLAGS_WERE_PUSHED = ['nfl.penalty'];
+export function keepFlagsPushed() {
+  if (kvGet('prefs:nfl-flags-feed')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      p.pushTypes = { ...Object.fromEntries(FLAGS_WERE_PUSHED.map((t) => [t, true])), ...p.pushTypes };
+      save.run(JSON.stringify(p), id);
+    }
+    kvSet('prefs:nfl-flags-feed', { at: Date.now(), devices: rows.length });
+  });
+  prefsCache.clear();
+  if (rows.length) console.log(`[prefs] NFL flags stay pushed for ${rows.length} existing devices`);
+}
+keepFlagsPushed();
+
+/**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
  * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
  * with home runs switched off, it arrives as a run and pushes.
@@ -282,20 +305,36 @@ export const withLines = (body: string, lines: string[] | null | undefined) => (
  * for this device (other facts of the moment, folded in).
  */
 export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null; clip?: string | null }) {
-  const t = EVENT_TYPE_BY_ID.get(row.type);
   const meta = row.meta ? JSON.parse(row.meta) : null;
+  const t = EVENT_TYPE_BY_ID.get(row.type) ?? (row.type === NOTICE_TYPE ? noticeLook(meta) : undefined);
   const clip = clipShown(row.clip ? JSON.parse(row.clip) : null, meta); // its play's clip, while ESPN has it up and clips are on
   return {
     ...(clip ? { clip } : {}),
     ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
+    ...(row.type === NOTICE_TYPE && meta?.urgent ? { urgent: true } : {}),
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: withLines(row.body, row.extra ? JSON.parse(row.extra) : null), occurredAt: row.occurred_at, detectedAt: row.detected_at,
-    target: targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
+    target: row.type === NOTICE_TYPE ? NOTICE_SENDER : targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
     // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
     shareUrl: `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`,
   };
 }
+
+// ─── Developer notices (notices.ts): a message from Hate Watch in every feed, never a push ─────
+export const NOTICE_TYPE = 'app.notice';
+/** A notice's league: no league's, so it shows under All; builds without notices tag it "NEWS". */
+export const NOTICE_LEAGUE = 'news';
+/**
+ * Who a notice is from, as a team every build can draw: a red "HW" badge (builds draw a "badge://" logo as a
+ * badge in its colour with its code, as for F1's constructors). Builds that know notices draw the app's icon.
+ */
+export const NOTICE_SENDER = {
+  kind: 'team', key: 'app:hatewatch', league: NOTICE_LEAGUE, espnId: '', name: 'Hate Watch', shortName: 'Hate Watch', abbrev: 'HW',
+  location: null, color: '#E5232B', altColor: null, logo: 'badge://hatewatch', logoDark: null, logoW: 512, logoH: 512,
+} as const;
+/** Not an alert type (nothing to turn off in Settings): its emoji and label in the feed. */
+export const noticeLook = (meta: { urgent?: boolean } | null) => (meta?.urgent ? { emoji: '⚠️', label: 'Important: from Hate Watch' } : { emoji: '📣', label: 'From Hate Watch' });
 
 // ─── Publish: persist once, then fan out to every follower who wants it ───────────────────────
 const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)
@@ -473,7 +512,7 @@ export function publish(events: Detected[], league: League) {
       const streak = streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
-      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
+      const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null);
       const body = withLines(e.body, lines);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length ? JSON.stringify({ kind: 'event', item: { ...item, body } }) : frame);

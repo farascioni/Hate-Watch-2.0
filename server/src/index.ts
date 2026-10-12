@@ -3,6 +3,7 @@ import { setPushSender } from './fanout.ts';
 import { sendPushes } from './push.ts';
 import { startApi } from './api.ts';
 import { engine } from './live.ts';
+import { watchNotices } from './notices.ts';
 import { db, kvGet } from './db.ts';
 import { LEAGUE_IDS } from './leagues.ts';
 
@@ -26,6 +27,7 @@ setTimeout(() => { void refresh(); setInterval(refresh, INGEST_EVERY_MS); }, due
 setPushSender(sendPushes);
 const server = startApi(Number(process.env.PORT ?? 8787));
 engine.start();
+watchNotices(); // a developer notice sent from the shell (notice-cli.ts) reaches open apps within seconds
 
 // Hosts (Fly, Docker) send SIGTERM on deploy/restart: stop accepting work and close SQLite cleanly.
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {

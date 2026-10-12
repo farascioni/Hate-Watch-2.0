@@ -21,6 +21,7 @@ for (const [lg, id, name, short, abbr] of [
   ['mlb', '10', 'New York Yankees', 'Yankees', 'NYY'], ['nfl', '20', 'New York Jets', 'Jets', 'NYJ'], ['nfl', '28', 'Washington Commanders', 'Commanders', 'WSH'],
   ['nhl', '5', 'Pittsburgh Penguins', 'Penguins', 'PIT'], ['nhl', '25', 'Minnesota Wild', 'Wild', 'MIN'],
   ['nfl', '10', 'Tennessee Titans', 'Titans', 'TEN'], ['nfl', '7', 'Denver Broncos', 'Broncos', 'DEN'],
+  ['wnba', '8', 'Minnesota Lynx', 'Lynx', 'MIN'], ['wnba', '129689', 'Golden State Valkyries', 'Valkyries', 'GS'], ['wnba', '20', 'Atlanta Dream', 'Dream', 'ATL'],
 ]) team.run(`team:${lg}:${id}`, lg, id, name, short, abbr);
 const player = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, image, image_w, image_h, image_kind, updated_at) VALUES (?, ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
 player.run('player:nhl:3124', 'nhl', '3124', 'Evgeni Malkin', 'team:nhl:5');
@@ -90,6 +91,27 @@ test('one standings read, one alert: eliminated, a division rival clinched, and 
   assert.deepEqual(got('padres-fan'), ["team.rival_clinched: The Dodgers clinched the NL West | Padres won't win the division."], 'a rival clinching, on its own');
   assert.equal(pushed('padres-fan'), 0, 'feed only by default');
   assert.equal(pushed('giants-fan'), 1);
+});
+
+test('WNBA: a conference rival clinching the league\'s best record ("*"), not a playoff spot ("x"); the other conference hears nothing', async () => {
+  // ESPN's final 2026 WNBA standings: the Lynx "*", the rest "x", "cx" or "e"; no conference title is marked.
+  fan('valkyries-fan', ['team:wnba:129689']);
+  fan('dream-fan', ['team:wnba:20']);
+  const entry = (id: string, seed: number, clincher = '') => ({ team: { id }, stats: [{ name: 'playoffSeed', value: seed }, { name: 'clincher', displayValue: clincher }] });
+  kvSet('standings:wnba', { 8: { rank: 1, group: 'W', clincher: 'x', streak: '' }, 129689: { rank: 2, group: 'W', clincher: '', streak: '' }, 20: { rank: 1, group: 'E', clincher: '', streak: '' } });
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = async () => ({ children: [
+    { abbreviation: 'E', standings: { entries: [entry('20', 1, 'x')] } },
+    { abbreviation: 'W', standings: { entries: [entry('8', 1, '*'), entry('129689', 2, 'x')] } },
+  ] });
+  divisionsDeps.getJson = async () => ({ children: [
+    { name: 'Eastern Conference', standings: { entries: [{ team: { id: '20' } }] } },
+    { name: 'Western Conference', standings: { entries: [{ team: { id: '8' } }, { team: { id: '129689' } }] } },
+  ] });
+  await scanStandings('wnba');
+  liveDeps.getJson = prev;
+  assert.deepEqual(got('valkyries-fan'), ["team.rival_clinched: The Lynx clinched the WNBA's best record | Valkyries won't be the top seed."]);
+  assert.deepEqual(got('dream-fan'), [], 'the Dream clinching a playoff spot ("x") is no clinch, and the Lynx are in the other conference');
 });
 
 test('a drop in the standings after a loss: a line on the loss alert, not an alert of its own (NFC East)', async () => {

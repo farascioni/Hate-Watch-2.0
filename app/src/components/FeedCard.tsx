@@ -2,11 +2,11 @@ import { memo, useId, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Avatar } from './Avatar';
+import { AppAvatar, Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { shareAlert } from '../lib/share';
-import { openAlert, targetHref } from '../lib/alerts';
+import { isNotice, openAlert, targetHref } from '../lib/alerts';
 import { colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 
@@ -22,34 +22,43 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
 
   // The alert opens on its own screen, all of its text (here, three lines); its photo opens its player's or team's
   // page. Its clip sits below, outside that tap area, so playing the video (or its controls) never opens anything.
+  // A developer notice is from Hate Watch itself: the app's icon, no page to open, no league, nothing to share.
+  const notice = isNotice(item);
   return (
-    <View style={[styles.card, fresh && styles.fresh, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <View style={[styles.card, notice && (item.urgent ? styles.urgent : styles.notice), fresh && styles.fresh, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Pressable
         onPress={() => openAlert(item)}
         onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)}
         style={styles.row}
       >
-        <Pressable onPress={() => router.push(targetHref(item.target))} hitSlop={4} accessibilityRole="button"
-          accessibilityLabel={'name' in item.target ? `${item.target.name}'s page` : 'Their page'}>
-          <Avatar target={item.target} size={52} />
-          <Text style={styles.emoji}>{item.emoji}</Text>
-        </Pressable>
+        {notice ? (
+          <View>
+            <AppAvatar size={52} />
+            <Text style={styles.emoji}>{item.emoji}</Text>
+          </View>
+        ) : (
+          <Pressable onPress={() => router.push(targetHref(item.target))} hitSlop={4} accessibilityRole="button"
+            accessibilityLabel={'name' in item.target ? `${item.target.name}'s page` : 'Their page'}>
+            <Avatar target={item.target} size={52} />
+            <Text style={styles.emoji}>{item.emoji}</Text>
+          </Pressable>
+        )}
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.body} numberOfLines={3}>{item.body}</Text>
           {item.alsoGot != null ? <AlsoGot n={item.alsoGot} /> : null}
           <View style={styles.meta}>
-            <LeagueTag league={item.league} />
-            <Text style={styles.metaText}>{item.typeLabel}</Text>
+            {notice ? null : <LeagueTag league={item.league} />}
+            <Text style={[styles.metaText, notice && styles.noticeLabel]}>{item.typeLabel}</Text>
             <Text style={styles.metaDot}>•</Text>
             <Text style={styles.metaText}>{ago(item.occurredAt, now)}</Text>
           </View>
         </View>
         {/* Its own tap target: sharing doesn't open the alert behind it. */}
-        <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
+        {notice ? null : <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
           <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
           {copied ? <Text style={styles.copied}>Copied</Text> : null}
-        </Pressable>
+        </Pressable>}
       </Pressable>
       {item.clip ? <AlertClip clip={item.clip} /> : null}
     </View>
@@ -82,6 +91,10 @@ const styles = StyleSheet.create({
   clipTitle: { color: colors.text, fontSize: 13, fontWeight: '700', lineHeight: 17 },
   card: { padding: space(4), marginHorizontal: space(3), marginBottom: space(2), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
   row: { flexDirection: 'row', gap: space(3) },
+  // A developer notice: edged in red (an important one, amber), so it reads as Hate Watch speaking, not an alert.
+  notice: { borderColor: colors.hateDim },
+  urgent: { borderColor: colors.warn },
+  noticeLabel: { color: colors.textDim, fontWeight: '800' },
   fresh: { borderColor: colors.hate, shadowColor: colors.hate, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
   emoji: { position: 'absolute', right: -6, bottom: -6, fontSize: 20 },
   title: { color: colors.text, fontSize: 16, fontWeight: '800', lineHeight: 21 },

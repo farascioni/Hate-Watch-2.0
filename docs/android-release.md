@@ -1,8 +1,28 @@
 # Releasing Hate Watch on Google Play (without owning an Android phone)
 
+## Index
+
+**Summary:** the path from nothing to Hate Watch on Google Play, written for someone who builds on Windows and has no Android phone. It costs $25 once and takes about three weeks, almost all of it Google's 14-day closed test with at least 12 testers. A borrowed Android phone is needed for about five minutes, once. The app itself needs no Android rewrite: EAS builds it in the cloud, and `app/app.json` and `app/eas.json` already have what Android needs, except the Firebase file for push and the Play Console upload settings (see "Where the repo stands today"). The steps run in order. Steps 2 to 7 can be done while Google reviews your identity, and the phone check (step 9) can be done any time before applying for production.
+
+**Sections:**
+- **Before you start: what this takes**: the $25 fee, the borrowed phone, the 12 testers for 14 days, the three weeks, and how an organization account skips the phone and the testers.
+- **Where the repo stands today**: what `app.json`, `eas.json` and the code already set up for Android, and what is still missing.
+- **Step 1: Create the Google Play developer account**: a personal account, the fee, identity verification.
+- **Step 2: Set up Android push notifications (Firebase)**: a Firebase project, `google-services.json` in `app/`, and the FCM service-account key uploaded to EAS.
+- **Step 3: Build the Android app with EAS**: an installable `.apk` from the `preview` profile, then the store `.aab` from `production`, and the keystore EAS creates on the first build.
+- **Step 4: Test it without a phone (Android emulator)**: Android Studio's emulator with a Google Play system image, and what to check.
+- **Step 5: Create the app and store listing in Play Console**: the listing's text and images, and the App content questionnaires with answers that fit Hate Watch.
+- **Step 6: Let EAS upload to Play Console for you (service account)**: a Google Cloud service account with Play Console permissions, and its key uploaded to EAS.
+- **Step 7: Internal testing (just you)**: submitting a build, installing it from the Play Store on the emulator, the pre-launch report, and the three tip products.
+- **Step 8: Closed testing: 12 testers for 14 days**: the track, the testers, the opt-in link, and why testers have to actually use the app.
+- **Step 9: Verify you have access to an Android phone (borrowed)**: the five-minute device check in the Play Console app.
+- **Step 10: Apply for production and launch**: the production application, the first release and its review.
+- **After launch**: updates in one command, Android share links, and folding this into the README.
+- **Sources**: the Expo and Google pages this guide is based on.
+
 This is the full path from nothing to Hate Watch live on the Google Play Store, written for someone who builds on Windows and doesn't own an Android device. The app needs no code rewrite for Android: it's an Expo app, EAS builds it in the cloud, and `app.json` already has the Android package name (`com.hatewatch.app`), icons and notification channel.
 
-Steps marked **🤖 Claude can do this** are things you can hand to me in a session.
+Steps marked **Claude can do this** are things you can hand to Claude in a session. Everything else needs you: a Google account, a payment, identity checks, a borrowed phone, and the testers.
 
 ## Before you start: what this takes
 
@@ -14,6 +34,24 @@ Steps marked **🤖 Claude can do this** are things you can hand to me in a sess
 | **Time** | About 3 weeks end to end, almost all of it the 14-day test. |
 
 > **Skipping the phone and the 12 testers:** both rules apply to *personal* accounts. An *organization* developer account (for a registered business such as an LLC, with a D-U-N-S number) is exempt from both. If you already have a business, consider signing up as one. Otherwise, the personal route below works.
+
+## Where the repo stands today
+
+What is already in place (checked against the files on October 11, 2026):
+
+- **The package name** is `com.hatewatch.app` (`android.package` in `app/app.json`), the same as the iOS bundle id.
+- **The icons:** an adaptive icon with foreground, background and monochrome layers (`app/assets/android-icon-*.png`) on `#0B0B0D`, generated with the rest by `app/scripts/build-icons.mjs` (`npm run icons` in `app/`). Android's notification icon (`app/assets/notification-icon.png`, tinted `#E5232B`) is set in the `expo-notifications` plugin.
+- **The notification channel:** alerts go to the channel `hate-events` (`defaultChannel` in the `expo-notifications` plugin).
+- **Predictive back is off** (`predictiveBackGestureEnabled: false`).
+- **The build profiles** (`app/eas.json`): `preview` builds an installable `.apk` (`android.buildType: "apk"`, added in b249331) against the production API, and `production` builds the `.aab` Google Play takes. `autoIncrement` gives each production build a new version code, and EAS keeps the count (`appVersionSource: "remote"`). Both profiles have an update channel (`preview`, `production`) for over-the-air updates.
+- **The tips:** `app/src/lib/tips.ts` lists the three product ids (`com.hatewatch.app.tip.coffee`, `.pizza`, `.trophy`). `expo-iap` is in the plugins, and the app treats tips as consumable. The comment in `tips.ts` says to create the same ids in Play Console as one-time products.
+- **The privacy policy and the data deletion** that Play Console asks about are on the server: `https://hate-watch-api.fly.dev/privacy`, and Settings → "Delete all my data" (`DELETE /me`).
+
+What is not there yet:
+
+- **No `app/google-services.json`**, and no `googleServicesFile` in `app.json`. Without them, Android builds get no push notifications (step 2).
+- **No Android submit settings** in `eas.json`. `submit.production` has only `ios.ascAppId`, so `--auto-submit` can't send an Android build to Play Console until step 6 adds them.
+- **No Android App Links:** the server serves `/.well-known/apple-app-site-association` for iOS share links, but no `assetlinks.json` (see "After launch").
 
 ---
 
@@ -40,7 +78,7 @@ On Android, Expo's push notifications are delivered through Google's Firebase Cl
    ```
    Choose **production** → **Google Service Account** → **Manage your Google Service Account Key for Push Notifications (FCM V1)** → **Set up a Google Service Account Key for Push Notifications (FCM V1)** → **Upload a new service account key**, and pick the file from step 4. After uploading, you can delete your local copy.
 
-**🤖 Claude can do this:** once `google-services.json` is in `app/`, I add `"googleServicesFile": "./google-services.json"` under `android` in `app.json` and commit it.
+**Claude can do this:** once `google-services.json` is in `app/`, I add `"googleServicesFile": "./google-services.json"` under `android` in `app.json` and commit it.
 
 ## Step 3: Build the Android app with EAS
 
@@ -51,14 +89,14 @@ EAS builds Android in the cloud, so you don't need Android Studio for this step.
    npx eas-cli@latest build --platform android --profile preview
    ```
    The first Android build asks whether to **generate a new Android Keystore**. Answer **yes**. EAS creates the app's upload key and stores it for you; don't lose access to your Expo account, because that key is what lets you publish updates.
-2. When it finishes, EAS gives you a link to the `.apk`.
+2. When it finishes, EAS gives you a link to the `.apk`. The `preview` profile sets `EXPO_PUBLIC_API_URL` to `https://hate-watch-api.fly.dev`, so this build talks to the production server and shows real alerts.
 3. Then build the store version (an `.aab`, the format Google Play requires):
    ```bash
    npx eas-cli@latest build --platform android --profile production
    ```
    `eas.json` already auto-increments the version code for each production build.
 
-**🤖 Claude can do this:** after the first interactive build has created the keystore, later builds run from here without you, like the iOS builds.
+**Claude can do this:** after the first interactive build has created the keystore, later builds run from here without you, like the iOS builds.
 
 ## Step 4: Test it without a phone (Android emulator)
 
@@ -85,10 +123,10 @@ The emulator can't do Google's device verification (step 9), but it's enough for
    - **Ads:** no ads.
    - **Content rating:** complete the IARC questionnaire honestly (no violence, no user-generated content, no gambling, no location sharing). It should come out at the lowest rating.
    - **Target audience:** 18 and over. That keeps the app out of the stricter children's-app rules.
-   - **Data safety:** the app collects **device or other IDs** (an app-generated device ID and the push token) for **app functionality**. It's not shared with third parties, it's encrypted in transit (HTTPS), and users can delete it (Settings → Delete all my data). It collects no name, email, location, contacts or photos. In-app purchases are processed by Google Play, and Hate Watch doesn't store payment details.
+   - **Data safety:** the app collects **device or other IDs** (an app-generated device ID and the push token) for **app functionality**. It's not shared with third parties, it's encrypted in transit (HTTPS), and users can delete it (Settings → Delete all my data). It collects no name, email, location, contacts or photos. (Settings → Give feedback opens the person's own mail app with a `mailto:` link: their mail app sends it, and the app never sees the address. That's why this answer leaves email out; check it against Play's current Data safety form. The privacy page says an email they choose to send reaches us, and the README's App Store answers make the same choice.) In-app purchases are processed by Google Play, and Hate Watch doesn't store payment details.
    - **News app:** no. **Government app:** no. **Financial features:** none. **Health:** none.
 
-**🤖 Claude can do this:** render the 512 px icon, the 1024 × 500 feature graphic and 1080 × 1920 phone screenshots with the same tooling as the App Store screenshots, and draft both descriptions.
+**Claude can do this:** render the 512 px icon, the 1024 × 500 feature graphic and 1080 × 1920 phone screenshots with the same tooling as the App Store screenshots, and draft both descriptions.
 
 ## Step 6: Let EAS upload to Play Console for you (service account)
 
@@ -101,7 +139,7 @@ EAS Submit uploads builds to Play Console using a Google Cloud service account.
 5. In Play Console, go to **Users and permissions** → **Invite new users**. Paste the service account's email. Under **App permissions**, add Hate Watch and grant: *View app information*, *Edit and delete draft apps*, *Release to production, exclude devices, and use Play App Signing*, *Release apps to testing tracks*, *Manage testing tracks and edit tester lists*, and *Manage store presence*. Click **Invite user**.
 6. Upload the key to EAS: run `npx eas-cli@latest credentials --platform android` → **production** → **Google Service Account** → upload it as the key for **EAS Submit**. You can then delete your local copy.
 
-**🤖 Claude can do this:** add the Android submit settings to `eas.json` (`"submit": { "production": { "android": { "track": "internal" } } }`) so builds can go to Play Console with `--auto-submit`, the same way iOS goes to TestFlight.
+**Claude can do this:** add the Android submit settings to `eas.json` (`"submit": { "production": { "android": { "track": "internal" } } }`) so builds can go to Play Console with `--auto-submit`, the same way iOS goes to TestFlight.
 
 ## Step 7: Internal testing (just you)
 
@@ -112,6 +150,7 @@ Internal testing is Google's TestFlight: up to 100 testers, available within min
    npx eas-cli@latest submit --platform android --profile production
    ```
    (Or build and submit in one go with `eas build --platform android --profile production --auto-submit`.)
+   What the flags mean (`eas submit --help`): `--profile` names the submit profile in `eas.json` (it defaults to `production` when there is one). That profile has no `android` settings until step 6 adds them. `--latest` submits the newest Android build on EAS, `--id <buildId>` a particular one, and `--path` a local `.aab` file.
 2. In Play Console, open **Testing** → **Internal testing** → **Testers**. Create an email list with your Google account and add a short release note.
 3. Use the **opt-in link** on that page. Open it in the emulator's browser while signed in to the same Google account, and install Hate Watch from the Play Store. This is the version that can test the tips, because in-app purchases only work for an app installed from Google Play.
 4. Check the **pre-launch report** a few hours later (under Testing, or in Quality). Google installs every testing-track build on real phones in its test lab, then shows crashes, screenshots and accessibility warnings. It's the closest thing to owning a few Android phones.
@@ -158,8 +197,8 @@ Do this with a borrowed phone any time before you apply for production. It takes
   ```bash
   npx eas-cli@latest build --platform android --profile production --auto-submit
   ```
-- **🤖 Claude can do this: share links on Android.** Today a shared alert opens the App Store page. Once the Play listing is live, I can send Android visitors to the Play Store instead, and set up Android App Links (an `assetlinks.json` on the server, plus intent filters in `app.json`) so share links open the app directly when it's installed, like iOS universal links. That needs the app-signing SHA-256 fingerprint from Play Console → Setup → App signing.
-- **🤖 Claude can do this: the README.** Once you've been through this once, I can fold the parts that turned out to matter into the README's Deploy section.
+- **Claude can do this: share links on Android.** Today only an iPhone, iPad or iPod is sent to the App Store (`server/src/share.ts` checks the browser's user agent); on an Android phone a shared alert opens the server's card page (the alert's picture and a download button that points to the App Store). Once the Play listing is live, I can send Android visitors to the Play Store instead, and set up Android App Links (an `assetlinks.json` on the server, plus intent filters in `app.json`) so share links open the app directly when it's installed, like iOS universal links. That needs the app-signing SHA-256 fingerprint from Play Console → Setup → App signing.
+- **Claude can do this: the README.** Once you've been through this once, I can fold the parts that turned out to matter into the README's Deploy section.
 
 ## Sources
 

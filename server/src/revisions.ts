@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
-import { TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ruled, scoreLine, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { BASKETBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
+import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -17,6 +18,15 @@ import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ruled, scoreLine, wiped
  *  - a finished drive's result the same way (three-and-out, turned over on downs, the red zone).
  * Scores are the tracker's (live.ts): it takes one back only when ESPN's plays and header agree it's gone, and asks
  * this which plays' score alerts that was (`takeBack`).
+ *
+ * Basketball (the NBA and the WNBA) uses the same ledger for the same reason: ESPN posts a play half-finished and edits
+ * it (October 11 2026's three preseason games: 35%, 49% and 39% of their plays). A shot is first typed "No Shot
+ * (Default Shot)" and typed minutes later; a free throw comes with no shooter, then with one, or as "misses" and is
+ * flipped to "makes"; a block names the wrong shooter for 4 seconds; a foul, shot or turnover is taken out and
+ * re-posted under a new id. So a changed play is judged again on its latest version: a player's alert the play no
+ * longer has gets a line (no push), the right player's alert goes out, a re-post is the same play, and a play ESPN
+ * took out has its alerts taken back. A play with no shooter yet alerts nothing until ESPN names one. Fouls are
+ * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right.
  */
 
 /** How long after we first see a play or a drive's result ESPN's changes to it are news. */
@@ -31,6 +41,8 @@ const kindOf = (e: Detected) => `${e.type}|${e.targetKey}`;
 const byKind = (es: Detected[]) => { const m = new Map<string, Detected>(); for (const e of es) if (!m.has(kindOf(e))) m.set(kindOf(e), e); return m; };
 /** Counted as the plays come in, so never re-run on a new version nor taken back: the starting quarterback pulled. */
 const ONCE = /qb[._]pulled$/;
+/** Basketball: fouling out replaces the foul's alert and can't be judged twice (the foul is counted by then): never taken back. */
+const FOULED_OUT = /\.fouled_out$/;
 /** What a play says, for noticing that ESPN changed it. */
 const sigOf = (p: NPlay) => JSON.stringify([p.type, p.text, p.scoring, p.home, p.away, p.teamId, p.endTeamId, p.participants]);
 /** When in the period a play started: the "(12:21)" its text opens with, else its clock. */
@@ -44,20 +56,76 @@ const actorOf = (p: NPlay) => p.text.replace(/^\(\d+:\d+\)\s*/, '').match(/(?:#\
  * NCSU08 … The previous play is under automatic review"; one re-posted as is, "(00:01) #20 J.Roberts rush … TOUCHDOWN"
  * then "#20 J.Roberts rush … TOUCHDOWN, clock 00:00 … kick attempt good".
  */
-export function samePlay(a: NPlay, b: NPlay): boolean {
+export function samePlay(a: NPlay, b: NPlay, basketball = false): boolean {
   const [x, y] = [startOf(a), startOf(b)];
   if (a.periodNum !== b.periodNum || x == null || y == null || Math.abs(x - y) > 10) return false;
+  if (basketball) {
+    // The same player (the first ESPN lists: the shooter, the fouler, the one who turned it over) doing the same kind of
+    // thing: the foul at 6:06 posted again at 6:06, the three at 11:24 and 11:26 whose distance and type ESPN fixed.
+    const [who, other] = [a.participants[0]?.id, b.participants[0]?.id];
+    return (who ? who === other : !other) && playKind(a) === playKind(b) && (!!who || a.type === b.type);
+  }
   const who = actorOf(a);
   return who ? who === actorOf(b) : !actorOf(b) && a.type === b.type;
 }
+/** What a basketball play is, for telling a re-post from another play at the same moment (the 3 free throws of a trip share a clock). */
+const playKind = (p: NPlay) => /free throw/i.test(p.type) ? `ft ${p.type}` : p.shooting ? 'shot' : /turnover|traveling/i.test(p.type) ? 'turnover' : /foul/i.test(p.type) ? 'foul' : p.type;
 
 const REVIEW = /\bunder (?:automatic )?review\b|\breplay official\b|\b(?:call )?(?:overturned|reversed)\b/i;
+/** Alerts about a flag (a player's, a college team's): what changes is the flag, not the play. */
+const FLAG = /^(?:nfl\.penalty|cfb\.team\.penalty)$/;
 /** Why a play's alert no longer holds, from the play as it is now (none: ESPN took it out). */
 export function changeLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, now: NPlay | null): string {
-  if (!now) return 'ESPN has since taken this play back.';
+  if (!now) return BASKETBALL.has(g.league) ? 'ESPN has since taken this play out.' : 'ESPN has since taken this play back.';
   if (/\bno play\b/i.test(ruled(now.text))) return wipedOutLine(g, ruled(now.text));
   if (REVIEW.test(now.text)) return 'Overturned on review.';
-  return now.type ? `ESPN has since changed this play to ${/^[aeiou]/i.test(now.type) ? 'an' : 'a'} ${now.type.toLowerCase()}.` : 'ESPN has since changed this play.';
+  if (BASKETBALL.has(g.league)) return 'ESPN has since changed this play.';
+  return now.type ? `ESPN has since changed this play to ${plainType(now.type)}.` : 'ESPN has since changed this play.';
+}
+
+/** ESPN's football play types in plain words ("a fumble recovery (own)" read like a database field). */
+const PLAIN: [RegExp, string][] = [
+  [/^Fumble Recovery \(Own\)/i, 'a fumble its own team recovered'],
+  [/^Fumble Recovery \(Opp/i, 'a fumble the other team recovered'],
+  [/^Sack Opp/i, 'a strip-sack the defense recovered'],
+  [/^Sack/i, 'a sack'],
+  [/^(?:Pass )?Interception/i, 'an interception'],
+  [/^Muffed Punt Recovery \(Opp/i, 'a muffed punt the kicking team recovered'],
+  [/^Pass Reception/i, 'a catch'],
+  [/^Pass Incompletion/i, 'an incompletion'],
+  [/^Rush(?:ing)?$/i, 'a run'],
+  [/^Rushing Touchdown/i, 'a rushing touchdown'],
+  [/^Passing Touchdown/i, 'a passing touchdown'],
+  [/^Punt$/i, 'a punt'],
+  [/^Kickoff/i, 'a kickoff'],
+  [/^Penalty$/i, 'a penalty'],
+];
+export function plainType(type: string): string {
+  return PLAIN.find(([re]) => re.test(type))?.[1] ?? `${/^[aeiou]/i.test(type) ? 'an' : 'a'} ${type.toLowerCase()}`;
+}
+
+/** A name's last word, for matching "M.Crosby", "Mi.Wilson", "C.Van Lanen" with "Maxx Crosby", "Mack Wilson Sr.". */
+const surname = (s: string) => s.replace(/\b(?:jr|sr|ii|iii|iv)\b\.?/gi, '').replace(/[^\p{L}' -]/gu, '').trim().split(/\s+/).at(-1)?.toLowerCase();
+const letters = (s: string) => s.replace(/[^\p{L}]/gu, '').toLowerCase();
+/** ESPN's "M.Crosby" / "Mi.Wilson" / "C.Van Lanen" is the player: his first name starts with the initial(s) and his last name is the surname. */
+function isNamed(playerKey: string, espnName: string): boolean {
+  const name = catalog.player(playerKey)?.name;
+  if (!name) return false;
+  const initial = letters(espnName.split('.')[0]), last = surname(espnName.replace(/^[^.]*\./, ''));
+  return !!last && last === surname(name) && letters(name.split(/\s+/)[0]).startsWith(initial);
+}
+/**
+ * The player's flag is still in the call that stands (the text after a "REVERSED."; "PENALTY on LV-M.Crosby,
+ * Unnecessary Roughness, 15 yards, enforced between downs."; ESPN writes a declined one "Penalty on …, declined"). ESPN
+ * drops or relabels the flagged player in the play's data a read later (Crosby became "other", Patterson was dropped)
+ * while the text keeps the flag: it stands.
+ */
+function flagStands(p: NPlay, playerKey: string): boolean {
+  return [...ruled(p.text).matchAll(/PENALTY on [A-Z]{2,3}-([^,]+),([^]*?)(?=PENALTY on |$)/g)].some((m) => !/declined/i.test(m[2]) && isNamed(playerKey, m[1]));
+}
+/** ESPN now calls this player's flag declined ("Penalty on DEN-Q.Robinson, Defensive Offside, declined."). */
+function flagDeclined(p: NPlay, playerKey: string): boolean {
+  return [...ruled(p.text).matchAll(/Penalty on [A-Z]{2,3}-([^,]+),([^]*?)(?=Penalty on |PENALTY on |$)/g)].some((m) => /declined/i.test(m[2]) && isNamed(playerKey, m[1]));
 }
 
 /** The line on a score's alerts taken back when the side scores on that drive after all (`p`: that play). */
@@ -86,7 +154,6 @@ export interface Revision { fresh: Detected[]; lines: Detected[] }
 export class PlayLedger {
   private plays = new Map<string, PlayEntry>(); // by the play's id now (a re-post moves it)
   private drives = new Map<string, { sig: string; firstAt: number; history: boolean; alerts: Map<string, Detected> }>();
-  private n = 0;
   private readonly g: GameCtx;
   private readonly log: (msg: string) => void;
 
@@ -101,10 +168,14 @@ export class PlayLedger {
    * Lines on alerts that went out, for the devices that got them (as their alert or a line on another of their
    * moment's), with no push: publish() adds a moment's `foldOnly` fact to the alert each device already has for it.
    * (Every football alert has a moment: bundleByPlay. One without would go out as an alert of its own: none.)
+   * A line's id is its alert's id and its own words (hashed), the same in every tracker: a counter started over with a
+   * new tracker (a game followed again) and could reuse a stored id, dropping a new line. The same words on the same
+   * alert are the same fact, and a feed row shows a line once anyway (addLateLine).
    */
-  linesOn(es: Detected[], line: string): Detected[] {
-    return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${++this.n}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
-      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true }));
+  linesOn(es: Detected[], line: string, alt?: string): Detected[] {
+    const key = createHash('sha256').update(line).digest('base64url').slice(0, 10);
+    return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${key}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
+      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}) }));
   }
 
   /** A play seen for the first time, and the alerts it sent. */
@@ -143,7 +214,7 @@ export class PlayLedger {
   repost(p: NPlay, now: number): PlayEntry | undefined {
     let best: [string, PlayEntry] | undefined;
     for (const [id, x] of this.plays) {
-      if (x.missingSince == null || x.header || now - x.missingSince > REVISE_MS || !samePlay(x.play, p)) continue;
+      if (x.missingSince == null || x.header || now - x.missingSince > REVISE_MS || !samePlay(x.play, p, BASKETBALL.has(this.g.league))) continue;
       if (!best || Math.abs(startOf(x.play)! - startOf(p)!) < Math.abs(startOf(best[1].play)! - startOf(p)!)) best = [id, x];
     }
     if (!best) return undefined;
@@ -159,6 +230,42 @@ export class PlayLedger {
   }
 
   /**
+   * The line on an alert (not a flag's) the play no longer has, when the play being what it is says more than
+   * `changeLine`: a lost fumble that turns out recovered by its own team ("ESPN has since corrected it: the Browns kept
+   * the ball.", Browns at Jets, October 11 2026), a quarterback's delay of game that was the punt or field goal team's.
+   */
+  private goneLine(e: Detected, p: NPlay, want: Map<string, Detected>): string | undefined {
+    if (BASKETBALL.has(this.g.league)) return this.basketballLine(e, p, want);
+    if (/^(?:nfl|cfb\.team)\.fumble_lost$/.test(e.type) && [...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:nfl|cfb\.team)\.fumble$/.test(f.type))) {
+      const team = e.targetKey.startsWith('player:') ? catalog.player(e.targetKey)?.teamKey : e.targetKey;
+      const name = team ? catalog.team(team)?.shortName : undefined;
+      const who = name ? (TEAMS_ONLY.has(this.g.league) ? name : `the ${name}`) : 'they';
+      return REVIEW.test(p.text) ? `Overturned on review: ${who} kept the ball.` : `ESPN has since corrected it: ${who} kept the ball.`;
+    }
+    if (e.type === 'nfl.qb.delay_of_game') {
+      const unit = /\(Punt formation\)/i.test(p.text) ? 'punt team' : /\(Field Goal formation\)/i.test(p.text) ? 'field goal unit' : undefined;
+      if (unit) return `ESPN has since put this on the ${unit}.`;
+    }
+    return undefined;
+  }
+
+  /**
+   * Basketball: why a player's alert no longer holds, from what the play's alerts are now: the free throw was made, the
+   * shot was blocked, it's another player's, or nobody's (a team turnover).
+   */
+  private basketballLine(e: Detected, p: NPlay, want: Map<string, Detected>): string | undefined {
+    const kind = e.type.replace(/^w?nba\./, '');
+    const now = [...want.values()];
+    const other = now.find((f) => f.type === e.type && f.targetKey !== e.targetKey);
+    if (other) return `ESPN has since credited this play to ${catalog.player(other.targetKey)?.name ?? 'another player'}.`;
+    if (kind === 'missed_free_throw' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the free throw was made.';
+    if (kind === 'missed_shot' && now.some((f) => /got_blocked$/.test(f.type))) return 'ESPN has since changed this: the shot was blocked.';
+    if (kind === 'missed_shot' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the shot went in.';
+    if (kind === 'turnover' && !p.participants.length) return 'ESPN has since made this a team turnover.';
+    return undefined;
+  }
+
+  /**
    * A play's alerts against a new version of it (null: ESPN took it out): the ones it no longer has get a line
    * (`lines`), the ones it has now go out (`fresh`). One taken back that it has again gets a line, never a second
    * alert (an interception wiped out by pass interference, then not: the flag overturned on review, Browns at
@@ -168,19 +275,43 @@ export class PlayLedger {
     const was = x.play, back = x.back;
     x.back = false;
     if (p) { x.play = p; x.sig = sigOf(p); }
-    if (x.history || now - x.firstAt > REVISE_MS) return { fresh: [], lines: [] };
-    const want = byKind(bundleByPlay(p ? this.detect(p) : []));
-    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [];
+    const stale = x.history || now - x.firstAt > REVISE_MS;
+    // Basketball: the fouls, recounted around the judgment. The old version's foul stops counting first (a foul re-posted
+    // under a new id is not a 6th), the new version is judged (its 6th foul is judged before it is counted), then counted.
+    const basketball = BASKETBALL.has(this.g.league);
+    if (basketball) unobservePlay(this.g, was);
+    const want = stale ? new Map<string, Detected>() : byKind(bundleByPlay(p ? this.detect(p) : []));
+    if (basketball && p) observePlay(this.g, p);
+    if (stale) return { fresh: [], lines: [] };
+    const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [], gone: Detected[] = [];
     for (const [k, e] of x.alerts) {
-      if (want.has(k) || ONCE.test(e.type)) continue;
+      if (want.has(k) || ONCE.test(e.type) || FOULED_OUT.test(e.type)) continue;
+      if (p && e.type === 'nfl.penalty' && flagStands(p, e.targetKey)) continue; // ESPN dropped his role, the flag stands
       x.alerts.delete(k);
       x.dropped.set(k, e);
-      lines.push(...this.linesOn([e], why));
+      gone.push(e);
     }
     for (const [k, e] of want) {
       if (x.alerts.has(k)) continue;
+      // Basketball: a foul whose 6th replaced it with "fouled out" is not sent again as a foul.
+      if (/\.foul$/.test(e.type) && [...x.alerts.values()].some((f) => FOULED_OUT.test(f.type) && f.targetKey === e.targetKey)) continue;
       const sent = x.dropped.get(k);
       if (sent) { x.dropped.delete(k); x.alerts.set(k, sent); again.push(sent); } else { x.alerts.set(k, e); fresh.push(e); }
+    }
+    // A flag's alert taken back while its play stands: the flag moved to another player (a false start charged to
+    // Hainsey 4 minutes after Van Lanen) or came off (a face mask picked up with the replay assist 12 s later: Eagles at
+    // Jaguars, October 11 2026). Not the play's "Wiped out by a penalty" or "changed to a pass reception". A device with
+    // the first player's alert gets the move as its line, not the new flag as a second one (`alt`: publish keeps one).
+    const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty');
+    for (const e of gone) {
+      if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why)); continue; }
+      // The flag became an ejection on the same play (a disqualification, a targeting call): the ejection's own line says so.
+      if ([...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:player\.ejected|cfb\.team\.ejection)$/.test(f.type))) continue;
+      const to = e.type === 'nfl.penalty' ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
+      if (!to.length) { lines.push(...this.linesOn([e], REVIEW.test(p.text) ? 'Overturned on review.' : e.type === 'nfl.penalty' && flagDeclined(p, e.targetKey) ? 'ESPN has since declined this flag.' : 'ESPN has since taken the flag off.')); continue; }
+      const alt = `flag-moved:${p.id}`;
+      for (const f of to) f.alt = alt;
+      lines.push(...this.linesOn([e], `ESPN has since charged this flag to ${to.map((f) => catalog.player(f.targetKey)?.name ?? 'another player').join(' and ')}.`, alt));
     }
     const restoredLine = back ? 'ESPN has since put this play back.' : p && REVIEW.test(p.text) ? 'Overturned on review: it stands.' : 'ESPN has since changed this play back.';
     if (lines.length || fresh.length || again.length) {

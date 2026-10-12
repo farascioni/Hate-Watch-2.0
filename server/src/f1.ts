@@ -4,9 +4,11 @@
 //   live:  while a race/sprint runs, poll the status of followed drivers → DNF alerts the moment they retire;
 //          and every car's timing (place, gap, laps down, pit stops) and the flag → the Scores tab's running
 //          order, and a followed driver's pit stop, getting lapped, or falling 3+ places behind their grid slot
-//   flag:  when a race/sprint is over (ESPN's "session complete", not the final up to 40 minutes later) and
-//          qualifying is final → finishing-position / qualifying alerts; a change after (a penalty) corrects them
-//   table: championship standings → drivers' and constructors' drops (a line on that day's alert, when there is one)
+//   flag:  when a race/sprint/qualifying is over (ESPN's "session complete", not the final up to 40 minutes later; a
+//          race waits a scan for a car still on track, qualifying for a second scan) → finishing-position / qualifying
+//          alerts; a change after (a penalty) corrects them
+//   table: championship standings → drivers' and constructors' drops (a line on that day's alert, when there is one);
+//          told with a race's or sprint's results (projectStandings) before ESPN's table has the points, same ids
 // A team's alert and its drivers' saying the same thing share a moment (fanout.ts): a device tracking both gets
 // the team's. Several alerts for a device in one publish are one notification (fanout.ts `bundled`).
 import { getJson as espnGetJson, mapLimit } from './espn.ts';
@@ -70,6 +72,7 @@ export interface F1Row {
   lap: number | null;  // lap the status applies to (retirement lap)
   teamKey?: string;
   lapsDown?: number;   // a classified finisher this many laps behind the winner (ESPN's behindLaps)
+  onTrack?: boolean;   // ESPN still has the car on track (its status has not yet turned to classified)
 }
 export interface SessionMeta { compId: string; kind: Session; label: string; at: number }
 
@@ -219,7 +222,7 @@ export function f1SessionResults(meta: SessionMeta, rows: F1Row[], live: LiveSen
       lapped && !live.lapped.has(r.id) && 'f1.driver.lapped'].filter(Boolean) as string[];
     if (!types.length) continue;
     const details = [noPoints && 'no points', lapped && (r.lapsDown === 1 ? 'lapped' : `${r.lapsDown} laps down`), behind && `behind teammate ${driverName(mate!.id)} (P${mate!.order})`].filter(Boolean);
-    const title = `${driverName(r.id)} finished P${r.order}${lost ? ` from P${r.grid} on the grid` : ''}${details.length ? `: ${details.join(', ')}` : ''}`;
+    const title = `${driverName(r.id)} finished P${r.order}${lost && !live.lost.has(r.id) ? ` from P${r.grid} on the grid` : ''}${details.length ? `: ${details.join(', ')}` : ''}`;
     // Only "no points": the team's alert says it ("Pierre Gasly P9"). Anything more is an alert of its own.
     const moment = types.length === 1 && noPoints ? absorbed.get(r.id) : undefined;
     drivers.push({
@@ -253,6 +256,7 @@ export async function fetchSessionRows(eventId: string, compId: string, withStat
       id: String(c.id), order: order?.get(String(c.id)) ?? Number(c.order ?? 0), grid: Number(c.startOrder ?? 0),
       out: isOut(name), outLabel: String(st?.type?.description ?? ''), lap: st?.period ? Number(st.period) : null,
       teamKey: teamOf(String(c.id), c.vehicle), ...(Number(behind) > 0 ? { lapsDown: Number(behind) } : {}),
+      ...(!isOut(name) && /ON_TRACK|IN_PROGRESS|RUNNING/i.test(name) ? { onTrack: true } : {}),
     };
   });
 }
@@ -278,6 +282,7 @@ export interface BoardCar {
   gap?: string;             // to the leader, as ESPN shows it ("+8.975", "+1:17.979"); none for the leader or a lapped car
   lapsDown: number;         // laps behind the leader
   pits: number;             // pit stops so far
+  laps?: number;            // laps completed (ESPN's lapsCompleted; 0 or none: not known)
   out: boolean;
   outLabel: string;         // ESPN's status ("Retired")
   outLap: number | null;
@@ -387,11 +392,17 @@ export interface BoardMemo {
   pit: Map<string, { stop: number; from: number; lap: number }>;
   lapped: Map<string, number>;
   down: Map<string, { reads: number; pits: number }>;
+  /** The most laps a car has completed and the reads in a row since that went up: a car that has stopped (ESPN calls it out minutes later). */
+  still: Map<string, { laps: number; reads: number }>;
   sent: Set<string>;
 }
-export const boardMemo = (): BoardMemo => ({ pit: new Map(), lapped: new Map(), down: new Map(), sent: new Set() });
+export const boardMemo = (): BoardMemo => ({ pit: new Map(), lapped: new Map(), down: new Map(), still: new Map(), sent: new Set() });
 /** Reads in a row (30s apart) a car must be lapped, or down places, before it's news: not a moment's blip in the timing. */
 const LAPPED_READS = 2, DOWN_READS = 3;
+/** Reads in a row (30s apart) a car's laps must not have gone up to count as stopped: 2.5 minutes, longer than a lap even under the safety car. */
+const STILL_READS = 5;
+/** A pit-stop count that went up for this share of the running cars in one read is the field being counted (a stoppage), not stops. */
+const FIELD_PITS = 0.75;
 
 /**
  * A followed driver's live alerts from the timing, against the read before (the first is a baseline: we may have
@@ -413,10 +424,12 @@ export function boardAlerts(meta: SessionMeta, prev: Board | undefined, cur: Boa
   const leader = cur.cars.find((c) => c.place === 1 && !c.out);
   const lastLap = cur.laps > 0 && cur.lap >= cur.laps;
   const send = (e: Detected) => { if (!memo.sent.has(e.id)) { memo.sent.add(e.id); events.push(e); } };
+  const running = cur.cars.filter((c) => !c.out && before.has(c.id));
+  const fieldWide = running.length >= 6 && running.filter((c) => c.pits > before.get(c.id)!.pits).length >= running.length * FIELD_PITS;
   for (const d of cur.cars) {
     if (!watched.has(d.id)) continue;
     const p = before.get(d.id);
-    if (!p || d.out) { memo.pit.delete(d.id); memo.lapped.delete(d.id); memo.down.delete(d.id); continue; }
+    if (!p || d.out) { memo.pit.delete(d.id); memo.lapped.delete(d.id); memo.down.delete(d.id); memo.still.delete(d.id); continue; }
     const name = driverName(d.id), targetKey = playerKey('f1', d.id), common = { targetKey, at: meta.at, meta: { compId: meta.compId, athleteId: d.id, label: meta.label } };
 
     const stop = memo.pit.get(d.id);
@@ -426,11 +439,17 @@ export function boardAlerts(meta: SessionMeta, prev: Board | undefined, cur: Boa
         : d.place < stop.from ? `${name} pitted and came out P${d.place}, up from P${stop.from}` : `${name} pitted and held P${d.place}`;
       send({ ...common, id: `${meta.compId}:f1.pit:${d.id}:${stop.stop}`, type: 'f1.driver.pit_stop', title, body: `${meta.label}: lap ${stop.lap}, ${ordinal(stop.stop)} stop` });
     }
-    if (d.pits > p.pits && p.place) memo.pit.set(d.id, { stop: d.pits, from: p.place, lap: cur.lap });
+    if (d.pits > p.pits && p.place && !fieldWide) memo.pit.set(d.id, { stop: d.pits, from: p.place, lap: cur.lap });
+
+    // A car whose laps stopped going up has stopped on track: it isn't news that the leader laps it.
+    const lapsDone = d.laps ?? 0, last = memo.still.get(d.id);
+    const still = lapsDone > 0 && last ? (lapsDone > last.laps ? { laps: lapsDone, reads: 0 } : { laps: last.laps, reads: last.reads + 1 }) : { laps: lapsDone, reads: 0 };
+    memo.still.set(d.id, still);
+    const stopped = still.reads >= STILL_READS;
 
     const lapped = d.lapsDown >= 1 && !lastLap && cur.lap > 1 ? (memo.lapped.get(d.id) ?? 0) + 1 : 0;
     memo.lapped.set(d.id, lapped);
-    if (lapped === LAPPED_READS) {
+    if (lapped >= LAPPED_READS && !stopped) {
       const by = leader && leader.id !== d.id ? catalog.playerByEspn('f1', leader.id)?.name : undefined;
       send({ ...common, id: `${meta.compId}:f1.lapped:${d.id}`, type: 'f1.driver.lapped', title: `${name} was lapped by ${by ?? 'the leader'}`, body: `${meta.label}: lap ${cur.lap}, running P${d.place}` });
     }
@@ -439,7 +458,7 @@ export function boardAlerts(meta: SessionMeta, prev: Board | undefined, cur: Boa
     const was = memo.down.get(d.id);
     const reads = down ? (was && was.pits === d.pits ? was.reads + 1 : 1) : 0;
     memo.down.set(d.id, { reads, pits: d.pits });
-    if (reads === DOWN_READS) send({ ...common, id: `${meta.compId}:f1.places:${d.id}`, type: 'f1.driver.lost_places', title: `${name} is down to P${d.place} from P${d.grid} on the grid`, body: `${meta.label}: lap ${cur.lap}` });
+    if (reads >= DOWN_READS && !stopped) send({ ...common, id: `${meta.compId}:f1.places:${d.id}`, type: 'f1.driver.lost_places', title: `${name} is down to P${d.place} from P${d.grid} on the grid`, body: `${meta.label}: lap ${cur.lap}` });
   }
   return events;
 }
@@ -548,6 +567,7 @@ class RaceWatch {
         gap: stats ? stat('gapToLeader')?.displayValue || undefined : before?.gap,
         lapsDown: stats ? Number(stat('lapsBehind')?.value ?? stat('behindLaps')?.value ?? 0) : before?.lapsDown ?? 0,
         pits: stats ? Number(stat('pitsTaken')?.value ?? 0) : before?.pits ?? 0,
+        laps: stats ? Number(stat('lapsCompleted')?.value ?? 0) || before?.laps : before?.laps,
         out: s?.out ?? before?.out ?? false, outLabel: s?.outLabel ?? before?.outLabel ?? '', outLap: s ? s.lap : before?.outLap ?? null,
       };
     });
@@ -610,6 +630,10 @@ export function settleResults(meta: SessionMeta, events: Detected[], rows: F1Row
  * qualifying when it's final (ESPN's "complete" there may be between Q1, Q2 and Q3). Then read again when the
  * order or status changes and holds (the final, a penalty), to correct what went out.
  */
+/** Scans a session's cars may still read on track after ESPN says it's over, before its results go out (their laps down may not be in yet). */
+const ON_TRACK_HOLD = 1;
+const holding = new Map<string, number>();
+
 async function settleSession(ev: any, comp: any, meta: Omit<SessionMeta, 'at'>) {
   const order = new Map<string, number>((comp.competitors ?? []).map((c: any) => [String(c.id), Number(c.order) || 0]));
   if ([...order.values()].some((n) => n <= 0)) order.clear(); // not a whole order: the competitor list's instead
@@ -617,12 +641,22 @@ async function settleSession(ev: any, comp: any, meta: Omit<SessionMeta, 'at'>) 
   const seen = resultsSeen.get(meta.compId);
   if (seen?.done === sig) { if (seen.pending) resultsSeen.set(meta.compId, { done: sig }); return; }
   if (seen && seen.pending !== sig) { resultsSeen.set(meta.compId, { ...seen, pending: sig }); return; }
+  // Qualifying "complete" (not yet final) is believed once the order has held for a second scan: it might be between segments.
+  if (!seen && meta.kind === 'qual' && !comp.status?.type?.completed) { resultsSeen.set(meta.compId, { done: '', pending: sig }); return; }
   const rows = await fetchSessionRows(String(ev.id), meta.compId, meta.kind !== 'qual', order.size ? order : undefined);
+  // A race "complete" while a car is still on track in ESPN's status: wait a scan for it to be classified (its laps down).
+  if (!seen && meta.kind !== 'qual' && !comp.status?.type?.completed && rows.some((r) => r.onTrack) && (holding.get(meta.compId) ?? 0) < ON_TRACK_HOLD) {
+    holding.set(meta.compId, (holding.get(meta.compId) ?? 0) + 1);
+    return;
+  }
   const events = f1SessionResults({ ...meta, at: Date.now() }, rows, liveSent(meta.compId));
   const { fresh, revised, withdrawn } = settleResults({ ...meta, at: Date.now() }, events, rows);
   resultsSeen.set(meta.compId, { done: sig });
-  log(`${meta.label} ${seen ? 'results changed' : 'finished'}: ${fresh.length} new alert(s)${seen ? `, ${revised} corrected, ${withdrawn} withdrawn` : ''}`);
   if (fresh.length) publish(fresh, 'f1');
+  // Only alerts someone follows are stored: the rest are "new" at every read, and aren't counted.
+  const stored = fresh.filter((e) => db.prepare('SELECT 1 FROM events WHERE id = ?').get(e.id)).length;
+  log(`${meta.label} ${seen ? 'results changed' : 'finished'}: ${stored} new alert(s) sent (${fresh.length - stored} more nobody follows)${seen ? `, ${revised} corrected, ${withdrawn} withdrawn` : ''}`);
+  if (meta.kind !== 'qual') await projectStandings(meta, rows).catch((e) => log(`${meta.label} standings error`, String(e)));
 }
 
 export async function scanF1() {
@@ -648,6 +682,7 @@ export async function scanF1() {
           void fetchSessionRows(String(ev.id), meta.compId, false).catch(() => fallback)
             .then((rows) => publish(startEvents({ ...meta, at }, rows.length ? rows : fallback), 'f1'));
         }
+        freezeStandings(meta.compId);
         const w = new RaceWatch(String(ev.id), meta);
         races.set(meta.compId, w);
         log(`watching ${meta.label}`);
@@ -655,16 +690,17 @@ export async function scanF1() {
       }
       if (state === 'post') { races.get(meta.compId)?.stop(); races.delete(meta.compId); preSeen.delete(meta.compId); }
       const recent = Date.now() - Date.parse(comp.date) < RECENT_MS;
-      const over = !!comp.status?.type?.completed || (kind !== 'qual' && /SESSION_COMPLETE/i.test(String(comp.status?.type?.name ?? '')));
+      const over = !!comp.status?.type?.completed || /SESSION_COMPLETE/i.test(String(comp.status?.type?.name ?? ''));
       if (over && recent) await settleSession(ev, comp, meta).catch((e) => log(`${meta.label} results error`, String(e)));
     }
   }
 }
 
-/** Drivers' and constructors' championship drops. The first snapshot is a silent baseline. */
-export async function scanF1Standings() {
+/** ESPN's drivers' and constructors' tables by target key: rank and points. */
+type Standings = Record<string, { rank: number; pts: string }>;
+async function readF1Standings(): Promise<Standings> {
   const res = await getJson(urls.standings('f1'), { timeoutMs: 8000 });
-  const now: Record<string, { rank: number; pts: string }> = {};
+  const now: Standings = {};
   for (const child of res.children ?? []) {
     const isDrivers = /driver/i.test(child.name);
     for (const e of child.standings?.entries ?? []) {
@@ -674,10 +710,11 @@ export async function scanF1Standings() {
       if (rank) now[key] = { rank, pts };
     }
   }
-  if (!Object.keys(now).length) return;
-  const prev = kvGet<typeof now>('standings:f1');
-  kvSet('standings:f1', now);
-  if (!prev) return;
+  return now;
+}
+
+/** The drops from one table to the next: a line on that day's result alert about them, when the device has one. */
+function standingsDrops(prev: Standings, now: Standings): Detected[] {
   const day = new Date().toISOString().slice(0, 10);
   const events: Detected[] = [];
   for (const [key, cur] of Object.entries(now)) {
@@ -696,6 +733,57 @@ export async function scanF1Standings() {
       lateOn: { targetKey: key, since: Date.now() - DROP_ON_MS, types: RESULT_TYPES, line: `Down to ${ordinal(cur.rank)} in the ${driver ? "drivers'" : "constructors'"} championship (${cur.pts} pts).` },
     });
   }
+  return events;
+}
+
+/** Drivers' and constructors' championship drops. The first snapshot is a silent baseline. */
+export async function scanF1Standings() {
+  const now = await readF1Standings();
+  if (!Object.keys(now).length) return;
+  const prev = kvGet<Standings>('standings:f1');
+  kvSet('standings:f1', now);
+  if (!prev) return;
+  const events = standingsDrops(prev, now);
+  if (events.length) publish(events, 'f1');
+}
+
+/** The championship tables as they were when a race or sprint went live, kept for its results' projection (once). */
+export function freezeStandings(compId: string) {
+  const now = kvGet<Standings>('standings:f1');
+  if (now && !kvGet(`standings:f1:pre:${compId}`)) kvSet(`standings:f1:pre:${compId}`, now);
+}
+
+/** Points by finishing place (the fastest lap has not scored since 2025). */
+const POINTS: Record<'race' | 'sprint', number[]> = { race: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1], sprint: [8, 7, 6, 5, 4, 3, 2, 1] };
+
+/**
+ * The championship as this session's results will leave it, told when they are: ESPN's tables only change minutes
+ * after the session is final (10:13 am for the 2026 Singapore GP, the flag at 9:51), so the drops are worked out here
+ * from the last table plus the points for the classification. The ids are the ones scanF1Standings makes, so when
+ * ESPN's table arrives the same drop is already stored and sends nothing. The base is the table as it was when the
+ * session went live (`freezeStandings`, kept in kv so a restart keeps it), not the stored one that
+ * scanF1Standings moves on: projected only while ESPN's table still equals that base. Once it has moved it has this
+ * session's points, and its own scan reports the drops.
+ */
+export async function projectStandings(meta: SessionMeta | Omit<SessionMeta, 'at'>, rows: F1Row[], read: () => Promise<Standings> = readF1Standings) {
+  if (meta.kind === 'qual') return;
+  const base = kvGet<Standings>(`standings:f1:pre:${meta.compId}`);
+  if (!base || JSON.stringify(await read()) !== JSON.stringify(base)) return;
+  const award = new Map<string, number>();
+  const table = POINTS[meta.kind];
+  rows.filter((r) => !r.out && r.order > 0).sort((a, b) => a.order - b.order).slice(0, table.length).forEach((r, i) => {
+    award.set(playerKey('f1', r.id), (award.get(playerKey('f1', r.id)) ?? 0) + table[i]);
+    if (r.teamKey) award.set(r.teamKey, (award.get(r.teamKey) ?? 0) + table[i]);
+  });
+  if (!award.size) return;
+  const total = (key: string) => Number(base[key].pts) + (award.get(key) ?? 0);
+  const keys = Object.keys(base).filter((k) => Number.isFinite(Number(base[k].pts)));
+  const projected: Standings = {};
+  for (const k of keys) {
+    const same = keys.filter((o) => o.startsWith('player:') === k.startsWith('player:'));
+    projected[k] = { rank: 1 + same.filter((o) => total(o) > total(k)).length, pts: String(total(k)) };
+  }
+  const events = standingsDrops(base, projected);
   if (events.length) publish(events, 'f1');
 }
 
