@@ -8,12 +8,21 @@
 
 export type CallOutcome = 'ok' | 'notFound' | 'error';
 
-interface Bucket { calls: number; retries: number; errors: number; notFound: number; bytes: number; ms: number }
-const blank = (): Bucket => ({ calls: 0, retries: 0, errors: 0, notFound: 0, bytes: 0, ms: 0 });
+interface Bucket { calls: number; retries: number; errors: number; notFound: number; bytes: number; ms: number; compared: number; same: number }
+const blank = (): Bucket => ({ calls: 0, retries: 0, errors: 0, notFound: 0, bytes: 0, ms: 0, compared: 0, same: 0 });
 
 let buckets = new Map<string, Bucket>();
 let since = Date.now();
 let lastLogged = new Map<string, Bucket>();
+
+/**
+ * Off unless `HW_CALLS_FINGERPRINT=1` (the test server that measures what the calls would cost with fewer of them; production
+ * leaves it off, since it hashes every response body). With it on, each response is fingerprinted and compared with the last
+ * one for the same URL, so a bucket knows how many of its calls returned exactly what the one before did (`unchanged`).
+ */
+export const FINGERPRINT = process.env.HW_CALLS_FINGERPRINT === '1';
+const lastPrint = new Map<string, string>();
+const withoutBust = (url: string) => url.replace(/([?&])_hw=\d+&?/, '$1').replace(/[?&]$/, '');
 
 const LEAGUE_NAMES: Record<string, string> = { 'eng.1': 'epl', 'college-football': 'cfb', soccer: 'epl' };
 const SPORT_LEAGUE: Record<string, string> = { mma: 'ufc', racing: 'f1' };
@@ -68,7 +77,7 @@ export function classify(url: string): { league: string; kind: string } {
 }
 
 /** One HTTP attempt sent to ESPN. `retry`: not the first attempt at this read. `bytes`: its content-length, 0 when it sent none. */
-export function recordCall(url: string, outcome: CallOutcome, ms: number, retry: boolean, bytes = 0) {
+export function recordCall(url: string, outcome: CallOutcome, ms: number, retry: boolean, bytes = 0, print?: string) {
   const { league, kind } = classify(url);
   const key = `${league}|${kind}`;
   let b = buckets.get(key);
@@ -79,6 +88,12 @@ export function recordCall(url: string, outcome: CallOutcome, ms: number, retry:
   if (retry) b.retries++;
   if (outcome === 'error') b.errors++;
   else if (outcome === 'notFound') b.notFound++;
+  if (print) {
+    const id = withoutBust(url), before = lastPrint.get(id);
+    if (before !== undefined) { b.compared++; if (before === print) b.same++; }
+    if (lastPrint.size > 20_000) lastPrint.clear(); // a finished game's URL is never read again
+    lastPrint.set(id, print);
+  }
 }
 
 const rowsOf = (from: Map<string, Bucket>, minus?: Map<string, Bucket>) => {
@@ -91,6 +106,7 @@ const rowsOf = (from: Map<string, Bucket>, minus?: Map<string, Bucket>) => {
     out.push({
       league, kind, calls, retries: b.retries - p.retries, errors: b.errors - p.errors, notFound: b.notFound - p.notFound,
       mb: Math.round(((b.bytes - p.bytes) / 1e6) * 10) / 10, avgMs: Math.round((b.ms - p.ms) / calls),
+      compared: b.compared - p.compared, same: b.same - p.same, // only with HW_CALLS_FINGERPRINT=1
     });
   }
   return out.sort((a, b) => b.calls - a.calls);
@@ -108,7 +124,7 @@ export function callStats() {
 }
 
 /** Forgets every count (tests). */
-export function resetCalls() { buckets = new Map(); lastLogged = new Map(); since = Date.now(); }
+export function resetCalls() { buckets = new Map(); lastLogged = new Map(); lastPrint.clear(); since = Date.now(); }
 
 /** The calls since the last time this ran, as the lines logged each hour: a total, then the busiest `top` reads. */
 export function callLog(top = 15): string[] {
@@ -118,7 +134,7 @@ export function callLog(top = 15): string[] {
   const sum = (f: (r: (typeof rows)[number]) => number) => rows.reduce((n, r) => n + f(r), 0);
   const n = (x: number) => x.toLocaleString('en-US');
   const lines = [`[calls] ${n(sum((r) => r.calls))} calls (${n(sum((r) => r.retries))} retries, ${n(sum((r) => r.errors))} errors, ${n(sum((r) => r.notFound))} not found), ${n(Math.round(sum((r) => r.mb)))} MB`];
-  for (const r of rows.slice(0, top)) lines.push(`[calls]   ${`${r.league} ${r.kind}`.padEnd(26)} ${n(r.calls).padStart(8)} calls ${String(r.mb).padStart(8)} MB  avg ${r.avgMs} ms${r.retries ? `  ${r.retries} retries` : ''}${r.errors ? `  ${r.errors} errors` : ''}`);
+  for (const r of rows.slice(0, top)) lines.push(`[calls]   ${`${r.league} ${r.kind}`.padEnd(26)} ${n(r.calls).padStart(8)} calls ${String(r.mb).padStart(8)} MB  avg ${r.avgMs} ms${r.compared ? `  ${Math.round((100 * r.same) / r.compared)}% unchanged` : ''}${r.retries ? `  ${r.retries} retries` : ''}${r.errors ? `  ${r.errors} errors` : ''}`);
   if (rows.length > top) lines.push(`[calls]   … and ${rows.length - top} more reads`);
   return lines;
 }

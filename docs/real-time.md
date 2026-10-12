@@ -67,7 +67,8 @@ The README's "Real-time: how fast is it?" has the summary; this is the full deta
 - **Since boot:** `GET /health` has `calls: { since, total, retries, errors, notFound, mb, rows }`, busiest first.
 - **Every hour** (`HW_CALLS_LOG_MS`, `startCallLog` in `index.ts`) the log gets that hour's calls: `[calls] 41,203 calls (312 retries, 4 errors, 91 not found), 1,402 MB`, then the 15 busiest reads (`[calls]   mlb summary   9,874 calls  530.1 MB  avg 210 ms`). On production: `fly logs -a hate-watch-api | grep '\[calls\]'`.
 - **Not counted:** the clips text reads (`liveDeps.getText` in `live.ts`) and the images the apps fetch from ESPN's CDN themselves. The counts restart with the server, so a deploy starts a new first hour.
-- `test/calls.test.ts` checks the classification of every kind of URL and the counting of retries, 404s and failures.
+- **Is the answer new? (`HW_CALLS_FINGERPRINT=1`, off in production).** With it on, `getJson` hashes each response body and compares it with the last one for the same URL (the `_hw` cache-buster ignored). A bucket then also knows `compared` and `same`, and the hourly log adds `NN% unchanged`. It is for a test server that measures what a call costs against what it learns: the share of a game's core plays reads that returned exactly what the one before did, or of an injury report, a standings table or a news feed that hadn't moved. It costs a hash of every body, so production leaves it off. A summary of a clock sport reads as changed almost every time, because its header carries the clock.
+- `test/calls.test.ts` checks the classification of every kind of URL, the counting of retries, 404s and failures, and the fingerprint.
 
 **Alerts that wait on purpose.** Most alerts go out on the poll that first sees their play. These wait, because going out at once would sometimes be wrong:
 

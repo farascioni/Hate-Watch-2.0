@@ -3,7 +3,8 @@
 // body. Live game polls don't: they `bust` ESPN's CDN cache with a unique URL, which makes every read a full 200.
 // Every request it sends is counted by league and kind of read (calls.ts: `GET /health`, and an hourly `[calls]` log).
 
-import { recordCall, type CallOutcome } from './calls.ts';
+import { createHash } from 'node:crypto';
+import { recordCall, FINGERPRINT, type CallOutcome } from './calls.ts';
 
 const etags = new Map<string, { etag: string; body: unknown }>();
 
@@ -23,15 +24,22 @@ export async function getJson<T = any>(url: string, opts: { timeoutMs?: number; 
   for (let attempt = 0; attempt < 3; attempt++) {
     // Every attempt is a request ESPN sees, so each one is counted (calls.ts), a retry included.
     const t0 = performance.now();
-    let outcome: CallOutcome = 'error', bytes = 0;
-    const count = () => recordCall(url, outcome, performance.now() - t0, attempt > 0, bytes);
+    let outcome: CallOutcome = 'error', bytes = 0, print: string | undefined;
+    const count = () => recordCall(url, outcome, performance.now() - t0, attempt > 0, bytes, print);
     try {
       const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
       bytes = Number(res.headers.get('content-length')) || 0;
       if (res.status === 304 && cached) { outcome = 'ok'; count(); return cached.body as T; }
       if (res.status === 404) outcome = 'notFound';
       if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
-      const body = (await res.json()) as T;
+      let body: T;
+      if (FINGERPRINT) { // the test server only: is this body the same as the last one for this URL? (calls.ts)
+        const text = await res.text();
+        body = JSON.parse(text) as T;
+        // Rosters and injury reports carry a top-level `timestamp` that moves on every read: it is not news.
+        const top = body as any;
+        print = createHash('md5').update(top && typeof top === 'object' && 'timestamp' in top ? JSON.stringify({ ...top, timestamp: undefined }) : text).digest('hex');
+      } else body = (await res.json()) as T;
       outcome = 'ok';
       count();
       const etag = res.headers.get('etag');

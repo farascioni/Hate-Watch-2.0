@@ -3,6 +3,7 @@
 import { test, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
+process.env.HW_CALLS_FINGERPRINT = '1'; // before the imports: calls.ts reads it once
 const { classify, callStats, callLog, resetCalls } = await import('../src/calls.ts');
 const { getJson, probePng } = await import('../src/espn.ts');
 
@@ -96,4 +97,25 @@ test('the hourly log shows the calls since the last one, busiest first, then sta
   await getJson(`${SITE}/hockey/nhl/injuries`);
   assert.match(callLog()[0], /^\[calls\] 1 calls/);
   assert.equal(callStats().total, 5); // since boot keeps counting
+});
+
+test('with the fingerprint on, a bucket counts the reads that returned what the one before did, the cache-buster ignored', async () => {
+  const bodies = [{ n: 1 }, { n: 1 }, { n: 1 }, { n: 2 }];
+  mock.method(globalThis, 'fetch', async () => reply(200, bodies.shift()));
+  const u = `${CORE}/baseball/leagues/mlb/events/9/competitions/9/plays?limit=1000`;
+  await getJson(u, { bust: true });  // first: nothing to compare with
+  await getJson(u, { bust: true });  // same
+  await getJson(u);                  // same (no buster now, same URL)
+  await getJson(u, { bust: true });  // changed
+  const [row] = callStats().rows;
+  assert.deepEqual([row.kind, row.calls, row.compared, row.same], ['plays', 4, 3, 2]);
+  assert.match(callLog()[1], /plays\s+4 calls.*67% unchanged/);
+});
+
+test('a top-level timestamp that moves on every read is not a change', async () => {
+  const bodies = [{ timestamp: '2026-10-12T22:00:00Z', injuries: [1] }, { timestamp: '2026-10-12T22:00:30Z', injuries: [1] }, { timestamp: '2026-10-12T22:01:00Z', injuries: [1, 2] }];
+  mock.method(globalThis, 'fetch', async () => reply(200, bodies.shift()));
+  for (let i = 0; i < 3; i++) await getJson(`${SITE}/hockey/nhl/injuries`);
+  const [row] = callStats().rows;
+  assert.deepEqual([row.kind, row.compared, row.same], ['injuries', 2, 1]);
 });
