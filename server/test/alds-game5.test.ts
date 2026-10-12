@@ -171,9 +171,13 @@ test('with the scoreboard slow, the summary says it was the end of their season'
 });
 
 test("the week's low point: an elimination over a bigger loss, and for a player's tracker too", () => {
-  const monday = new Date(); // the Monday after, 9 am in New York (13:00 UTC with daylight time, 14:00 without: either is past 9)
-  monday.setUTCDate(monday.getUTCDate() + ((8 - monday.getUTCDay()) % 7 || 7));
-  monday.setUTCHours(14, 0, 0, 0);
+  // The recap that covers these alerts: from the next midnight in New York (a recap covers the days before its Monday),
+  // the first Monday 9 am there. Whatever the time the tests run: a Sunday night there is already Monday in UTC.
+  const ny = (t: number) => Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).formatToParts(t).map((x) => [x.type, x.value]));
+  let at = Math.floor(Date.now() / 3600_000) * 3600_000 + 3600_000;
+  for (let i = 0; i < 48 && Number(ny(at).hour) !== 0; i++) at += 3600_000;
+  for (let i = 0; i < 9 * 24 && !(ny(at).weekday === 'Mon' && Number(ny(at).hour) === 9); i++) at += 3600_000;
+  const monday = new Date(at);
   // The White Sox's other loss that week, by 10 runs.
   db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta) VALUES ('X:final:team.lost:4', 'team.lost', 'mlb', 'X', 'team:mlb:4', 'Successful Hate Watch! White Sox got BLOWN OUT by the Guardians', 'Final Score: 10 to 0', ?, ?, '{"margin":10}')`).run(Date.now(), Date.now());
   db.prepare(`INSERT INTO feed (device_id, event_id, occurred_at, pushed) VALUES ('white-sox', 'X:final:team.lost:4', ?, 1)`).run(Date.now());
