@@ -49,6 +49,9 @@ MLB
 
 NBA AND WNBA
 - Misses name the shot and distance, not heaves. WNBA: rival gets the top seed.
+- A play ESPN changes after posting is judged again: a line, no push, and the right player's alert.
+- A shot not yet typed reads "missed a 29-foot three"; a block never goes to the blocker.
+- Falling behind again within 2 minutes is a line on the earlier alert.
 
 EVERYWHERE
 - Fixes can arrive without a new build.
@@ -58,6 +61,7 @@ EVERYWHERE
 - After a loss (F1: a race), a standings drop or elimination is a line on it.
 - Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere.
+- No standings drops in the preseason.
 - The Scores switch says what it lists: events, games, fights.
 - League filters show yours, then More by sport.
 - Clips play only when you press play.

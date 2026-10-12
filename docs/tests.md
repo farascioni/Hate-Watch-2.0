@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12). Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 349 tests in 53 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12).
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 349 tests in 53 files, offline, in about 4 seconds, all passing on October 12, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12). Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 349 tests in 53 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 325 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 349 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -69,6 +69,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `notices.test.ts` | Developer notices: every feed, never pushed, drawn as from Hate Watch; urgent; dry run and the text checks; left out of the recap; live to open apps; withdrawn |
 | `pitchers.test.ts` | Blown saves, no quality starts and losses from the box score (NYY @ TB live, 2026-10-06; finals from 2026-09-20 and 2026-10-04) |
 | `play-revisions.test.ts` | Football plays ESPN changes after posting them, with October 10 2026's noon college games' own plays: a pick wiped out by a penalty, an incompletion turned interception, a flag added later, a touchdown overturned and scored on the same drive, one touchdown under three ids, the header ahead of lagging drives, a stray "End of Game", drives whose result changed |
+| `nba-revisions.test.ts` | Basketball plays ESPN changes after posting them, with the plays and wording of October 11 2026's preseason games: a shot not yet typed is an unknown shot ("missed a 29-foot three"), a block never goes to the blocker, a free throw with no shooter alerts when he is named, "misses" flipped to "makes" is a line with no push, a shot first credited to Desmond Bane is Paolo Banchero's (a line on the first, the alert for the second), a miss that was a block, a foul re-posted under a new id is one alert, a play taken out is a line after 30 seconds, a team turnover, fouling out with a re-posted foul and a 6th foul named late, a lead changing hands again within 2 minutes is a line, and the preseason's standings table says nothing (not the Premier League's) |
 | `restart-backfill.test.ts` | A restart and the plays nobody read: a game live at boot takes 5 minutes of plays as news (a 3-minute-old strikeout alerts, a 10-minute-old one is history), a game followed later keeps 90 seconds, a second restart sends nothing twice; a follow during a scoreboard scan runs it again right after (`every`); a revision line has the same id from a new tracker. |
 | `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
 | `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |

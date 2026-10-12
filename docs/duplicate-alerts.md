@@ -9,7 +9,7 @@
 - [Layer 2: the database stores an id once](#layer-2-the-database-stores-an-id-once): what `publish()` does in order, why nothing after the insert can repeat, and the only ways to change an alert after it went out.
 - [Layer 3: the game tracker judges each play once](#layer-3-the-game-tracker-judges-each-play-once): everything `GameTracker` remembers so a re-poll makes no alerts, and the baselines kept in `kv`.
 - [Layer 4: one moment, one alert per device](#layer-4-one-moment-one-alert-per-device): `moment`, `fold`, `foldOnly`, `alt`, `unless`, `aliases`, `firstFollowed`, `list`, `lateOn`, late facts, and two worked examples (a homer with a fold and an alt, a loss and its facts).
-- [Layer 5: ESPN's edits are revisions, not new alerts](#layer-5-espns-edits-are-revisions-not-new-alerts): the football ledger, MLB's held and logged changes, F1 corrections, clips, and a worked football revision from the tests.
+- [Layer 5: ESPN's edits are revisions, not new alerts](#layer-5-espns-edits-are-revisions-not-new-alerts): the football and basketball ledger, MLB's held and logged changes, F1 corrections, clips, and a worked football revision from the tests.
 - [Layer 6: the app keeps one copy of each id](#layer-6-the-app-keeps-one-copy-of-each-id): `mergeFeed`, live frames and reconnects.
 - [What survives a restart](#what-survives-a-restart): what the database keeps and memory forgets, a restart step by step, and what can be lost.
 - [Known gaps](#known-gaps): what nothing catches today.
@@ -203,7 +203,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`mergePlays`:** ESPN's core and site feeds are merged by play id before detection, so a play in both is one
   play (README "Real-time": "Two sources per game"). College football's drive plays (`fromDrivePlays`) skip a play
   listed in two drives.
-- **The football ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (Layer 5).
+- **The football and basketball ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (Layer 5).
 - **The pregame facts in `kv`** (`pregame:${league}:${gameId}`: odds, records, the series), so the facts of a loss
   are the same after a restart.
 
@@ -260,7 +260,8 @@ them per device, in the order the alerts are listed:
   F1's start is one alert per device, not one per constructor and driver.
 - **`lateOn`:** a line on the device's latest alert about a target since a time, of some types (or one of a team's
   loss alerts, `loss`), instead of an alert of its own, when the device has one; otherwise an alert as usual (a
-  standings drop within 6 hours of a loss is a line on the loss). It reads the feed in the database
+  standings drop within 6 hours of a loss is a line on the loss; in basketball a team falling behind again within 2
+  minutes, `FELL_AGAIN_MS`, is a line on its earlier "falls behind"). It reads the feed in the database
   (`latestAbout`), so it works after a restart.
 - **Late facts:** a fact that comes a poll later (an NFL drive's result after its last play, a game misconduct after
   the instigator penalty, a half-inning's end after its last out) goes on the moment's alert as a line with no push.
@@ -336,6 +337,17 @@ ESPN changes plays after posting them. On October 10 2026's twelve noon college 
 turnovers overturned on review, one touchdown posted under three ids), and changed drives' results after they ended
 (the header comment of `revisions.ts`).
 
+- **Basketball** (the NBA and the WNBA) goes through the same ledger, from a read that has the core feed. ESPN posts a
+  basketball play half-finished and edits it (35 to 49% of the plays in three October 11 2026 preseason games): a shot
+  "No Shot (Default Shot)" typed minutes later, a free throw with no shooter or flipped from "misses" to "makes", a block
+  naming the wrong shooter for seconds, a foul or shot taken out and re-posted. So a changed play is judged again on its
+  latest version (a play with no player alerts nothing until named): the alert it no longer has gets a line, no push
+  ("ESPN has since credited this play to Paolo Banchero.", "ESPN has since changed this: the free throw was made.",
+  "…the shot was blocked.", "ESPN has since taken this play out."), the right player's alert goes out, and a re-post
+  (`samePlay(…, true)`: the same period, the clock within 10 seconds, the same first participant and kind of play) is one
+  alert. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
+  a new id isn't a 6th, and "fouled out" is never taken back. Details: docs/alerts.md, "Revisions: ESPN changes a
+  basketball play after its alert".
 - **Football** (`server/src/revisions.ts`, `PlayLedger`, used by `GameTracker.poll` for college football and the
   NFL): for `REVISE_MS` (15 minutes) after it's first seen, each play and drive keeps the alerts it sent, by kind
   (type and target). Each read compares them with the play as ESPN has it now (`changed`, when the play's text, type,
@@ -443,7 +455,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 | Kept (database) | Forgotten (memory) |
 |---|---|
 | `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `noBatter`, `resultSigs`, `resultTexts` |
-| `kv` baselines: standings, injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football revisions ledger |
+| `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football and basketball revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen` |
 
 A restart, step by step:
@@ -472,8 +484,8 @@ What is lost:
 
 - **Late facts.** A fact that comes after a restart for a moment alerted before it has no `delivered` entry. If it
   has no `lateOn`, it can go out as an alert of its own rather than a line, and a `foldOnly` one is never shown.
-- **Revisions.** A football play edited after a restart can't be compared with what it sent before: the ledger is
-  empty, and a revision line has no `delivered` entry to land on.
+- **Revisions.** A football or basketball play edited after a restart can't be compared with what it sent before: the
+  ledger is empty, and a revision line has no `delivered` entry to land on.
 - **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, from before the
   90-second window is history.
 - **Plays nobody read** (fixed October 11, 2026). The 90-second window counts from the play's own time (ESPN's
@@ -492,6 +504,7 @@ This is one reason for the decision **"No production restarts during live games"
 - **Text-keyed MLB ids** depend on ESPN's text staying the same. A re-judged rewritten result would make a new id,
   which is why changed results are logged, not judged again.
 - **A fold sentence is compared as text.** Two wordings of the same fact are two lines.
+- **A basketball play ESPN removes after 15 minutes** keeps its alert with no line (`REVISE_MS`; Franz Wagner's block alert in Magic at Cavaliers, removed 24 minutes later). A first alert on a play that ESPN fixes within seconds still goes out first (a free throw posted as "misses" that is flipped to "makes" a minute later): only its line corrects it.
 - **A soccer foul that ESPN later marks "Penalty conceded"** is judged again (`fouls` in `GameTracker`), and the
   penalty's alerts have their own ids and moment (`soccerFoul`), so a device can get the foul (feed only) and then
   the penalty (pushed) as two alerts about one foul. To be fixed with the Man City at Liverpool review's soccer

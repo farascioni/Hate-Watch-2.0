@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { catalog } from './catalog.ts';
-import { FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { startF1, f1Status } from './f1.ts';
@@ -536,7 +536,10 @@ export class GameTracker {
     // summary's drives for college, the core feed for the NFL). `changed`: lines on alerts already sent, no push.
     const football = FOOTBALL.has(league) && plays.length > 0 && (teamsOnly ? summary.status === 'fulfilled' : core.status === 'fulfilled');
     const changed: Detected[] = [];
-    if (football) this.ledger.read(new Set(plays.map((p) => p.id)), now);
+    // Basketball: the same ledger, from a read that has the core feed (revisions.ts): ESPN posts its plays half-finished
+    // and edits them (35 to 49% of October 11 2026's preseason plays), so a changed play is judged again.
+    const ledgered = football || (BASKETBALL.has(league) && plays.length > 0 && core.status === 'fulfilled');
+    if (ledgered) this.ledger.read(new Set(plays.map((p) => p.id)), now);
     let header: Header | undefined; // football: the summary header's score while the game is on
     let final: { home: number; away: number } | null = null;
     if (summary.status === 'fulfilled') {
@@ -593,8 +596,8 @@ export class GameTracker {
       const fresh = !waiting && !this.seen.has(p.id);
       if (fresh) {
         this.seen.add(p.id);
-        // Football: a play ESPN took out and re-posted under a new id is that play again, revised (already counted).
-        const was = football && !history ? this.ledger.repost(p, now) : undefined;
+        // A play ESPN took out and re-posted under a new id is that play again, revised (already counted).
+        const was = ledgered && !history ? this.ledger.repost(p, now) : undefined;
         if (was) {
           const r = this.ledger.revise(was, p, now);
           events.push(...r.fresh);
@@ -609,9 +612,9 @@ export class GameTracker {
             this.halfEnds.set(ended, { playId: p.id, since: now, seen: `${r?.id} pas=${h?.key === ended ? h.pas.length : 0} reached=${h?.key === ended && h.reached}` });
           }
           observePlay(this.ctx, p);
-          if (football) this.ledger.add(p, es, { history }, now);
+          if (ledgered) this.ledger.add(p, es, { history }, now);
         }
-      } else if (football) {
+      } else if (ledgered) {
         const r = this.ledger.changed(p, now);
         if (r) { events.push(...r.fresh); changed.push(...r.lines); }
       }
@@ -649,7 +652,10 @@ export class GameTracker {
       bump(led, score);
       changed.push(...this.ledger.sweep(now), ...this.footballTakeBack(score, plays, header, now));
       events.push(...this.headerAhead(score, plays, header, led, now));
-    } else if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
+    } else if (ledgered) {
+      changed.push(...this.ledger.sweep(now)); // plays ESPN took out
+    }
+    if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
       log(`[${league} ${gameId}] score went down to ${score.away}-${score.home} (a goal taken back?); the next one is news again`);
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
@@ -976,6 +982,20 @@ export function every(ms: number, fn: () => Promise<void>, opts: { unref?: boole
 /** `division`: its place in its division (DIVISION_STANDINGS), when the standings were read by division. */
 interface StandingSnap { rank: number; group: string; clincher: string; streak: string; note?: string; division?: { name: string; rank: number } }
 
+/** ESPN's season type for a table (1 preseason, 2 regular season, 3 postseason): the first group's `standings.seasonType`. */
+const PRESEASON = 1;
+export function standingsSeasonType(res: any): number | undefined {
+  let found: number | undefined;
+  const walk = (node: any) => {
+    if (found != null || !node) return;
+    const t = Number(node.standings?.seasonType);
+    if (t) { found = t; return; }
+    for (const c of node.children ?? []) walk(c);
+  };
+  walk(res);
+  return found;
+}
+
 /** Leagues whose divisions decide the playoffs: their standings are read by division, and a drop names it ("2nd in the AL Central"). */
 const DIVISION_STANDINGS = new Set<League>(['mlb', 'nfl', 'nhl']);
 /** A division's name as fans say it: MLB "AL Central" (ESPN's short "AL Cent"), the NFL's "AFC East", the NHL's "Atlantic". */
@@ -1040,11 +1060,21 @@ const WNBA_TOP_SEED = new Set(['*']);
  */
 export async function scanStandings(lg: League) {
   const byDivision = DIVISION_STANDINGS.has(lg);
-  const now = parseStandings(await liveDeps.getJson(byDivision ? `${urls.standings(lg)}?level=3` : urls.standings(lg), { timeoutMs: 8000 }), byDivision);
+  const res = await liveDeps.getJson(byDivision ? `${urls.standings(lg)}?level=3` : urls.standings(lg), { timeoutMs: 8000 });
+  const now = parseStandings(res, byDivision);
   if (!now.size) return;
   const prev = new Map(Object.entries(kvGet<Record<string, StandingSnap>>(`standings:${lg}`) ?? {}));
   kvSet(`standings:${lg}`, Object.fromEntries(now));
   if (!prev.size) return; // first snapshot is the baseline
+  // The preseason's table counts its games as wins and losses (the Magic went from 4th to 10th in the East on one
+  // October 11 2026 game): no standings news until the regular season, and a table of another season type than the
+  // last is a new baseline (its order starts over). Not soccer: ESPN calls the Premier League's regular season type 1.
+  // Only the preseason's end: the regular season's own end (the playoffs) is where eliminations and clinches land.
+  if (!SOCCER.has(lg)) {
+    const season = standingsSeasonType(res), was = kvGet<number>(`standings-season:${lg}`);
+    if (season != null) kvSet(`standings-season:${lg}`, season);
+    if (season === PRESEASON || (was === PRESEASON && season != null)) return;
+  }
   const day = new Date().toISOString().slice(0, 10), year = new Date().getFullYear(), at = Date.now();
   const onLoss = (key: string, line: string) => ({ lateOn: { targetKey: key, since: at - DROP_ON_LOSS_MS, types: [], loss: true, line } });
   // Division rivals that just won the division (MLB, NFL, NBA, NHL: the leagues with divisions); in the WNBA, a

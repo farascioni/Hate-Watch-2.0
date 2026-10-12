@@ -66,6 +66,8 @@ export interface GameCtx {
   /** NBA, WNBA: each player's personal fouls so far (observePlay), for fouling out. */
   fouls?: Record<string, number>;
   foulKeys?: Set<string>; // basketball: each personal foul counted once (personalFoul)
+  /** NBA, WNBA: the plays that vouch for each counted foul (an offensive foul and its turnover are one foul): a foul is un-counted when none is left (unobservePlay). */
+  foulPlays?: Map<string, Set<string>>;
   /** NBA, WNBA: points scored in a row against each side, for "on a 14-0 run" (teamScoreEvents). */
   run?: { home: number; away: number };
   /** NHL: each goalie's shots faced and goals allowed so far (observePlay), and the ones pulled. */
@@ -399,9 +401,11 @@ export function observePlay(g: GameCtx, p: NPlay) {
     if (saver && p.teamId) g.goalies.set(conceding, saver);
     if (/start of shootout/i.test(p.text)) g.shootout = true;
   }
-  if (BASKETBALL.has(g.league) && personalFoul(p)) {
-    const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id, key = `${actor}:${personalFoul(p)}`;
-    if (actor && !g.foulKeys?.has(key)) { (g.foulKeys ??= new Set()).add(key); (g.fouls ??= {})[actor] = (g.fouls[actor] ?? 0) + 1; }
+  const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
+  if (foul) {
+    const vouch = (g.foulPlays ??= new Map()).get(foul.key) ?? g.foulPlays.set(foul.key, new Set()).get(foul.key)!;
+    vouch.add(p.id);
+    if (!g.foulKeys?.has(foul.key)) { (g.foulKeys ??= new Set()).add(foul.key); (g.fouls ??= {})[foul.actor] = (g.fouls[foul.actor] ?? 0) + 1; }
   }
   if (SOCCER.has(g.league) && p.teamId) {
     // Keepers start from the line-ups (keepers()); then a keeper comes on, or the one in goal is sent off.
@@ -1453,6 +1457,8 @@ function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | u
   return qb ? { qb, named: !!named } : undefined;
 }
 
+/** ESPN's placeholder shot type, until it types the shot ("No Shot (Default Shot)"). */
+const UNKNOWN_SHOT = /\bdefault shot\b|^no shot\b/i;
 /** ESPN's basketball shot types as a fan says them; any other is ESPN's own, lowercased, without "shot". */
 const SHOT_NAME: Record<string, string> = {
   'Jump Shot': 'jumper', 'Pullup Jump Shot': 'pull-up jumper', 'Step Back Jump Shot': 'step-back jumper', 'Fade Away Jump Shot': 'fadeaway',
@@ -1477,10 +1483,13 @@ export function missedShot(g: GameCtx, p: NPlay, name: string): string | null {
   const said = p.text.match(/(\d+)-foot/)?.[1];
   const ft = said ? Number(said) : p.shot ? Math.round(Math.hypot(p.shot.x - 25, p.shot.y - 1)) : undefined;
   if (/heave/i.test(p.type) || (ft ?? 0) >= 40) return null;
-  let kind = SHOT_NAME[p.type] ?? p.type.toLowerCase().replace(/\s*shot$/, '');
+  // ESPN posts every shot first as "No Shot (Default Shot)" ("misses shot") and types it minutes later (85 s to 23 min in
+  // the October 11 2026 preseason games: 37% of missed-shot alerts said "a no shot (default shot)"): an unknown shot.
+  const unknown = UNKNOWN_SHOT.test(p.type);
+  let kind = unknown ? (three ? 'three' : 'shot') : SHOT_NAME[p.type] ?? p.type.toLowerCase().replace(/\s*shot$/, '');
   if (!kind || /miss/.test(kind)) return `${name} missed ${three ? 'a three' : 'a shot'}`;
   // A three keeps a jump shot's move ("pull-up three", "step-back three"); anything else ESPN calls it is just a three.
-  if (three) kind = kind === 'jumper' || /floater|layup|dunk|hook|tip-in|putback|roll|bank/.test(kind) ? 'three' : `${kind.replace(/\s*jumper$/, '')} three`;
+  if (three && !unknown) kind = kind === 'jumper' || /floater|layup|dunk|hook|tip-in|putback|roll|bank/.test(kind) ? 'three' : `${kind.replace(/\s*jumper$/, '')} three`;
   const what = `${ft != null && ft >= 5 ? `${ft}-foot ` : ''}${kind}`;
   return `${name} missed ${/^(8|11|18|8\d)-|^[aeiou]/i.test(what) ? 'an' : 'a'} ${what}${lateAndClose(g, p, three ? 3 : 2)}`;
 }
@@ -1504,7 +1513,9 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   if (!actor && !/technical/i.test(p.type)) return out;
   if (p.shooting && !p.scoring) {
     if (/blocks/i.test(t)) {
-      const shooter = onTeam(g, p, p.teamId) ?? p.participants[1]?.id;
+      // The shooter is the player on the play's team, else the one ESPN labels the shooter; never "the second player
+      // listed", who is the blocker (a shooter missing from the catalog got his blocker's alert: Dallas at Houston).
+      const shooter = onTeam(g, p, p.teamId) ?? role(p, 'shooter')[0];
       if (shooter) out.push(mk(g, p, `${lg}.got_blocked`, shooter, `${nameOf(lg, shooter)} got sent back ✋`, { aliases: [`${lg}.missed_shot`] }));
     } else if (/free throw/i.test(t + p.type) && /miss/i.test(t)) {
       out.push(mk(g, p, `${lg}.missed_free_throw`, actor!, `${nameOf(lg, actor!)} missed a free throw`));
@@ -1538,6 +1549,26 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
 function personalFoul(p: NPlay): string | undefined {
   if (!/foul/i.test(p.type) || /technical/i.test(p.type)) return undefined;
   return /offensive/i.test(p.type) ? `offensive:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` : p.id;
+}
+
+/** Basketball: the foul a play records, as who it's on and its key (the same for an offensive foul and its turnover). */
+function foulOf(g: GameCtx, p: NPlay): { actor: string; key: string } | undefined {
+  const foul = personalFoul(p);
+  const actor = foul ? onTeam(g, p, p.teamId) ?? p.participants[0]?.id : undefined;
+  return actor ? { actor, key: `${actor}:${foul}` } : undefined;
+}
+
+/**
+ * Basketball: a play's foul stops counting (ESPN took the play out, or changed who fouled): it's un-counted once no
+ * play vouches for it, so a foul ESPN posted twice, or a ghost, doesn't bring a player's 6th foul early.
+ */
+export function unobservePlay(g: GameCtx, p: NPlay) {
+  const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
+  const vouch = foul && g.foulPlays?.get(foul.key);
+  if (!foul || !vouch?.delete(p.id) || vouch.size) return;
+  g.foulPlays!.delete(foul.key);
+  g.foulKeys?.delete(foul.key);
+  if (g.fouls?.[foul.actor]) g.fouls[foul.actor]--;
 }
 
 function nhl(g: GameCtx, p: NPlay): Detected[] {
@@ -1992,6 +2023,8 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
         title: safety ? `${team} gave up a safety and fell behind the ${oppName}`
           : rbi ? `${oppName} took the lead over ${the(g.league, team)} on ${rbi}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
         ...base, ...moment, fold: safety ? `${team} gave up a safety and fell behind.` : `${oppName} took the lead.`,
+        // Basketball: a lead that changes hands again within FELL_AGAIN_MS is a line on the device's earlier "falls behind", not a card of its own.
+        ...(BASKETBALL.has(g.league) ? { lateOn: { targetKey: base.targetKey, since: p.at - FELL_AGAIN_MS, types: ['team.fell_behind'], line: `${oppName} took the lead again: ${scoreLine(g, p)}.` } } : {}),
       });
     }
     // NHL: an empty-net goal or a short-handed one against them (they were on the power play), counting as "opponent scores".
@@ -2048,6 +2081,8 @@ export interface SeriesSpot { kind: 'series' | 'season'; before: number; lostBef
 
 /** Basketball: points in a row against a team for "on a run" (NBA 14-0: 10% of team-games; WNBA 12-0: 18%). */
 export const RUN_POINTS = { nba: 14, wnba: 12 };
+/** Basketball: "falls behind" again for a team within this long of its last one is a line on it (Bulls at Nuggets: 19 in a night, five in four minutes). */
+export const FELL_AGAIN_MS = 2 * 60_000;
 /** Soccer: a goal against from this minute on, taking a lead or a draw away, is a late goal. */
 export const LATE_MINUTE = 85;
 /** A soccer clock's minute: "57'" → 57, "90'+4'" → 94. */

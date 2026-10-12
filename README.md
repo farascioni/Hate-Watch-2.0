@@ -51,7 +51,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12).
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 349 tests in 53 files, offline, in about 4 seconds, all passing on October 12, 2026.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
 The other docs: [docs/alerts.md](docs/alerts.md) (every alert in detail), [docs/duplicate-alerts.md](docs/duplicate-alerts.md), [docs/android-release.md](docs/android-release.md), and [docs/working-in-this-repo.md](docs/working-in-this-repo.md) (the explanations behind CLAUDE.md's rules).
@@ -76,7 +76,7 @@ The full detail: [docs/data.md](docs/data.md).
 
 ## Real-time: how fast is it?
 
-**In short:** An alert reaches an open app within milliseconds of the server seeing the play, and a closed phone typically 1-3 seconds later through Expo's push service. Nearly all the delay before that is ESPN's: it posts a play well after it happens, so each live game's feeds are read every 2 seconds with ESPN's CDN cache bypassed. A few alerts wait on purpose, for ESPN to finish a review or a half-inning, and football alerts are revised when ESPN changes a play after posting it. The tables below give every stage and every deliberate wait, with the constant and environment variable behind each.
+**In short:** An alert reaches an open app within milliseconds of the server seeing the play, and a closed phone typically 1-3 seconds later through Expo's push service. Nearly all the delay before that is ESPN's: it posts a play well after it happens, so each live game's feeds are read every 2 seconds with ESPN's CDN cache bypassed. A few alerts wait on purpose, for ESPN to finish a review or a half-inning, and football and basketball alerts are revised when ESPN changes a play after posting it. The tables below give every stage and every deliberate wait, with the constant and environment variable behind each.
 
 The full detail: [docs/real-time.md](docs/real-time.md).
 
@@ -136,7 +136,7 @@ The full detail: [docs/sharing.md](docs/sharing.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12). Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 349 tests in 53 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 
