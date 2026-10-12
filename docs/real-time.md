@@ -63,6 +63,12 @@ The README's "Real-time: how fast is it?" has the summary; this is the full deta
 | Clips after a final | every minute for an hour | `CLIPS_POLL_MS` |
 | A new developer notice, for open apps | 5s | `HW_NOTICE_POLL_MS` |
 
+**Counting the calls to ESPN.** Every request the server sends to ESPN is counted by league and kind of read (`calls.ts`; `getJson` and `probePng` in `espn.ts` record each HTTP attempt, a retry included, since ESPN sees it). `classify` files a URL under a league (`mlb`, `epl`, `cfb`, `f1`, `ufc`…) and a kind (`summary`, `plays`, `touches`, `scoreboard`, `standings`, `injuries`, `news`, `roster`, `schedule`, `headshot check`…); anything it doesn't recognize is `other`. Each bucket keeps its calls, retries, errors (no answer, or an HTTP error other than 404), not-found answers (a 404 is often the expected answer: an F1 entry list before the grid is out, a player with no photo), megabytes (ESPN's `content-length`, the gzipped size, for responses that send one) and average milliseconds.
+- **Since boot:** `GET /health` has `calls: { since, total, retries, errors, notFound, mb, rows }`, busiest first.
+- **Every hour** (`HW_CALLS_LOG_MS`, `startCallLog` in `index.ts`) the log gets that hour's calls: `[calls] 41,203 calls (312 retries, 4 errors, 91 not found), 1,402 MB`, then the 15 busiest reads (`[calls]   mlb summary   9,874 calls  530.1 MB  avg 210 ms`). On production: `fly logs -a hate-watch-api | grep '\[calls\]'`.
+- **Not counted:** the clips text reads (`liveDeps.getText` in `live.ts`) and the images the apps fetch from ESPN's CDN themselves. The counts restart with the server, so a deploy starts a new first hour.
+- `test/calls.test.ts` checks the classification of every kind of URL and the counting of retries, 404s and failures.
+
 **Alerts that wait on purpose.** Most alerts go out on the poll that first sees their play. These wait, because going out at once would sometimes be wrong:
 
 | Alert | Waits | Setting | Why |

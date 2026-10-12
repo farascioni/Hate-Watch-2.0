@@ -8,6 +8,7 @@ import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, TEAMS_ONLY, type League } from './leagues.ts';
 import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
+import { callStats } from './calls.ts';
 import { privacyPage, supportPage } from './pages.ts';
 import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } from './share.ts';
 import { allGames, deviceTeams, forgetDeviceTeams, gameDetail, gamesFor, getGame, nextF1Weekend } from './scores.ts';
@@ -53,7 +54,7 @@ function authDevice(header: string | undefined | null): string | undefined {
 }
 
 // ─── Public ───────────────────────────────────────────────────────────────────────────────────
-route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status() }));
+route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status(), calls: callStats() }));
 // Each league's sport too: the app shows any soccer league's matches the soccer way.
 // `ui`: how the app shows each league (its color, filter, words: leagues.ts LeagueUi). `teamsOnly`: a league with no players (college football).
 route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ui: LEAGUES[id].ui, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));

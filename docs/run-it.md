@@ -33,7 +33,7 @@ Install with `npm ci`, not `npm install`. `npm ci` installs exactly what `packag
 5. It starts the API on `PORT` (default 8787; production uses 8080, set in `fly.toml`), the live-game engine (`engine.start()`), and the watcher that sends developer notices to open apps (`watchNotices()`).
 6. On `SIGTERM` or `SIGINT` (Ctrl-C, or a deploy), it closes the HTTP server and the database and exits.
 
-To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, catalog: { teams, players }, live: … }`. `GET /catalog/report` returns the last ingest's report, with each league's counts and every problem it noted.
+To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, catalog: { teams, players }, live: …, calls: … }`: `calls` is every request the server has sent to ESPN since it started, by league and kind of read (docs/real-time.md, "Counting the calls to ESPN"). `GET /catalog/report` returns the last ingest's report, with each league's counts and every problem it noted.
 
 **Server scripts** (`server/package.json`):
 
