@@ -32,11 +32,14 @@ db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position,
 for (const [id, name, short, abbr, location] of [['5', 'Cleveland Browns', 'Browns', 'CLE', 'Cleveland'], ['23', 'Pittsburgh Steelers', 'Steelers', 'PIT', 'Pittsburgh'], ['6', 'Dallas Cowboys', 'Cowboys', 'DAL', 'Dallas'],
   ['28', 'Washington Commanders', 'Commanders', 'WSH', 'Washington'], ['3', 'Chicago Bears', 'Bears', 'CHI', 'Chicago'], ['16', 'Minnesota Vikings', 'Vikings', 'MIN', 'Minnesota'],
   ['2', 'Buffalo Bills', 'Bills', 'BUF', 'Buffalo'], ['17', 'New England Patriots', 'Patriots', 'NE', 'New England'], ['30', 'Jacksonville Jaguars', 'Jaguars', 'JAX', 'Jacksonville'],
-  ['21', 'Philadelphia Eagles', 'Eagles', 'PHI', 'Philadelphia']])
+  ['21', 'Philadelphia Eagles', 'Eagles', 'PHI', 'Philadelphia'], ['7', 'Denver Broncos', 'Broncos', 'DEN', 'Denver'], ['24', 'Los Angeles Chargers', 'Chargers', 'LAC', 'Los Angeles'],
+  ['25', 'San Francisco 49ers', '49ers', 'SF', 'San Francisco'], ['26', 'Seattle Seahawks', 'Seahawks', 'SEA', 'Seattle'], ['34', 'Houston Texans', 'Texans', 'HOU', 'Houston'],
+  ['10', 'Tennessee Titans', 'Titans', 'TEN', 'Tennessee'], ['20', 'New York Jets', 'Jets', 'NYJ', 'New York'], ['22', 'Arizona Cardinals', 'Cardinals', 'ARI', 'Arizona']])
   team.run(`team:nfl:${id}`, 'nfl', id, name, short, abbr, location);
 const nflPlayer = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES (?, 'nfl', ?, ?, ?, ?, 'x', 1, 1, 'headshot', 0)`);
 for (const [id, name, teamId, position] of [['3122840', 'Deshaun Watson', '5', 'QB'], ['4685327', 'Daylen Everette', '23', 'CB'], ['2576980', 'Marcus Mariota', '28', 'QB'], ['4248911', 'DaRon Bland', '6', 'CB'], ['4431611', 'Caleb Williams', '3', 'QB'],
-  ['4035791', 'Cole Van Lanen', '30', 'OT'], ['4242391', 'Robert Hainsey', '30', 'C'], ['4426448', 'Jarrian Jones', '30', 'CB']])
+  ['4035791', 'Cole Van Lanen', '30', 'OT'], ['4242391', 'Robert Hainsey', '30', 'C'], ['4426448', 'Jarrian Jones', '30', 'CB'],
+  ['3916655', 'Maxx Crosby', '13', 'DE'], ['4692048', 'Que Robinson', '7', 'LB'], ['3916903', 'Dre Greenlaw', '25', 'LB'], ['4575665', 'Jacob Cowing', '25', 'WR'], ['4360761', 'Michael Wilson', '22', 'WR'], ['3916800', 'Mack Wilson Sr.', '22', 'LB'], ['4432577', 'C.J. Stroud', '34', 'QB']])
   nflPlayer.run(`player:nfl:${id}`, id, name, `team:nfl:${teamId}`, position);
 loadCatalog();
 
@@ -148,7 +151,7 @@ test('a touchdown overturned in place (the same play, now a catch at the 1) and 
   await T.poll();
   Object.assign(T.g, { away: 7, current: drive(T.g.current.plays[0], { ...next, text: `${next.text} #38 B.Boehm kick attempt good (H: #32 C.Stumbaugh, LS: #45 C.Britton)`, awayScore: 7 }) });
   await T.poll(2);
-  assert.deepEqual(feed('nu'), [['team.opponent_scored', 'Ball State scored 6 on Northwestern', ['ESPN has since changed this play to a pass reception.', 'Then Ball State scored on the same drive: BALL 6, NU 21.']]]);
+  assert.deepEqual(feed('nu'), [['team.opponent_scored', 'Ball State scored 6 on Northwestern', ['ESPN has since changed this play to a catch.', 'Then Ball State scored on the same drive: BALL 6, NU 21.']]]);
 });
 
 test('a touchdown overturned and scored on the next snap while the header never dropped the points: one alert, one line (South Carolina at Florida)', async () => {
@@ -325,7 +328,7 @@ test('the same play re-posted: same period, a start within 10 seconds, the same 
     'Wiped out by a penalty on South Carolina: Offside.');
   assert.equal(R.changeLine({ league: 'cfb', homeId: '77', awayId: '2050' }, p('(04:32) Shotgun #0 A.Chiles pass incomplete short left to #27 G.Sawchuk thrown to NU00 QB hurried by #7 B.Marsh PENALTY BSU UNR: Unnecessary Roughness (#27 G.Forsha) 15 yards from NU01 to NU16, 1ST DOWN. NO PLAY')),
     'Wiped out by a penalty on Ball State: Unnecessary Roughness.', '"BSU": Ball State\'s initials');
-  assert.equal(R.changeLine(g, D.fromSitePlay({ id: 'y', type: { text: 'Pass Reception' }, text: '(08:40) #6 K.Luster pass complete … to the NU01, 1ST DOWN' })), 'ESPN has since changed this play to a pass reception.');
+  assert.equal(R.changeLine(g, D.fromSitePlay({ id: 'y', type: { text: 'Pass Reception' }, text: '(08:40) #6 K.Luster pass complete … to the NU01, 1ST DOWN' })), 'ESPN has since changed this play to a catch.');
 });
 
 // An NFL core-API play, as ESPN posts it: its teams and players are refs; `clock` in seconds left.
@@ -431,4 +434,127 @@ test("an NFL flag ESPN moved to another player says so on the first one's alert,
     participants: [{ athlete: nflRef('athletes', '4426448'), type: 'other' }] }];
   await T.poll();
   assert.deepEqual(feed('jones'), [['nfl.penalty', 'Jarrian Jones was flagged', ['ESPN has since taken the flag off.']]], 'not "changed this play to a pass reception"');
+});
+
+// ─── The NFL Week 5 recording report (October 11 2026): F5 to F10 ─────────────────────────────────────────────
+test('a flag ESPN drops from the play\'s data but keeps in its text stands; one it declines says so; one that became a disqualification says "ejected", not "taken off" (Raiders at Patriots, Broncos at Chargers, 49ers at Seahawks)', async () => {
+  device('crosby', 'player:nfl:3916655');
+  device('robinson', 'player:nfl:4692048');
+  device('greenlaw', 'player:nfl:3916903');
+  // Maxx Crosby's unnecessary roughness after a touchdown: ESPN relabeled him "other" a read later, the text kept the flag.
+  const A = game('nfl', '401872986', '17', '13', { away: 0, home: 6 });
+  await A.poll();
+  const crosby = corePlay('401872986293', 'Rush', 'M.Jones up the middle to NE 40 for 2 yards (M.Crosby).PENALTY on LV-M.Crosby, Unnecessary Roughness, 15 yards, enforced between downs.', '17', [['rusher', '4426448'], ['penalized', '3916655']], 0, 6, { period: 1, clock: 683 });
+  A.g.core = [A.g.core[0], crosby];
+  await A.poll();
+  A.g.core = [A.g.core[0], { ...crosby, participants: [{ athlete: nflRef('athletes', '4426448'), type: 'rusher' }, { athlete: nflRef('athletes', '3916655'), type: 'other' }] }];
+  await A.poll(2);
+  assert.deepEqual(feed('crosby'), [['nfl.penalty', 'Maxx Crosby was flagged', []]], 'the flag stands: no "taken the flag off"');
+  // Que Robinson's offside: accepted, then declined.
+  const B = game('nfl', '401872989', '24', '7', { away: 10, home: 9 });
+  await B.poll();
+  const offside = corePlay('4018729892538', 'Rush', 'A.Ekeler right end to LAC 30 for 1 yard (Q.Robinson).PENALTY on DEN-Q.Robinson, Defensive Offside, 5 yards, enforced between downs.', '24', [['rusher', '4426448'], ['penalized', '4692048']], 10, 9, { period: 3, clock: 332 });
+  B.g.core = [B.g.core[0], offside];
+  await B.poll();
+  B.g.core = [B.g.core[0], { ...offside, text: 'A.Ekeler right end to LAC 30 for 1 yard (Q.Robinson). Penalty on DEN-Q.Robinson, Defensive Offside, declined.', participants: [{ athlete: nflRef('athletes', '4426448'), type: 'rusher' }, { athlete: nflRef('athletes', '4692048'), type: 'other' }] }];
+  await B.poll(2);
+  assert.deepEqual(feed('robinson'), [['nfl.penalty', 'Que Robinson was flagged', ['ESPN has since declined this flag.']]]);
+  // Dre Greenlaw's unnecessary roughness, then a disqualification: the ejection replaces the flag alert.
+  const C = game('nfl', '401872992', '26', '25', { away: 14, home: 10 });
+  await C.poll();
+  const dq = corePlay('401872992166', 'Rush', 'S.Darnold scrambles right end pushed ob at SF 47 for 5 yards (D.Greenlaw).PENALTY on SF-D.Greenlaw, Unnecessary Roughness, 15 yards, enforced at SF 47.', '26', [['rusher', '4426448'], ['penalized', '3916903']], 14, 10, { period: 2, clock: 390 });
+  C.g.core = [C.g.core[0], dq];
+  await C.poll();
+  C.g.core = [C.g.core[0], { ...dq, text: dq.text.replace('Unnecessary Roughness', 'Disqualification') }];
+  await C.poll(2);
+  assert.deepEqual(feed('greenlaw'), [['nfl.penalty', 'Dre Greenlaw was flagged', ['Dre Greenlaw got ejected.']]], 'the ejection\'s line, not "taken the flag off" as well');
+});
+
+test('a flag still in the call that stands after a review is not kept; ESPN\'s plain words name the play it became (F7)', () => {
+  const g = { league: 'nfl' as const, homeId: '23', awayId: '5' };
+  const now = (type: string, text = 'x') => D.fromCorePlay(corePlay('4018729000001', type, text, '5', [], 0, 0));
+  assert.equal(R.changeLine(g, now('Fumble Recovery (Own)')), 'ESPN has since changed this play to a fumble its own team recovered.');
+  assert.equal(R.changeLine(g, now('Sack Opp Fumble Recovery')), 'ESPN has since changed this play to a strip-sack the defense recovered.');
+  assert.equal(R.changeLine(g, now('Pass Interception Return')), 'ESPN has since changed this play to an interception.');
+  assert.equal(R.changeLine(g, now('Rush')), 'ESPN has since changed this play to a run.');
+  assert.equal(R.changeLine(g, now('Punt')), 'ESPN has since changed this play to a punt.');
+  assert.equal(R.changeLine(g, now('Two Point Pass')), 'ESPN has since changed this play to a two point pass.', 'any other: ESPN\'s own, lowercased');
+});
+
+test('a muffed punt the kicking team recovers is the returner\'s lost fumble; one he recovers himself is nothing (49ers at Seahawks)', () => {
+  const alerts = (p: any) => D.PLAYER_DETECTORS.nfl({ league: 'nfl', gameId: '401872992', homeId: '26', awayId: '25', goalies: new Map() }, D.fromCorePlay(p)).map((e) => `${e.type}: ${e.title}`);
+  const muff = corePlay('401872992469', 'Muffed Punt Recovery (Opponent)', '(9:34) M.Dickson punts 39 yards to SF 35, Center-C.Stoll. J.Cowing MUFFS catch, RECOVERED by SEA-E.Saubert at SF 24.', '25',
+    [['punter', '4362081'], ['recoverer', '4572077'], ['returner', '4575665']], 7, 0, { period: 1, clock: 574, endTeam: '26' });
+  assert.deepEqual(alerts(muff), ['nfl.fumble_lost: Jacob Cowing lost a fumble']);
+  const own = corePlay('401872992470', 'Punt', '(9:34) M.Dickson punts 39 yards to SF 35, Center-C.Stoll. J.Cowing MUFFS catch, and recovers at SF 33.', '25',
+    [['punter', '4362081'], ['recoverer', '4575665'], ['returner', '4575665']], 7, 0, { period: 1, clock: 574 });
+  assert.deepEqual(alerts(own), [], 'his own team recovered it');
+});
+
+test('a lost fumble ESPN corrects to its own team\'s recovery after the final says so on the alert (Browns at Jets)', async () => {
+  device('watson2', 'player:nfl:3122840');
+  const T = game('nfl', '401872983', '20', '5', { away: 12, home: 17 });
+  await T.poll();
+  const roles: [string, string][] = [['passer', '3122840']];
+  const fumble = corePlay('4018729833950', 'Sack Opp Fumble Recovery', '(Shotgun) D.Watson sacked at CLV 19 for 0 yards (W.McDonald). FUMBLES (W.McDonald), RECOVERED by NYJ-J.Smith at CLV 19.', '5', roles, 12, 17, { period: 4, clock: 57, endTeam: '20' });
+  T.g.core = [T.g.core[0], fumble];
+  await T.poll();
+  assert.deepEqual(pushed('watson2'), ['Deshaun Watson lost a fumble']);
+  Object.assign(T.g, { state: 'post', period: 4, clock: '0:00' });
+  await T.poll(2); // END GAME: the tracker finishes
+  assert.equal(T.tracker.finished, true);
+  T.g.core = [T.g.core[0], { ...fumble, type: { text: 'Fumble Recovery (Own)' }, text: '(Shotgun) D.Watson sacked at CLV 19 for 0 yards (W.McDonald). FUMBLES (W.McDonald), and recovers at CLV 19. D.Watson to CLV 18 for -1 yards', end: { team: nflRef('teams', '5') } }];
+  await T.poll();
+  assert.deepEqual(feed('watson2').filter((r) => r[0] === 'nfl.fumble_lost'), [['nfl.fumble_lost', 'Deshaun Watson lost a fumble', ['Deshaun Watson got sacked.', 'ESPN has since corrected it: the Browns kept the ball.']]]);
+  assert.deepEqual(pushed('watson2').filter((t) => /fumble/.test(t)), ['Deshaun Watson lost a fumble'], 'no second push for the fumble (the loss pushed once, at the final)');
+});
+
+test('a delay of game charged to the quarterback, then marked a punt: the line says it was the punt team\'s (Texans at Titans)', () => {
+  const g = { league: 'nfl' as const, gameId: '401872984', homeId: '10', awayId: '34', goalies: new Map(), qbs: { '34': '4432577' } } as any;
+  const ledger = new R.PlayLedger(g, () => {});
+  const dog = D.fromCorePlay(corePlay('4018729841234', 'Penalty', 'PENALTY on HST, Delay of Game, 5 yards, enforced at TEN 40 - No Play.', '34', [], 26, 3, { period: 3, clock: 480 }));
+  const sent = D.PLAYER_DETECTORS.nfl(g, dog);
+  assert.deepEqual(sent.map((e) => e.title), ['C.J. Stroud took a delay of game penalty']);
+  NOW += 1000;
+  ledger.add(dog, sent, { history: false }, NOW);
+  const punt = D.fromCorePlay(corePlay('4018729841234', 'Penalty', '(Punt formation) PENALTY on HST, Delay of Game, 5 yards, enforced at TEN 40 - No Play.', '34', [], 26, 3, { period: 3, clock: 480 }));
+  const r = ledger.changed(punt, NOW + 12_000)!;
+  assert.deepEqual(r.lines.map((e) => e.fold), ['ESPN has since put this on the punt team.']);
+});
+
+test('an NFL game that ends tied sends each team\'s trackers a feed-only "tied" alert, one to a device tracking both (Bears and Vikings)', async () => {
+  device('bears', 'team:nfl:3');
+  device('both', 'team:nfl:3', 'team:nfl:16');
+  device('vikings', 'team:nfl:16');
+  const T = game('nfl', '401872988', '16', '3', { away: 27, home: 27 });
+  await T.poll();
+  Object.assign(T.g, { state: 'post', period: 5, clock: '0:00' });
+  await T.poll(2);
+  const tied = [['nfl.team.tied', 'Bears tied the Vikings, 27-27', []]];
+  assert.deepEqual(feed('bears'), tied);
+  assert.deepEqual(feed('both'), tied, 'one alert');
+  assert.deepEqual(feed('vikings'), [['nfl.team.tied', 'Vikings tied the Bears, 27-27', []]]);
+  assert.deepEqual([pushed('bears'), pushed('both'), pushed('vikings')], [[], [], []], 'feed only');
+  assert.deepEqual(D.gameTiedEvents({ league: 'nfl', gameId: 'x', homeId: '16', awayId: '3' }, { home: 20, away: 17 }, 0), [], 'a win is not a tie');
+});
+
+test('two players with one surname: a flag moves from Michael Wilson to Mack Wilson Sr. (his initials), and a review that put the ball out of bounds is "Overturned on review: …" (Cardinals; Bengals at Dolphins)', async () => {
+  device('mwilson', 'player:nfl:4360761');
+  device('watson3', 'player:nfl:3122840');
+  const T = game('nfl', '401872991', '22', '8', { away: 0, home: 7 });
+  await T.poll();
+  const block = corePlay('401872991937', 'Rush', 'J.Love left tackle to ARZ 22 for 1 yard (A.Hutchinson).PENALTY on ARZ-Mi.Wilson, Illegal Block Above the Waist, 10 yards, enforced at ARZ 21.', '8', [['rusher', '4426448'], ['penalized', '4360761']], 0, 7, { period: 2, clock: 600 });
+  T.g.core = [T.g.core[0], block];
+  await T.poll();
+  T.g.core = [T.g.core[0], { ...block, text: block.text.replace('Mi.Wilson', 'Ma.Wilson'), participants: [{ athlete: nflRef('athletes', '4426448'), type: 'rusher' }, { athlete: nflRef('athletes', '3916800'), type: 'penalized' }] }];
+  await T.poll();
+  assert.deepEqual(feed('mwilson'), [['nfl.penalty', 'Michael Wilson was flagged', ['ESPN has since charged this flag to Mack Wilson Sr..']]], 'not kept: the text now names Ma.Wilson');
+  // A lost fumble a review reversed (ball out of bounds): the review is the reason, and who kept the ball.
+  const g = { league: 'nfl' as const, gameId: '401872982', homeId: '5', awayId: '20', goalies: new Map() } as any;
+  const ledger = new R.PlayLedger(g, () => {});
+  const lost = D.fromCorePlay(corePlay('4018729821452', 'Sack Opp Fumble Recovery', '(Shotgun) D.Watson sacked at CLV 19 for 0 yards (W.McDonald). FUMBLES (W.McDonald), RECOVERED by NYJ-J.Smith at CLV 19.', '5', [['passer', '3122840']], 0, 0));
+  ledger.add(lost, D.PLAYER_DETECTORS.nfl(g, lost), { history: false }, NOW);
+  const reviewed = D.fromCorePlay(corePlay('4018729821452', 'Fumble Recovery (Own)', `${lost.text}The Replay Official reviewed the ball was inbounds ruling, and the play was REVERSED.(Shotgun) D.Watson sacked at CLV 19 for 0 yards (W.McDonald). FUMBLES (W.McDonald), ball out of bounds at CLV 19.`, '5', [['passer', '3122840']], 0, 0));
+  const r = ledger.changed(reviewed, NOW + 120_000)!;
+  assert.deepEqual(r.lines.map((e) => e.fold), ['Overturned on review: the Browns kept the ball.']);
 });

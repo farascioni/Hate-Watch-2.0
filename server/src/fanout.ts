@@ -512,7 +512,7 @@ export function publish(events: Detected[], league: League) {
       const streak = streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
-      const willPush = !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
+      const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null);
       const body = withLines(e.body, lines);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length ? JSON.stringify({ kind: 'event', item: { ...item, body } }) : frame);

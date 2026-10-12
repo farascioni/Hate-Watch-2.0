@@ -60,7 +60,52 @@ export function changeLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, now
   if (!now) return 'ESPN has since taken this play back.';
   if (/\bno play\b/i.test(ruled(now.text))) return wipedOutLine(g, ruled(now.text));
   if (REVIEW.test(now.text)) return 'Overturned on review.';
-  return now.type ? `ESPN has since changed this play to ${/^[aeiou]/i.test(now.type) ? 'an' : 'a'} ${now.type.toLowerCase()}.` : 'ESPN has since changed this play.';
+  return now.type ? `ESPN has since changed this play to ${plainType(now.type)}.` : 'ESPN has since changed this play.';
+}
+
+/** ESPN's football play types in plain words ("a fumble recovery (own)" read like a database field). */
+const PLAIN: [RegExp, string][] = [
+  [/^Fumble Recovery \(Own\)/i, 'a fumble its own team recovered'],
+  [/^Fumble Recovery \(Opp/i, 'a fumble the other team recovered'],
+  [/^Sack Opp/i, 'a strip-sack the defense recovered'],
+  [/^Sack/i, 'a sack'],
+  [/^(?:Pass )?Interception/i, 'an interception'],
+  [/^Muffed Punt Recovery \(Opp/i, 'a muffed punt the kicking team recovered'],
+  [/^Pass Reception/i, 'a catch'],
+  [/^Pass Incompletion/i, 'an incompletion'],
+  [/^Rush(?:ing)?$/i, 'a run'],
+  [/^Rushing Touchdown/i, 'a rushing touchdown'],
+  [/^Passing Touchdown/i, 'a passing touchdown'],
+  [/^Punt$/i, 'a punt'],
+  [/^Kickoff/i, 'a kickoff'],
+  [/^Penalty$/i, 'a penalty'],
+];
+export function plainType(type: string): string {
+  return PLAIN.find(([re]) => re.test(type))?.[1] ?? `${/^[aeiou]/i.test(type) ? 'an' : 'a'} ${type.toLowerCase()}`;
+}
+
+/** A name's last word, for matching "M.Crosby", "Mi.Wilson", "C.Van Lanen" with "Maxx Crosby", "Mack Wilson Sr.". */
+const surname = (s: string) => s.replace(/\b(?:jr|sr|ii|iii|iv)\b\.?/gi, '').replace(/[^\p{L}' -]/gu, '').trim().split(/\s+/).at(-1)?.toLowerCase();
+const letters = (s: string) => s.replace(/[^\p{L}]/gu, '').toLowerCase();
+/** ESPN's "M.Crosby" / "Mi.Wilson" / "C.Van Lanen" is the player: his first name starts with the initial(s) and his last name is the surname. */
+function isNamed(playerKey: string, espnName: string): boolean {
+  const name = catalog.player(playerKey)?.name;
+  if (!name) return false;
+  const initial = letters(espnName.split('.')[0]), last = surname(espnName.replace(/^[^.]*\./, ''));
+  return !!last && last === surname(name) && letters(name.split(/\s+/)[0]).startsWith(initial);
+}
+/**
+ * The player's flag is still in the call that stands (the text after a "REVERSED."; "PENALTY on LV-M.Crosby,
+ * Unnecessary Roughness, 15 yards, enforced between downs."; ESPN writes a declined one "Penalty on …, declined"). ESPN
+ * drops or relabels the flagged player in the play's data a read later (Crosby became "other", Patterson was dropped)
+ * while the text keeps the flag: it stands.
+ */
+function flagStands(p: NPlay, playerKey: string): boolean {
+  return [...ruled(p.text).matchAll(/PENALTY on [A-Z]{2,3}-([^,]+),([^]*?)(?=PENALTY on |$)/g)].some((m) => !/declined/i.test(m[2]) && isNamed(playerKey, m[1]));
+}
+/** ESPN now calls this player's flag declined ("Penalty on DEN-Q.Robinson, Defensive Offside, declined."). */
+function flagDeclined(p: NPlay, playerKey: string): boolean {
+  return [...ruled(p.text).matchAll(/Penalty on [A-Z]{2,3}-([^,]+),([^]*?)(?=Penalty on |PENALTY on |$)/g)].some((m) => /declined/i.test(m[2]) && isNamed(playerKey, m[1]));
 }
 
 /** The line on a score's alerts taken back when the side scores on that drive after all (`p`: that play). */
@@ -165,6 +210,25 @@ export class PlayLedger {
   }
 
   /**
+   * The line on an alert (not a flag's) the play no longer has, when the play being what it is says more than
+   * `changeLine`: a lost fumble that turns out recovered by its own team ("ESPN has since corrected it: the Browns kept
+   * the ball.", Browns at Jets, October 11 2026), a quarterback's delay of game that was the punt or field goal team's.
+   */
+  private goneLine(e: Detected, p: NPlay, want: Map<string, Detected>): string | undefined {
+    if (/^(?:nfl|cfb\.team)\.fumble_lost$/.test(e.type) && [...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:nfl|cfb\.team)\.fumble$/.test(f.type))) {
+      const team = e.targetKey.startsWith('player:') ? catalog.player(e.targetKey)?.teamKey : e.targetKey;
+      const name = team ? catalog.team(team)?.shortName : undefined;
+      const who = name ? (TEAMS_ONLY.has(this.g.league) ? name : `the ${name}`) : 'they';
+      return REVIEW.test(p.text) ? `Overturned on review: ${who} kept the ball.` : `ESPN has since corrected it: ${who} kept the ball.`;
+    }
+    if (e.type === 'nfl.qb.delay_of_game') {
+      const unit = /\(Punt formation\)/i.test(p.text) ? 'punt team' : /\(Field Goal formation\)/i.test(p.text) ? 'field goal unit' : undefined;
+      if (unit) return `ESPN has since put this on the ${unit}.`;
+    }
+    return undefined;
+  }
+
+  /**
    * A play's alerts against a new version of it (null: ESPN took it out): the ones it no longer has get a line
    * (`lines`), the ones it has now go out (`fresh`). One taken back that it has again gets a line, never a second
    * alert (an interception wiped out by pass interference, then not: the flag overturned on review, Browns at
@@ -179,6 +243,7 @@ export class PlayLedger {
     const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [], gone: Detected[] = [];
     for (const [k, e] of x.alerts) {
       if (want.has(k) || ONCE.test(e.type)) continue;
+      if (p && e.type === 'nfl.penalty' && flagStands(p, e.targetKey)) continue; // ESPN dropped his role, the flag stands
       x.alerts.delete(k);
       x.dropped.set(k, e);
       gone.push(e);
@@ -194,9 +259,11 @@ export class PlayLedger {
     // the first player's alert gets the move as its line, not the new flag as a second one (`alt`: publish keeps one).
     const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty');
     for (const e of gone) {
-      if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], why)); continue; }
+      if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why)); continue; }
+      // The flag became an ejection on the same play (a disqualification, a targeting call): the ejection's own line says so.
+      if ([...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:player\.ejected|cfb\.team\.ejection)$/.test(f.type))) continue;
       const to = e.type === 'nfl.penalty' ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
-      if (!to.length) { lines.push(...this.linesOn([e], REVIEW.test(p.text) ? 'Overturned on review.' : 'ESPN has since taken the flag off.')); continue; }
+      if (!to.length) { lines.push(...this.linesOn([e], REVIEW.test(p.text) ? 'Overturned on review.' : e.type === 'nfl.penalty' && flagDeclined(p, e.targetKey) ? 'ESPN has since declined this flag.' : 'ESPN has since taken the flag off.')); continue; }
       const alt = `flag-moved:${p.id}`;
       for (const f of to) f.alt = alt;
       lines.push(...this.linesOn([e], `ESPN has since charged this flag to ${to.map((f) => catalog.player(f.targetKey)?.name ?? 'another player').join(' and ')}.`, alt));

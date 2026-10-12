@@ -28,7 +28,7 @@ const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.c
   'team.opponent_scored', 'team.fell_behind', 'team.standings_drop', 'team.losing_streak', 'team.player_injured', 'epl.foul', 'mlb.team.down_in_order',
   'team.rival_clinched',
   // October 2026's sport alerts: the in-game drip, feed only.
-  'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nba.brick_night', 'nba.scoreless_half', 'nba.team.opponent_run',
+  'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nfl.team.tied', 'nba.brick_night', 'nba.scoreless_half', 'nba.team.opponent_run',
   'wnba.brick_night', 'wnba.scoreless_half', 'wnba.team.opponent_run', 'nhl.minus', 'nhl.team.empty_net_goal', 'nhl.team.shorthanded_goal', 'epl.hit_woodwork',
   // College football (October 2026): the NFL's, as its own.
   'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty',
@@ -39,7 +39,7 @@ const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.c
 // Alerts added since: nobody had them, so they come with the new defaults for everyone.
 const ADDED = ['mlb.team.down_in_order', 'team.rival_clinched', 'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nba.brick_night', 'nba.scoreless_half',
   'nba.team.opponent_run', 'wnba.brick_night', 'wnba.scoreless_half', 'wnba.team.opponent_run', 'nhl.minus', 'nhl.team.empty_net_goal', 'nhl.team.shorthanded_goal', 'epl.hit_woodwork',
-  'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty', 'f1.driver.pit_stop'];
+  'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty', 'f1.driver.pit_stop', 'nfl.team.tied'];
 const NEW = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : FEED.includes(t.id) ? 'feed' : 'push']));
 
 test('a new install: the result and the rare headline failures push, the in-game drip is feed only, the noisiest are off', () => {

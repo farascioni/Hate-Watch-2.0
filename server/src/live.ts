@@ -9,7 +9,7 @@ import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, type Detected, type GameCtx, type NPlay, type Pregame,
   awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent,
 } from './detectors.ts';
@@ -42,6 +42,13 @@ const CLIP_READS = 4;
 const CLIP_TRIES = 3; // a clip whose record won't load is skipped after this many reads
 const CLIPS_POLL_MS = 60_000;
 const CLIPS_AFTER_FINAL_MS = 60 * 60_000;
+/**
+ * ESPN corrects football plays after posting END GAME: a lost fumble became the offense's own recovery 24 s after it, and
+ * an overtime's last play a sack 36 s after (Browns at Jets, Giants at Commanders, October 11 2026; 4 of 12 games had
+ * a change that matters within two minutes). The play ledger revises them, so the tracker goes on reading for this long.
+ */
+const FINAL_CORRECTIONS_MS = Number(process.env.HW_FINAL_CORRECTIONS_MS ?? 3 * 60_000);
+const FINAL_CORRECTIONS_POLL_MS = Number(process.env.HW_FINAL_CORRECTIONS_POLL_MS ?? 10_000);
 const CLIP_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']); // the leagues ESPN has clips for (none for the NFL or soccer in October 2026)
 const SCOREBOARD_MS = Number(process.env.HW_SCOREBOARD_MS ?? 10000);   // discovers games going live / final
 const STANDINGS_MS = Number(process.env.HW_STANDINGS_MS ?? 60000);
@@ -303,6 +310,14 @@ export class GameTracker {
       if (!flagOn('clips.feed') && !flagOn('clips.loss')) continue; // switched off: nothing to read for
       const s = await liveDeps.getJson(urls.summary(this.ctx.league, this.ctx.gameId), { bust: true, timeoutMs: 6000 }).catch(() => null);
       if (s) await this.readClips(s).catch((e) => log(`[${this.ctx.league} ${this.ctx.gameId}] clips`, String(e)));
+    }
+  }
+
+  /** Football, after the final: the plays and drives again for FINAL_CORRECTIONS_MS, for ESPN's corrections (revisions.ts). */
+  private async correctionsAfterFinal() {
+    for (let reads = Math.ceil(FINAL_CORRECTIONS_MS / FINAL_CORRECTIONS_POLL_MS); reads > 0; reads--) {
+      await new Promise((r) => setTimeout(r, FINAL_CORRECTIONS_POLL_MS).unref());
+      try { await this.poll(); } catch (e) { log(`[${this.ctx.league} ${this.ctx.gameId}] read after the final failed`, String(e)); }
     }
   }
 
@@ -687,6 +702,8 @@ export class GameTracker {
     this.first = false;
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
     if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
+    // After the final ESPN's data can still flip back (a drive FUMBLE, DOWNS, FUMBLE in 36 s: Browns at Jets): what the reads then find goes to the feed, never a push.
+    if (this.finished) for (const e of events) e.noPush = true;
     if (events.length) { publish(bundleByPlay(events), league); this.newAlerts = true; }
     if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
@@ -766,7 +783,12 @@ export class GameTracker {
     const seasonType = Number(this.box?.header?.season?.type ?? this.pre.seasonType ?? 2);
     const players = this.box && seasonType !== 1 ? playerFinalEvents(this.ctx, boxPlayerFacts(this.ctx.league, this.box), final, Date.now(), lost) : [];
     if (CLIP_LEAGUES.has(this.ctx.league)) void this.clipsAfterFinal();
-    if (!lost) { if (players.length) publish(players, this.ctx.league); return; } // a tie
+    if (FOOTBALL.has(this.ctx.league)) void this.correctionsAfterFinal();
+    if (!lost) { // a tie: the NFL's says so, feed only
+      const tied = [...gameTiedEvents(this.ctx, final, Date.now()), ...players];
+      if (tied.length) publish(tied, this.ctx.league);
+      return;
+    }
     // One alert per device for a loss (they share a moment), each the first it wants: soccer's "thrashed"
     // (3+ goals), then the team's loss, then its facts (a walk-off, losing as the favorite…: each a line on
     // the loss, or the alert itself for a device with the loss off), then "their team lost" for its players.

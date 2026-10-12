@@ -110,6 +110,7 @@ const BASE: EventTypeDef[] = [
   { id: 'nfl.team.turnover_on_downs', scope: 'team', leagues: ['nfl'], section: 'Team', label: 'Turns it over on downs', description: 'Tracked team goes for it on 4th down and doesn\'t make it.', defaultOn: true, emoji: '🛑' },
   { id: 'nfl.team.red_zone_empty', scope: 'team', leagues: ['nfl'], section: 'Team', label: 'Comes away empty from the red zone', description: 'Tracked team gets inside the 20 and scores nothing: a turnover, on downs, a missed field goal. A line on the turnover\'s alert if you track that player too.', defaultOn: true, emoji: '🫙' },
   { id: 'nfl.team.three_and_out', scope: 'team', leagues: ['nfl'], section: 'Team', label: 'Goes three-and-out', description: 'Tracked team punts after three plays or fewer without a first down.', defaultOn: true, defaultPush: false, emoji: '3️⃣' },
+  { id: 'nfl.team.tied', scope: 'team', leagues: ['nfl'], section: 'Team', label: 'Ties a game', description: 'The game ends level after overtime. Not a loss, so not a Successful Hate Watch: feed only.', defaultOn: true, defaultPush: false, emoji: '🤝' },
   // College football (teams only): the NFL's alerts as the team's own, so each league's Settings keep theirs. Sections as
   // the NFL's; in each, the ones that push, then feed-only, then off.
   { id: 'cfb.team.interception', scope: 'team', leagues: ['cfb'], section: 'Offense', label: 'Throws an interception', description: 'Tracked team throws an interception (a pick-six says so).', defaultOn: true, emoji: '🎯' },

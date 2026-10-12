@@ -37,9 +37,9 @@ F1
 FOOTBALL
 - A CFB chip: the FBS's 138 teams by conference, with games, scores, box scores, standings and Top-25 ranks. (Server)
 - Alerts: interceptions, lost fumbles, missed field goals, ejections, the QB pulled, turnovers on downs, the red zone, AP Top 25 moves; sacks and flags in the feed. (Server)
-- A play or flag ESPN changes after its alert gets a line on it, no second alert; what it became goes out. NFL too. (Server)
+- A football play or flag ESPN changes, even after the final, gets a line, no second alert; the new play alerts. (Server)
 - More teams' flags go out, with the team and foul named right. (Server)
-- NFL: a wiped-out play alerts only its flag; every sack and lost strip-sack counts; flags feed only on new installs. (Server)
+- NFL: a wiped-out play alerts only its flag; every sack, strip-sack and muffed punt counts; ties and new installs' flags are feed only. (Server)
 
 MLB
 - A homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)

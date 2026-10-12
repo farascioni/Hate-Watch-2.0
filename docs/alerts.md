@@ -11,7 +11,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 **Sections:**
 
 - [MLB](#mlb): a batter's strikeouts (and 3+), outs, double and triple plays, being thrown out on the bases, going hitless; a fielder's error; a catcher's passed ball; a pitcher's homers (back-to-back too), runs, walks and handed-over runs.
-- [NFL](#nfl): interceptions, sacks, incompletions, fumbles, missed kicks, flags, a touchdown wiped out, a quarterback pulled, ejections; three-and-outs, turnovers on downs, empty red-zone trips; how ESPN's later edits to football plays become lines, not new alerts.
+- [NFL](#nfl): interceptions, sacks, incompletions, fumbles, missed kicks, flags, a touchdown wiped out, a quarterback pulled, ejections; three-and-outs, turnovers on downs, empty red-zone trips; a tied game; how ESPN's later edits to football plays become lines, not new alerts.
 - [NFL delay of game / safety](#nfl-delay-of-game--safety): a team's delay of game given to its quarterback; a safety for the team and the player responsible.
 - [NFL onside kick](#nfl-onside-kick): the receiving team's alert when the other side kicks onside and keeps the ball (NFL and college).
 - [NBA](#nba): blocks, missed free throws, missed shots (named, with the distance, late and close), turnovers, technicals and ejections, fouls and fouling out, scoreless at the half, brick nights, the other team's star, a 14-0 run.
@@ -164,7 +164,7 @@ The MLB player alerts that come from a single play: strikeouts, outs, double pla
 
 ## NFL
 
-The NFL's player alerts from single plays (interceptions, sacks, incompletions, fumbles, missed kicks, flags, a touchdown wiped out, a quarterback pulled, an ejection) and the team's drive alerts (three-and-out, on downs, the red zone). Delay of game and safeties are in [NFL delay of game / safety](#nfl-delay-of-game--safety), onside kicks in [NFL onside kick](#nfl-onside-kick), college football's team versions in [College football](#college-football).
+The NFL's player alerts from single plays (interceptions, sacks, incompletions, fumbles, missed kicks, flags, a touchdown wiped out, a quarterback pulled, an ejection) and the team's drive alerts (three-and-out, on downs, the red zone), and a game that ends tied ([A tied game](#a-tied-game)). Delay of game and safeties are in [NFL delay of game / safety](#nfl-delay-of-game--safety), onside kicks in [NFL onside kick](#nfl-onside-kick), college football's team versions in [College football](#college-football).
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
@@ -180,6 +180,7 @@ The NFL's player alerts from single plays (interceptions, sacks, incompletions, 
 | `nfl.team.turnover_on_downs` | Turns it over on downs | team | Team | push |
 | `nfl.team.red_zone_empty` | Comes away empty from the red zone | team | Team | push |
 | `nfl.team.three_and_out` | Goes three-and-out | team | Team | feed only |
+| `nfl.team.tied` | Ties a game | team | Team | feed only |
 | `player.ejected` | Gets ejected | player | Game | push |
 
 **Where the plays come from.** The NFL's plays come from ESPN's core plays feed only: the site summary has drives without participants, so `GameTracker.poll` leaves its plays out for the NFL (`sitePlays` is empty for `nfl`). The summary is still read every 2 seconds, for the status, the header's score and the drives. The detector is `nfl()` in `detectors.ts`.
@@ -207,6 +208,7 @@ The NFL's player alerts from single plays (interceptions, sacks, incompletions, 
 - **Who fumbled:** the play's `fumbler` participants, less anyone listed as `forcedBy` (ESPN can name the defender who forced a strip-sack as its fumbler and leave the quarterback out: Barmore on Rodgers, Steelers at Patriots). When the text says "…sacked … . FUMBLES" and the passer isn't listed, the passer is added as the fumbler.
 - **Lost or kept:** the text's "RECOVERED by XXX-" codes (capitals: the ball changed hands) are mapped to ESPN's abbreviations (`NFL_CODE`: ARZ→ARI, BLT→BAL, CLV→CLE, HST→HOU, LA→LAR, WAS→WSH, JAC→JAX). Lost when any recovering team isn't the fumbler's. With no such code, the type decides: "Opponent", "Opp Fumble" or "Fumble Return" means lost. So a strip-sack the defense recovers ("Sack Opp Fumble Recovery", 21 in weeks 1 to 5) and a kick returner's fumble the kicking team recovers (typed just "Kickoff", 6) count as lost.
 - **Titles:** "Chimere Dike lost a fumble", "Aaron Rodgers lost a fumble — returned for a TD 🙃" (a touchdown on the return: the type says Touchdown, or "TOUCHDOWN" follows the recovery in the text), "Bijan Robinson fumbled" (kept; `test/sport-alerts.test.ts`).
+- **A muffed catch the other team recovers:** "J.Cowing MUFFS catch, RECOVERED by SEA-E.Saubert" is typed "Muffed Punt Recovery (Opponent)" and lists Cowing as the `returner`, not a `fumbler`, so the `returner` of a play whose text says MUFFS counts as the fumbler when a capitalized "RECOVERED by" names another team (49ers at Seahawks, October 11 2026; five such muffs in the season's finished games, none alerted before). A muff the returner recovers himself ("and recovers") sends nothing. College football's version already read it from the side that ended with the ball (`cfb.team.fumble_lost`).
 - **A lost fumble counts as "Fumbles (any)"** (`aliases: ['nfl.fumble']`). On a strip-sack the lost fumble goes in front of the quarterback's sack alert, so a device gets "lost a fumble" with the sack as its line.
 - Ball carriers only on a player's screen (not OT, G, C, OL, DE, DT, PK, LS).
 
@@ -220,13 +222,19 @@ The NFL's player alerts from single plays (interceptions, sacks, incompletions, 
 - **Trigger:** every participant ESPN lists as `penalized` on the play, wiped out or not. **Title:** "Robert Hainsey was flagged", with " (declined)" when the text says declined.
 - **Replaced by something more specific** on the same play for the same player (the `replace()` helper in `nfl()`): a safety from a flag in the end zone, the quarterback's own delay of game, an ejection, a touchdown his flag wiped out. The specific alert carries `aliases: ['nfl.penalty']`.
 - **Default:** feed only for installs from October 11, 2026 (the Jaguars, team and players, got 14 pushes for flags of 19 in London). Installs from before keep flags pushed: `keepFlagsPushed()` in `fanout.ts` wrote `pushTypes['nfl.penalty'] = true` into every existing device once (kv `prefs:nfl-flags-feed`).
-- **Revisions:** a flag ESPN moves to another player, or takes off, is a line on the alert that went out: "ESPN has since charged this flag to Robert Hainsey." or "ESPN has since taken the flag off." (Eagles at Jaguars, October 11 2026, `test/play-revisions.test.ts`). See [Revisions](#revisions-espn-changes-a-football-play-after-its-alert).
+- **Revisions:** a flag ESPN moves to another player, or takes off, is a line on the alert that went out: "ESPN has since charged this flag to Robert Hainsey." or "ESPN has since taken the flag off." (Eagles at Jaguars, October 11 2026, `test/play-revisions.test.ts`); a flag it declines, "ESPN has since declined this flag."; one that stands and one that became an ejection get no "taken off" line (below). See [Revisions](#revisions-espn-changes-a-football-play-after-its-alert).
 
 ### Touchdown wiped out by a penalty
 
 - **Trigger:** what stands of the play says "TOUCHDOWN NULLIFIED" ("TOUCHDOWN NULLIFIED by Penalty. PENALTY on GB-A.Belton, …").
 - **Two alerts:** the flagged player's (`flaggedFor`: the penalized player whose name matches the first "PENALTY on XXX-F.Last"), "<Name>'s penalty wiped out a touchdown", in place of his penalty alert; and his team's, "Packers had a touchdown wiped out by a penalty" (`test/sport-alerts.test.ts`), id `${gameId}:${playId}:nfl.td_wiped_out:team-${teamId}`.
 - It still pushes for new installs (unlike plain flags).
+
+### A tied game (feed only)
+
+- **Trigger:** the NFL's final with equal scores (overtime can end level: Giants at Commanders, 27-27, October 11 2026). It's no loss, so no Successful Hate Watch and no loss facts (`gameTiedEvents` in `detectors.ts`, published from `GameTracker.finish`).
+- **Title:** "Giants tied the Commanders, 27-27", one alert per team, body "Final Score: 27 to 27. Nobody won.". Both teams share the moment `${gameId}:final:tied`; a device tracking both gets the one it followed first (`firstFollowed`). Id `${gameId}:final:nfl.team.tied:${teamId}`.
+- **Test:** `test/play-revisions.test.ts`.
 
 ### Gets pulled (quarterbacks)
 
@@ -259,6 +267,14 @@ Alerts go out the moment a play is first seen; nothing waits for a review. ESPN 
 - **An alert the play has now and didn't before** goes out then: an incompletion that became an interception, a flag added later (feed only, like any flag).
 - **An alert taken back that the play has again** gets a line, never a second alert: "Overturned on review: it stands.", "ESPN has since put this play back.", or "ESPN has since changed this play back.".
 - **A flag that moved or came off** while its play stands: "ESPN has since charged this flag to Robert Hainsey." or "ESPN has since taken the flag off.". A device that had the first player's flag gets that line, not the new player's flag as a second alert (`alt` group `flag-moved:<playId>`).
+- **A flag that still stands** is kept (`flagStands` in `revisions.ts`): ESPN drops the flagged player from the play's data, or relabels him "other", a read later while the text keeps "PENALTY on LV-M.Crosby, Unnecessary Roughness, 15 yards, enforced between downs." (the call that stands, by surname; a declined flag is written "Penalty on …, declined"). "Taken the flag off" was true for 1 of the 5 flags that got it in the October 11 2026 games (Raiders at Patriots, Bengals at Dolphins, Broncos at Chargers, 49ers at Seahawks).
+- **A flag ESPN declines** after posting it (Que Robinson's offside, Broncos at Chargers): "ESPN has since declined this flag." (NFL).
+- **A flag that became an ejection** (Dre Greenlaw's unnecessary roughness became a disqualification): the ejection alert replaces the flag alert, so the flag says nothing of its own and the ejection's line follows ("Dre Greenlaw got ejected.").
+- **A quarterback's delay of game** that turns out to be the punt or field goal team's ("(Punt formation)" added 12 seconds later, C.J. Stroud, Texans at Titans): "ESPN has since put this on the punt team." ("the field goal unit").
+- **A lost fumble the play no longer has but still shows as a fumble** (the offense recovered it): "ESPN has since corrected it: the Browns kept the ball." (`goneLine`; college football's team version the same).
+- **ESPN's play types in plain words** in "ESPN has since changed this play to …" (`plainType`): "a fumble its own team recovered", "a strip-sack the defense recovered", "an interception", "a catch", "a run", "a punt", "a kickoff"; any other type is ESPN's own, lowercased.
+- **After the final** the tracker goes on reading a football game's plays and drives for 3 minutes (`correctionsAfterFinal` in `live.ts`, every 10 seconds; `HW_FINAL_CORRECTIONS_MS`, `HW_FINAL_CORRECTIONS_POLL_MS`), so ESPN's corrections after END GAME are revisions like any other: an overtime's last play that became a Jayden Daniels sack 36 seconds after the final (Giants at Commanders) is now an alert, a flag named late goes out. ESPN can change a play more than once in that time (Browns at Jets: a lost fumble became the offense's own recovery at 24 seconds, and at 60 seconds the same play showed a second fumble the Jets recovered); each change is a line, in order (`test/final-corrections.test.ts`). What the reads after the final find goes to the feed and never pushes (`noPush` on the alert), because ESPN's data can still flip back: the Browns' drive ended FUMBLE, DOWNS, FUMBLE inside 36 seconds, which would have pushed a false "turned it over on downs". Not kept across a restart.
+
 - **A re-post** under a new id at the same spot (`samePlay`: the same period, a start within 10 seconds by the "(12:21)" its text opens with, the same player) is that play, revised.
 - **A play gone** from the feed for 30 seconds (`GONE_MS`) has its alerts taken back; a single short read doesn't count.
 - **A drive whose result changed** gets "ESPN has since changed how the drive ended: <result>." on its alerts, and its new alerts go out.

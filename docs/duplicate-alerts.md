@@ -351,6 +351,13 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   - A flag's alert taken back while its play stands says what became of the flag: "ESPN has since charged this flag
     to Robert Hainsey." or "ESPN has since taken the flag off." A device that had the first player's alert gets that
     line, not the new player's flag as a second alert (they share an `alt`, `flag-moved:${playId}`).
+  - A flag that still stands in the call's text (ESPN dropped or relabeled the flagged player in the data) is kept: no
+    line. One ESPN now calls declined says so; one that became an ejection gets no flag line, the ejection's own
+    follows; a lost fumble that is now the offense's own recovery says "ESPN has since corrected it: the Browns kept
+    the ball."; a quarterback's delay of game that is the punt team's says so. Details: docs/alerts.md, "Revisions".
+  - A football game's plays and drives are read for 3 more minutes after the final (`correctionsAfterFinal`), so a
+    correction after END GAME is a revision too (a sack that was a run, a flag named late). What it finds goes to
+    the feed and never pushes (`noPush`: ESPN's data can still flip back). That reading is in memory only.
   - A play re-posted under a new id at the same spot (`samePlay`: the same period, a start within 10 seconds, the
     same player, or naming none, the same type) is that play, revised (`repost`), not a new one. One touchdown posted
     under three ids is one alert.

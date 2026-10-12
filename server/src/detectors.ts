@@ -99,6 +99,8 @@ export interface Detected {
    * not the first in the list: tracking Gerrit Cole and then Aaron Judge, a Yankees loss is Cole's.
    */
   firstFollowed?: boolean;
+  /** Never a push, whatever the device's settings: an alert found by the reads after a game's final (live.ts), where ESPN's data can still flip back. */
+  noPush?: boolean;
   /**
    * A fact to add to another alert of the same moment instead of sending this one too: a device that
    * gets one of the moment's alerts first gets this sentence on it ("Lost as 78% favorites."). Alerts
@@ -1153,6 +1155,12 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   const took = [...said.matchAll(/RECOVERED by ([A-Z]{2,3})-/g)].map((m) => NFL_CODE[m[1]] ?? m[1]);
   const forced = role(p, 'forcedBy'), fumblers = wiped ? [] : role(p, 'fumbler').filter((f) => !forced.includes(f));
   if (!wiped && passer && !fumblers.includes(passer) && /\bsacked\b[^)]*?(?:\([^)]*\))?\.\s*FUMBLES\b/.test(said)) fumblers.unshift(passer);
+  // A muffed catch the other team recovers ("J.Cowing MUFFS catch, RECOVERED by SEA-E.Saubert"): ESPN types it "Muffed
+  // Punt Recovery (Opponent)" and lists the returner as the returner, not a fumbler (five this season, none alerted).
+  if (!wiped && /\bMUFFS\b/.test(said)) for (const r of role(p, 'returner')) {
+    const team = playerTeamId(g.league, r), code = team ? catalog.teamByEspn(g.league, team)?.abbrev : undefined;
+    if (code && took.some((t) => t !== code) && !fumblers.includes(r)) fumblers.push(r);
+  }
   for (const f of fumblers) {
     const team = playerTeamId(g.league, f), code = team ? catalog.teamByEspn(g.league, team)?.abbrev : undefined;
     const lost = code && took.length ? took.some((t) => t !== code) : /Opponent|Opp Fumble|Fumble Return/i.test(ty);
@@ -1815,6 +1823,25 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
     ...(elim ? { aliases: ['team.eliminated'] } : {}),
     moment: lossMoment(g.gameId),
   };
+}
+
+/**
+ * A tied NFL game (overtime can end level: Giants at Commanders, 27-27, October 11 2026): no loss, so no Successful Hate
+ * Watch, but the end of it is news for both teams' trackers. Feed only; one alert per device (the moment).
+ */
+export function gameTiedEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId'>, final: { home: number; away: number }, at: number): Detected[] {
+  if (g.league !== 'nfl' || final.home !== final.away) return [];
+  return [[g.homeId, g.awayId], [g.awayId, g.homeId]].map(([id, other]) => ({
+    id: `${g.gameId}:final:nfl.team.tied:${id}`,
+    type: 'nfl.team.tied',
+    targetKey: teamKey(g.league, id),
+    title: `${teamName(g.league, id)} tied ${the(g.league, teamName(g.league, other))}, ${final.home}-${final.away}`,
+    body: `Final Score: ${final.home} to ${final.away}. Nobody won.`,
+    at,
+    meta: { gameId: g.gameId, score: `${final.home}-${final.away}` },
+    moment: `${g.gameId}:final:tied`,
+    firstFollowed: true, // tracking both: the one followed first
+  }));
 }
 
 /**
