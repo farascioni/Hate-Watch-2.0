@@ -24,7 +24,8 @@ UFC
 F1
 - Sprints get alerts; a driver's teammate is whoever drove the other car that weekend. (Server)
 - Lights out is one alert naming yours; a double DNF or no points takes in its drivers' alerts. (Server)
-- Race and sprint results come as they end; a later penalty corrects them. (Server)
+- Race, sprint and qualifying results come as the session ends; a later penalty corrects them. (Server)
+- Championship drops come with the result, not 20 minutes later. (Server)
 - Drivers and constructors have a Stats tab.
 - Search lists F1's constructors A to Z, and drivers by constructor.
 - Before an F1 session, its screen previews the weekend.
@@ -42,7 +43,7 @@ FOOTBALL
 
 MLB
 - A homer says how far it went, and back-to-back; team alerts name the RBI ("on Kwan's RBI double"). (Server)
-- Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught more reliably. (Server)
+- Bases loaded against your team: an alert, pushed. Innings ending in order or stranding runners are caught better. (Server)
 - Playoff exits say ELIMINATED on players' alerts too; the loss's facts and losing pitcher are lines. (Server)
 - No quality start needs 2+ earned runs when pulled early; errors by "C. Montgomery" reach Colson. (Server)
 
@@ -51,22 +52,22 @@ NBA AND WNBA
 
 EVERYWHERE
 - Fixes can arrive without a new build.
-- Tracking both sides, a game's start is one alert, not two. (Server)
+- Tracking both sides: one start alert. (Server)
 - Standings drops name the division in MLB, the NFL and the NHL. (Server)
 - Card names and titles wrap at large text sizes.
 - After a loss (F1: a race), a standings drop or elimination is a line on it. (Server)
 - Filters say Athletes with All on, else Players (F1: Drivers, UFC: Fighters).
 - The WNBA is the last league everywhere. (Server)
-- The Scores tab's switch says what it lists: events, games or fights.
-- League filters show yours, then More: every league by sport.
+- The Scores switch says what it lists: events, games, fights.
+- League filters show yours, then More by sport.
 - Clips play only when you press play.
-- Tapping an alert opens it in full; its photo opens their page.
-- Buttons center their labels; VoiceOver reads them as buttons.
-- No alert gets the same later line twice, or loses one. (Server)
+- An alert opens in full; its photo opens their page.
+- Buttons center their labels and read as buttons.
+- No alert repeats a later line or loses one. (Server)
 - After a deploy, plays from the minutes before still alert, once. (Server)
 - Following a team mid-game starts tracking it at once. (Server)
-- Notices from Hate Watch (outages, news) come in the feed, never pushed. (Server)
-- Settings has no Leagues section; leagues off there come back on.
+- Notices from Hate Watch come in the feed, never pushed. (Server)
+- Settings has no Leagues section.
 - The guide lists every league; the counter says team or fighter.
 
 ## Build 12 (October 9, 2026)

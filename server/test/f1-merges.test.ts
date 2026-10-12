@@ -168,14 +168,18 @@ test("a championship drop: a line on that day's alert about them (no new row, no
   assert.deepEqual(pushes, [], 'drops are feed-only by default');
 });
 
-test('qualifying waits for the final: ESPN\'s "session complete" may come between Q1, Q2 and Q3', async () => {
+test('qualifying at "session complete": believed once the order holds a second scan (it may come between Q1, Q2 and Q3), not at the final', async () => {
   withQuali = true;
   const qualiAlerts = () => (db.prepare(`SELECT COUNT(*) AS n FROM events WHERE id LIKE 'Q1:%'`).get() as { n: number }).n;
   quali.status.type = { state: 'in', name: 'STATUS_SESSION_COMPLETE', completed: false };
   await F.scanF1();
-  assert.equal(qualiAlerts(), 0, 'not at "session complete"');
+  assert.equal(qualiAlerts(), 0, 'not on the first scan of "session complete"');
+  await F.scanF1();
+  assert.ok(qualiAlerts() > 0, 'the second: 33 minutes before ESPN\'s final in the 2026 Singapore GP');
+  const sent = qualiAlerts();
   quali.status.type = { state: 'post', name: 'STATUS_FINAL', completed: true };
   await F.scanF1();
-  assert.ok(qualiAlerts() > 0, 'at the final');
+  await F.scanF1();
+  assert.equal(qualiAlerts(), sent, 'the final changes nothing');
   withQuali = false;
 });

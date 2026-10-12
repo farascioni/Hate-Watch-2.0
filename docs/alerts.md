@@ -686,25 +686,26 @@ When a race or sprint ends, each driver gets **one** alert with every fact that 
 - **Behind teammate:** the other car of the same constructor that day finished ahead (the teammate is whoever drove the other car that weekend, from the session's entry list).
 - **Lapped:** a classified finisher with ESPN's `behindLaps` of 1 or more (not a retired car, and not one still on track when the session's over).
 - **Title:** "<Name> finished P16 from P9 on the grid: no points, behind teammate Franco Colapinto (P13)" (README); "Charles Leclerc finished P12 from P2 on the grid: no points, behind teammate Lewis Hamilton (P3)" (`test/f1-timing.test.ts`); "Lance Stroll finished P20: no points, 2 laps down, behind teammate Fernando Alonso (P9)" (`test/sport-alerts.test.ts`). The "from P_ on the grid" part appears whenever they lost 3+ places; "lapped" or "N laps down" whenever lapped.
-- **Live facts aren't counted twice:** a driver already told live that they were lapped or 3+ places down (`liveSent`: the stored `f1.lapped` and `f1.places` ids) keeps that fact in the finish title, but the finish alert doesn't count those types again.
+- **Live facts aren't counted twice:** a driver already told live that they were lapped or 3+ places down (`liveSent`: the stored `f1.lapped` and `f1.places` ids) keeps "lapped" in the finish title, but the finish alert doesn't count those types again, and leaves "from P3 on the grid" out (the live alert said it: Lewis Hamilton, 2026 Singapore GP, "finished P6: behind teammate Charles Leclerc (P2)" after "is down to P6 from P3 on the grid").
 - **Only "no points"** with the team's no-points alert: the driver's alert shares the team's moment and the team's alert names the driver, so a device tracking both gets the team's.
 - Id `${compId}:f1.finish:${driverId}`.
 
 ### Loses places from the grid (live)
 
-- **Trigger** (`boardAlerts`, from the timing read every 30 seconds): a followed driver 3 or more places below their grid slot, counting only real places (`placesLost`: a car that started behind and is ahead counts only if it has stopped as often, and a car that started ahead and is behind counts against it only if out or stopped no more often, so a pit cycle isn't a loss), held for three reads in a row with no stop of theirs, and not on the last lap. Once a session.
+- **Trigger** (`boardAlerts`, from the timing read every 30 seconds): a followed driver 3 or more places below their grid slot, counting only real places (`placesLost`: a car that started behind and is ahead counts only if it has stopped as often, and a car that started ahead and is behind counts against it only if out or stopped no more often, so a pit cycle isn't a loss), held for three reads in a row with no stop of theirs, and not on the last lap. Not for a car that has stopped on track (below). Once a session.
 - **Title:** "Charles Leclerc is down to P5 from P2 on the grid" (`test/f1-timing.test.ts`), "Lando Norris is down to P9 from P4 on the grid". **Body:** "<session>: lap N".
 - Id `${compId}:f1.places:${driverId}`.
 
 ### Gets lapped (live)
 
 - **Trigger:** a followed driver's `lapsBehind` 1 or more for two reads in a row (`LAPPED_READS`), after lap 1 and not on the last lap (when a car the leader has finished ahead of looks a lap down until it crosses the line itself). Once a session.
+- **Not for a car that has stopped:** a car whose laps completed (`lapsCompleted`) haven't gone up for 5 reads in a row (2.5 minutes, `STILL_READS`) is parked, and ESPN calls it out minutes later (Gabriel Bortoleto stopped on lap 7 and was marked retired seven minutes later, 2026 Singapore GP). It gets no lapped or places-lost alert; if it moves again they can still come, once. The DNF alert is ESPN's status, whenever that turns.
 - **Title:** "Charles Leclerc was lapped by Max Verstappen" (the leader in the timing, else "the leader"). **Body:** "<session>: lap N, running P_".
 - Id `${compId}:f1.lapped:${driverId}`.
 
 ### Pits (live, feed only by default)
 
-- **Trigger:** a followed driver's pit stop count goes up between two timing reads; the alert goes out a read later, with where they came out.
+- **Trigger:** a followed driver's pit stop count goes up between two timing reads; the alert goes out a read later, with where they came out. Not when the count went up for 75% or more of the cars still running in that one read (`FIELD_PITS`, at least 6 cars): that is a stoppage or ESPN counting the field, not stops (the 2026 Singapore GP sprint: every car's count went 1, 2, 3 on laps 3 to 5, 35 alerts for a 20-lap sprint).
 - **Title:** "Charles Leclerc pitted and dropped from P3 to P5", "<Name> pitted and came out P4, up from P6", or "Lance Stroll pitted and held P6". **Body:** "Test GP · Race: lap 11, 1st stop" (`test/f1-timing.test.ts`).
 - Id `${compId}:f1.pit:${driverId}:${stop}`.
 
@@ -716,7 +717,7 @@ When a race or sprint ends, each driver gets **one** alert with every fact that 
 
 ### Knocked out in qualifying, out-qualified by teammate
 
-- **When:** when qualifying is final (ESPN's "complete" can come between Q1, Q2 and Q3, so qualifying waits for `completed`).
+- **When:** at ESPN's "session complete", once the order has held for a second scan (60 seconds); the final changes nothing. ESPN marked the 2026 Singapore GP's qualifying complete once, at the end of Q3, 33 minutes before the final; the second scan guards against a "complete" between Q1, Q2 and Q3.
 - **Knockout stages:** the top 10 reach Q3; the rest split evenly between Q2 and Q1 (`cut = floor((cars - 10) / 2)`; with 22 cars, P11-16 are out in Q2 and P17-22 in Q1).
 - **One alert per driver:** "<Name> was knocked out in Q1 (P<place>)", with ", behind teammate <Name> (P<place>)" when the teammate was ahead, or "<Name> was out-qualified by teammate <Name> (P<theirs> to P<teammate's>)", counting for both switches when both apply. Id `${compId}:f1.quali:${driverId}`.
 
@@ -726,8 +727,9 @@ When a race or sprint ends, each driver gets **one** alert with every fact that 
 - **Title:** "Alexander Albon dropped to 16th in the drivers' championship" (`test/f1-merges.test.ts`). **Body:** "Down from <old rank> · <points> pts".
 - **A line on that day's result:** within 12 hours of a result alert the device got about that driver (`DROP_ON_MS`, `lateOn` with the result types), it's the line "Down to 16th in the drivers' championship (<points> pts)." on it instead (`test/f1-merges.test.ts`: Norris's drop is a line, Albon's, with no alert that day, is its own).
 - Id `f1st:${key}:${day}:${from}->${to}`.
+- **Told with the result, before ESPN's table** (`projectStandings`): ESPN's tables change minutes after a race or sprint is final (10:13 am for the 2026 Singapore GP, the flag at 9:51), so when the results go out the drops are worked out from the table as it was when the session went live (`freezeStandings`: kv `standings:f1:pre:<session id>`, kept across a restart) plus the points for the classification (25-18-15-12-10-8-6-4-2-1 in a race, 8 to 1 in a sprint, none for a car out, no fastest-lap point) and sent with the same id; ESPN's table later makes the same id and sends nothing. Not projected once ESPN's table has moved from that frozen one (it has the points), so a later re-read of the results (the final, a penalty) adds nothing. Ties are not drops. A result a penalty changes after the projection can leave the first drop standing and add the changed one under another id. Constructors the same way, from both cars.
 
-**Tests:** `test/f1-live.test.ts` (a simulated race through the real engine), `test/f1-timing.test.ts`, `test/f1-merges.test.ts`, `test/logic.test.ts`, `test/sport-alerts.test.ts`, `node test/f1-replay.ts` (the real current weekend against ESPN's classification).
+**Tests:** `test/f1-live.test.ts` (a simulated race through the real engine), `test/f1-timing.test.ts`, `test/f1-singapore.test.ts`, `test/f1-merges.test.ts`, `test/logic.test.ts`, `test/sport-alerts.test.ts`, `node test/f1-replay.ts` (the real current weekend against ESPN's classification).
 
 ## F1 constructors
 
@@ -752,7 +754,7 @@ How a race weekend becomes alerts (`server/src/f1.ts`; its header comment is the
 - **No play-by-play:** a race weekend is one ESPN event whose sessions (practice, qualifying, sprint, race) are competitions. Only qualifying ("Qual"), the sprint ("SR" or "Sprint") and the race have alerts (`sessionKind`); practice and the sprint shootout don't.
 - **The scoreboard every 30 seconds** (`scanF1`, `F1_SCAN_MS`), only while anyone tracks an F1 driver or constructor (`watchedF1Drivers`: followed drivers and both cars of a followed constructor). It finds sessions going live and finishing, and fills the Scores tab.
 - **While a race or sprint runs** (`RaceWatch`): the followed drivers' statuses every 15 seconds (DNFs and double DNFs live), and every 30 seconds every car's timing from ESPN's core API (`readBoard`, about 45 small requests: place, gap, laps down, pit stops, status, plus the session's lap and flag). The timing fills the race's card (`withBoard`) and makes the live alerts (`boardAlerts`) against the read before; the first read is a baseline. Nothing live once the flag has fallen: the finish alerts say it.
-- **Results** (`settleSession`): a race or sprint is read when ESPN says the session is complete (minutes after the flag, before ESPN calls it final, up to 40 minutes later), on the scoreboard's order; qualifying when it's final. Then read again when the order or status changes and the change holds for a second scan: a penalty, or the final order. A re-read corrects what went out (`settleResults`): an alert whose facts changed is rewritten in place with no push (`reviseEvent`); one now true goes out; one no longer true becomes "Correction: Pierre Gasly finished P8" (body "<session>: the result changed after this alert.") and stops being a Successful Hate Watch ("Correction: Alpine finished P8, P10" for a team, `test/f1-merges.test.ts`).
+- **Results** (`settleSession`): a race or sprint is read when ESPN says the session is complete (minutes after the flag, before ESPN calls it final, up to 40 minutes later), on the scoreboard's order, after one scan's wait if a car still reads on track in ESPN's status (its laps down may not be in yet); qualifying when it's final. Then read again when the order or status changes and the change holds for a second scan: a penalty, or the final order. A re-read corrects what went out (`settleResults`): an alert whose facts changed is rewritten in place with no push (`reviseEvent`); one now true goes out; one no longer true becomes "Correction: Pierre Gasly finished P8" (body "<session>: the result changed after this alert.") and stops being a Successful Hate Watch ("Correction: Alpine finished P8, P10" for a team, `test/f1-merges.test.ts`).
 - **Only recent sessions:** results are announced and corrected only for sessions that started in the last 8 hours (`RECENT_MS`), so a deploy never re-announces an old race.
 - **One alert per driver per session,** facts merged, counting for each switch ([F1 drivers](#f1-drivers)).
 - **One notification per session:** a device's F1 alerts from one session in one publish are one push, "🏁 Singapore GP · Sprint: 7 alerts", each alert's title a line of it, in the thread `f1:<session id>` (`bundled` in `fanout.ts`). Each is still its own feed row.

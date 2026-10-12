@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 320 tests in 50 files, offline, in about 4 seconds, all passing on October 11, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12). Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 320 tests in 50 files, offline, in about 4 seconds, all passing on October 11, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12).
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 320 tests in 50 files, offline, in about 4 seconds, all passing on October 11, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 325 tests in 51 files, offline, in about 4 seconds, all passing on October 11, 2026 except alds-game5's weekly recap (it fails on main too: a null recap on October 12). Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 320 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 325 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -51,6 +51,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `f1-merges.test.ts` | F1 alerts merged so a busy device isn't flooded (Singapore's sprint, October 10 2026: 33 notifications with everyone tracked): one start alert, a double DNF and no points taking in their drivers', one notification per session publish, penalties correcting results in place, a championship drop as a line |
 | `f1-preview.test.ts` | An F1 weekend's preview (`f1-preview.ts`): grids set and not, a weekend two weeks out, a live card's state, standings failing |
 | `f1-stats.test.ts` | F1's stats pages (`f1-stats.ts`): a race called off, retirements and non-starters, a team swap, look-alike race names |
+| `f1-singapore.test.ts` | What the 2026 Singapore GP report found: no pit alerts when the whole field's count jumps, no "lapped" for a parked car, results held one scan while a car reads on track, and the championship drops told with the results (with ESPN's table later adding nothing) |
 | `f1-timing.test.ts` | A running race's timing through the real engine: the running order with gaps, and a followed driver's pit stop, getting lapped and places lost (not for a pit cycle) |
 | `game-start.test.ts` | "Hate Watch Starting" on the pre-game to live flip, through a real `GameTracker`; never for a game first seen under way; the loss wording |
 | `half-end-wait.test.ts` | A half-inning's end waits for a read with its third out, but only `HW_HALF_END_WAIT_MS` (the bottom of the 8th of ALDS Game 5, whose third out never came) |

@@ -96,7 +96,7 @@ from the tests):
 | Standings drop | `standings:${league}:${teamId}:${day}:${from}->${to}`, or `…:${day}:${division}:${from}->${to}` for a drop in the division | `standings:mlb:26:2026-10-08:2->3`, "Giants dropped to 3rd in the NL" |
 | Losing streak | `streak:${league}:${teamId}:${day}:${streak}` | `streak:nhl:3:2026-10-09:L4`, "Flames have lost 4 straight" |
 | Eliminated, rival clinched, relegation zone | `elim:${league}:${teamId}:${year}`, `clinch:${league}:${rivalId}:${year}:${teamId}`, `releg:${league}:${teamId}:${day}` | `elim:mlb:26:2026`, "Giants are ELIMINATED"; `clinch:mlb:19:2026:26`, "The Dodgers clinched the NL West" |
-| F1 championship drop | `f1st:${targetKey}:${day}:${from}->${to}` | `f1st:player:f1:5498:2026-10-11:4->5`, "Charles Leclerc dropped to 5th in the drivers' championship" |
+| F1 championship drop | `f1st:${targetKey}:${day}:${from}->${to}`, made twice for one race: when the results go out (`projectStandings`) and when ESPN's table changes (`scanF1Standings`), the same id, so the second stores nothing | `f1st:player:f1:5498:2026-10-11:4->5`, "Charles Leclerc dropped to 5th in the drivers' championship" |
 | AP poll (`cfb-poll.ts`) | `cfbap:${week}:${type}:${teamId}` | |
 | Weekly recap (`recap.ts`) | `recap:${first 16 characters of a base64url SHA-256 of the device id}:${week}` | `recap:Vf3jywfTfArsGwqS:2026-10-05` |
 | Developer notice (`notices.ts`) | `notice:${time sent, in ms}` | |
@@ -210,7 +210,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 Outside the game tracker:
 
 - **F1** (`server/src/f1.ts`): a live race's `memo.sent` (ids sent this session), `preSeen` (only a start seen
-  before lights out is news) and `resultsSeen` (a result is read again only after a change holds for a second scan).
+  before lights out is news) and `resultsSeen` (a result is read again only after a change holds for a second scan; qualifying "complete" is first believed on its second scan), `holding` (a race's results wait one scan while a car reads on track) and the standings table frozen when a race or sprint went live (kv `standings:f1:pre:${compId}`, which `projectStandings` reads and never changes).
   Results are announced only for sessions that started in the last 8 hours.
 - **Baselines in `kv`:** the first read of something is a baseline, not news. That covers the AP poll's week
   (`cfb:ap:week`), standings (`standings:${league}`), injury reports (`injuries:${league}`), the news cut-off
