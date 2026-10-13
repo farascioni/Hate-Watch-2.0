@@ -2150,7 +2150,8 @@ export function heavyLossEvent(g: Pick<GameCtx, 'league' | 'gameId'>, lost: Dete
     title: `Successful Hate Watch! ${teamName(g.league, loserId)} were thrashed ${w}-${l} by ${the(g.league, teamName(g.league, winnerId))}`,
     body: lost.body,
     at: lost.at,
-    meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey },
+    // margin and score are the loss's own: this alert's Recent misery row replaces the plain loss's (misery.ts), so it carries them.
+    meta: { gameId: g.gameId, winnerId, lostId: lost.id, teamKey: lost.targetKey, margin: w - l, score: `${w}-${l}` },
     moment: lost.moment,
   };
 }

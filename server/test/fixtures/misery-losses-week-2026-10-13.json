@@ -1,0 +1,387 @@
+[
+ {
+  "id": "401908015:final:team.lost:15",
+  "league": "mlb",
+  "title": "Braves lost to the Dodgers",
+  "meta": "{\"gameId\":\"401908015\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908004:final:team.lost:8",
+  "league": "mlb",
+  "title": "Brewers lost to the Padres",
+  "meta": "{\"gameId\":\"401908004\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401907992:final:team.lost:4",
+  "league": "mlb",
+  "title": "White Sox lost to the Guardians",
+  "meta": "{\"gameId\":\"401907992\",\"winnerId\":\"5\",\"score\":\"9-3\",\"margin\":6}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908016:final:team.lost:15",
+  "league": "mlb",
+  "title": "Braves are ELIMINATED ⚰️",
+  "meta": "{\"gameId\":\"401908016\",\"winnerId\":\"19\",\"score\":\"4-1\",\"margin\":3,\"eliminated\":true}",
+  "source": "backfill"
+ },
+ {
+  "id": "401891830:final:team.lost:16",
+  "league": "nhl",
+  "title": "Penguins lost to the Capitals",
+  "meta": "{\"gameId\":\"401891830\",\"winnerId\":\"23\",\"score\":\"5-3\",\"margin\":2}",
+  "source": "backfill"
+ },
+ {
+  "id": "401907987:final:team.lost:10",
+  "league": "mlb",
+  "title": "Yankees got SWEPT 🧹 and are ELIMINATED ⚰️",
+  "meta": "{\"gameId\":\"401907987\",\"winnerId\":\"30\",\"score\":\"4-3\",\"margin\":1,\"eliminated\":true}",
+  "source": "backfill"
+ },
+ {
+  "id": "401914129:final:team.lost:9",
+  "league": "nba",
+  "title": "Warriors lost to the Trail Blazers",
+  "meta": "{\"gameId\":\"401914129\",\"winnerId\":\"22\",\"score\":\"123-118\",\"margin\":5}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892456:final:team.lost:25",
+  "league": "nhl",
+  "title": "Ducks lost to the Oilers",
+  "meta": "{\"gameId\":\"401892456\",\"winnerId\":\"6\",\"score\":\"5-2\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908005:final:team.lost:25",
+  "league": "mlb",
+  "title": "Padres are ELIMINATED ⚰️",
+  "meta": "{\"gameId\":\"401908005\",\"winnerId\":\"8\",\"score\":\"3-1\",\"margin\":2,\"eliminated\":true}",
+  "source": "backfill"
+ },
+ {
+  "id": "401901823:final:team.lost:20",
+  "league": "nba",
+  "title": "76ers lost to the Nets",
+  "meta": "{\"gameId\":\"401901823\",\"winnerId\":\"17\",\"score\":\"114-108\",\"margin\":6}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892462:final:team.lost:4",
+  "league": "nhl",
+  "title": "Blackhawks lost to the Islanders",
+  "meta": "{\"gameId\":\"401892462\",\"winnerId\":\"12\",\"score\":\"4-1\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872980:final:team.lost:6",
+  "league": "nfl",
+  "title": "Cowboys lost to the Buccaneers",
+  "meta": "{\"gameId\":\"401872980\",\"winnerId\":\"27\",\"score\":\"24-16\",\"margin\":8}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892463:final:team.lost:3",
+  "league": "nhl",
+  "title": "Flames got BLOWN OUT by the Avalanche",
+  "meta": "{\"gameId\":\"401892463\",\"winnerId\":\"17\",\"score\":\"7-3\",\"margin\":4}",
+  "source": "backfill"
+ },
+ {
+  "id": "401907993:final:team.lost:4",
+  "league": "mlb",
+  "title": "White Sox lost to the Guardians",
+  "meta": "{\"gameId\":\"401907993\",\"winnerId\":\"5\",\"score\":\"9-5\",\"margin\":4}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892466:final:team.lost:13",
+  "league": "nhl",
+  "title": "Rangers lost to the Capitals",
+  "meta": "{\"gameId\":\"401892466\",\"winnerId\":\"23\",\"score\":\"3-1\",\"margin\":2}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892467:final:team.lost:16",
+  "league": "nhl",
+  "title": "Penguins lost to the Blue Jackets",
+  "meta": "{\"gameId\":\"401892467\",\"winnerId\":\"29\",\"score\":\"3-2\",\"margin\":1}",
+  "source": "backfill"
+ },
+ {
+  "id": "401839115:f1.team.no_points:team:f1:106922",
+  "league": "f1",
+  "title": "Alpine finished outside the points",
+  "meta": "{\"gameId\":\"401839115\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401839115:f1.team.no_points:team:f1:123986",
+  "league": "f1",
+  "title": "Aston Martin finished outside the points",
+  "meta": "{\"gameId\":\"401839115\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401858484:final:team.lost:2483",
+  "league": "cfb",
+  "title": "Oregon lost to UCLA",
+  "meta": "{\"gameId\":\"401858484\",\"winnerId\":\"26\",\"score\":\"17-15\",\"margin\":2}",
+  "source": "backfill"
+ },
+ {
+  "id": "401856717:final:team.lost:251",
+  "league": "cfb",
+  "title": "Texas lost to Oklahoma",
+  "meta": "{\"gameId\":\"401856717\",\"winnerId\":\"201\",\"score\":\"27-24\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401902645:final:team.lost:12",
+  "league": "nba",
+  "title": "Clippers lost to the Raptors",
+  "meta": "{\"gameId\":\"401902645\",\"winnerId\":\"28\",\"score\":\"114-106\",\"margin\":8}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892476:final:team.lost:4",
+  "league": "nhl",
+  "title": "Blackhawks lost to the Hurricanes",
+  "meta": "{\"gameId\":\"401892476\",\"winnerId\":\"7\",\"score\":\"5-2\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401898398:final:team.lost:20",
+  "league": "nba",
+  "title": "76ers got BLOWN OUT by the Celtics",
+  "meta": "{\"gameId\":\"401898398\",\"winnerId\":\"2\",\"score\":\"144-106\",\"margin\":38}",
+  "source": "backfill"
+ },
+ {
+  "id": "401907994:final:team.lost:4",
+  "league": "mlb",
+  "title": "White Sox are ELIMINATED ⚰️",
+  "meta": "{\"gameId\":\"401907994\",\"winnerId\":\"5\",\"score\":\"2-0\",\"margin\":2,\"eliminated\":true}",
+  "source": "backfill"
+ },
+ {
+  "id": "401858485:final:team.lost:213",
+  "league": "cfb",
+  "title": "Penn State lost to USC",
+  "meta": "{\"gameId\":\"401858485\",\"winnerId\":\"30\",\"score\":\"31-23\",\"margin\":8}",
+  "source": "backfill"
+ },
+ {
+  "id": "401856715:final:team.lost:99",
+  "league": "cfb",
+  "title": "LSU lost to Kentucky",
+  "meta": "{\"gameId\":\"401856715\",\"winnerId\":\"96\",\"score\":\"35-34\",\"margin\":1}",
+  "source": "backfill"
+ },
+ {
+  "id": "401856712:final:team.lost:333",
+  "league": "cfb",
+  "title": "Alabama lost to Georgia",
+  "meta": "{\"gameId\":\"401856712\",\"winnerId\":\"61\",\"score\":\"20-17\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401892480:final:team.lost:3",
+  "league": "nhl",
+  "title": "Flames lost to the Ducks",
+  "meta": "{\"gameId\":\"401892480\",\"winnerId\":\"25\",\"score\":\"4-2\",\"margin\":2}",
+  "source": "backfill"
+ },
+ {
+  "id": "401839117:f1.team.no_points:team:f1:106922",
+  "league": "f1",
+  "title": "Alpine finished outside the points",
+  "meta": "{\"gameId\":\"401839117\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401839117:f1.team.no_points:team:f1:123986",
+  "league": "f1",
+  "title": "Aston Martin finished outside the points",
+  "meta": "{\"gameId\":\"401839117\"}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872984:final:team.lost:10",
+  "league": "nfl",
+  "title": "Titans got BLOWN OUT by the Texans",
+  "meta": "{\"gameId\":\"401872984\",\"winnerId\":\"34\",\"score\":\"26-3\",\"margin\":23}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872990:final:team.lost:3",
+  "league": "nfl",
+  "title": "Bears got BLOWN OUT by the Packers",
+  "meta": "{\"gameId\":\"401872990\",\"winnerId\":\"9\",\"score\":\"31-7\",\"margin\":24}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872985:final:team.lost:11",
+  "league": "nfl",
+  "title": "Colts lost to the Steelers",
+  "meta": "{\"gameId\":\"401872985\",\"winnerId\":\"23\",\"score\":\"34-22\",\"margin\":12}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872983:final:team.lost:5",
+  "league": "nfl",
+  "title": "Browns lost to the Jets",
+  "meta": "{\"gameId\":\"401872983\",\"winnerId\":\"20\",\"score\":\"17-12\",\"margin\":5}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872991:final:team.lost:22",
+  "league": "nfl",
+  "title": "Cardinals got BLOWN OUT by the Lions",
+  "meta": "{\"gameId\":\"401872991\",\"winnerId\":\"8\",\"score\":\"45-21\",\"margin\":24}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908030:final:team.lost:19",
+  "league": "mlb",
+  "title": "Dodgers lost to the Brewers",
+  "meta": "{\"gameId\":\"401908030\",\"winnerId\":\"8\",\"score\":\"2-1\",\"margin\":1}",
+  "source": "backfill"
+ },
+ {
+  "id": "401872993:final:team.lost:1",
+  "league": "nfl",
+  "title": "Falcons lost to the Ravens",
+  "meta": "{\"gameId\":\"401872993\",\"winnerId\":\"33\",\"score\":\"30-23\",\"margin\":7}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908031:final:team.lost:19",
+  "league": "mlb",
+  "title": "Dodgers lost to the Brewers",
+  "meta": "{\"gameId\":\"401908031\",\"winnerId\":\"8\",\"score\":\"7-4\",\"margin\":3}",
+  "source": "backfill"
+ },
+ {
+  "id": "401908023:final:team.lost:30",
+  "league": "mlb",
+  "title": "Rays lost to the Guardians",
+  "meta": "{\"gameId\":\"401908023\",\"winnerId\":\"5\",\"score\":\"7-3\",\"margin\":4}",
+  "source": "backfill"
+ },
+ {
+  "id": "401914130:final:team.lost:134478",
+  "league": "nba",
+  "title": "Opponent got BLOWN OUT by the Trail Blazers",
+  "meta": "{\"gameId\":\"401914130\",\"winnerId\":\"22\",\"score\":\"119-66\",\"margin\":53}",
+  "source": "board"
+ },
+ {
+  "id": "401898402:final:team.lost:25",
+  "league": "nba",
+  "title": "Thunder lost to the Hawks",
+  "meta": "{\"gameId\":\"401898402\",\"winnerId\":\"1\",\"score\":\"113-110\",\"margin\":3}",
+  "source": "board"
+ },
+ {
+  "id": "401901824:final:team.lost:27",
+  "league": "nba",
+  "title": "Wizards lost to the Nets",
+  "meta": "{\"gameId\":\"401901824\",\"winnerId\":\"17\",\"score\":\"131-122\",\"margin\":9}",
+  "source": "board"
+ },
+ {
+  "id": "401914124:final:team.lost:18",
+  "league": "nba",
+  "title": "Knicks lost to the Timberwolves",
+  "meta": "{\"gameId\":\"401914124\",\"winnerId\":\"16\",\"score\":\"122-104\",\"margin\":18}",
+  "source": "board"
+ },
+ {
+  "id": "401898721:final:team.lost:24",
+  "league": "nba",
+  "title": "Spurs lost to the Jazz",
+  "meta": "{\"gameId\":\"401898721\",\"winnerId\":\"26\",\"score\":\"119-109\",\"margin\":10}",
+  "source": "board"
+ },
+ {
+  "id": "401872994:final:team.lost:14",
+  "league": "nfl",
+  "title": "Rams lost to the Bills",
+  "meta": "{\"gameId\":\"401872994\",\"winnerId\":\"2\",\"score\":\"37-34\",\"margin\":3}",
+  "source": "board"
+ },
+ {
+  "id": "401892485:final:team.lost:26",
+  "league": "nhl",
+  "title": "Panthers lost to the Sabres",
+  "meta": "{\"gameId\":\"401892485\",\"winnerId\":\"2\",\"score\":\"5-3\",\"margin\":2}",
+  "source": "board"
+ },
+ {
+  "id": "401892486:final:team.lost:11",
+  "league": "nhl",
+  "title": "Devils lost to the Senators",
+  "meta": "{\"gameId\":\"401892486\",\"winnerId\":\"14\",\"score\":\"4-1\",\"margin\":3}",
+  "source": "board"
+ },
+ {
+  "id": "401892487:final:team.lost:37",
+  "league": "nhl",
+  "title": "Golden Knights lost to the Wild",
+  "meta": "{\"gameId\":\"401892487\",\"winnerId\":\"30\",\"score\":\"4-2\",\"margin\":2}",
+  "source": "board"
+ },
+ {
+  "id": "401872981:final:team.lost:21",
+  "league": "nfl",
+  "title": "Eagles lost to the Jaguars",
+  "meta": "{\"gameId\":\"401872981\",\"winnerId\":\"30\",\"score\":\"19-17\",\"margin\":2}",
+  "source": "board"
+ },
+ {
+  "id": "401872982:final:team.lost:15",
+  "league": "nfl",
+  "title": "Dolphins lost to the Bengals",
+  "meta": "{\"gameId\":\"401872982\",\"winnerId\":\"4\",\"score\":\"31-24\",\"margin\":7}",
+  "source": "board"
+ },
+ {
+  "id": "401872986:final:team.lost:13",
+  "league": "nfl",
+  "title": "Raiders got BLOWN OUT by the Patriots",
+  "meta": "{\"gameId\":\"401872986\",\"winnerId\":\"17\",\"score\":\"45-17\",\"margin\":28}",
+  "source": "board"
+ },
+ {
+  "id": "401872987:final:team.lost:18",
+  "league": "nfl",
+  "title": "Saints lost to the Vikings",
+  "meta": "{\"gameId\":\"401872987\",\"winnerId\":\"16\",\"score\":\"23-13\",\"margin\":10}",
+  "source": "board"
+ },
+ {
+  "id": "401872989:final:team.lost:24",
+  "league": "nfl",
+  "title": "Chargers lost to the Broncos",
+  "meta": "{\"gameId\":\"401872989\",\"winnerId\":\"7\",\"score\":\"23-17\",\"margin\":6}",
+  "source": "board"
+ },
+ {
+  "id": "401872992:final:team.lost:26",
+  "league": "nfl",
+  "title": "Seahawks lost to the 49ers",
+  "meta": "{\"gameId\":\"401872992\",\"winnerId\":\"25\",\"score\":\"32-29\",\"margin\":3}",
+  "source": "board"
+ },
+ {
+  "id": "401879267:final:team.lost:361",
+  "league": "epl",
+  "title": "Newcastle were thrashed 4-1 by Coventry",
+  "meta": "{\"gameId\":\"401879267\",\"winnerId\":\"388\"}",
+  "source": "board"
+ }
+]

@@ -17,6 +17,7 @@ export const FLAGS = {
   images: 'ESPN\'s player photos and team logos, everywhere below',
   'images.headshots': 'Player photos (a badge in the team\'s colour with its code and the jersey number instead)',
   'images.logos': 'Team logos (a badge in the team\'s colour with its code instead)',
+  'loss.rating': 'How bad a loss was: the rating on Recent misery\'s loss rows and its "Loss rating: Ugly (65/100)." line (loss-rating.ts)',
 } as const;
 export type Flag = keyof typeof FLAGS;
 

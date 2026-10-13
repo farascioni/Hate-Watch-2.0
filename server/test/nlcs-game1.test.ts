@@ -241,3 +241,13 @@ test('Recent misery has the real game\'s losses as the tracker words them, one r
   // The winner has no loss.
   assert.ok(!miseryRows(`team:mlb:${MIL}`, Date.now() + 60_000).some((r) => r.id.startsWith('NL8:')));
 });
+
+test("a preseason game's loss through a real tracker is marked, so its Recent misery row is never rated; the regular season's is not", () => {
+  const sb = (id: string, type: number) => ({ ...scoreboardFinal(id), season: { year: 2026, type } });
+  new GameTracker('mlb', 'NL11', MIL, LAD).finishFromScoreboard({ home: 2, away: 1 }, sb('NL11', 1));
+  new GameTracker('mlb', 'NL12', MIL, LAD).finishFromScoreboard({ home: 2, away: 1 }, sb('NL12', 2));
+  const meta = (id: string) => JSON.parse(miseryRows(`team:mlb:${LAD}`, Date.now() + 60_000).find((r) => r.id === `${id}:final:team.lost:${LAD}`)!.meta!);
+  assert.equal(meta('NL11').preseason, true, 'recorded, and marked');
+  assert.equal(meta('NL12').preseason, undefined);
+  assert.equal(meta('NL12').margin, 1);
+});

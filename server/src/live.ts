@@ -1216,7 +1216,9 @@ export class GameTracker {
     const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...half.lines, ...playerTeamLostEvents(this.ctx, lost, tracked), ...playerLossLines([...facts, ...half.lines], tracked), ...players];
     // The loss's alerts get the winning play's clip (the play that put the winner ahead for good), else the recap (clips.ts).
     const winning = leadStory(this.plays, lost.meta?.winnerId === this.ctx.homeId ? 'home' : 'away').goAhead?.id;
-    for (const e of loss) if (e.moment === lost.moment) e.meta = { ...e.meta, lossClip: true, ...(winning ? { clipPlayId: winning } : {}) };
+    // A preseason game's loss is recorded like any other but not rated (loss-rating.ts: a 53-point preseason blowout is no disaster).
+    const preseason = seasonType === 1 || ev?.season?.type === 1;
+    for (const e of loss) if (e.moment === lost.moment) e.meta = { ...e.meta, lossClip: true, ...(winning ? { clipPlayId: winning } : {}), ...(preseason ? { preseason: true } : {}) };
     publish(loss, this.ctx.league);
     this.newAlerts = true;
     if (CLIP_LEAGUES.has(this.ctx.league)) void this.readClips(this.box).catch(() => {}); // the winning play's clip may be out already

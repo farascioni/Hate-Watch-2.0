@@ -17,10 +17,15 @@
 // the facts' `fold` sentences are its `lines`, a heavy loss gives it its title, and `player.team_lost` is not stored:
 // a player's page finds their team's losses through `players.team_key` (miseryRows).
 //
+// How bad a loss was: a loss row's rating (loss-rating.ts) is not stored. `ratingOf` works it out when the row is read, from
+// the margin the row kept in its meta (or, for a row that lost it, the body's "Final Score: 4 to 1"), so every row has one.
+// The row keeps only what the rating needs (`metaOf`: the margin, the score, and `preseason`, which is never rated).
+//
 // Retention: rows older than KEEP_DAYS go; a page shows the last MISERY_DAYS, at most MISERY_LIMIT.
 import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
 import { eliminationOf, gameLostEvent, heavyLossEvent, seriesStanding, type Detected } from './detectors.ts';
 import { SOCCER, type League } from './leagues.ts';
+import { marginFromBody, rateLoss, type LossRating } from './loss-rating.ts';
 
 export const MISERY_DAYS = 30;
 export const MISERY_LIMIT = 30;
@@ -99,6 +104,13 @@ const plain = (title: string) => title.replace(HATE_WATCH, '');
 const json = (v: unknown) => (v == null ? null : JSON.stringify(v));
 
 /**
+ * What a row keeps of its alert's meta: the game, who won, the score and margin (the loss rating reads the margin),
+ * whether it ended a season, and whether it was a preseason game (`preseason`, set by the tracker and the scoreboard
+ * path: a preseason loss is recorded like any other but never rated).
+ */
+const metaOf = (m: Detected['meta']) => ({ gameId: m?.gameId, winnerId: m?.winnerId, score: m?.score, margin: m?.margin, eliminated: m?.eliminated, preseason: m?.preseason });
+
+/**
  * Put one alert, as publish() was given it, on the list. Safe to call twice with the same alert, and never throws:
  * a failure here must not cost anyone an alert.
  */
@@ -126,17 +138,22 @@ function record(e: Detected, league: League, source: MiseryRow['source'], now: n
       WHERE (misery.source != 'tracker' AND excluded.source = 'tracker')
          OR (excluded.type LIKE '%.team.heavy_loss' AND misery.type NOT LIKE '%.team.heavy_loss')`)
     .run(id, loss ? 'loss' : 'event', type, league, ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null, e.targetKey, plain(e.title), e.body,
-      e.at, json({ gameId: e.meta?.gameId, winnerId: e.meta?.winnerId, score: e.meta?.score, margin: e.meta?.margin, eliminated: e.meta?.eliminated }), shareCode(id), source);
+      e.at, json(metaOf(e.meta)), shareCode(id), source);
   prune(now);
 }
 
 /**
  * An alert changed after it went out (fanout.ts reviseEvent: an F1 result a penalty changed): the row takes the new
- * words, or goes if the alert no longer stands or is no longer one a page shows.
+ * words and facts, or goes if the alert no longer stands or is no longer one a page shows. Its facts are refreshed key
+ * by key, only the ones the revision has, so a corrected score gives a corrected margin (the loss rating reads it) and a
+ * revision that doesn't carry the margin keeps the row's own.
  */
 export function reviseMisery(id: string, e: Judged & Pick<Detected, 'body'> & { withdrawn?: boolean }) {
-  if (e.withdrawn || !isMisery({ ...e, meta: { ...e.meta, withdrawn: e.withdrawn } })) db.prepare('DELETE FROM misery WHERE id = ?').run(id);
-  else db.prepare('UPDATE misery SET type = ?, title = ?, body = ? WHERE id = ?').run(shownType(e) ?? e.type, plain(e.title), e.body, id);
+  if (e.withdrawn || !isMisery({ ...e, meta: { ...e.meta, withdrawn: e.withdrawn } })) { db.prepare('DELETE FROM misery WHERE id = ?').run(id); return; }
+  const was = db.prepare('SELECT meta FROM misery WHERE id = ?').get(id) as { meta: string | null } | undefined;
+  const fresh = Object.fromEntries(Object.entries(metaOf(e.meta)).filter(([, v]) => v !== undefined));
+  db.prepare('UPDATE misery SET type = ?, title = ?, body = ?, meta = ? WHERE id = ?')
+    .run(shownType(e) ?? e.type, plain(e.title), e.body, json({ ...(was?.meta ? JSON.parse(was.meta) : {}), ...fresh }), id);
 }
 
 /**
@@ -162,7 +179,9 @@ function board(lg: League, ev: any, now: number): boolean {
   const out = eliminationOf(lg, ev);
   const lost = gameLostEvent(g, final, at, out, out ? null : seriesStanding(ev));
   if (!lost) return false; // a tie
+  if (ev.season?.type === 1) lost.meta = { ...lost.meta, preseason: true }; // recorded like any other, never rated (ratingOf)
   const heavy = heavyLossEvent(g, lost, final);
+  if (heavy && lost.meta?.preseason) heavy.meta = { ...heavy.meta, preseason: true };
   recordMisery(heavy ?? lost, lg, 'board', now);
   if (heavy) recordMisery(lost, lg, 'board', now);
   return true;
@@ -183,6 +202,21 @@ export function miseryRows(targetKey: string, now = Date.now(), days = MISERY_DA
   const player = targetKey.startsWith('player:');
   return db.prepare(`SELECT * FROM misery WHERE occurred_at > ? AND (target_key = ?${player ? ` OR (kind = 'loss' AND target_key = (SELECT team_key FROM players WHERE key = ?))` : ''})
     ORDER BY occurred_at DESC, id LIMIT ?`).all(now - days * DAY_MS, targetKey, ...(player ? [targetKey] : []), limit) as unknown as MiseryRow[];
+}
+
+/**
+ * How bad a loss row was (loss-rating.ts), worked out when it is read from the row's own facts, so every row stored
+ * since the table began has one if it has a margin. Null for anything that isn't a rated loss: an event, a league with
+ * no blowout size (UFC, F1), a preseason game, and a loss with no margin. The margin is the one the alert kept; failing
+ * that, the one in the body's "Final Score: 4 to 1" (backfilled rows and 3+ goal soccer losses stored before they kept it).
+ * A margin is never guessed at.
+ */
+export function ratingOf(r: Pick<MiseryRow, 'kind' | 'league' | 'body' | 'meta'>): LossRating | null {
+  if (r.kind !== 'loss') return null;
+  let meta: { margin?: unknown; preseason?: unknown } = {};
+  try { meta = r.meta ? JSON.parse(r.meta) : {}; } catch { /* a row with unreadable meta falls back to its body */ }
+  if (meta.preseason) return null;
+  return rateLoss(r.league, { margin: typeof meta.margin === 'number' ? meta.margin : marginFromBody(r.body) });
 }
 
 /** A row by its share link's code, shaped like an `events` row (share.ts): a shared alert nobody tracked still opens. */

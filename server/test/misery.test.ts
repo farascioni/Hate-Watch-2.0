@@ -10,7 +10,8 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { publish, reviseEvent } = await import('../src/fanout.ts');
 const { gameLostEvent, heavyLossEvent, lossFacts } = await import('../src/detectors.ts');
-const { miseryRows, recordFinalOnBoard, isMisery, miseryByCode, MISERY_LIMIT } = await import('../src/misery.ts');
+const { miseryRows, recordFinalOnBoard, isMisery, miseryByCode, ratingOf, reviseMisery, MISERY_LIMIT } = await import('../src/misery.ts');
+const { setFlag } = await import('../src/flags.ts');
 const { startApi } = await import('../src/api.ts');
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'x', 1, 1, 0)`);
@@ -147,4 +148,104 @@ test('a page shows the last 30 days, newest first, at most 30', () => {
   const page = rows('team:nba:4');
   assert.equal(page.length, MISERY_LIMIT);
   assert.equal(page[0][0], 'N0:final:team.lost:4', 'newest first');
+});
+
+// ─── How bad a loss was (loss-rating.ts): served on the loss rows, from the margin ─────────────────────────────────────────────
+
+const metaOf = (id: string) => JSON.parse((db.prepare('SELECT meta FROM misery WHERE id = ?').get(id) as { meta: string }).meta);
+
+async function served(key: string) {
+  const server = startApi(0);
+  await new Promise((r) => server.once('listening', r));
+  try { return (await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/targets/${encodeURIComponent(key)}/misery`)).json()).items as any[]; }
+  finally { server.close(); }
+}
+
+test('the endpoint rates loss rows only, and only with the loss.rating switch on', async () => {
+  const lost = gameLostEvent({ league: 'mlb', gameId: 'R1', homeId: '19', awayId: '26' }, { home: 8, away: 0 }, now - 500_000)!; // the Giants lose by 8 runs
+  publish([lost], 'mlb');
+  const giants = (await served('team:mlb:26')).find((i) => i.id === lost.id);
+  assert.deepEqual(giants.rating, { score: 65, label: 'Ugly' }, '8 runs against a 7-run blowout');
+  assert.match(giants.body, /^Loss rating: Ugly \(65\/100\)\. Final Score: 8 to 0/, 'the line, for builds without a badge, in front of the body');
+  const dodgers = (await served('team:mlb:19')).find((i) => i.id === 'M1:final:team.lost:19'); // lost 3-0: a score, no label, no line
+  assert.deepEqual(dodgers.rating, { score: 24, label: null });
+  assert.doesNotMatch(dodgers.body, /Loss rating/);
+  // A player's page mixes his own rows (an ejection) with his team's losses: only the loss is rated.
+  const ohtani = await served('player:mlb:2');
+  assert.ok(ohtani.some((i) => i.id === 'E1' && i.loss === false && i.rating === undefined), 'an ejection has no rating');
+  assert.ok(ohtani.some((i) => i.loss === true && i.rating), "the team's loss on his page has one");
+  assert.ok(ohtani.every((i) => i.loss || i.rating === undefined));
+  // The line belongs to the endpoint: the row, and a share link of it, don't carry it.
+  assert.doesNotMatch(String(miseryByCode(giants.shareUrl.split('/a/')[1])?.extra ?? ''), /Loss rating/);
+  assert.doesNotMatch((db.prepare('SELECT lines FROM misery WHERE id = ?').get(lost.id) as { lines: string | null }).lines ?? '', /Loss rating/);
+  setFlag('loss.rating', false);
+  try {
+    const off = (await served('team:mlb:26')).find((i) => i.id === lost.id);
+    assert.equal(off.rating, undefined, 'switched off, a loss is served as before');
+    assert.doesNotMatch(off.body, /Loss rating/);
+    assert.equal(off.loss, true);
+  } finally { setFlag('loss.rating', true); }
+  assert.ok((await served('team:mlb:26')).find((i) => i.id === lost.id).rating, 'and on again');
+});
+
+test("a soccer 3+ goal loss keeps the loss's margin and score in either publish order, from the tracker and the scoreboard, and is rated", () => {
+  const g3 = { league: 'epl' as const, gameId: 'S3', homeId: '379', awayId: '360' }, g4 = { ...g3, gameId: 'S4' };
+  const lost3 = gameLostEvent(g3, { home: 4, away: 1 }, now - 7000)!, lost4 = gameLostEvent(g4, { home: 5, away: 0 }, now - 6000)!;
+  publish([heavyLossEvent(g3, lost3, { home: 4, away: 1 })!, lost3], 'epl'); // the order the tracker publishes
+  publish([lost4, heavyLossEvent(g4, lost4, { home: 5, away: 0 })!], 'epl'); // the heavy one second still wins the row
+  recordFinalOnBoard('epl', board('S5', '379', '360', 4, 1), now);
+  for (const [id, margin, score] of [[lost3.id, 3, '4-1'], [lost4.id, 5, '5-0'], ['S5:final:team.lost:360', 3, '4-1']] as const) {
+    const row = db.prepare('SELECT * FROM misery WHERE id = ?').get(id) as any;
+    assert.equal(row.type, 'epl.team.heavy_loss', id);
+    assert.equal(metaOf(id).margin, margin, `${id} keeps its margin`);
+    assert.equal(metaOf(id).score, score);
+    assert.deepEqual(ratingOf(row), margin === 3 ? { score: 57, label: 'Ugly' } : { score: 85, label: 'Disaster' }, id);
+  }
+});
+
+test("a loss row that lost its margin is rated from the loss alert's own body, and never guessed", () => {
+  const row = (league: string, body: string, meta: string | null, kind: 'loss' | 'event' = 'loss') => ({ kind, league, body, meta });
+  assert.deepEqual(ratingOf(row('epl', 'Final Score: 4 to 1', '{"gameId":"X","winnerId":"388"}')), { score: 57, label: 'Ugly' }, "Newcastle's 4-1: a soccer row stored before it kept a margin");
+  assert.deepEqual(ratingOf(row('mlb', 'Down 0-1 in the NLCS. Final Score: 2 to 1', '{"gameId":"401908030"}')), { score: 8, label: null }, 'a backfilled row with only its game');
+  assert.deepEqual(ratingOf(row('mlb', 'Final Score: 9 to 3', '{"margin":6}')), ratingOf(row('mlb', 'Final Score: 9 to 3', null)), 'the meta and the body agree');
+  assert.equal(ratingOf(row('mlb', 'Final Score: 9 to 3', '{"margin":2}'))!.score, 16, "the row's own margin wins over its body");
+  assert.equal(ratingOf(row('mlb', '', '{"gameId":"401908015"}')), null, 'no margin anywhere: nothing is guessed');
+  assert.equal(ratingOf(row('mlb', 'Swept 3-0 by the Rays in the ALDS.', null)), null);
+  assert.deepEqual(ratingOf(row('mlb', 'Final Score: 9 to 3', 'not json')), ratingOf(row('mlb', 'Final Score: 9 to 3', null)), 'unreadable meta falls back to the body');
+  assert.equal(ratingOf(row('mlb', 'Final Score: 9 to 3', '{"margin":6}', 'event')), null, 'an event is not a loss');
+  assert.equal(ratingOf(row('ufc', 'Final Score: 9 to 3', '{"margin":6}')), null, 'the UFC has no margin');
+  assert.equal(ratingOf(row('f1', '', '{"gameId":"401839115"}')), null);
+});
+
+test('a preseason loss is recorded like any other and never rated (a 53-point preseason blowout is no disaster)', () => {
+  const pre = { ...board('P1', '22', '134478', 119, 66), season: { type: 1 } }; // the Trail Blazers beat a team not in the catalog, as on October 12 2026
+  assert.equal(recordFinalOnBoard('nba', pre, now), true, 'still recorded');
+  const row = db.prepare("SELECT * FROM misery WHERE id = 'P1:final:team.lost:134478'").get() as any;
+  assert.ok(row, 'the row exists');
+  assert.equal(metaOf(row.id).margin, 53);
+  assert.equal(metaOf(row.id).preseason, true);
+  assert.equal(ratingOf(row), null, 'but it has no rating');
+  recordFinalOnBoard('nba', board('P2', '22', '134478', 119, 66), now); // the same score in the regular season (type 2)
+  const reg = db.prepare("SELECT * FROM misery WHERE id = 'P2:final:team.lost:134478'").get() as any;
+  assert.equal(metaOf(reg.id).preseason, undefined);
+  assert.deepEqual(ratingOf(reg), { score: 85, label: 'Disaster' });
+  // The tracker marks it on the alert (live.ts): the row follows.
+  const lost = gameLostEvent({ league: 'nba', gameId: 'P3', homeId: '7', awayId: '4' }, { home: 120, away: 90 }, now - 3000)!;
+  publish([{ ...lost, meta: { ...lost.meta, preseason: true } }], 'nba');
+  assert.equal(ratingOf(db.prepare('SELECT * FROM misery WHERE id = ?').get(lost.id) as any), null);
+});
+
+test("an ESPN score correction refreshes the row's margin and score (reviseMisery), and a revision without them keeps the row's", () => {
+  db.prepare("INSERT INTO follows (device_id, target_key, created_at) VALUES ('d', 'team:mlb:19', 0)").run();
+  const lost = gameLostEvent({ league: 'mlb', gameId: 'V1', homeId: '26', awayId: '19' }, { home: 5, away: 2 }, now - 2000)!;
+  publish([lost], 'mlb');
+  assert.ok(db.prepare('SELECT 1 FROM events WHERE id = ?').get(lost.id), 'someone tracks it, so the alert path has it too');
+  assert.equal(metaOf(lost.id).margin, 3);
+  assert.equal(reviseEvent(lost.id, { type: 'team.lost', title: lost.title, body: 'Final Score: 12 to 2. A 10-run blowout.', meta: { margin: 10, score: '12-2' } }), true);
+  assert.equal(metaOf(lost.id).margin, 10, 'the corrected margin');
+  assert.equal(metaOf(lost.id).score, '12-2');
+  assert.equal(metaOf(lost.id).gameId, 'V1', 'the rest of the row stays');
+  assert.deepEqual(ratingOf(db.prepare('SELECT * FROM misery WHERE id = ?').get(lost.id) as any), { score: 81, label: 'Disaster' });
+  reviseMisery(lost.id, { type: 'team.lost', targetKey: lost.targetKey, title: lost.title, body: 'Final Score: 12 to 2. A 10-run blowout.', meta: {} });
+  assert.equal(metaOf(lost.id).margin, 10, 'a revision that does not carry the margin keeps it');
 });

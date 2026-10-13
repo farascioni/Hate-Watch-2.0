@@ -605,7 +605,7 @@ How a soccer match is read, which every soccer alert depends on. The plays are t
 - **Instead of the plain loss:** it shares the loss's moment and is published first (`finish` puts it ahead of `team.lost`), so a device with it on gets "thrashed", and one with it off gets the plain loss (which for soccer also says "were thrashed": `gameLostEvent` uses the soccer blowout wording, so the two differ only in their switch).
 - **One Successful Hate Watch:** it's in `HATE_WATCH_TYPES` and carries `lostId`, the loss's id, so the counter goes up once, under the team (`hateWatchOf` in `server/src/hate-watches.ts`), and "N other hate watchers" counts both.
 - **Tracked players** get "Successful Hate Watch! Jack Rudoni and Coventry were thrashed 5-0 by Brighton" (`playerTeamLostEvents`, `test/soccer.test.ts`).
-- Id `${gameId}:final:epl.team.heavy_loss:${loserId}`.
+- Id `${gameId}:final:epl.team.heavy_loss:${loserId}`. Its meta carries the loss's `margin` and `score` too (with `gameId`, `winnerId`, `lostId`, `teamKey`): its Recent misery row replaces the plain loss's, so the row would have lost the margin without them.
 
 ## Adding a soccer league
 
@@ -990,6 +990,7 @@ Two ways out.
 - **A Successful Hate Watch is counted** for every device tracking the team or one of its players, before alert settings are checked (`recordHateWatch` in `publish`), and the alert says how many others got it ("23 other hate watchers": the README's counter section).
 - **The loss gets a clip:** the winning play's (the play that put the winner ahead for good, `leadStory`), else the recap (`lossClip` in its meta; MLB, NBA, WNBA, NHL; `server/src/clips.ts`).
 - **Id:** `${gameId}:final:team.lost:${loserId}`, moment `${gameId}:final:lost`.
+- **Its meta** (never the words): `gameId`, `winnerId`, `margin` (the winner's score minus the loser's), `score` ("45-17"), `blowout`, `eliminated` and `sweep`, and `preseason: true` when the game is a preseason game (ESPN's season type 1, from the tracker's summary or the scoreboard event: `live.ts` `finish`, `misery.ts` `board`). Recent misery keeps the margin to rate the loss (`docs/recent-misery.md`, "How bad a loss was") and a preseason loss is never rated. No new alert, id or push.
 
 ### How they lost: the loss's facts
 

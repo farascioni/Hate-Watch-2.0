@@ -53,7 +53,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 442 tests in 61 files, offline, in about 4 seconds, all passing on October 13, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 459 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
 The other docs: [docs/alerts.md](docs/alerts.md) (every alert in detail), [docs/duplicate-alerts.md](docs/duplicate-alerts.md), [docs/android-release.md](docs/android-release.md), and [docs/working-in-this-repo.md](docs/working-in-this-repo.md) (the explanations behind CLAUDE.md's rules).
@@ -108,7 +108,7 @@ The full detail, with the runbooks: [docs/redundancy.md](docs/redundancy.md).
 
 ## Recent misery
 
-**In short:** The second tab on every player and team page lists the priority things that happened to them in the last 30 days: every loss (with how it happened as lines on it) and the worst of the rest (an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF, a UFC loss). It is the same list for every user: not your feed, not shaped by your alert settings, and filled in for teams and players nobody tracks. The server writes it into its own table (`misery`, `server/src/misery.ts`) from the alerts it already makes and the scoreboard it already reads, and serves it publicly at `GET /targets/:key/misery`. It adds no ESPN calls.
+**In short:** The second tab on every player and team page lists the priority things that happened to them in the last 30 days: every loss (with how it happened as lines on it) and the worst of the rest (an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF, a UFC loss). It is the same list for every user: not your feed, not shaped by your alert settings, and filled in for teams and players nobody tracks. The server writes it into its own table (`misery`, `server/src/misery.ts`) from the alerts it already makes and the scoreboard it already reads, and serves it publicly at `GET /targets/:key/misery`. It adds no ESPN calls. Each loss also carries a rating (a score out of 100 and Rough, Ugly or Disaster) worked out from how big its margin was, served as `rating` and as a line on the row behind the `loss.rating` server switch.
 
 The full detail: [docs/recent-misery.md](docs/recent-misery.md).
 
@@ -150,7 +150,7 @@ The full detail: [docs/sharing.md](docs/sharing.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 442 tests in 61 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 459 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 
