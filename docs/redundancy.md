@@ -4,7 +4,7 @@
 
 ## Index
 
-**Summary:** the server is one Fly machine with SQLite on one volume, so its failures are the volume's, the host's and the region's. Two things are in place against them. **Litestream** streams the database to object storage (Tigris) every second or so, so a lost volume loses about a second of data instead of up to a day, and a machine started on an empty volume restores itself before it serves. **`GET /health/deep`** answers 503 when the database, the ESPN reads, a game's poll loop or the replication has stopped, for an outside monitor to message the owner (Fly's own check stays on `/health`). Both are built and tested offline; they do nothing until the setup steps below are done. A warm standby in a second region, and independence from the fly.dev address, are designed but not built.
+**Summary:** the server is one Fly machine with SQLite on one volume, so its failures are the volume's, the host's and the region's. Two things are in place against them. **Litestream** streams the database to object storage (Tigris) every second or so, so a lost volume loses about a second of data instead of up to a day, and a machine started on an empty volume restores itself before it serves. **`GET /health/deep`** answers 503 when the database, the ESPN reads, a game's poll loop or the replication has stopped, for an outside monitor to message the owner (Fly's own check stays on `/health`). Both are built, tested offline and deployed (release v81, October 13, 2026); `/health/deep` is live, and replication does nothing until its secret is set (Setting it up). A warm standby in a second region, and independence from the fly.dev address, are designed but not built.
 
 **Sections:**
 - **Redundancy: when the server fails**: the failures, what each costs today, and what is in place.
@@ -19,7 +19,7 @@
 
 ## Redundancy: when the server fails
 
-**In short:** the server is one Fly machine with SQLite on one volume, so its failures are the volume's, the host's and the region's. Two things are in place against them. **Litestream** streams the database to object storage (Tigris) every second or so, so a lost volume loses about a second of data instead of up to a day, and a machine started on an empty volume restores itself before it serves. **`GET /health/deep`** answers 503 when the database, the ESPN reads, a game's poll loop or the replication has stopped, for an outside monitor to message the owner (Fly's own check stays on `/health`). Both are built and tested offline; they do nothing until the setup steps below are done. A warm standby in a second region, and independence from the fly.dev address, are designed but not built.
+**In short:** the server is one Fly machine with SQLite on one volume, so its failures are the volume's, the host's and the region's. Two things are in place against them. **Litestream** streams the database to object storage (Tigris) every second or so, so a lost volume loses about a second of data instead of up to a day, and a machine started on an empty volume restores itself before it serves. **`GET /health/deep`** answers 503 when the database, the ESPN reads, a game's poll loop or the replication has stopped, for an outside monitor to message the owner (Fly's own check stays on `/health`). Both are built, tested offline and deployed (release v81, October 13, 2026); `/health/deep` is live, and replication does nothing until its secret is set (Setting it up). A warm standby in a second region, and independence from the fly.dev address, are designed but not built.
 
 Why one machine at all: the live poller, every WebSocket and the database are one process, and "one alert per id" holds because `publish()` inserts into one database (docs/duplicate-alerts.md, Layer 2). Two machines with a database each would both publish and both push. Everything here keeps one writer.
 
@@ -61,7 +61,7 @@ For the first 120 s after a boot only the database is checked, since the first s
 
 ### Setting it up (once)
 
-Nothing below has been done yet. Each step is the owner's to run or approve (CLAUDE.md, "Release flow": ask before every deploy).
+**Status (October 13, 2026): step 1 is done.** Production runs the image as release v81 (backup `hatewatch-backup-2026-10-13-before-redundancy.db` taken first), `GET /health/deep` answers 200 and the log shows the not-set line. Steps 2 to 6 are not done. Each step is the owner's to run or approve (CLAUDE.md, "Release flow": ask before every deploy).
 
 1. **Deploy the image without the secret** (`fly deploy --remote-only` from `server/`, when nothing is live and after the `VACUUM INTO` backup). This only adds the files and `/health/deep`; `start.sh` skips Litestream. If Fly's build fails, the old machine keeps running. Check `https://hate-watch-api.fly.dev/health/deep` answers 200 and the log shows the not-set line.
 2. **Create the bucket:** `fly storage create -a hate-watch-api -n hatewatch-backups`. It sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and the endpoint as secrets on the app (which may restart it, so run it when nothing is live too) and prints the keys once: **keep a copy in a password manager**, because a restore from your own computer (below) needs them.
