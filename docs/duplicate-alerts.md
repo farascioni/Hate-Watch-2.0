@@ -58,7 +58,9 @@ decide which of several true alerts a device gets.
 - **The same thing seen under a new id is not new.** Football plays re-posted under new ids are found by place
   (Layer 5); an ABS challenge's pitch that gets a new id is held by its place (`absSlot`).
 - **Don't re-run detectors on a changed MLB result.** Some MLB ids are built from the play's text, and a rewrite
-  would make a new id. `GameTracker.poll` logs the change instead (one exception, a crew chief review; below).
+  would make a new id. `GameTracker.poll` logs the change instead. The exceptions are narrow and each has an id that
+  cannot go out twice: a crew chief review, a home run's distance, an error moved to another fielder, a result that
+  became a scoring play, and a replay challenge's sentence written in later (`revisedResult`; below).
 - **Changing an id's shape re-sends.** A deploy that changes how an id is built sends every alert made again with
   the new shape as new: the last 5 minutes of each game in progress (a deploy is a restart: `atBoot`), and F1 results for sessions that started in
   the last 8 hours, which are read again after a restart.
@@ -86,7 +88,7 @@ from the tests):
 | Scoreless at the half (NBA, WNBA) | `${gameId}:half:${league}.scoreless_half:${athleteId}` | (a player's alert, by athlete) |
 | Once a game (MLB) | `${gameId}:mlb.team.position_player_pitching:${teamId}` | |
 | A finished drive (football, `nflDriveEvents`) | `${gameId}:drive:${driveId}:${type}` | `401858481:drive:40185848117:cfb.team.three_and_out`, "Indiana went three-and-out" |
-| MLB, keyed on text | caught stealing `${gameId}:cs:${half}:${text}:${runner}`; out on the bases `${gameId}:bases:${halfKey}:${text}:${who}`; a gift run and its runs `${gameId}:${type}:${halfKey}:${text}:${pitcher}`; a lost replay challenge `${gameId}:challenge:${key}:${text}:${loserId}` (the text normalized, spaces as dashes) | |
+| MLB, keyed on text | caught stealing `${gameId}:cs:${half}:${text}:${runner}`; out on the bases `${gameId}:bases:${halfKey}:${text}:${who}`; a gift run and its runs `${gameId}:${type}:${halfKey}:${text}:${pitcher}`; the same for the pitcher's run alert and the fielder's error on a runner's play with no batter (a pickoff error: `${gameId}:mlb.pitcher.runs_allowed:${halfKey}:${text}:${pitcher}`, one for each pitcher charged; `…:mlb.fielder.error:…:${fielder}`); a lost replay challenge `${gameId}:challenge:${key}:${text}:${loserId}` (the text normalized, spaces as dashes) | |
 | F1 (`f1.ts`) | `${compId}:f1.finish:${driverId}` (one finish alert per driver per session, its facts merged), `${compId}:f1.quali:${driverId}`, `${compId}:f1.driver.dnf:${driverId}`, `${compId}:f1.team.double_dnf:${teamKey}`, `${compId}:f1.team.no_points:${teamKey}`, `${compId}:f1.pit:${driverId}:${stop}`, `${compId}:f1.lapped:${driverId}`, `${compId}:f1.places:${driverId}`, `${compId}:f1.driver.back_of_grid:${driverId}`, `${compId}:f1.driver.session_start:${driverId}`, `${compId}:team.game_start:${teamKey}` | `401839115:f1.finish:5498`, "Charles Leclerc finished P3: behind teammate Lewis Hamilton (P2)"; `401839115:team.game_start:team:f1:106842`, "Hate Watch Starting: Ferrari" |
 | UFC (`ufc.ts`) | `${fightId}:${type}:${loserId}`, `${fightId}:ufc.knocked_down:${athleteId}:${n}`, `${fightId}:ufc.fight_start:${athleteId}` | `401863575:ufc.lost:4350812`, "Successful Hate Watch! Ilia Topuria got knocked out by Justin Gaethje (KO/TKO R4 5:00)" |
 | News (`news.ts`) | `news:${league}:${articleId}:${targetKey}` (one per article and target) | |
@@ -104,15 +106,21 @@ from the tests):
 | A revision's line (`linesOn` in `revisions.ts`) | `${the alert's id}:changed:${hash}`, `hash` the first 10 characters of a base64url SHA-256 of the line's words: the same line on the same alert is the same id in any tracker | `401858481:401858481541:cfb.team.interception:158:changed:` and the hash of "Wiped out by a penalty on Indiana: Roughing The Passer." |
 
 **Ids keyed on text.** A few MLB alerts are keyed on the play's text instead of its id: caught stealing, out on the
-bases, a run handed over on a wild pitch or a balk (and the runs it counts as), and a lost replay challenge. ESPN
+bases, a run handed over on a wild pitch or a balk (and the runs it counts as), a lost replay challenge, and, on a
+runner's play with no batter (a pickoff error), the pitcher's run alert and the fielder's error. ESPN
 posts these plays twice under different ids (a "Wild Pitch" play and a "Play Result" with the same text, the
 runner's play and the at-bat's: "ESPN twin plays collapse to one", commit 2bfbef7; `challenges.test.ts`), and the
 text is what stays the same, so both copies make one id and one alert. The flip side is that if ESPN rewrote the
 text, the id would change. So `GameTracker.poll` (`server/src/live.ts`) keeps each at-bat result's text and runner
-roles as last seen (`resultSigs`) and only logs a rewrite ("result … changed after it was posted"), never judging it
-again. The one exception is a crew chief review written into a result later ("Volpe homered…" rewritten as "Volpe
-doubled… Umpire review: HR call on the field was overturned…"): the rewritten result is checked for that alone
-(`umpireReviewLost`, `resultTexts`, `crew-chief-review.test.ts`), and only when the review is what's new.
+roles as last seen (`resultSigs`) and logs a rewrite ("result … changed after it was posted"), never judging it
+again. The exceptions: a crew chief review written into a result later ("Volpe homered…" rewritten as "Volpe
+doubled… Umpire review: HR call on the field was overturned…"), checked for that alone (`umpireReviewLost`, `resultTexts`,
+`crew-chief-review.test.ts`), and only when the review is what's new; and `revisedResult`, which compares the new version
+with the last one (`resultPlays`) and reaches only these: a home run's distance and an error moved to another fielder
+(a line, no push, on the alerts the play made, which `sent` remembers, or a new fielder's alert), a result that
+became a scoring play (the pitcher's run alert), and a replay challenge's sentence added to it (`challengeWatch`: believed
+after it has held 45 seconds, never from one version). The detectors are run on a copy of the game's state for this, and
+only the alert types named are kept.
 
 **The same thing under a new id.** ESPN re-posts football plays under new ids when a review changes them (one
 touchdown came under three ids at Missouri), and `PlayLedger.repost` matches them by place (Layer 5). An ABS
@@ -181,7 +189,12 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`seen`:** play ids already judged. A play is passed to the detectors (`PLAYER_DETECTORS[league]`) only on its
   first sighting, then `observePlay` updates the game's state (bases, goalies, the half-inning). An MLB result
   posted before its batter is on it waits (`waitForBatter`, `noBatter`, up to `HW_HALF_END_WAIT_MS`, 20 seconds) and
-  is judged once, when it's ready.
+  is judged once, when it's ready. So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
+  says "Official Scorer Ruling Pending" (`HW_RULING_WAIT_MS`, 45 seconds; `settling`, `settleSince`): the version that
+  settles is the one judged, and the plays after it are not judged until it is, so the state they build (bases, whose
+  runner is whose) stays in order. An "End Inning" play two reads in a row lack, with the half not over, is forgotten
+  (`reopenedHalves`, `endInnings`): removed from `seen` and from the half's judged state, so the same id coming back is a
+  new end.
 - **History on attach:** when the tracker first attaches to a game (a new follow, or a server restart), plays whose
   time (ESPN's wallclock) is older than `BACKFILL_WINDOW_MS` (90 seconds) update its state and its score but are
   never alerted. A game attached on the server's first scoreboard read of its league (`atBoot`: it was live when the
@@ -206,8 +219,15 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
   judged pair's makeup and alert ids; each key event's text and when it was first seen; each card alert's moment by player and
   minute. The play ids in them are the alerts' ids, so a goal, card, substitution or foul that the touch feed has before the
   summary does is judged once (`seen`, `fouls`) and the summary's copy is the same play.
-- **`resultSigs`, `resultTexts`:** each MLB at-bat result as last seen, to log a rewrite rather than judge it again
-  (Layer 1).
+- **`resultSigs`, `resultTexts`, `resultPlays`:** each MLB at-bat result as last seen, to log a rewrite rather than judge it
+  again (Layer 1), and to tell what it changed (`revisedResult`).
+- **`sent`, `sentById`:** the alerts each MLB play made, after `bundleByPlay` (they have their moment), for the lines a rewrite
+  puts on them. A text-keyed alert made twice by ESPN's twin plays is one alert, so both plays are given the first, the one
+  the devices hold. **`halfJudged`:** the last result of each half whose end was judged, which its alerts hang on, for the
+  line when the end is taken back.
+- **`challengeWatch`:** replay challenge sentences ESPN added to a posted result, with when they last changed.
+  **`strikeThrees`:** strike-three pitches of at-bats ESPN gave no result for, and the result made from the pitch
+  (`withStrikeThrees`). **`ctx.owner`** (`observePlay`): the pitcher each runner on base reached against, whose run his is.
 - **`mergePlays`:** ESPN's core and site feeds are merged by play id before detection, so a play in both is one
   play (README "Real-time": "Two sources per game"). College football's drive plays (`fromDrivePlays`) skip a play
   listed in two drives.
@@ -336,8 +356,8 @@ counts everyone who got any of the moment's loss alerts.
 
 **Rules:**
 
-- **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge,
-  held by design).
+- **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge, a
+  strikeout on a challenged pitch and a result waiting for the official scorer, held by design).
 - **What ESPN changes afterwards is a revision of the alert that went out:** a line with no push on the alerts that
   no longer hold, and the alerts the play has now and didn't before sent as new. Never a second notification about
   the same play.
@@ -401,7 +421,10 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   "down to N men" counts as it goes. A touch ESPN retypes (11 type changes in that match) or removes is judged again as a
   pair for 6 minutes: an alert it newly makes goes out, one already out takes the new words, one it no longer makes stays and
   is logged. Details: docs/alerts.md, "EPL how" and "Soccer passes and dribbles".
-- **MLB:** a changed at-bat result is logged, not judged again (Layer 1). A lost ABS challenge waits for the review
+- **MLB:** a changed at-bat result is logged, not judged again, but for the narrow cases of Layer 1 (`revisedResult`): a home
+  run's distance becomes a line ("ESPN corrected the distance: 436 feet."), an error moved to another fielder a line on the
+  first one's alert ("ESPN moved this error to Freddie Freeman.") and an alert for the new one, a taken-back third out a line on
+  the half's early alert ("A replay review overturned the third out; the inning went on."). A lost ABS challenge waits for the review
   (`holdAbs`): it goes out once a later play exists and `HW_ABS_SETTLE_MS` (30 seconds) have passed (at the final, at
   once), and only if the pitch still reads Confirmed and, on an at-bat's last pitch, the result doesn't say the call
   was overturned. A pitch missing from one read isn't taken back, because ESPN serves stale copies that drop the
@@ -472,7 +495,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 
 | Kept (database) | Forgotten (memory) |
 |---|---|
-| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `resultSigs`, `resultTexts`, soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
+| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football and basketball revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen` |
 
@@ -504,8 +527,10 @@ What is lost:
   has no `lateOn`, it can go out as an alert of its own rather than a line, and a `foldOnly` one is never shown.
 - **Revisions.** A football or basketball play edited after a restart can't be compared with what it sent before: the
   ledger is empty, and a revision line has no `delivered` entry to land on.
-- **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, from before the
-  90-second window is history.
+- **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, a strikeout under an
+  ABS review or a result waiting for the official scorer, from before the 90-second window is history. A line a rewrite would
+  put on an alert (a distance, a moved error, a taken-back third out) after a restart has no `sent` record to land on and is
+  not made.
 - **Plays nobody read** (fixed October 11, 2026). The 90-second window counts from the play's own time (ESPN's
   wallclock), and ESPN posts plays well after that time: in production during ALDS Game 5, 10.9 to 92.7 seconds after it
   (median 23.9; README "Real-time", "What production measures"), plus the seconds the server is down for the deploy.
@@ -521,6 +546,9 @@ This is one reason for the decision **"No production restarts during live games"
   nothing, but code that pushed without going through `publish` would not be caught by anything.
 - **Text-keyed MLB ids** depend on ESPN's text staying the same. A re-judged rewritten result would make a new id,
   which is why changed results are logged, not judged again.
+- **A rewrite that is not one of `revisedResult`'s** is still only logged. NLCS Game 2's squeeze bunt sentence flipped three
+  times and went out as ESPN first wrote it ("Edman to first … Edman to second."); there is no general "ESPN rewrote this"
+  line, because a sentence ESPN is still working on would write a line each time.
 - **A fold sentence is compared as text.** Two wordings of the same fact are two lines.
 - **A basketball play ESPN removes after 15 minutes** keeps its alert with no line (`REVISE_MS`; Franz Wagner's block alert in Magic at Cavaliers, removed 24 minutes later). A first alert on a play that ESPN fixes within seconds still goes out first (a free throw posted as "misses" that is flipped to "makes" a minute later): only its line corrects it.
 - **A soccer foul that ESPN later marks "Penalty conceded"** is judged again (`fouls` in `GameTracker`), and the

@@ -13,6 +13,15 @@ RECENT MISERY
 - A player's page also shows their team's losses.
 - A loss says "Successful Hate Watch!" only if you track that team or player.
 
+MLB
+- A strikeout on a challenged pitch waits 30 seconds, so one ESPN turns into a walk is never sent.
+- A pickoff error is no "got picked off", and its pitcher alerts come once.
+- A lost replay challenge ESPN adds later is sent once it holds; "Official Scorer Ruling Pending" is waited out.
+- A homer's corrected distance and an error ESPN moves to another fielder become lines on the alerts sent.
+- A run is the pitcher's whose runner scores, as in the box score; a run a review gives back alerts the pitcher too.
+- A third out a review overturns gets a line, and the inning's real end is judged.
+- A strikeout ESPN never posts is made from the third strike.
+
 ## Build 13 (October 12, 2026)
 
 Changes since build 12. Server updates already work on every build.

@@ -44,6 +44,10 @@ export interface GameCtx {
   homerRun?: { id: string; n: number };
   /** MLB: who is on each base right now (role -> athleteId), from the latest full base-state snapshot. */
   bases?: Partial<Record<'onFirst' | 'onSecond' | 'onThird', string>>;
+  /** MLB: the pitcher each runner on base reached against (athleteId -> athleteId), kept by observePlay: the run he scores is that pitcher's (chargedRuns). */
+  owner?: Record<string, string>;
+  /** MLB: the half-inning `bases` was last read in (a pinch runner is told from a new half's runner by it). */
+  basesHalf?: string;
   /**
    * MLB: the current half-inning, for NOBLETIGER (bases loaded, nobody out, then no runs), for "opponent has
    * runners in scoring position" (`risp`: the batting team has had one this half) and "opponent loads the bases"
@@ -55,6 +59,8 @@ export interface GameCtx {
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
   lastPitchAbs?: boolean;
+  /** MLB: the latest pitch is one ESPN still reads "Confirmed" (an ABS challenge it can overturn within seconds): a strikeout on it waits for the review (settling in live.ts). */
+  absConfirmed?: boolean;
   /** Teams that have had their "blew a big lead" alert this game (teamScoreEvents): once each. */
   blewLead?: Set<string>;
   /** MLB: each batter's strikeouts so far this game (observePlay), for "struck out for the 3rd time". */
@@ -499,12 +505,25 @@ export function observePlay(g: GameCtx, p: NPlay) {
     const [batter] = role(p, 'batter');
     if (p.typeSlug === 'play-result' && batter && /struck out/i.test(p.text)) (g.ks ??= {})[batter] = (g.ks[batter] ?? 0) + 1;
     if (p.typeSlug === 'play-result') g.lastResult = p;
-    if (PITCH.test(p.text)) g.lastPitchAbs = ABS_PITCH.test(p.type);
+    if (PITCH.test(p.text)) { g.lastPitchAbs = ABS_PITCH.test(p.type); g.absConfirmed = absCall(p) === 'confirmed'; }
     // Pitches and at-bat results list the batter plus every runner: a full snapshot of the bases.
     // Runner events (steals, pickoffs) list only the pitcher, so they must not clear the bases.
     if (p.participants.some((x) => x.role === 'batter')) {
       const at = (base: 'onFirst' | 'onSecond' | 'onThird') => p.participants.find((x) => x.role === base)?.id;
-      g.bases = { onFirst: at('onFirst'), onSecond: at('onSecond'), onThird: at('onThird') };
+      const bases = { onFirst: at('onFirst'), onSecond: at('onSecond'), onThird: at('onThird') };
+      // Whose runner: the pitcher on the play when he gets on base (a hit, a walk, an error); a pinch runner (one runner gone, one
+      // new, between pitches) takes the one he ran for; anyone already on base keeps his.
+      const [pitcher] = role(p, 'pitcher');
+      const was = Object.values(g.bases ?? {}).filter((x): x is string => !!x), now = Object.values(bases).filter((x): x is string => !!x);
+      const gone = was.filter((x) => !now.includes(x));
+      for (const id of now) {
+        if (was.includes(id)) continue;
+        const from = p.typeSlug !== 'play-result' && g.basesHalf === halfKey(p) && gone.length === 1 && now.filter((x) => !was.includes(x)).length === 1 ? g.owner?.[gone[0]] : undefined;
+        const who = from ?? pitcher;
+        if (who) (g.owner ??= {})[id] = who;
+      }
+      g.bases = bases;
+      g.basesHalf = halfKey(p);
     }
   }
 }
@@ -862,6 +881,9 @@ const CAUGHT_STEALING = new RegExp(`${INITIAL}${NAME} caught stealing (second|th
  * text); the id is built from the text, not the play id, so both collapse into one notification.
  */
 function runnerOut(g: GameCtx, p: NPlay): Detected | null {
+  // "Edman scored on pickoff error by pitcher Henderson, Betts picked off second.": an error means the runner was safe
+  // (NLCS Game 2, October 12 2026: "Mookie Betts got picked off second" went out for a runner left on second).
+  if (/\berror\b/i.test(p.text)) return null;
   let lastName: string, initial: string | undefined, from: Base, what: string;
   const po = p.text.match(PICKED_OFF);
   const cs = po ? null : p.text.match(CAUGHT_STEALING); // check pickoffs first: "picked off and caught stealing"
@@ -929,8 +951,19 @@ export const absCall = (p: Pick<NPlay, 'type'>) => (p.type.match(ABS_PITCH)?.[2]
  * overturned to "Ball - Overturned"). Other ids are their own place.
  */
 export const pitchSlot = (id: string) => (/^\d{9,}$/.test(id) ? id.slice(0, -4) : id);
+/**
+ * A strikeout on a challenged last pitch: the pitch still reads "Confirmed", or the result carries the challenge's sentence
+ * ("Betts struck out looking. Los Angeles Dodgers challenged: call on the field was upheld."). ESPN overturned one of these
+ * into a walk (NLCS Game 2, October 12 2026), so the tracker judges it only after ABS_SETTLE_MS (live.ts, settling).
+ */
+export const strikeoutUnderReview = (g: GameCtx, p: NPlay) => p.typeSlug === 'play-result' && /struck out/i.test(p.text) && (!!g.absConfirmed || /\bchallenged:/i.test(p.text));
+/** ESPN's placeholder for an at-bat result the official scorer hasn't ruled on yet (a hit or an error): "Official Scorer Ruling Pending. Edman to second." */
+export const RULING_PENDING = /\bOfficial Scorer Ruling Pending\.?\s*/i;
 /** A failed challenge in an at-bat result: "Chicago White Sox challenged: call on the field was upheld." */
 const CHALLENGE_LOST = /\bchallenged\b[^.]*?\bcall on the field (?:was )?(?:upheld|confirmed|stands|stood)\b/i;
+/** A replay challenge's sentence in an at-bat result: how it ended so far ("upheld": the challenge failed), or null when the text has none. */
+export const challengeOutcome = (text: string): 'upheld' | 'overturned' | null =>
+  CHALLENGE_LOST.test(text) ? 'upheld' : /\bchallenged\b[^.]*?\bcall on the field (?:was )?overturned\b/i.test(text) ? 'overturned' : null;
 /**
  * A crew chief review (the umpires review a call themselves, no team challenged it), in an at-bat result:
  * "Umpire review: call on the field was overturned." and, Rays @ Yankees 2026-10-07, "Umpire review: HR call
@@ -1116,6 +1149,29 @@ export function pitcherEvents(g: GameCtx, pitchers: BoxPitcher[], o: { final: bo
 }
 
 // ─── Per-league player detectors ──────────────────────────────────────────────────────────────
+/**
+ * Whose the runs of a scoring play are: the pitcher each scoring runner reached against (g.owner), not the one on the mound
+ * when he scored (ALCS Game 1, October 12 2026: "Ian Seymour gave up 2 runs" and "Kevin Kelly gave up 2 runs" for runs the box
+ * score charged to Wells and Sulser; NLCS Game 2's Dustin May was the first). The scorers are the batter and everyone on base for
+ * a homer, else the names the text says "scored" (resolved on the batting team). Null when they can't be told or don't add up to
+ * the play's runs: the pitcher on the play gets them all, as before.
+ */
+function chargedRuns(g: GameCtx, p: NPlay, pitcher: string, runs: number, homer: boolean): Map<string, number> | null {
+  const onBase = Object.values(g.bases ?? {}).filter((x): x is string => !!x), [batter] = role(p, 'batter');
+  const scorers: string[] = homer ? [...onBase, ...(batter ? [batter] : [])] : [];
+  if (!homer) {
+    if (!p.teamId) return null;
+    for (const m of p.text.matchAll(new RegExp(String.raw`${INITIAL}([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III))?) scored\b`, 'gu'))) {
+      const id = byLastName(g, p.teamId, m[2], m[1]);
+      if (id) scorers.push(id);
+    }
+  }
+  if (scorers.length !== runs || !scorers.every((id) => onBase.includes(id) || id === batter)) return null;
+  const out = new Map<string, number>();
+  for (const id of scorers) { const who = id === batter ? pitcher : g.owner?.[id] ?? pitcher; out.set(who, (out.get(who) ?? 0) + 1); }
+  return out;
+}
+
 function mlb(g: GameCtx, p: NPlay): Detected[] {
   // ESPN marks every half-inning except the game's last with an "End Inning" play. Its alerts come from the half's
   // plays as they stand once a read has its third out (mlbHalfInningEnd, which the game tracker calls), not from here.
@@ -1125,6 +1181,10 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   const [pitcher] = role(p, 'pitcher');
   const t = p.text;
   const isResult = p.typeSlug === 'play-result' || p.scoring;
+  // ESPN posts a runner's play twice, a "Pick Off" and a "Play Result" with the same text and no batter on either: alerts
+  // made from one (a run, an error) take their id from the half-inning and the text, so the pair is one alert.
+  const textId = (type: string, who: string) => `${g.gameId}:${type}:${halfKey(p) ?? ''}:${normalize(t).replace(/ /g, '-')}:${who}`;
+  const twin = !batter && !isPitch(p);
 
   if (isResult && batter) {
     if (/struck out/i.test(t)) {
@@ -1160,7 +1220,6 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     // come from the half-inning and the text: one alert.
     const gift = p.scoring ? t.match(GIFT_RUN) : null;
     const pushedIn = p.scoring && isResult && /\b(walked|hit by pitch)\b/i.test(t) && !/\b(singled|doubled|tripled|homered)\b/i.test(t);
-    const textId = (type: string, who: string) => `${g.gameId}:${type}:${halfKey(p) ?? ''}:${normalize(t).replace(/ /g, '-')}:${who}`;
     if (/homered/i.test(t)) {
       // How far, when ESPN says ("homered to right (348 feet)"): "a 348-foot 2-run homer".
       const feet = t.match(/\((\d+) feet\)/)?.[1];
@@ -1174,12 +1233,19 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
       g.homerRun = { id: p.id, n };
       const what = n > 1 ? `${Array(n).fill('back').join('-to-')} homers${feet ? ` (${feet} feet)` : ''}` : label;
       out.push(mk(g, p, 'mlb.pitcher.home_run_allowed', pitcher, `${pn} gave up ${what}`, { aliases: ['mlb.pitcher.runs_allowed'] }));
+      // The runners on base came against others: their runs are theirs, as alerts of their own.
+      for (const [who, n] of chargedRuns(g, p, pitcher, runs, true) ?? []) {
+        if (who !== pitcher) out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', who, `${nameOf('mlb', who)} gave up ${n} run${n > 1 ? 's' : ''}`), ...(twin ? { id: textId('mlb.pitcher.runs_allowed', who) } : {}) });
+      }
     } else if (gift && !/passed ball/i.test(gift[1])) {
       out.push({ ...mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/balk/i.test(gift[1]) ? 'balked in a run' : 'let a run score on a wild pitch'}`, { aliases: ['mlb.pitcher.runs_allowed'] }), id: textId('mlb.pitcher.gift_run', pitcher) });
     } else if (pushedIn) {
       out.push(mk(g, p, 'mlb.pitcher.gift_run', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'hit a batter' : 'walked'} in a run`, { aliases: ['mlb.pitcher.runs_allowed', 'mlb.pitcher.walk'] }));
     } else if (runs) {
-      out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', pitcher, `${pn} gave up ${runs} run${runs > 1 ? 's' : ''}`), ...(gift ? { id: textId('mlb.pitcher.runs_allowed', pitcher) } : {}) });
+      // Each run is its pitcher's (chargedRuns); the pitcher on the play when that can't be told. One alert for each pitcher.
+      for (const [who, n] of chargedRuns(g, p, pitcher, runs, false) ?? [[pitcher, runs] as const]) {
+        out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', who, `${nameOf('mlb', who)} gave up ${n} run${n > 1 ? 's' : ''}`), ...(gift || twin ? { id: textId('mlb.pitcher.runs_allowed', who) } : {}) });
+      }
     }
     if (isResult && /\b(walked|hit by pitch)\b/i.test(t) && !pushedIn) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
     // A passed ball that scores a run is the catcher's ("…on a passed ball by Langeliers").
@@ -1196,7 +1262,7 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
   if (err && p.teamId) {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;
     const who = byLastName(g, fieldingTeam, err[2], err[1]);
-    if (who) out.push(mk(g, p, 'mlb.fielder.error', who, `${nameOf('mlb', who)} committed an error`));
+    if (who) out.push({ ...mk(g, p, 'mlb.fielder.error', who, `${nameOf('mlb', who)} committed an error`), ...(twin ? { id: textId('mlb.fielder.error', who) } : {}) });
   }
   return out;
 }

@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding,
+  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -88,6 +88,16 @@ const PLAYOFF_FINAL_WAIT_MS = Number(process.env.HW_PLAYOFF_FINAL_WAIT_MS ?? 120
  * "Overturned" pitch within 10 to 15 s every time it was timed (six reversals, ALDS Game 5 and NLCS Game 1, October 2026).
  */
 export const ABS_SETTLE_MS = Number(process.env.HW_ABS_SETTLE_MS ?? 30_000);
+/**
+ * MLB: how long a result that says "Official Scorer Ruling Pending" waits for the ruling before it is judged without that
+ * sentence (settling): 34 s in NLCS Game 2, October 12 2026. And how long a challenge sentence ESPN adds to a posted result
+ * must hold, unchanged, before it is believed (challengeSettled): ESPN wrote "upheld" three times in 100 s on a review that
+ * ended "overturned" (ALCS Game 1).
+ */
+export const RULING_WAIT_MS = Number(process.env.HW_RULING_WAIT_MS ?? 45_000);
+export const CHALLENGE_SETTLE_MS = Number(process.env.HW_CHALLENGE_SETTLE_MS ?? 45_000);
+/** MLB: the alerts a half-inning's end makes (reopenedHalves puts a line on them when the end is taken back). */
+const HALF_END_TYPES = new Set(['mlb.team.stranded_risp', 'mlb.team.down_in_order', 'mlb.team.nobletiger']);
 /** MLB: how long a half-inning's end waits for a read with its third out (halfInningEnds), and an at-bat's result for its batter. */
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
@@ -170,10 +180,24 @@ export class GameTracker {
   private halfEnds = new Map<string, { playId: string; since: number; seen: string }>();
   /** MLB: at-bat results ESPN posted without their batter, not judged until he's on them (or HALF_END_WAIT_MS passes). */
   private noBatter = new Map<string, number>();
+  /** MLB: results waiting to be judged since when: for the official scorer's ruling (RULING_WAIT_MS), or a strikeout's ABS review (ABS_SETTLE_MS): settling. */
+  private settleSince = new Map<string, number>();
   /** MLB: each at-bat result's text and roles as last seen, to log ESPN's changes to a result after posting it. */
   private resultSigs = new Map<string, string>();
   /** MLB: each at-bat result's text as last seen, to catch a crew chief review ESPN writes into it later. */
   private resultTexts = new Map<string, string>();
+  /** MLB: each at-bat result as last seen, to compare a rewrite with it (revisedResult). */
+  private resultPlays = new Map<string, NPlay>();
+  /** MLB: the alerts each play made (after bundleByPlay, so each has its moment), for the lines a rewrite puts on them (revisedResult, linesOnPlay). In memory only. */
+  private sent = new Map<string, Detected[]>();
+  private sentById = new Map<string, Detected>();
+  /** MLB: each "End Inning" play seen, with its half and the reads in a row that have lacked it (reopenedHalves), and the last result of each half whose end was judged (what its alerts hang on). */
+  private endInnings = new Map<string, { key: string; missing: number }>();
+  private halfJudged = new Map<string, string>();
+  /** MLB: strike-three pitches that ended an at-bat ESPN gave no result for, since when, and the result made from the pitch (withStrikeThrees). */
+  private strikeThrees = new Map<string, { since: number; made?: NPlay }>();
+  /** MLB: a replay challenge's sentence ESPN added to a posted result, until it has held for CHALLENGE_SETTLE_MS (challengeSettled). */
+  private challengeWatch = new Map<string, { outcome: 'upheld' | 'overturned' | null; since: number; abs: boolean }>();
   /** Soccer: the touch-by-touch feed so far (by position; earlier pages skipped when we attach late), and the next touch to judge. */
   private touches: (NPlay | undefined)[] = [];
   /** Soccer: the same feed as ESPN sent it, by the same positions (fromTouchKeyPlay and fromTouchFoul read these). */
@@ -411,6 +435,104 @@ export class GameTracker {
     return send;
   }
 
+  /**
+   * MLB: whether a result is still under review and must wait before it is judged. A strikeout on a challenged last pitch
+   * waits ABS_SETTLE_MS (ESPN posts the challenged call "Confirmed" and can overturn it into a walk: Betts, NLCS Game 2,
+   * October 12 2026), and a result that says "Official Scorer Ruling Pending" waits RULING_WAIT_MS for the ruling, then is
+   * judged without that sentence. The settled version is the one judged. Nothing waits at the final.
+   */
+  private settling(p: NPlay, now: number, final: boolean): boolean {
+    if (final) return false;
+    const pending = RULING_PENDING.test(p.text);
+    if (!pending && !strikeoutUnderReview(this.ctx, p)) return false; // the ruling came, or the strikeout was rewritten: judged as it reads now
+    const since = this.settleSince.get(p.id) ?? now;
+    if (!this.settleSince.has(p.id)) {
+      this.settleSince.set(p.id, now);
+      log(`[mlb ${this.ctx.gameId}] result ${p.id} ${pending ? 'is waiting for the official scorer' : 'is a strikeout under an ABS review'}: waiting ("${p.text}")`);
+    }
+    const wait = pending ? RULING_WAIT_MS : ABS_SETTLE_MS;
+    if (now - since < wait) return true;
+    if (pending && RULING_PENDING.test(p.text)) {
+      log(`[mlb ${this.ctx.gameId}] result ${p.id} still has no ruling after ${wait / 1000}s: judged without it`);
+      p.text = p.text.replace(RULING_PENDING, '').trim();
+    }
+    return false;
+  }
+
+  /**
+   * MLB: remember the alerts a poll published under the plays that made them. ESPN's twin plays (a Pick Off and a Play Result
+   * with one text) make one alert id twice and only the first is stored and delivered, so both plays are given that first one,
+   * the one whose moment the devices hold, for the lines a rewrite puts on it.
+   */
+  private rememberSent(out: Detected[]) {
+    for (const e of out) {
+      const playId = e.meta?.playId;
+      if (typeof playId !== 'string') continue;
+      const kept = this.sentById.get(e.id) ?? (this.sentById.set(e.id, e), e);
+      const list = this.sent.get(playId) ?? this.sent.set(playId, []).get(playId)!;
+      if (!list.includes(kept)) list.push(kept);
+    }
+  }
+
+  /** The alerts a play made, with a line on each (no push): `line` goes on every device's copy that got the alert or a line on it. */
+  private linesOnPlay(playId: string, line: string, only?: (e: Detected) => boolean): Detected[] {
+    return this.ledger.linesOn((this.sent.get(playId) ?? []).filter((e) => !only || only(e)), line);
+  }
+
+  /**
+   * MLB: what ESPN's rewrite of a posted at-bat result means for the alerts that went out on it. The detectors aren't run
+   * again on a rewritten result (Layer 1: text-keyed ids), so only these, each with an id that cannot go out twice:
+   * a home run's distance changed (a line on its alerts), an error moved to another fielder (a line on the first fielder's
+   * alert, the new fielder's alert), a result that became a scoring play (the pitcher's run alert: the team's came from the
+   * score), and a replay challenge's sentence added to it (watched until it holds: challengeSettled).
+   */
+  private revisedResult(prev: NPlay, p: NPlay, plays: NPlay[], now: number, events: Detected[], changed: Detected[]) {
+    const feet = (t: string) => t.match(/\((\d+) feet\)/)?.[1];
+    if (feet(prev.text) && feet(p.text) && feet(prev.text) !== feet(p.text)) {
+      changed.push(...this.linesOnPlay(p.id, `ESPN corrected the distance: ${feet(p.text)} feet.`));
+      log(`[mlb ${this.ctx.gameId}] result ${p.id}: the homer's distance went from ${feet(prev.text)} to ${feet(p.text)} feet: a line on its alerts`);
+    }
+    const again = PLAYER_DETECTORS.mlb({ ...this.ctx }, p); // on a copy of the game's state: a rewrite changes none of it
+    if (!prev.scoring && p.scoring) events.push(...again.filter((e) => e.type === 'mlb.pitcher.runs_allowed' || e.type === 'mlb.pitcher.home_run_allowed'));
+    const errors = (this.sent.get(p.id) ?? []).filter((e) => e.type === 'mlb.fielder.error'), now2 = again.filter((e) => e.type === 'mlb.fielder.error');
+    if (errors.length && now2.length && !now2.some((e) => errors.some((x) => x.targetKey === e.targetKey))) {
+      const to = catalog.player(now2[0].targetKey)?.name ?? 'another fielder';
+      changed.push(...this.ledger.linesOn(errors, `ESPN moved this error to ${to}.`));
+      events.push(...now2);
+      log(`[mlb ${this.ctx.gameId}] result ${p.id}: the error moved to ${to}`);
+    }
+    const outcome = challengeOutcome(p.text);
+    if (outcome && !challengeOutcome(prev.text)) {
+      const lastPitch = plays.filter((x) => isPitch(x) && x.id.slice(0, -6) === p.id.slice(0, -6)).pop();
+      this.challengeWatch.set(p.id, { outcome, since: now, abs: !!lastPitch && absCall(lastPitch) !== null });
+      log(`[mlb ${this.ctx.gameId}] result ${p.id} was given a challenge sentence after it was posted (${outcome}): watching it`);
+    }
+  }
+
+  /**
+   * MLB: a replay challenge's sentence added to a posted result is believed once it has held, unchanged, for
+   * CHALLENGE_SETTLE_MS and the game is past that at-bat (a later at-bat's play, not an End Inning play, which can be taken
+   * out), or 3 times as long: ALCS Game 1's review wrote "upheld" three times in 100 s, never for more than 35 s at a time, and ended "overturned". Then the lost challenge goes out
+   * (challengeLost's own id, from the text). A version without the sentence starts the wait over; "overturned" ends it.
+   * At the final it goes at once.
+   */
+  private challengeSettled(plays: NPlay[], now: number, final: boolean): Detected[] {
+    const out: Detected[] = [];
+    for (const [id, w] of this.challengeWatch) {
+      const i = plays.findIndex((p) => p.id === id);
+      if (i < 0) continue; // a stale read, or taken out: waits
+      const p = plays[i], outcome = challengeOutcome(p.text);
+      if (outcome !== w.outcome) { w.outcome = outcome; w.since = now; }
+      if (outcome === 'overturned') { this.challengeWatch.delete(id); log(`[mlb ${this.ctx.gameId}] result ${id}: the challenge was overturned: no alert`); continue; }
+      if (outcome !== 'upheld') continue;
+      const past = plays.slice(i + 1).some((x) => x.typeSlug !== 'end-inning' && x.id.slice(0, -6) !== id.slice(0, -6));
+      if (!final && (now - w.since < CHALLENGE_SETTLE_MS || (!past && now - w.since < 3 * CHALLENGE_SETTLE_MS))) continue; // the next at-bat can be minutes away (a break between innings): 3 times as long is enough alone
+      this.challengeWatch.delete(id);
+      out.push(...PLAYER_DETECTORS.mlb({ ...this.ctx, lastPitchAbs: w.abs }, p).filter((e) => e.type === 'mlb.challenge_lost'));
+    }
+    return out;
+  }
+
   /** MLB: whether to keep waiting for the batter on an at-bat's result (awaitingBatter), HALF_END_WAIT_MS at most. */
   private waitForBatter(p: NPlay, now: number): boolean {
     const since = this.noBatter.get(p.id);
@@ -418,6 +540,60 @@ export class GameTracker {
     if (now - since < HALF_END_WAIT_MS) return true;
     log(`[mlb ${this.ctx.gameId}] result ${p.id} still has no batter after ${HALF_END_WAIT_MS / 1000}s: judged as it is`);
     return false;
+  }
+
+  /**
+   * MLB: a strikeout ESPN never posts a result for. ALCS Game 1, October 12 2026: Bailey's at-bat ended on "Strike
+   * Looking - Overturned: Strike 3 Looking" and the third out, and neither ESPN feed ever had "Bailey struck out looking."
+   * (the box score has the strikeout). A strike-three pitch that is the last play of its at-bat, with no result after
+   * HALF_END_WAIT_MS, is given the result it would have had: the pitch's place plus 990057, the same id, so a result that
+   * comes later is the same play and cannot alert twice. It is part of the plays from then on (the game's state, the half
+   * inning's end, a final waiting for the last out all read it).
+   */
+  private withStrikeThrees(plays: NPlay[], now: number): NPlay[] {
+    const have = new Set(plays.map((p) => p.id));
+    const add = new Map<number, NPlay>();
+    plays.forEach((p, i) => {
+      if (!isPitch(p) || !/^Pitch \d+\s*:\s*Strike 3 (?:Looking|Swinging)\b/i.test(p.text) || !/^\d{12,}$/.test(p.id)) return;
+      const resultId = `${p.id.slice(0, -6)}990057`, batter = p.participants.find((x) => x.role === 'batter')?.id;
+      const over = plays.slice(i + 1).some((x) => x.id.slice(0, -6) !== p.id.slice(0, -6)); // something else has started
+      if (have.has(resultId) || !batter || !over) { if (have.has(resultId)) this.strikeThrees.delete(p.id); return; }
+      const rec = this.strikeThrees.get(p.id) ?? { since: now };
+      this.strikeThrees.set(p.id, rec);
+      if (!rec.made) {
+        if (now - rec.since < HALF_END_WAIT_MS) return;
+        const last = (catalog.playerByEspn('mlb', batter)?.name ?? 'The batter').split(' ').slice(1).join(' ') || 'The batter';
+        rec.made = { ...p, id: resultId, type: 'Play Result', typeSlug: 'play-result', text: `${last} struck out ${/looking/i.test(p.text) ? 'looking' : 'swinging'}.`, scoring: false, scoreValue: 0 };
+        log(`[mlb ${this.ctx.gameId}] ${p.id} was the third strike of an at-bat ESPN gave no result for after ${HALF_END_WAIT_MS / 1000}s: "${rec.made.text}" made from the pitch`);
+      }
+      add.set(i, rec.made);
+    });
+    return add.size ? plays.flatMap((p, i) => (add.has(i) ? [p, add.get(i)!] : [p])) : plays;
+  }
+
+  /**
+   * MLB: a half-inning ESPN reopens. An "End Inning" play that two reads in a row lack, while the plays say the half isn't
+   * over (a replay review overturned the third out: ALCS Game 1, October 12 2026, Ramírez's play in the top of the 9th), is
+   * forgotten: the id coming back is a new end, so the real end is judged when it comes (the tracker had seen the id, and
+   * judged the half once, on the out that was taken back). The alerts that first judgment sent get a line, no push.
+   */
+  private reopenedHalves(plays: NPlay[], changed: Detected[]) {
+    for (const [id, w] of this.endInnings) {
+      if (plays.some((p) => p.id === id)) { w.missing = 0; continue; }
+      if (++w.missing < 2) continue;
+      if (halfFromPlays(this.ctx, plays, w.key).done) continue; // the half is over without that play: not a reopening
+      // What was judged must still be there, with fewer than 3 outs (the review took the out back). A read that lacks it too
+      // is a stale copy that dropped the latest plays, and waits.
+      const last = this.halfJudged.get(w.key), judged = last ? plays.find((p) => p.id === last) : undefined;
+      if (last && (!judged || (judged.outs ?? 0) >= 3)) continue;
+      this.endInnings.delete(id);
+      this.seen.delete(id);
+      this.halfEnds.delete(w.key);
+      this.halfJudged.delete(w.key);
+      const review = plays.some((p) => `${p.period?.type}${p.period?.number}` === w.key && /\bchallenged\b|\breview\b/i.test(p.text));
+      if (last) changed.push(...this.linesOnPlay(last, review ? 'A replay review overturned the third out; the inning went on.' : 'ESPN took back the third out; the inning went on.', (e) => HALF_END_TYPES.has(e.type)));
+      log(`[mlb ${this.ctx.gameId}] ${w.key}: the End Inning play ${id} is gone and the plays say the half isn't over: its end will be judged again${last ? '; a line on what was sent' : ''}`);
+    }
   }
 
   /**
@@ -435,6 +611,7 @@ export class GameTracker {
       if (!es) continue;
       this.halfEnds.delete(key);
       const { last, half } = halfFromPlays(this.ctx, plays, key);
+      if (last) this.halfJudged.set(key, last.id);
       const stands = `${last?.id} pas=${half?.pas.length ?? 0} reached=${!!half?.reached}`;
       if (stands !== w.seen || late) log(`[mlb ${this.ctx.gameId}] ${key} over: ${es.map((e) => e.type).join(', ') || 'nothing'} (as the plays stand: ${stands}; as first seen: ${w.seen}${late ? `; no third out after ${HALF_END_WAIT_MS / 1000}s` : ''})`);
       out.push(...es);
@@ -561,7 +738,8 @@ export class GameTracker {
     // Soccer: the touch feed has a goal, card or substitution before the summary's key events do (the same play id): the summary's
     // version is the play once it is there, the touch feed's until then.
     const touchPlays = soccer ? this.touchKeyPlays() : [];
-    const plays = mergePlays(corePlays, soccer ? mergePlays(sitePlays, touchPlays) : sitePlays);
+    const merged = mergePlays(corePlays, soccer ? mergePlays(sitePlays, touchPlays) : sitePlays);
+    const plays = league === 'mlb' ? this.withStrikeThrees(merged, Date.now()) : merged;
     if (plays.length) this.plays = plays;
     if (soccer) this.reviseKeyText([...sitePlays, ...touchPlays], Date.now());
 
@@ -622,6 +800,7 @@ export class GameTracker {
     // the team's next goal. `announced` is the score each side's alerts have gone out for.
     let score = { home: 0, away: 0 };
     const led = { home: 0, away: 0 }; // each side's biggest lead before this play ("blew a big lead")
+    let held = false; // MLB: a result ahead of this play is settling
     for (const p of plays) {
       bump(led, score);
       const prev = score;
@@ -630,7 +809,11 @@ export class GameTracker {
       const history = this.first && p.at < cutoff;
       // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
       const waiting = league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now);
-      const fresh = !waiting && !this.seen.has(p.id);
+      // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
+      // after it wait their turn, so the game's state (bases, who is on) is built in order.
+      const settle = league === 'mlb' && !history && !waiting && !held && !this.seen.has(p.id) && this.settling(p, now, !!final);
+      if (settle) held = true;
+      const fresh = !waiting && !settle && !(held && !this.seen.has(p.id)) && !this.seen.has(p.id);
       if (fresh) {
         this.seen.add(p.id);
         // A play ESPN took out and re-posted under a new id is that play again, revised (already counted).
@@ -645,6 +828,7 @@ export class GameTracker {
           // MLB: a half-inning's end is judged from its plays, on a read with its third out (halfInningEnds).
           const ended = league === 'mlb' && !history ? endedHalf(p) : undefined;
           if (ended) {
+            this.endInnings.set(p.id, { key: ended, missing: 0 });
             const h = this.ctx.half, r = this.ctx.lastResult; // what the plays as first seen made of it, for the log
             this.halfEnds.set(ended, { playId: p.id, since: now, seen: `${r?.id} pas=${h?.key === ended ? h.pas.length : 0} reached=${h?.key === ended && h.reached}` });
           }
@@ -659,15 +843,19 @@ export class GameTracker {
       // rewritten as "Volpe doubled, Lombard Jr. scored. Umpire review: HR call on the field was
       // overturned…"). Detectors see a play once, so a rewritten result is checked for a review alone,
       // and only when the review is what's new (a result that had one when we attached is history).
-      if (league === 'mlb' && p.typeSlug === 'play-result' && !waiting) {
+      if (league === 'mlb' && p.typeSlug === 'play-result' && this.seen.has(p.id)) {
         const was = this.resultTexts.get(p.id);
         this.resultTexts.set(p.id, p.text);
         if (!fresh && !history && was !== undefined && was !== p.text && !/\bumpire review:/i.test(was)) events.push(...umpireReviewLost(this.ctx, p));
         // Any other change to a result after it was posted is logged, not judged again: alerts keyed on a play's text
-        // (caught stealing, out on the bases, a gift run) would go out a second time, and a strikeout's count move.
+        // (caught stealing, out on the bases, a gift run) would go out a second time, and a strikeout's count move. What
+        // the change means for the alerts already sent is revisedResult's.
         const sig = `${p.text} [${p.participants.map((x) => x.role).sort().join(' ')}]`, before = this.resultSigs.get(p.id);
         this.resultSigs.set(p.id, sig);
+        const prev = this.resultPlays.get(p.id);
+        this.resultPlays.set(p.id, p);
         if (before !== undefined && before !== sig && !history) log(`[mlb ${gameId}] result ${p.id} changed after it was posted: "${before}" → "${sig}"`);
+        if (prev && !fresh && !history && (before !== sig || prev.scoring !== p.scoring)) this.revisedResult(prev, p, plays, now, events, changed);
       }
       const up = (s: 'home' | 'away') => score[s] > this.announced[s];
       if (up('home') || up('away')) {
@@ -697,6 +885,7 @@ export class GameTracker {
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
     this.score = score;
+    if (league === 'mlb') this.reopenedHalves(plays, changed);
     if (league === 'mlb') events.push(...this.halfInningEnds(plays, now));
     if (soccer) {
       // Fouls, handballs and penalties conceded: from the touch feed as soon as it has the foul, and from the commentary (whose
@@ -751,11 +940,17 @@ export class GameTracker {
       }
     }
     this.first = false;
+    if (league === 'mlb') events.push(...this.challengeSettled(plays, now, !!final));
     if (league === 'mlb') events.splice(0, events.length, ...this.holdAbs(events, plays, !!final));
     if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
     // After the final ESPN's data can still flip back (a drive FUMBLE, DOWNS, FUMBLE in 36 s: Browns at Jets): what the reads then find goes to the feed, never a push.
     if (this.finished) for (const e of events) e.noPush = true;
-    if (events.length) { publish(soccer ? this.linkFoulsToCards(bundleByPlay(events)) : bundleByPlay(events), league); this.newAlerts = true; }
+    if (events.length) {
+      const out = soccer ? this.linkFoulsToCards(bundleByPlay(events)) : bundleByPlay(events);
+      publish(out, league);
+      if (league === 'mlb') this.rememberSent(out);
+      this.newAlerts = true;
+    }
     if (CLIP_LEAGUES.has(league) && summary.status === 'fulfilled') void this.readClips(summary.value).catch((e) => log(`[${league} ${gameId}] clips`, String(e)));
     // The Scores tab: this play-by-play is ahead of the scoreboard, and the summary has win probability.
     const wp = summary.status === 'fulfilled' ? summary.value.winprobability?.at?.(-1) : undefined;
