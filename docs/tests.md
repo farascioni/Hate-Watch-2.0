@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 417 tests in 59 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 417 tests in 59 files, offline, in about 4 seconds, all passing on October 13, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 417 tests in 59 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 417 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 425 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -37,6 +37,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 |---|---|
 | `abs-settle.test.ts` | A lost ABS challenge waits for the review to settle, with ESPN's real plays and ids from October 7, 2026 (Rays @ Yankees, CLE @ CHW), when three alerts went out for challenges that were won |
 | `alds-game5.test.ts` | White Sox at Guardians, ALDS Game 5 (October 10, 2026), from the fixture: the bases loaded as its own alert; a half-inning judged from its plays as they stand; "C. Montgomery" found among two Montgomerys; the loss's lines at the final; ELIMINATED on "their team lost"; no quality start; a lost ABS challenge surviving a stale read; a slow scoreboard still eliminating; a failed read logged |
+| `bills-rams.test.ts` | Bills at Rams, Monday Night Football (October 12, 2026), through a real tracker, with the game's own wording, for the two fixes its post game recording report found: a score that levels the game says so ("Rams tied the game, 34-34." as a line, no push, whether a field goal, a touchdown with its kick, or the extra point that arrives later levels it; not for a touchdown that ties only until its kick makes it a lead; once for a device with a player on the play too), and a sack in a failed two-point try ("Matthew Stafford got sacked on the two-point try", a sack on a down unchanged) |
 | `box-score.test.ts` | The game screen's box score (`boxscore.ts`): a table per stat group, away team first, the bad numbers marked for red |
 | `bundling.test.ts` | One alert per play per device (`bundleByPlay`): the team's and its players' alerts become one with lines; `alt` gives one line; a later fact goes on the alert already sent, without a push |
 | `catalog-injured.test.ts` | Players on an injured list but off the roster (MLB's 60-day IL) still join their team |

@@ -410,6 +410,13 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
     running. If the same side then scores on that drive within 10 minutes, the alert gets a line ("Then Wake Forest
     scored on the same drive: WAKE 16, NCSU 14."), not a second alert. A score the running total counted wrongly
     gets "ESPN has since corrected the score: …" (`takeBack`, `carry`).
+  - A score that levels the game says so, with no push: "Rams tied the game, 34-34." (`tiedLine`), a line on the
+    scored-on side's alerts for that score. The extra point or two-point try that levels it is an edit to the
+    touchdown's play (or a play of its own), so `footballScore` puts the line on the touchdown's alerts, which the ledger
+    kept (`scores`; the side's latest, `lastScored`, when the kick is on another play). A field goal, or a touchdown with
+    its kick in the text, that levels the game puts the same line in the publish of its own alerts. The scored-on alert's
+    fold has the same words, so a device with a player on the play too gets it once. A touchdown still waiting for its
+    kick isn't said to tie.
   - A finished drive's result is revised the same way (`drivesRead`): "ESPN has since changed how the drive ended:
     End of Half."
   - `ONCE` alerts (the starting quarterback pulled) are counted as they come and never re-run on a new version.
@@ -497,7 +504,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 |---|---|
 | `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football and basketball revisions ledger |
-| | F1's `memo.sent`, `preSeen`, `resultsSeen` |
+| | F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
 
 A restart, step by step:
 

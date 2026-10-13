@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome,
+  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -251,6 +251,8 @@ export class GameTracker {
   private ledger: PlayLedger;
   private downReads = { home: 0, away: 0 };
   private takenBack: Partial<Record<'home' | 'away', { drive?: string; period?: number; until: number; alerts: Detected[] }>> = {};
+  /** Each side's latest score alerts (against the other team), for the tying line when its point after is on another play (footballScore). */
+  private lastScored: Partial<Record<'home' | 'away', Detected[]>> = {};
   private ahead: Partial<Record<'home' | 'away', { value: number; since: number; period: number; clock?: number }>> = {};
   private noHeader = { home: 0, away: 0 };
 
@@ -625,11 +627,14 @@ export class GameTracker {
    * was said, not a safety) with its touchdown, whichever play ESPN puts it on: nothing again. A side whose score
    * was taken back scoring on that drive within RESCORE_MS (a touchdown overturned at the 1, scored on the next
    * snap) is that score: a line on its alerts ("Then Wake Forest scored on the same drive: WAKE 16, NCSU 14."), no
-   * new alert. `said`: the score announced before this play. The rest are this play's.
+   * new alert. A score that levels the game says so, on the scored-on side's alerts: "Rams tied the game, 34-34." (tiedLine),
+   * a line with no push, whether the touchdown itself levelled it or its extra point did, 24 seconds later (Bills at Rams,
+   * October 12 2026: 34-33 on the touchdown, 34-34 once the kick was good, 5 seconds left in the 4th). `said`: the score
+   * announced before this play. The rest are this play's.
    */
   private footballScore(es: Detected[], p: NPlay, said: { home: number; away: number }, now: number, changed: Detected[]): Detected[] {
     const before = new Set(this.ledger.get(p.id)?.scores.map((e) => this.ledger.scorer(e)));
-    const quiet = new Set<'home' | 'away'>();
+    const quiet = new Set<'home' | 'away'>(), rescored = new Set<'home' | 'away'>();
     for (const s of ['home', 'away'] as const) {
       if (p[s] <= said[s]) continue;
       if (before.has(s) || (p[s] - said[s] <= 2 && !isSafety(p))) { quiet.add(s); continue; }
@@ -637,14 +642,32 @@ export class GameTracker {
       if (!back || now > back.until || (back.drive && p.driveId ? back.drive !== p.driveId : back.period !== p.periodNum)) continue;
       delete this.takenBack[s];
       quiet.add(s);
+      rescored.add(s);
       const line = againLine(this.ctx, s, p);
       changed.push(...this.ledger.linesOn(back.alerts, line));
       this.ledger.addScores(p.id, back.alerts); // taken back again, they get another line
       log(`[${this.ctx.league} ${this.ctx.gameId}] the ${s} side scored on the drive its score was taken back on (play ${p.id}): ${line}`);
     }
     const out = es.filter((e) => !quiet.has(this.ledger.scorer(e)));
+    // The side that was behind scored and it's level now: the scored-on side's alerts say so. A touchdown's alerts are on
+    // this play (its extra point is an edit to it) or, when ESPN puts the kick on a play of its own, the side's latest.
+    const level = p.home === p.away && said.home !== said.away, tier = said.home < said.away ? 'home' as const : 'away' as const;
+    let tie: Detected[] = [];
+    if (level && p[tier] > said[tier] && !rescored.has(tier)) {
+      const line = tiedLine(this.ctx, tier === 'home' ? this.ctx.homeId : this.ctx.awayId, p), is = (e: Detected) => this.ledger.scorer(e) === tier;
+      if (quiet.has(tier)) { // the kick: a line on the touchdown's alerts, already sent (published on its own, before the poll's new alerts)
+        const sent = this.ledger.get(p.id)?.scores.filter(is);
+        changed.push(...this.ledger.linesOn(sent?.length ? sent : this.lastScored[tier] ?? [], line));
+      } else if (!kickPending(p)) {
+        // The score itself, with its alerts in their publish (a line waits for its alert): a field goal, or a touchdown whose kick is
+        // already in its text. A touchdown still waiting for its kick isn't said to tie yet (kickPending): the line comes with the
+        // kick if it does level the game.
+        tie = this.ledger.linesOn(out.filter(is), line);
+      }
+    }
+    for (const s of ['home', 'away'] as const) { const mine = out.filter((e) => this.ledger.scorer(e) === s); if (mine.length) this.lastScored[s] = mine; }
     this.ledger.addScores(p.id, out);
-    return out;
+    return [...out, ...tie];
   }
 
   /**

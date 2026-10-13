@@ -22,6 +22,10 @@ MLB
 - A third out a review overturns gets a line, and the inning's real end is judged.
 - A strikeout ESPN never posts is made from the third strike.
 
+FOOTBALL
+- A score that ties the game says so ("Rams tied the game, 34-34."), as a line on the alert with no push; when the extra point is what ties it, the line comes a few seconds after the touchdown.
+- A sack on a failed two-point try reads "got sacked on the two-point try".
+
 ## Build 13 (October 12, 2026)
 
 Changes since build 12. Server updates already work on every build.

@@ -539,6 +539,23 @@ export function scoreLine(g: GameCtx, p: Pick<NPlay, 'home' | 'away'>) {
   return `${teamAbbrev(g.league, g.awayId)} ${p.away}, ${teamAbbrev(g.league, g.homeId)} ${p.home}`;
 }
 
+/**
+ * Football: the line for a score that levels the game, "Rams tied the game, 34-34." (`scoringId`: the side that scored,
+ * `p`: the play with the level score). The same words are the fold of the scored-on alert (teamScoreEvents) and the late
+ * line live.ts puts on a touchdown's alerts when its extra point or two-point try is what levels it (footballScore): a
+ * device that has the line already doesn't get it twice. Bills at Rams, October 12 2026: the Rams tied it twice in the 4th,
+ * the second time with 5 seconds left, and the Bills' trackers were told only "Rams scored 6 on the Bills".
+ */
+export function tiedLine(g: Pick<GameCtx, 'league'>, scoringId: string, p: Pick<NPlay, 'home' | 'away'>) {
+  return `${teamName(g.league, scoringId)} tied the game, ${p.home}-${p.away}.`;
+}
+/**
+ * Football: a touchdown whose kick (an extra point, a two-point try; college "kick attempt") isn't in its text yet. ESPN adds
+ * it some seconds later, so the score may still move by 1 or 2: a touchdown that ties on its own usually becomes a lead
+ * (Rams, 6-6 then 7-6 and 13-13 then 14-13, October 12 2026), and isn't said to tie until its kick is in.
+ */
+export const kickPending = (p: Pick<NPlay, 'text'>) => /\bTOUCHDOWN\b/.test(p.text) && !/extra point|kick attempt|\bPAT\b|two[- ]point|2-pt|2pt/i.test(p.text);
+
 /** Participant whose catalog team matches the given team (NBA participants are unlabelled). */
 function onTeam(g: GameCtx, p: NPlay, teamId: string | undefined) {
   return p.participants.find((x) => playerTeamId(g.league, x.id) === teamId)?.id;
@@ -1287,7 +1304,18 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
   if (passer && !wiped && /Interception/i.test(ty)) out.push(mk(g, p, 'nfl.qb.interception', passer, `${nameOf(g.league, passer)} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`));
   // A sack whatever ESPN types the play: one where the offense recovers its own fumble is "Fumble Recovery (Own)"
   // (Lawrence twice, Eagles at Jaguars, October 11 2026; 12 of 281 sacks in weeks 1 to 5 weren't typed "Sack").
-  if (passer && !wiped && (/^Sack/i.test(ty) || /\bsacked\b/.test(ruled(p.text)))) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
+  // A sack in a two-point try isn't a down: ESPN adds the try to its touchdown's text ("… TOUCHDOWN. TWO-POINT CONVERSION
+  // ATTEMPT. M.Stafford is sacked. ATTEMPT FAILS.", Rams, October 12 2026) and the box score counts no sack. The down is the
+  // text before the try; a sack in the try says so, with the try as its body.
+  const stands = ruled(p.text), tryAt = stands.search(/\bTWO-POINT CONVERSION ATTEMPT\b/i);
+  const down = tryAt >= 0 ? stands.slice(0, tryAt) : stands, tried = tryAt >= 0 ? stands.slice(tryAt) : '';
+  if (passer && !wiped && (/^Sack/i.test(ty) || /\bsacked\b/.test(down))) out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked`));
+  else if (passer && !wiped && /\bsacked\b/.test(tried)) {
+    const offense = playerTeamId(g.league, passer), name = offense ? teamName(g.league, offense) : '', its = /s$/i.test(name) ? `${name}'` : `${name}'s`;
+    const what = tried.replace(/^TWO-POINT CONVERSION ATTEMPT\.?\s*/i, '').trim();
+    out.push(mk(g, p, 'nfl.qb.sacked', passer, `${nameOf(g.league, passer)} got sacked on the two-point try`,
+      { body: `${name ? `The ${its} two-point` : 'The two-point'} try${/ATTEMPT FAILS/i.test(tried) ? ' failed' : ''}: ${what} — ${scoreLine(g, p)}` }));
+  }
   if (passer && !wiped && /Pass Incompletion/i.test(ty)) out.push(mk(g, p, 'nfl.qb.incompletion', passer, `${nameOf(g.league, passer)} threw incomplete`));
   // A fumble is lost when a team not the fumbler's took the ball: "RECOVERED by NE-E.Ponder" (capitals: the ball has
   // changed hands since the snap; "recovered by" and "and recovers" are the side's own), else when the type says so. A
@@ -2237,9 +2265,11 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
       // MLB, batted in: "Guardians tied the White Sox on Kwan's RBI single", "Guardians scored on Naylor's 2-run double against the White Sox".
       const batted = rbi ? (p[side] === p[opp] ? `${oppName} tied ${the(g.league, team)} on ${rbi}` : `${oppName} scored on ${rbi} against ${the(g.league, team)}`) : null;
       // A score that levels the game says so in its line ("Brewers tied the game."), as a go-ahead one does ("took the lead").
+      // Football's carries the score ("Rams tied the game, 34-34."): the same words as the line footballScore puts on a score that
+      // levels the game, so a device never has both. A touchdown still waiting for its kick isn't said to tie (kickPending).
       const tied = p[side] === p[opp];
       out.push({ id: `${g.gameId}:${p.id}:team.opponent_scored:${teamId}`, type: 'team.opponent_scored', title: SOCCER.has(g.league) ? `${oppName} scored against ${team}` : batted ?? `${oppName} ${what} on ${the(g.league, team)}`, ...base, ...unlessBehind, ...moment,
-        fold: `${oppName} ${tied ? (SOCCER.has(g.league) ? 'equalized' : 'tied the game') : what}.` });
+        fold: tied && FOOTBALL.has(g.league) ? (kickPending(p) ? `${oppName} ${what}.` : tiedLine(g, oppId, p)) : `${oppName} ${tied ? (SOCCER.has(g.league) ? 'equalized' : 'tied the game') : what}.` });
     }
     // Basketball: the other side's run reached RUN_POINTS on this play (once a run). A line on that play's
     // alert, not an alternative to it: "Knicks took the lead." and "It's a 14-0 Knicks run."
