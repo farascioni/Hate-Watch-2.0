@@ -110,6 +110,12 @@ export interface Detected {
   /** Never a push, whatever the device's settings: an alert found by the reads after a game's final (live.ts), where ESPN's data can still flip back. */
   noPush?: boolean;
   /**
+   * Published after the rest of its poll's alerts (live.ts), so on a moment it shares with a score alert it is dropped (it has
+   * no `fold`) and never takes the moment: a device's alert for a moment is the first it wants, and a `noPush` one that took it
+   * would silence the pushes folded into it (a team's flag on the play it was scored on: NFL team flags).
+   */
+  afterOthers?: boolean;
+  /**
    * A fact to add to another alert of the same moment instead of sending this one too: a device that
    * gets one of the moment's alerts first gets this sentence on it ("Lost as 78% favorites."). Alerts
    * without one are the same news about another target (a player's "their team lost"), and are dropped.
@@ -1383,6 +1389,7 @@ function nfl(g: GameCtx, p: NPlay): Detected[] {
       title: `${teamName(g.league, teamId)} had a touchdown wiped out by a penalty`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id } });
   }
   out.push(...qbPulled(g, p));
+  out.push(...teamFlags(g, p));
   return out;
 }
 
@@ -1624,6 +1631,34 @@ function delayOfGameQb(g: GameCtx, p: NPlay): { qb: string; named: boolean } | u
   const named = role(p, 'penalized').find((id) => catalog.playerByEspn(g.league, id)?.position === 'QB');
   const qb = named ?? g.qbs?.[p.teamId!];
   return qb ? { qb, named: !!named } : undefined;
+}
+
+/** A flag in an NFL play's text: "PENALTY on BUF-J.Hawes, False Start, 5 yards…", "PENALTY on BUF, Illegal Shift, …", "Penalty on DEN-Q.Robinson, Defensive Offside, declined.". */
+const NFL_FLAG = /\b(?:PENALTY|Penalty) on ([A-Z]{2,3})(?:-[^,]+)?, ([^,.]+)([^]*?)(?=\b(?:PENALTY|Penalty) on |$)/g;
+
+/**
+ * A team's flags, whether or not ESPN names a player ("PENALTY on BUF, Illegal Shift, 5 yards" had nobody to tell, Bills
+ * at Rams, October 12 2026, and a team tracker got no flag of any kind, since the player alerts go to the player's
+ * trackers). The same "Commits a penalty" setting, shown on a team's page too
+ * (`alsoScope`): one alert per team per play, "Bills were flagged: Illegal Shift", "(declined)" for a declined one, in the
+ * play's moment for that team with no fold, so a device that has the player's flag alert gets nothing more. Always feed
+ * only (`noPush`): installs from before keep `nfl.penalty` pushed for players, and every flag on a tracked team would
+ * be the 14 pushes for 19 flags that made flags quiet. Published after the poll's other alerts (`afterOthers`).
+ */
+function teamFlags(g: GameCtx, p: NPlay): Detected[] {
+  if (g.league !== 'nfl') return []; // nfl() runs for college football too, which has its own team flag (cfb.team.penalty)
+  const byTeam = new Map<string, string[]>();
+  for (const m of ruled(p.text).matchAll(NFL_FLAG)) {
+    const teamId = [g.homeId, g.awayId].find((id) => teamAbbrev(g.league, id) === (NFL_CODE[m[1]] ?? m[1]));
+    if (!teamId) continue;
+    const what = `${m[2].trim()}${/declined/i.test(m[3]) ? ' (declined)' : ''}`, seen = byTeam.get(teamId) ?? [];
+    if (!seen.includes(what)) byTeam.set(teamId, [...seen, what]);
+  }
+  return [...byTeam].map(([teamId, what]) => ({
+    id: `${g.gameId}:${p.id}:nfl.penalty:team-${teamId}`, type: 'nfl.penalty', targetKey: teamKey(g.league, teamId),
+    title: `${teamName(g.league, teamId)} were flagged: ${what.join(', ')}`, body: `${p.text} — ${scoreLine(g, p)}`, at: p.at,
+    meta: { gameId: g.gameId, playId: p.id }, moment: playMoment(g.gameId, p.id, teamKey(g.league, teamId)), noPush: true, afterOthers: true,
+  }));
 }
 
 /** ESPN's placeholder shot type, until it types the shot ("No Shot (Default Shot)"). */

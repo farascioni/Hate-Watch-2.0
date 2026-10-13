@@ -175,7 +175,9 @@ export class PlayLedger {
   linesOn(es: Detected[], line: string, alt?: string): Detected[] {
     const key = createHash('sha256').update(line).digest('base64url').slice(0, 10);
     return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${key}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
-      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}) }));
+      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}),
+      // A line about a weak alert (a team's flag) lands on that alert only (publish).
+      ...(e.afterOthers ? { afterOthers: true } : {}) }));
   }
 
   /** A play seen for the first time, and the alerts it sent. */
@@ -302,12 +304,13 @@ export class PlayLedger {
     // Hainsey 4 minutes after Van Lanen) or came off (a face mask picked up with the replay assist 12 s later: Eagles at
     // Jaguars, October 11 2026). Not the play's "Wiped out by a penalty" or "changed to a pass reception". A device with
     // the first player's alert gets the move as its line, not the new flag as a second one (`alt`: publish keeps one).
-    const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty');
+    // (A player's flags only: a team's `nfl.penalty` is the team being flagged, not another player to move this one to.)
+    const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty' && e.targetKey.startsWith('player:'));
     for (const e of gone) {
       if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why)); continue; }
       // The flag became an ejection on the same play (a disqualification, a targeting call): the ejection's own line says so.
       if ([...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:player\.ejected|cfb\.team\.ejection)$/.test(f.type))) continue;
-      const to = e.type === 'nfl.penalty' ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
+      const to = e.type === 'nfl.penalty' && e.targetKey.startsWith('player:') ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
       if (!to.length) { lines.push(...this.linesOn([e], REVIEW.test(p.text) ? 'Overturned on review.' : e.type === 'nfl.penalty' && flagDeclined(p, e.targetKey) ? 'ESPN has since declined this flag.' : 'ESPN has since taken the flag off.')); continue; }
       const alt = `flag-moved:${p.id}`;
       for (const f of to) f.alt = alt;

@@ -21,13 +21,16 @@ for (const [id, name, short, abbr, location] of [['2', 'Buffalo Bills', 'Bills',
 const player = db.prepare(`INSERT INTO players (key, league, espn_id, name, team_key, position, image, image_w, image_h, image_kind, updated_at) VALUES (?, 'nfl', ?, ?, ?, 'QB', 'x', 1, 1, 'headshot', 0)`);
 player.run('player:nfl:12483', '12483', 'Matthew Stafford', 'team:nfl:14');
 player.run('player:nfl:3918298', '3918298', 'Josh Allen', 'team:nfl:2');
+player.run('player:nfl:4573699', '4573699', 'Jackson Hawes', 'team:nfl:2');
+player.run('player:nfl:4033748', '4033748', 'Connor McGovern', 'team:nfl:2');
 loadCatalog();
-const pushes: string[] = [];
-setPushSender((m) => pushes.push(...m.map((x: any) => x.title)));
-const device = (id: string, ...follows: string[]) => {
-  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run(id, 's', 'ios', `tok-${id}`, JSON.stringify(DEFAULT_PREFS));
+const pushes: string[] = [], pushedTo: string[] = []; // titles; and "token|title", for what one device was sent
+setPushSender((m) => { pushes.push(...m.map((x: any) => x.title)); pushedTo.push(...m.map((x: any) => `${x.to}|${x.title}`)); });
+const deviceWith = (id: string, prefs: object, ...follows: string[]) => {
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run(id, 's', 'ios', `tok-${id}`, JSON.stringify({ ...DEFAULT_PREFS, ...prefs }));
   for (const f of follows) db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run(id, f);
 };
+const device = (id: string, ...follows: string[]) => deviceWith(id, {}, ...follows);
 
 const ref = (kind: string, id: string) => ({ $ref: `http://sports.core.api.espn.com/v2/sports/football/leagues/nfl/${kind}/${id}` });
 const HOME = '14', AWAY = '2'; // the Rams at home, the Bills away
@@ -193,4 +196,141 @@ test('F2: a sack on the down before a try ("sacked" ahead of "TWO-POINT CONVERSI
   const p = { id: '9', type: 'Sack', text: 'M.Stafford sacked at LA 41 for -6 yards (D.Carter). TWO-POINT CONVERSION ATTEMPT. M.Stafford pass incomplete. ATTEMPT FAILS.', participants: [{ id: '12483', role: 'passer' }], away: 0, home: 0 } as any;
   const es = PLAYER_DETECTORS.nfl({ league: 'nfl', gameId: 'x', homeId: HOME, awayId: AWAY } as any, p).filter((e: any) => e.type === 'nfl.qb.sacked');
   assert.deepEqual(es.map((e: any) => e.title), ['Matthew Stafford got sacked']);
+});
+
+// ─── F4: a team's flags, for the team's trackers (the same "Commits a penalty" setting, always feed only) ─────────────────────
+/** A push's title less the emoji its type puts in front. */
+const bare = (t: string) => t.replace(/^\p{Extended_Pictographic}️?\s*/u, '');
+const flagGame = (gameId: string) => {
+  const g = game(gameId), history = play(`${gameId}0100`, 'Rushing Touchdown', 'J.Cook up the middle for 5 yards, TOUCHDOWN. T.Bass extra point is GOOD.', { away: 14, home: 13, team: AWAY, scoring: true, ago: 10 * 60_000 });
+  g.core = [history]; g.away = 14; g.home = 13;
+  return { g, history, tracker: new GameTracker('nfl', gameId, HOME, AWAY) };
+};
+
+test('F4: a flag on the team that names no player ("PENALTY on BUF, Illegal Shift") is "Bills were flagged: Illegal Shift" for a Bills tracker, feed only', async () => {
+  device('bills-flag', 'team:nfl:2');
+  const { g, history, tracker } = flagGame('401872940');
+  await tracker.poll();
+  const sent = pushes.length;
+  g.core = [history, play('4018729400200', 'Penalty', '(Shotgun) PENALTY on BUF, Illegal Shift, 5 yards, enforced at BUF 21 - No Play.', { away: 14, home: 13, team: AWAY })];
+  await tracker.poll();
+  const r = rows('bills-flag', 'nfl.penalty');
+  assert.deepEqual(r.map((x) => [x.title, x.lines, x.pushed]), [['Bills were flagged: Illegal Shift', [], false]]);
+  assert.equal(r[0].body, '(Shotgun) PENALTY on BUF, Illegal Shift, 5 yards, enforced at BUF 21 - No Play. — BUF 14, LAR 13');
+  assert.equal(pushes.length, sent, 'never a push');
+  tracker.stop();
+});
+
+test('F4: a flag that names a player is the team\'s too, and a device with the team and the player has one alert, not two', async () => {
+  device('bills-only', 'team:nfl:2');
+  device('bills-and-hawes', 'team:nfl:2', 'player:nfl:4573699');
+  device('hawes-only', 'player:nfl:4573699');
+  const { g, history, tracker } = flagGame('401872941');
+  await tracker.poll();
+  g.core = [history, play('4018729410200', 'Penalty', '(Shotgun) PENALTY on BUF-J.Hawes, False Start, 5 yards, enforced at LA 19 - No Play.', { away: 14, home: 13, team: AWAY, who: [['4573699', 'penalized']] })];
+  await tracker.poll();
+  assert.deepEqual(rows('bills-only', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Bills were flagged: False Start', []]], 'the team tracker gets the team\'s flag');
+  assert.deepEqual(rows('hawes-only', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Jackson Hawes was flagged', []]], 'the player\'s tracker gets the player\'s, as before');
+  const both = rows('bills-and-hawes', 'nfl.penalty');
+  assert.deepEqual(both.map((x) => [x.title, x.lines]), [['Jackson Hawes was flagged', []]], 'one alert, the player\'s, and no extra line from the team\'s');
+  tracker.stop();
+});
+
+test('F4: a flag posted for the team and named a poll later (Dolphins, Patterson: ESPN added him 96 seconds on) is one row for a device with both, the player as its line; pushed for the player it keeps its own row', async () => {
+  device('bills-late-both', 'team:nfl:2', 'player:nfl:4573699');
+  deviceWith('hawes-late-pushed', { pushTypes: { 'nfl.penalty': true } }, 'team:nfl:2', 'player:nfl:4573699');
+  const { g, history, tracker } = flagGame('401872947');
+  await tracker.poll();
+  const flag = (text: string, who: [string, string][]) => play('4018729470200', 'Penalty', text, { away: 14, home: 13, team: AWAY, who });
+  g.core = [history, flag('(Shotgun) PENALTY on BUF, False Start, 5 yards, enforced at LA 19 - No Play.', [])];
+  await tracker.poll();
+  g.core = [history, flag('(Shotgun) PENALTY on BUF-J.Hawes, False Start, 5 yards, enforced at LA 19 - No Play.', [['4573699', 'penalized']])];
+  await tracker.poll();
+  assert.deepEqual(rows('bills-late-both', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Bills were flagged: False Start', ['Jackson Hawes was flagged.']]], 'one row, the player a line on it');
+  assert.deepEqual(rows('hawes-late-pushed', 'nfl.penalty').map((x) => [x.title, x.pushed]), [['Bills were flagged: False Start', false], ['Jackson Hawes was flagged', true]], 'his flag still pushes');
+  tracker.stop();
+});
+
+test('F4: Dolphins at Bengals\' kickoff as ESPN posted it (the team flag, the same twice with another distance, then Patterson named): one row for a device with both', async () => {
+  device('bills-kick', 'team:nfl:2', 'player:nfl:4573699');
+  const { g, history, tracker } = flagGame('401872948');
+  await tracker.poll();
+  const kick = (text: string, who: [string, string][]) => play('4018729480200', 'Kickoff', text, { away: 14, home: 13, team: AWAY, who });
+  const steps: [string, [string, string][]][] = [
+    ['(Onside Kick formation) J.Hawes kicks onside 12 yards from BUF 35 to BUF 47, out of bounds.\nPENALTY on BUF, Kickoff Out of Bounds, placed at 50.', [['4573699', 'other']]],
+    ['(Onside Kick formation) J.Hawes kicks onside 15 yards from BUF 35 to 50, out of bounds.PENALTY on BUF, Kickoff Out of Bounds, placed at 50.', [['4573699', 'other']]],
+    ['(Onside Kick formation) J.Hawes kicks onside 15 yards from BUF 35 to 50, out of bounds.PENALTY on BUF-J.Hawes, Kickoff Out of Bounds, placed at 50.', [['4573699', 'penalized']]],
+    ['J.Hawes kicks onside 15 yards from BUF 35 to 50, out of bounds.PENALTY on BUF-J.Hawes, Kickoff Out of Bounds, placed at 50.', [['4573699', 'penalized']]],
+  ];
+  for (const [text, who] of steps) { g.core = [history, kick(text, who)]; await tracker.poll(); }
+  assert.deepEqual(rows('bills-kick', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Bills were flagged: Kickoff Out of Bounds', ['Jackson Hawes was flagged.']]]);
+  tracker.stop();
+});
+
+test('F4: installs from before keep flags pushed for players, and a team\'s flags still never push (pushTypes["nfl.penalty"] is the whole type)', async () => {
+  deviceWith('old-team', { pushTypes: { 'nfl.penalty': true } }, 'team:nfl:2');
+  deviceWith('old-player', { pushTypes: { 'nfl.penalty': true } }, 'player:nfl:4573699');
+  const { g, history, tracker } = flagGame('401872942');
+  await tracker.poll();
+  const before = pushedTo.length;
+  g.core = [history, play('4018729420200', 'Penalty', '(Shotgun) PENALTY on BUF-J.Hawes, False Start, 5 yards, enforced at LA 19 - No Play.', { away: 14, home: 13, team: AWAY, who: [['4573699', 'penalized']] })];
+  await tracker.poll();
+  const now = pushedTo.slice(before).filter((p) => p.startsWith('tok-old-')).map((p) => p.split('|')[1]); // these two devices' pushes
+  assert.deepEqual(rows('old-team', 'nfl.penalty').map((x) => [x.title, x.pushed]), [['Bills were flagged: False Start', false]]);
+  assert.deepEqual(rows('old-player', 'nfl.penalty').map((x) => [x.title, x.pushed]), [['Jackson Hawes was flagged', true]], 'the player\'s flag is still pushed for them');
+  assert.deepEqual(now.map(bare), ['Jackson Hawes was flagged'], 'one push in all: the player\'s');
+  tracker.stop();
+});
+
+test('F4: a flag on the team that was scored on, on the play it was scored on, is a line at most: the pushed "took the lead" stays the alert', async () => {
+  deviceWith('bills-pushed', { pushTypes: { 'nfl.penalty': true, 'team.fell_behind': true } }, 'team:nfl:2');
+  const { g, history, tracker } = flagGame('401872943');
+  await tracker.poll();
+  const before = pushes.length;
+  g.core = [history, play('4018729430200', 'Passing Touchdown', 'M.Stafford pass short left to P.Nacua for 6 yards, TOUCHDOWN. Penalty on BUF-D.Hamlin, Defensive Holding, declined.', { away: 14, home: 19, team: HOME, scoring: true })]; g.home = 19;
+  await tracker.poll();
+  const behind = rows('bills-pushed', 'team.fell_behind');
+  assert.deepEqual(behind.map((x) => [x.title, x.pushed]), [['Rams scored 6 to take the lead over the Bills', true]], 'the alert, pushed');
+  assert.deepEqual(rows('bills-pushed', 'nfl.penalty'), [], 'the declined flag is not a second alert (it would have silenced the push)');
+  assert.deepEqual(pushes.slice(before).map(bare), ['Rams scored 6 to take the lead over the Bills']);
+  tracker.stop();
+});
+
+test('F4: a flag moved to another player stays the team\'s flag (no line for the team tracker), and the first player\'s line names the player, not the team', async () => {
+  device('bills-moved', 'team:nfl:2');
+  device('mcgovern-moved', 'player:nfl:4033748');
+  const { g, history, tracker } = flagGame('401872944');
+  await tracker.poll();
+  const flag = (text: string, who: string) => play('4018729440200', 'Penalty', text, { away: 14, home: 13, team: AWAY, who: [[who, 'penalized']] });
+  g.core = [history, flag('(Shotgun) PENALTY on BUF-C.McGovern, False Start, 5 yards, enforced at LA 19 - No Play.', '4033748')];
+  await tracker.poll();
+  g.core = [history, flag('(Shotgun) PENALTY on BUF-J.Hawes, False Start, 5 yards, enforced at LA 19 - No Play.', '4573699')];
+  await tracker.poll();
+  assert.deepEqual(rows('bills-moved', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Bills were flagged: False Start', []]], 'still a Bills flag');
+  assert.deepEqual(rows('mcgovern-moved', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Connor McGovern was flagged', ['ESPN has since charged this flag to Jackson Hawes.']]]);
+  tracker.stop();
+});
+
+test('F4: a flag ESPN takes off gets "ESPN has since taken the flag off." on the team\'s alert', async () => {
+  device('bills-off', 'team:nfl:2');
+  const { g, history, tracker } = flagGame('401872945');
+  await tracker.poll();
+  g.core = [history, play('4018729450200', 'Penalty', '(Shotgun) PENALTY on BUF, Illegal Shift, 5 yards, enforced at BUF 21 - No Play.', { away: 14, home: 13, team: AWAY })];
+  await tracker.poll();
+  g.core = [history, play('4018729450200', 'Pass Reception', '(Shotgun) J.Allen pass short right to K.Coleman to BUF 30 for 9 yards (Q.Lake).', { away: 14, home: 13, team: AWAY })];
+  await tracker.poll();
+  assert.deepEqual(rows('bills-off', 'nfl.penalty').map((x) => [x.title, x.lines]), [['Bills were flagged: Illegal Shift', ['ESPN has since taken the flag off.']]]);
+  tracker.stop();
+});
+
+test('F4: two flags on one team on one play are one alert; a declined flag says so; offsetting flags flag each team', async () => {
+  device('bills-two', 'team:nfl:2');
+  device('rams-offsetting', 'team:nfl:14');
+  const { g, history, tracker } = flagGame('401872946');
+  await tracker.poll();
+  g.core = [history, play('4018729460200', 'Penalty', '(Shotgun) PENALTY on BUF-T.Grable, Offensive Holding, 10 yards, enforced at LA 48 - No Play.PENALTY on BUF-C.Bishop, Unnecessary Roughness, 15 yards, enforced at LA 48. Penalty on LA-Q.Lake, Defensive Offside, declined.', { away: 14, home: 13, team: AWAY })];
+  await tracker.poll();
+  assert.deepEqual(rows('bills-two', 'nfl.penalty').map((x) => x.title), ['Bills were flagged: Offensive Holding, Unnecessary Roughness']);
+  assert.deepEqual(rows('rams-offsetting', 'nfl.penalty').map((x) => x.title), ['Rams were flagged: Defensive Offside (declined)']);
+  tracker.stop();
 });

@@ -79,6 +79,7 @@ from the tests):
 | A player's play alert (`mk`) | `${gameId}:${playId}:${type}:${athleteId}` | `401907994:4019079941102990057:mlb.batter.strikeout:32801`, "Jose Ramirez struck out looking" |
 | A team's play alert | `${gameId}:${playId}:${type}:${teamId}` | `401858481:401858481541:cfb.team.interception:158`, "Nebraska threw an interception" (Indiana at Nebraska, October 10 2026) |
 | A team's play alert, other form | `${gameId}:${playId}:${type}:team-${teamId}` (the safety, a lost ABS challenge) | `401907994:4019079940401020090:mlb.challenge_lost:team-5`, "Guardians lost an ABS challenge" |
+| A team's flag (NFL, `teamFlags`: one per team per play, its penalties joined) | `${gameId}:${playId}:nfl.penalty:team-${teamId}` | `401872994:4018729944019:nfl.penalty:team-2`, "Bills were flagged: False Start" |
 | A scoring play against a team (`teamScoreEvents`) | `${gameId}:${playId}:team.opponent_scored:${teamId}`, `…:team.fell_behind:…`, `…:team.blew_lead:…` | `401810230:40181023024:team.fell_behind:10`, "Pelicans scored 3 to take the lead over the Rockets" |
 | A team's loss (`gameLostEvent`) | `${gameId}:final:team.lost:${loserId}` | `401815054:final:team.lost:19`, "Successful Hate Watch! Dodgers lost to the Giants" |
 | A loss's facts, sent as alerts (`lossFacts`) | `${gameId}:final:${type}:${loserId}` | `401815054:final:team.lost_as_favorite:19`, "…Dodgers lost to the Giants as 64% favorites" |
@@ -298,6 +299,15 @@ them per device, in the order the alerts are listed:
   card's moment, with no `fold`, when the card is in the same publish or already published: a device that gets the card
   doesn't get the foul, and one with cards off still does. A foul that came first never gets a later card's moment: the card
   would become a line on a feed-only foul and lose its push.
+- **`afterOthers`, a weak alert** (a team's NFL flag, `teamFlags`): published after the rest of its poll's alerts (`live.ts`
+  sorts `events` stably), with the play's moment for its team and no `fold`, so on a moment it shares with a score alert, a
+  player's flag or a touchdown wiped out the device's alert is the other one and the flag is dropped. It never pushes
+  (`noPush`), and a `noPush` alert that took a moment would silence the pushes folded into it, which is why it goes last.
+  In `publish`, a device whose holder of the moment is a weak alert (`delivered`'s `weak`) gives the moment up to any later
+  alert but its own lines: a pushed drive result is an alert of its own, not a silent line on the flag. The one exception is the same
+  flag with its player named a poll later when that wouldn't push (`sameFlag`: its bell, or `noPush` after the final), which is
+  a line on the team's row. A line about an alert the device doesn't hold (`afterOthers` lines, copied by `linesOn`) does
+  not land on whatever holds the moment.
 - **`recipients()`:** a team's alert goes to its trackers and to trackers of its players with "Get their team's
   alerts" on, once per device.
 - **A push per device per alert.** The device's alert is pushed if anything it carries would be. Its folded facts
@@ -395,6 +405,9 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   - A flag's alert taken back while its play stands says what became of the flag: "ESPN has since charged this flag
     to Robert Hainsey." or "ESPN has since taken the flag off." A device that had the first player's alert gets that
     line, not the new player's flag as a second alert (they share an `alt`, `flag-moved:${playId}`).
+  - A team's flag (`nfl.penalty` on the team, `teamFlags`) is judged from the call's text, not from the participants, so it stays
+    when a flag moves from one of its players to another (no line for the team; the moved-flag check looks at player flags
+    only), and is taken back ("ESPN has since taken the flag off.") only when the team has none on the play.
   - A flag that still stands in the call's text (ESPN dropped or relabeled the flagged player in the data) is kept: no
     line. One ESPN now calls declined says so; one that became an ejection gets no flag line, the ejection's own
     follows; a lost fumble that is now the offense's own recovery says "ESPN has since corrected it: the Browns kept
@@ -566,6 +579,11 @@ This is one reason for the decision **"No production restarts during live games"
   tracker, so a game followed again could give a new line a stored id and lose it; they're now the line's own words
   hashed (Layer 1). And the 90-second window could skip a play the old server never read at a restart; games live at
   boot now take 5 minutes ("Plays nobody read").
+- **A team's flag and a player's flag for the same flag** can be two rows for a device that tracks both, when ESPN names the
+  player a poll after it posted the flag for the team and the player's flag pushes for that device (an install that kept flags
+  pushed): the push is kept, so the team's row stays beside it (8 of 34 added flags in the replays; the unpushed ones are one
+  row with the player as a line). A weak flag's own "taken off" line is dropped when a pushed alert has since become the
+  device's holder of the moment, so that row can stay as it was.
 - **The same revision line twice on one alert** (a play taken back, put back, then taken back again) has the same id,
   so the second "taken back" is dropped at the insert. The alert's row already shows that line once.
 

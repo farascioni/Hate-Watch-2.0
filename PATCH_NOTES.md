@@ -28,6 +28,7 @@ MLB
 FOOTBALL
 - A score that ties the game says so ("Rams tied the game, 34-34."), as a line on the alert with no push; when the extra point is what ties it, the line comes a few seconds after the touchdown.
 - A sack on a failed two-point try reads "got sacked on the two-point try".
+- Track an NFL team and its flags reach your feed too, even when no player is named: "Bills were flagged: Illegal Shift". It is the same "Commits a penalty" setting (now on a team's page as well), and a team's flags never push.
 
 ## Build 13 (October 12, 2026)
 

@@ -971,6 +971,9 @@ export class GameTracker {
     if (changed.length) publish(changed, league); // on their own: a line waits for no other alert of its moment
     // After the final ESPN's data can still flip back (a drive FUMBLE, DOWNS, FUMBLE in 36 s: Browns at Jets): what the reads then find goes to the feed, never a push.
     if (this.finished) for (const e of events) e.noPush = true;
+    // A team's NFL flags last (afterOthers): on a moment shared with a score alert the first alert a device wants is its alert,
+    // and a flag, which never pushes, must not take it from a pushed one (the stable sort keeps every other alert's order).
+    if (events.some((e) => e.afterOthers)) events.sort((a, b) => Number(!!a.afterOthers) - Number(!!b.afterOthers));
     if (events.length) {
       const out = soccer ? this.linkFoulsToCards(bundleByPlay(events)) : bundleByPlay(events);
       publish(out, league);

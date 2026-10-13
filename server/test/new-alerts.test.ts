@@ -211,11 +211,12 @@ test('ejections: an NHL game misconduct, an instigator and game misconduct toget
     const nfl = { id: 'n1', type: 'Rushing Touchdown', typeSlug: 'rushing-touchdown', text: 'J.Gibbs right end for 13 yards, TOUCHDOWN. PENALTY on WAS-D.Payne, Disqualification, 15 yards, enforced on the kickoff.',
       participants: [{ id: '3115315', role: 'penalized' }], scoring: true, scoreValue: 6, home: 13, away: 7, at: Date.now(), shooting: false };
     const flagged = PLAYER_DETECTORS.nfl(g('nfl', '28', '20'), nfl as any);
-    assert.deepEqual(flagged.map((e) => [e.type, e.title, e.aliases]), [['player.ejected', 'Daron Payne got ejected', ['nfl.penalty']]]);
+    assert.deepEqual(flagged.map((e) => [e.type, e.title, e.aliases]), [['player.ejected', 'Daron Payne got ejected', ['nfl.penalty']], ['nfl.penalty', 'Commanders were flagged: Disqualification', undefined]], "his team is flagged too (the team tracker's alert)");
     // Offsetting flags, and ESPN left the penalized players out (Titans, 2025): found on his team by name.
     const punt = { ...nfl, id: 'n2', type: 'Punt', typeSlug: 'punt', scoring: false, participants: [{ id: '3115480', role: 'punter' }],
       text: 'L.Cooke punts 49 yards to TEN 22, Center-R.Matiscik. C.Dike to TEN 35 for 13 yards (J.Kiser; R.Matiscik).Penalty on TEN-M.Brown, Disqualification, offsetting.Penalty on DEN-J.Kiser, Unnecessary Roughness, offsetting.' };
-    assert.deepEqual(PLAYER_DETECTORS.nfl(g('nfl', '10', '7'), punt as any).map((e) => [e.type, e.title]), [['player.ejected', 'Mike Brown got ejected']]);
+    assert.deepEqual(PLAYER_DETECTORS.nfl(g('nfl', '10', '7'), punt as any).map((e) => [e.type, e.title]),
+      [['player.ejected', 'Mike Brown got ejected'], ['nfl.penalty', 'Titans were flagged: Disqualification'], ['nfl.penalty', 'Broncos were flagged: Unnecessary Roughness']], 'both teams are flagged, for their team trackers');
   }
 });
 

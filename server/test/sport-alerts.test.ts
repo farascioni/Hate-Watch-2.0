@@ -318,6 +318,7 @@ test("NFL: a touchdown wiped out by a penalty: the flagged player's (in place of
   assert.deepEqual(es.map((e) => [e.type, e.targetKey, e.title, e.aliases]), [
     ['nfl.td_wiped_out', 'player:nfl:3054211', "Aaron Banks's penalty wiped out a touchdown", ['nfl.penalty']],
     ['nfl.td_wiped_out', 'team:nfl:9', 'Packers had a touchdown wiped out by a penalty', undefined],
+    ['nfl.penalty', 'team:nfl:9', 'Packers were flagged: Offensive Holding', undefined], // the team's flag, last: a line at most, never the alert
   ]);
   publish(bundleByPlay(es), 'nfl');
   assert.deepEqual(got('packers-and-banks'), [`nfl.td_wiped_out: Aaron Banks's penalty wiped out a touchdown | Packers had a touchdown wiped out by a penalty. ${text} — WSH 7, GB 0`]);

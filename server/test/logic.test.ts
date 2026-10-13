@@ -190,7 +190,8 @@ test('NFL: delay of game goes to the offense QB; safeties replace the generic al
   loadCatalog();
 
   const g: any = { league: 'nfl', gameId: 'g', homeId: '5', awayId: '23', goalies: new Map() };
-  const nfl = (o: object) => PLAYER_DETECTORS.nfl(g, play({ id: Math.random().toString(), teamId: '23', ...o }));
+  // (The player alerts: a team's own flag, "Steelers were flagged: Delay of Game", is `bills-rams.test.ts`'s.)
+  const nfl = (o: object) => PLAYER_DETECTORS.nfl(g, play({ id: Math.random().toString(), teamId: '23', ...o })).filter((e) => !(e.type === 'nfl.penalty' && e.targetKey.startsWith('team:')));
   // QB is tracked from passes; a running back's trick-play pass doesn't replace him.
   observePlay(g, play({ teamId: '23', participants: [{ id: 'QB1', role: 'passer' }] }));
   observePlay(g, play({ teamId: '23', participants: [{ id: 'RB1', role: 'passer' }] }));

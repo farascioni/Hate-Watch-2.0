@@ -348,15 +348,15 @@ test('an NFL play wiped out by a penalty is only its flags, though ESPN often ke
   // Cowboys at Commanders: a sack wiped out by defensive holding, still typed a sack.
   const sack = corePlay('4018729442910', 'Sack', '(Shotgun) M.Mariota sacked at WAS 28 for -7 yards (D.Winters).PENALTY on DAL-D.Bland, Defensive Holding, 5 yards, enforced at WAS 35 - No Play.', '28',
     [['passer', '2576980'], ['sackedBy', '4428914'], ['tackler', '4428914'], ['penalized', '4248911']], 27, 13, { period: 3, clock: 387 });
-  assert.deepEqual(alerts('28', '6', sack), ['nfl.penalty: DaRon Bland was flagged']);
+  assert.deepEqual(alerts('28', '6', sack), ['nfl.penalty: DaRon Bland was flagged', 'nfl.penalty: Cowboys were flagged: Defensive Holding'], "the player's flag and his team's; no sack");
   // Bears at Vikings: offsetting fouls, still an incompletion.
   const offsetting = corePlay('401872937429', 'Pass Incompletion', 'C.Williams pass incomplete short right [L.Rodriguez].Penalty on CHI-G.Bradbury, Offensive Holding, offsetting, enforced at MIN 35 - No Play.Penalty on MIN-L.Rodriguez, Roughing the Passer, offsetting.', '3',
     [['passer', '4431611']], 3, 0, { period: 1, clock: 462 });
-  assert.deepEqual(alerts('16', '3', offsetting), []);
+  assert.deepEqual(alerts('16', '3', offsetting), ['nfl.penalty: Bears were flagged: Offensive Holding', 'nfl.penalty: Vikings were flagged: Roughing the Passer'], 'no player named: each team is flagged, for its team tracker');
   assert.equal(R.changeLine({ league: 'nfl', homeId: '16', awayId: '3' }, D.fromCorePlay(offsetting)), 'Wiped out by offsetting penalties.');
   // Browns at Steelers: the flag that wiped out the interception overturned on review. The interception stands.
   assert.deepEqual(alerts('23', '5', corePlay('4018729643321', 'Pass Interception Return', PICK_REVIEWED, '5', PICK_ROLES, 10, 21, { endTeam: '23' })), ['nfl.qb.interception: Deshaun Watson threw an interception']);
-  assert.deepEqual(alerts('23', '5', corePlay('4018729643321', 'Pass Interception Return', PICK_FLAG, '5', PICK_ROLES, 10, 21, { endTeam: '23' })), [], 'before the review: wiped out');
+  assert.deepEqual(alerts('23', '5', corePlay('4018729643321', 'Pass Interception Return', PICK_FLAG, '5', PICK_ROLES, 10, 21, { endTeam: '23' })), ['nfl.penalty: Steelers were flagged: Defensive Pass Interference'], 'before the review: wiped out, the Steelers\' flag for their team tracker; after it, no flag stands and none is sent');
   // Patriots at Bills: the flag that wiped it out is the one before "No Play", not one enforced between downs after it.
   assert.equal(D.wipedOutLine({ league: 'nfl', homeId: '2', awayId: '17' }, '(Shotgun) J.Allen pass incomplete short right to D.Moore (M.Jones) [C.Elliss].PENALTY on NE-M.Jones, Defensive Holding, 5 yards, enforced at NE 16 - No Play.PENALTY on NE, Unsportsmanlike Conduct, 5 yards, enforced between downs.'),
     'Wiped out by a penalty on the Patriots: Defensive Holding.');
@@ -514,7 +514,7 @@ test('a delay of game charged to the quarterback, then marked a punt: the line s
   const ledger = new R.PlayLedger(g, () => {});
   const dog = D.fromCorePlay(corePlay('4018729841234', 'Penalty', 'PENALTY on HST, Delay of Game, 5 yards, enforced at TEN 40 - No Play.', '34', [], 26, 3, { period: 3, clock: 480 }));
   const sent = D.PLAYER_DETECTORS.nfl(g, dog);
-  assert.deepEqual(sent.map((e) => e.title), ['C.J. Stroud took a delay of game penalty']);
+  assert.deepEqual(sent.map((e) => e.title), ['C.J. Stroud took a delay of game penalty', 'Texans were flagged: Delay of Game'], "the quarterback's, and the team's for a team tracker");
   NOW += 1000;
   ledger.add(dog, sent, { history: false }, NOW);
   const punt = D.fromCorePlay(corePlay('4018729841234', 'Penalty', '(Punt formation) PENALTY on HST, Delay of Game, 5 yards, enforced at TEN 40 - No Play.', '34', [], 26, 3, { period: 3, clock: 480 }));

@@ -416,7 +416,7 @@ function bundled(pushes: Pending[]): PushMessage[] {
  * becomes a line on that alert, with no push. Kept in memory for LATE_FOLD_MS, so not across a restart.
  */
 const LATE_FOLD_MS = 6 * 3600_000;
-const delivered = new Map<string, { at: number; devices: Map<string, { eventId: string; alts: Set<string>; lines: Set<string> }> }>();
+const delivered = new Map<string, { at: number; devices: Map<string, { eventId: string; alts: Set<string>; lines: Set<string>; weak?: boolean }> }>();
 function pruneDelivered(now: number) {
   for (const [m, d] of delivered) { if (now - d.at < LATE_FOLD_MS) break; delivered.delete(m); } // oldest first
 }
@@ -486,13 +486,24 @@ export function publish(events: Detected[], league: League) {
         }
         const before = delivered.get(e.moment)?.devices.get(f.device_id);
         if (before) {
-          // They got this moment's alert in an earlier publish: the fact goes on it as a line, without a push.
-          if (e.fold && !(e.alt && before.alts.has(e.alt)) && !before.lines.has(e.fold)) {
-            before.lines.add(e.fold);
-            if (e.alt) before.alts.add(e.alt);
-            late.push({ deviceId: f.device_id, eventId: before.eventId, line: e.fold });
+          // A weak alert (`afterOthers`: a team's NFL flag, feed only) holds its moment for no one else. Its own lines land on it;
+          // a line about an alert this device doesn't have doesn't; and any other alert is an alert of its own, not a line without a
+          // push on a flag (a pushed drive result arriving a poll after the flag would have lost its push).
+          const aboutIt = !!e.foldOnly && e.id.startsWith(`${before.eventId}:changed:`);
+          if (e.foldOnly && (e.afterOthers || before.weak) && !aboutIt) continue;
+          // The one thing a weak flag does hold: the same flag with its player named a poll later (ESPN adds the penalized player to
+          // a play it posted without him), when that wouldn't push (its bell, or `noPush` after the final): it is a line on the
+          // team's flag, not a second row.
+          const sameFlag = e.type === 'nfl.penalty' && (!!e.noPush || !pushWanted(prefs, e, league));
+          if (!before.weak || e.foldOnly || sameFlag) {
+            // They got this moment's alert in an earlier publish: the fact goes on it as a line, without a push.
+            if (e.fold && !(e.alt && before.alts.has(e.alt)) && !before.lines.has(e.fold)) {
+              before.lines.add(e.fold);
+              if (e.alt) before.alts.add(e.alt);
+              late.push({ deviceId: f.device_id, eventId: before.eventId, line: e.fold });
+            }
+            continue;
           }
-          continue;
         }
         const held = waiting.get(e.moment) ?? waiting.set(e.moment, new Map()).get(e.moment)!;
         if (e.foldOnly) { held.set(f.device_id, [...(held.get(f.device_id) ?? []), e]); continue; } // a line on its alert, once there is one
@@ -529,7 +540,7 @@ export function publish(events: Detected[], league: League) {
     // Remember who got this moment's alert, for facts that come in a later publish.
     if (e.moment) {
       const m = delivered.get(e.moment) ?? (delivered.set(e.moment, { at: detectedAt, devices: new Map() }), delivered.get(e.moment)!);
-      for (const d of deliver) m.devices.set(d.f.device_id, { eventId: e.id, alts: d.alts, lines: new Set(d.folded.map((x) => x.fold!)) });
+      for (const d of deliver) m.devices.set(d.f.device_id, { eventId: e.id, alts: d.alts, lines: new Set(d.folded.map((x) => x.fold!)), ...(e.afterOthers ? { weak: true } : {}) });
     }
   }
   if (pushes.length) pushSender(bundled(pushes));
