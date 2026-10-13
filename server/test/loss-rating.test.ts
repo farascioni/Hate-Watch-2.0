@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 
 process.env.HW_DB = ':memory:';
 const { BLOWOUT_MARGIN } = await import('../src/detectors.ts');
-const { BANDS, labelOf, marginFromBody, rateLoss, ratingLine } = await import('../src/loss-rating.ts');
+const { BANDS, labelOf, marginFromBody, rateLoss } = await import('../src/loss-rating.ts');
 const { ratingOf } = await import('../src/misery.ts');
 
 const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'nhl', 'wnba', 'epl'] as const;
@@ -47,13 +47,6 @@ test('a league with no blowout size (the UFC, F1, an unknown one) is never rated
 test('the labels: under 25 none, 25 Rough, 50 Ugly, 75 Disaster', () => {
   assert.deepEqual(BANDS.map((b) => [b.from, b.label]), [[75, 'Disaster'], [50, 'Ugly'], [25, 'Rough']]);
   assert.deepEqual([0, 24, 25, 49, 50, 74, 75, 85, 100].map(labelOf), [null, null, 'Rough', 'Rough', 'Ugly', 'Ugly', 'Disaster', 'Disaster', 'Disaster']);
-});
-
-test('the line for older builds is for the labelled ones only', () => {
-  assert.equal(ratingLine({ score: 65, label: 'Ugly' }), 'Loss rating: Ugly (65/100).');
-  assert.equal(ratingLine({ score: 28, label: 'Rough' }), 'Loss rating: Rough (28/100).');
-  assert.equal(ratingLine({ score: 85, label: 'Disaster' }), 'Loss rating: Disaster (85/100).');
-  assert.equal(ratingLine({ score: 24, label: null }), null);
 });
 
 test("the margin from a loss alert's body, for rows that lost theirs", () => {

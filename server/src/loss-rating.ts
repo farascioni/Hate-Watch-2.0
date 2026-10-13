@@ -1,9 +1,10 @@
-// How bad a loss was: a 0-100 score and a label ("Rough", "Ugly", "Disaster") for a loss, from how many points,
+// How bad a loss was: a 0-100 severity score (and a label, "Rough", "Ugly", "Disaster") for a loss, from how many points,
 // runs or goals it was lost by and, once the pre-game chance is kept (not yet), how heavily the loser was favored.
-// Pure arithmetic on numbers: it reads no database, makes no ESPN call and writes nothing, so the Recent misery
-// endpoint (api.ts, misery.ts `ratingOf`) works it out at read time from a row's own facts, and every row already
-// stored can be rated without a migration. docs/recent-misery.md, "How bad a loss was", has the formula, the bands and
-// what is not covered yet.
+// INTERNAL: nothing a user sees says it. It is not on an alert, a push, a feed row, a Recent misery card or the endpoint
+// (the owner's decision, October 13, 2026); it is only for code that has to rank losses (misery.ts `ratingOf`).
+// Pure arithmetic on numbers: it reads no database, makes no ESPN call and writes nothing, so it can be worked out any
+// time from a row's own facts, and every row already stored can be rated without a migration. docs/recent-misery.md,
+// "How bad a loss was", has the formula, the bands and what is not covered yet.
 //
 //   B (blowout) = margin / (1.5 * BLOWOUT_MARGIN[league]), 0..1. BLOWOUT_MARGIN is the size at which the loss alert says
 //                 "BLOWN OUT" (detectors.ts, about 1 in 8 losses), so a loss that size is B = 0.67 and 1.5 times it is 1.
@@ -62,6 +63,3 @@ export function marginFromBody(body: string | null | undefined): number | null {
   const margin = m ? Number(m[1]) - Number(m[2]) : 0;
   return margin > 0 ? margin : null;
 }
-
-/** The line a row carries for older app builds, for the labels only: "Loss rating: Ugly (65/100)." */
-export const ratingLine = (r: LossRating): string | null => (r.label ? `Loss rating: ${r.label} (${r.score}/100).` : null);

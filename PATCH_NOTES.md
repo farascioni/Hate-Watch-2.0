@@ -15,8 +15,7 @@ RECENT MISERY
 - It no longer depends on what you track or your alert settings, and it works for teams and players nobody tracks.
 - A player's page also shows their team's losses.
 - A loss says "Successful Hate Watch!" only if you track that team or player.
-- Each loss now has a rating for how bad it was, by its margin against that sport's blowout size: Rough, Ugly or Disaster, with a score out of 100. It shows as a line on the loss ("Loss rating: Ugly (65/100)."); a close loss shows nothing, and preseason games are not rated. A badge comes in a later update.
-- A soccer loss by 3 or more goals keeps its margin on the list (it was dropped before, so it could not be rated), and a corrected final score refreshes it.
+- A soccer loss by 3 or more goals keeps its score and margin on the list (it was dropped before), and a corrected final score refreshes them.
 
 MLB
 - A strikeout on a challenged pitch waits 30 seconds, so one ESPN turns into a walk is never sent.

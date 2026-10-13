@@ -17,9 +17,10 @@
 // the facts' `fold` sentences are its `lines`, a heavy loss gives it its title, and `player.team_lost` is not stored:
 // a player's page finds their team's losses through `players.team_key` (miseryRows).
 //
-// How bad a loss was: a loss row's rating (loss-rating.ts) is not stored. `ratingOf` works it out when the row is read, from
-// the margin the row kept in its meta (or, for a row that lost it, the body's "Final Score: 4 to 1"), so every row has one.
-// The row keeps only what the rating needs (`metaOf`: the margin, the score, and `preseason`, which is never rated).
+// How bad a loss was: a loss row's severity (loss-rating.ts) is internal: it is shown nowhere and not stored. `ratingOf`
+// works it out when something needs it, from the margin the row kept in its meta (or, for a row that lost it, the body's
+// "Final Score: 4 to 1"), so every row has one. The row keeps only what it needs (`metaOf`: the margin, the score, and
+// `preseason`, which is never rated).
 //
 // Retention: rows older than KEEP_DAYS go; a page shows the last MISERY_DAYS, at most MISERY_LIMIT.
 import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
@@ -205,8 +206,8 @@ export function miseryRows(targetKey: string, now = Date.now(), days = MISERY_DA
 }
 
 /**
- * How bad a loss row was (loss-rating.ts), worked out when it is read from the row's own facts, so every row stored
- * since the table began has one if it has a margin. Null for anything that isn't a rated loss: an event, a league with
+ * How bad a loss row was (loss-rating.ts), internal (shown nowhere), worked out from the row's own facts, so every row
+ * stored since the table began has one if it has a margin. Null for anything that isn't a rated loss: an event, a league with
  * no blowout size (UFC, F1), a preseason game, and a loss with no margin. The margin is the one the alert kept; failing
  * that, the one in the body's "Final Score: 4 to 1" (backfilled rows and 3+ goal soccer losses stored before they kept it).
  * A margin is never guessed at.

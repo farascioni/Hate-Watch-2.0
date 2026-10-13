@@ -11,7 +11,6 @@ const { loadCatalog } = await import('../src/catalog.ts');
 const { publish, reviseEvent } = await import('../src/fanout.ts');
 const { gameLostEvent, heavyLossEvent, lossFacts } = await import('../src/detectors.ts');
 const { miseryRows, recordFinalOnBoard, isMisery, miseryByCode, ratingOf, reviseMisery, MISERY_LIMIT } = await import('../src/misery.ts');
-const { setFlag } = await import('../src/flags.ts');
 const { startApi } = await import('../src/api.ts');
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'x', 1, 1, 0)`);
@@ -150,7 +149,7 @@ test('a page shows the last 30 days, newest first, at most 30', () => {
   assert.equal(page[0][0], 'N0:final:team.lost:4', 'newest first');
 });
 
-// ─── How bad a loss was (loss-rating.ts): served on the loss rows, from the margin ─────────────────────────────────────────────
+// ─── How bad a loss was (loss-rating.ts): internal, from the margin, never shown ─────────────────────────────────────────────
 
 const metaOf = (id: string) => JSON.parse((db.prepare('SELECT meta FROM misery WHERE id = ?').get(id) as { meta: string }).meta);
 
@@ -161,31 +160,21 @@ async function served(key: string) {
   finally { server.close(); }
 }
 
-test('the endpoint rates loss rows only, and only with the loss.rating switch on', async () => {
+test('the rating is internal: no endpoint item, title, line or body carries it, and it can still be worked out from a row', async () => {
   const lost = gameLostEvent({ league: 'mlb', gameId: 'R1', homeId: '19', awayId: '26' }, { home: 8, away: 0 }, now - 500_000)!; // the Giants lose by 8 runs
   publish([lost], 'mlb');
-  const giants = (await served('team:mlb:26')).find((i) => i.id === lost.id);
-  assert.deepEqual(giants.rating, { score: 65, label: 'Ugly' }, '8 runs against a 7-run blowout');
-  assert.match(giants.body, /^Loss rating: Ugly \(65\/100\)\. Final Score: 8 to 0/, 'the line, for builds without a badge, in front of the body');
-  const dodgers = (await served('team:mlb:19')).find((i) => i.id === 'M1:final:team.lost:19'); // lost 3-0: a score, no label, no line
-  assert.deepEqual(dodgers.rating, { score: 24, label: null });
-  assert.doesNotMatch(dodgers.body, /Loss rating/);
-  // A player's page mixes his own rows (an ejection) with his team's losses: only the loss is rated.
-  const ohtani = await served('player:mlb:2');
-  assert.ok(ohtani.some((i) => i.id === 'E1' && i.loss === false && i.rating === undefined), 'an ejection has no rating');
-  assert.ok(ohtani.some((i) => i.loss === true && i.rating), "the team's loss on his page has one");
-  assert.ok(ohtani.every((i) => i.loss || i.rating === undefined));
-  // The line belongs to the endpoint: the row, and a share link of it, don't carry it.
+  const items = [...await served('team:mlb:26'), ...await served('team:mlb:19'), ...await served('player:mlb:2')];
+  assert.ok(items.some((i) => i.id === lost.id), 'the loss is on the page');
+  for (const i of items) {
+    assert.equal(i.rating, undefined, `${i.id}: no rating field`);
+    assert.doesNotMatch(`${i.title} ${i.body}`, /Loss rating|Disaster|\bUgly\b|\bRough\b|\/100/, `${i.id}: nothing about it in the words`);
+  }
+  const giants = items.find((i) => i.id === lost.id);
+  assert.match(giants.body, /^Final Score: 8 to 0/, 'the body is the alert\'s own');
   assert.doesNotMatch(String(miseryByCode(giants.shareUrl.split('/a/')[1])?.extra ?? ''), /Loss rating/);
   assert.doesNotMatch((db.prepare('SELECT lines FROM misery WHERE id = ?').get(lost.id) as { lines: string | null }).lines ?? '', /Loss rating/);
-  setFlag('loss.rating', false);
-  try {
-    const off = (await served('team:mlb:26')).find((i) => i.id === lost.id);
-    assert.equal(off.rating, undefined, 'switched off, a loss is served as before');
-    assert.doesNotMatch(off.body, /Loss rating/);
-    assert.equal(off.loss, true);
-  } finally { setFlag('loss.rating', true); }
-  assert.ok((await served('team:mlb:26')).find((i) => i.id === lost.id).rating, 'and on again');
+  // Still there for code that ranks losses: 8 runs against a 7-run blowout.
+  assert.deepEqual(ratingOf(db.prepare('SELECT * FROM misery WHERE id = ?').get(lost.id) as any), { score: 65, label: 'Ugly' });
 });
 
 test("a soccer 3+ goal loss keeps the loss's margin and score in either publish order, from the tracker and the scoreboard, and is rated", () => {

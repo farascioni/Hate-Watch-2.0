@@ -990,7 +990,7 @@ Two ways out.
 - **A Successful Hate Watch is counted** for every device tracking the team or one of its players, before alert settings are checked (`recordHateWatch` in `publish`), and the alert says how many others got it ("23 other hate watchers": the README's counter section).
 - **The loss gets a clip:** the winning play's (the play that put the winner ahead for good, `leadStory`), else the recap (`lossClip` in its meta; MLB, NBA, WNBA, NHL; `server/src/clips.ts`).
 - **Id:** `${gameId}:final:team.lost:${loserId}`, moment `${gameId}:final:lost`.
-- **Its meta** (never the words): `gameId`, `winnerId`, `margin` (the winner's score minus the loser's), `score` ("45-17"), `blowout`, `eliminated` and `sweep`, and `preseason: true` when the game is a preseason game (ESPN's season type 1, from the tracker's summary or the scoreboard event: `live.ts` `finish`, `misery.ts` `board`). Recent misery keeps the margin to rate the loss (`docs/recent-misery.md`, "How bad a loss was") and a preseason loss is never rated. No new alert, id or push.
+- **Its meta** (never the words): `gameId`, `winnerId`, `margin` (the winner's score minus the loser's), `score` ("45-17"), `blowout`, `eliminated` and `sweep`, and `preseason: true` when the game is a preseason game (ESPN's season type 1, from the tracker's summary or the scoreboard event: `live.ts` `finish`, `misery.ts` `board`). Recent misery keeps the margin for its internal severity score (`docs/recent-misery.md`, "How bad a loss was": shown nowhere) and a preseason loss is never scored. No new alert, id or push.
 
 ### How they lost: the loss's facts
 

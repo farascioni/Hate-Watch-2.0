@@ -19,8 +19,7 @@ import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
 import { statsFor } from './stats.ts';
-import { MISERY_DAYS, miseryRows, ratingOf } from './misery.ts';
-import { ratingLine } from './loss-rating.ts';
+import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
@@ -124,14 +123,7 @@ route('GET', '/targets/:key/stats', false, async (_r, _u, [key]) => {
 route('GET', '/targets/:key/misery', false, (_r, _u, [key]) => {
   const k = decodeURIComponent(key);
   if (!targetDto(k)) throw new HttpError(404, 'not found');
-  const rate = flagOn('loss.rating'); // a switch (flags.ts): off, a loss is served as before
-  return { items: miseryRows(k).map((r) => {
-    // A loss's rating (loss-rating.ts), worked out here from the row, never stored. Rough, Ugly and Disaster also add a
-    // line to the copy served, for builds from before the app shows a badge; the row's own lines (and a share link's) don't have it.
-    const rating = rate ? ratingOf(r) : null, line = rating && ratingLine(rating);
-    const lines = line ? JSON.stringify([...(r.lines ? JSON.parse(r.lines) : []), line]) : r.lines;
-    return { ...feedItem({ ...r, detected_at: r.occurred_at, extra: lines } as Parameters<typeof feedItem>[0]), loss: r.kind === 'loss', ...(rating ? { rating } : {}) };
-  }), days: MISERY_DAYS };
+  return { items: miseryRows(k).map((r) => ({ ...feedItem({ ...r, detected_at: r.occurred_at, extra: r.lines } as Parameters<typeof feedItem>[0]), loss: r.kind === 'loss' })), days: MISERY_DAYS };
 });
 route('GET', '/targets/:key', false, (_r, _u, [key]) => {
   const k = decodeURIComponent(key);

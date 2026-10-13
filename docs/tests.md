@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 459 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 458 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 459 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 458 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 459 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 458 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 459 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 458 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -67,7 +67,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `live-score.test.ts` | Team scoring alerts when ESPN edits plays: a goal marked as scoring later, one taken back, one seen only through the next, through a real `GameTracker` (WPG @ PIT, 2026-10-05) |
 | `logic.test.ts` | The core rules: type and league switches, mute (feed, no push), aliases, quiet hours across midnight, scores never going backwards, standings by seed, the two feeds' merge keeping play order, stranded runners, down in order, caught stealing, delay of game and safeties, NOBLETIGER, scoring position, scored on and fell behind as one alert, F1 results, per-target choices, the per-alert bell, an onside kick (TEN @ BAL) |
 | `loss-facts.test.ts` | A loss's facts (a walk-off, losing as the favorite, a shutout, a sweep) as lines on one loss alert, on real games |
-| `loss-rating.test.ts` | How bad a loss was (`loss-rating.ts`): each league's score at 0, 0.44, 0.88, 1.32 and 1.5 times its blowout size, the bands, clamping and garbage input, the labels' boundaries, the line, the margin read from a body, the upset term, and production's week (October 6-13, 2026) from `fixtures/misery-losses-week-2026-10-13.json` |
+| `loss-rating.test.ts` | How bad a loss was (`loss-rating.ts`): each league's score at 0, 0.44, 0.88, 1.32 and 1.5 times its blowout size, the bands, clamping and garbage input, the labels' boundaries, the margin read from a body, the upset term, and production's week (October 6-13, 2026) from `fixtures/misery-losses-week-2026-10-13.json` |
 | `mlb-outs.test.ts` | A hitter's outs by kind, double and triple plays, and a hit with a runner thrown out not being his out |
 | `mlb-oct12-review.test.ts` | What the NLCS Game 2 and ALCS Game 1 reports (October 12 2026) found, through a real `GameTracker` on the plays ESPN posted (`fixtures/mlb-oct12-review.json`): a pickoff error is no pickoff, ESPN's twin plays make one pitcher alert, a challenged strikeout and an "Official Scorer Ruling Pending" result wait, a homer's distance and a moved error become lines, a challenge sentence added later is believed only once it holds, a result that becomes a scoring play makes the pitcher's alert, a taken-back third out is reopened, a strike three with no result becomes the strikeout, and runs go to the pitcher whose runner scores |
 | `misery.test.ts` | Recent misery (`misery.ts`): a loss nobody tracks as one row with its facts as lines, a player's page with the team's losses and none per player, only priority alerts and serious injuries, soccer's heavy loss, a withdrawn alert, the scoreboard's loss replaced by the tracker's, the 30-day page, the public endpoint and a share link |
