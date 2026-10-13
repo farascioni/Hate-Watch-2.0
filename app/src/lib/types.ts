@@ -43,6 +43,8 @@ export interface FeedItem {
   gameId?: string | null;
   /** A Successful Hate Watch: how many other people got this alert too. */
   alsoGot?: number;
+  /** Recent misery only: a loss, which says "Successful Hate Watch!" for a viewer who tracks the team or player (the server's title leaves it off). */
+  loss?: boolean;
   /** A developer notice marked important (newer servers; lib/alerts.ts isNotice). */
   urgent?: boolean;
   /** ESPN's clip of its play (a loss: of the winning play, or the recap), once it's out, while the server's switch is on. */

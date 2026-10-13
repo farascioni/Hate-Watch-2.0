@@ -11,13 +11,18 @@ import { colors, space } from '../../theme';
 import type { FeedItem, Player, StatsPage, Target } from '../../lib/types';
 import { ROSTER_GROUPS } from '../../lib/positions';
 
-const DAY = 24 * 3600_000; // "Recent misery" is the last day's alerts
+const DAY = 24 * 3600_000;
+const MISERY_DAYS = 30; // "Recent misery": the last 30 days (server MISERY_DAYS)
+
+/** A loss is a "Successful Hate Watch!" only for someone who tracks the team or player; the server's list has no such wording. */
+const withHateWatch = (item: FeedItem, tracked: boolean): FeedItem => (item.loss && tracked ? { ...item, title: `Successful Hate Watch! ${item.title}` } : item);
 
 export default function TargetScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
-  const { feed, noteTrackers, leagueInfo } = useStore();
-  const [recent, setRecent] = useState<FeedItem[]>([]);
+  const { noteTrackers, leagueInfo, isFollowing } = useStore();
+  const [misery, setMisery] = useState<FeedItem[] | null>(null); // null: not loaded yet
+  const [miseryFailed, setMiseryFailed] = useState(false);
   const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first (F1 and the UFC have stats pages too: f1-stats.ts, ufc.ts)
   const [stats, setStats] = useState<StatsPage | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
@@ -29,15 +34,20 @@ export default function TargetScreen() {
   // Fetched alongside the target, since Stats is the tab that shows first (F1's 404 is ignored).
   const loadStats = () => { setStatsFailed(false); api.stats(targetKey).then(setStats).catch(() => setStatsFailed(true)); };
   useEffect(loadStats, [targetKey]);
-  // Their last day of alerts from the server (the app's loaded feed may not reach back that far),
-  // plus any that arrive live while you're here.
-  useEffect(() => { api.targetFeed(targetKey, Date.now() - DAY).then((r) => setRecent(r.items)).catch(() => {}); }, [targetKey]);
-  const history = useMemo(() => {
-    const byId = new Map<string, FeedItem>();
-    // The weekly recap is filed under your top team, but it's about your week, not theirs.
-    for (const f of [...recent, ...feed]) if (f.target.key === targetKey && f.type !== 'app.weekly_recap' && now - f.occurredAt < DAY) byId.set(f.id, f);
-    return [...byId.values()].sort((a, b) => b.occurredAt - a.occurredAt);
-  }, [recent, feed, targetKey, now]);
+  // Recent misery is the same list for everyone (server misery.ts): the priority things that happened to them, not
+  // this device's alerts. A server without it (an older one) answers with this device's own last day instead.
+  const loadMisery = () => {
+    setMiseryFailed(false);
+    api.misery(targetKey).then((r) => setMisery(r.items))
+      .catch(() => api.targetFeed(targetKey, Date.now() - DAY).then((r) => setMisery(r.items.filter((f) => f.type !== 'app.weekly_recap'))))
+      .catch(() => setMiseryFailed(true));
+  };
+  useEffect(loadMisery, [targetKey]);
+  useEffect(() => { // while it's open, a loss that comes in shows up
+    if (tab !== 'misery') return;
+    const t = setInterval(loadMisery, 60_000);
+    return () => clearInterval(t);
+  }, [tab, targetKey]);
   // The roster by position group (MLB starters, relievers, catchers…), each with its players; only groups that have some.
   const groups = useMemo(() => {
     const roster = target?.roster ?? [];
@@ -68,7 +78,7 @@ export default function TargetScreen() {
       </View>
       <View style={styles.tabs} accessibilityRole="tablist">
         {([['stats', 'Stats'], ['misery', 'Recent misery']] as const).map(([id, label]) => (
-          <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, view === id && styles.tabOn]}
+          <Pressable key={id} onPress={() => { setTab(id); if (id === 'misery') loadMisery(); }} style={[styles.tab, view === id && styles.tabOn]}
             accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
             <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{label}</Text>
           </Pressable>
@@ -84,9 +94,16 @@ export default function TargetScreen() {
         ) : <ActivityIndicator color={colors.hate} style={styles.note} />
       ) : (
         <>
-          <SectionHeader>Last 24 hours</SectionHeader>
-          {history.length ? history.map((h) => <FeedCard key={h.id} item={h} now={now} />)
-            : <Text style={[styles.noteText, styles.note]}>No misery in the last 24 hours. Give it time.</Text>}
+          <SectionHeader>Last {MISERY_DAYS} days</SectionHeader>
+          {misery?.length ? misery.map((h) => <FeedCard key={h.id} item={withHateWatch(h, isFollowing(h.target.key) || isFollowing(targetKey))} now={now} />)
+            : miseryFailed ? (
+              <View style={styles.note}>
+                <Text style={styles.noteText}>Couldn't load the misery.</Text>
+                <Pressable onPress={loadMisery} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>Try again</Text></Pressable>
+              </View>
+            ) : misery ? <Text style={[styles.noteText, styles.note]}>{`No misery in the last ${MISERY_DAYS} days. Give it time.`}</Text>
+            : <ActivityIndicator color={colors.hate} style={styles.note} />}
+          {misery?.length ? <Text style={[styles.noteText, styles.footer]}>The same for everyone: losses and the worst of what happens to them, whoever tracks them.</Text> : null}
         </>
       )}
       {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
@@ -128,6 +145,7 @@ const styles = StyleSheet.create({
   tabTextOn: { color: colors.text },
   note: { alignItems: 'center', gap: space(2), paddingVertical: space(8), paddingHorizontal: space(6) },
   noteText: { color: colors.textDim, fontSize: 14, textAlign: 'center' },
+  footer: { paddingHorizontal: space(6), paddingVertical: space(3), fontSize: 12 },
   retry: { color: colors.text, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   // Wraps like the league chips in Search: every position group in view, each chip whole.
   positions: { paddingHorizontal: space(3), paddingBottom: space(2) },

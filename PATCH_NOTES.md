@@ -5,9 +5,17 @@ Each section's text is pasted into TestFlight's "What to Test" as it is, so it s
 characters and uses no emoji. New changes go under "Next build" as they ship; when a build goes to
 TestFlight, that heading becomes its build number and a new "Next build" starts above it.
 
-## Next build (changes since build 12)
+## Next build
 
-Server updates already work on every build.
+RECENT MISERY
+- The Recent misery tab on a player's or team's page is now the same list for everyone: the last 30 days of losses, with how they happened (a blown lead, overtime, a walk-off, losing as the favorite), and the worst of the rest, such as an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF or a UFC loss.
+- It no longer depends on what you track or your alert settings, and it works for teams and players nobody tracks.
+- A player's page also shows their team's losses.
+- A loss says "Successful Hate Watch!" only if you track that team or player.
+
+## Build 13 (October 12, 2026)
+
+Changes since build 12. Server updates already work on every build.
 
 SCORES
 - Before a game, its Box score previews leaders, last five games, injuries, the predictor.

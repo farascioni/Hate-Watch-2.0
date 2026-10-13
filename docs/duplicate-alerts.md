@@ -156,6 +156,8 @@ a 4-digit type that changes from "Confirmed" to "Overturned" (`pitchSlot`), so t
 `publishTo(deviceId, e, league)` (one device's weekly recap, `recap.ts`) does the same for one device: it returns
 `false`, and sends nothing, if the id was stored before.
 
+**Recent misery is beside this, not in it** (`misery.ts`, docs/recent-misery.md). `publish()` hands each alert to `recordMisery()` before step 1 drops the ones nobody tracks, so the global list has losses nobody tracks. It writes only to its own `misery` table, which no alert code reads, and it never throws, so it changes no id, delivery, feed row or push. A changed alert (`reviseEvent`) is passed on to it as well, so a withdrawn one leaves the list.
+
 `reviseEvent(id, …)` changes a stored alert in place (an F1 result a penalty changed): its type, title, body and
 facts become the new ones, each feed that has it gets an `eventUpdate` frame, nothing is pushed, and an alert that
 no longer stands (`withdrawn`) comes off every device's Successful Hate Watch tally. `eventChanged(id)` sends an
@@ -556,7 +558,7 @@ The docs hook asks for this file again before an edit to any of these, by the ed
 writes to them:
 
 - `server/src/`: `detectors.ts`, `live.ts`, `fanout.ts`, `revisions.ts`, `event-types.ts`, `push.ts`, `f1.ts`,
-  `ufc.ts`, `news.ts`, `recap.ts`, `cfb-poll.ts`, `hate-watches.ts`, `notices.ts`, `clips.ts`, `db.ts`, `api.ts`
+  `ufc.ts`, `news.ts`, `recap.ts`, `cfb-poll.ts`, `hate-watches.ts`, `notices.ts`, `clips.ts`, `misery.ts`, `db.ts`, `api.ts`
   (every file that builds, publishes or changes an alert; `grep -lE "publish\(|publishTo\(|reviseEvent\(|eventChanged\(|addLateLine\(|\bDetected\b" server/src/*.ts`
   should list nothing outside these. A new one goes in this list and in `ALERT_CODE` in the hook, the same.)
 - `server/test/`: any test file (the tests are mostly alert tests)

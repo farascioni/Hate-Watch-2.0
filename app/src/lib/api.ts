@@ -81,7 +81,9 @@ export const api = {
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),
   setPushToken: (pushToken: string | null) => request('PUT', '/me/push-token', { pushToken }),
 
-  /** One player's or team's alerts since a time, for their page ("Recent misery"). */
+  /** One player's or team's alerts to this device since a time: Recent misery's fallback for a server without /misery. */
+  /** Recent misery: the priority things that happened to one player or team in the last 30 days, the same for everyone (server misery.ts). */
+  misery: (key: string) => request<{ items: FeedItem[]; days: number }>('GET', `/targets/${enc(key)}/misery`),
   targetFeed: (key: string, after: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=100&target=${enc(key)}&after=${after}`),
   feed: (before?: number) => request<{ items: FeedItem[] }>('GET', `/me/feed?limit=50${before ? `&before=${before}` : ''}`),
   clearFeed: () => request('DELETE', '/me/feed'),

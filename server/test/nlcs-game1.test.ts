@@ -17,6 +17,7 @@ const { DEFAULT_PREFS, setPushSender } = await import('../src/fanout.ts');
 const { playsBehindFinal, roundLabel, seriesStanding, eliminationOf, summaryEvent, teamScoreEvents, fromCorePlay, gameLostEvent } = await import('../src/detectors.ts');
 const { liveDeps, GameTracker, ABS_SETTLE_MS } = await import('../src/live.ts');
 const { urls } = await import('../src/leagues.ts');
+const { miseryRows } = await import('../src/misery.ts');
 
 const fx = JSON.parse(readFileSync(new URL('./fixtures/nlcs-game1-401908030.json', import.meta.url), 'utf8'));
 const MIL = '8', LAD = '19';
@@ -223,4 +224,20 @@ test('a series game that ends nothing says where the series stands for its loser
   // The clincher keeps its elimination.
   new GameTracker('mlb', 'NL10', MIL, LAD).finish({ home: 2, away: 5 }, scoreboardFinal('NL10', { round: 'ALDS - Game 3', wins: { [MIL]: 0, [LAD]: 3 }, total: 5, home: 2, away: 5, done: true }));
   assert.equal(feed('brewers', 'NL10').find((i) => i.type === 'team.lost')!.body, 'Swept 3-0 by the Dodgers in the ALDS. Final Score: 5 to 2');
+});
+
+test('Recent misery has the real game\'s losses as the tracker words them, one row each, for the team and its players', () => {
+  // The finals above went through a real tracker and publish(): the Dodgers' loss is a row, with the series line, once.
+  const lad = miseryRows(`team:mlb:${LAD}`, Date.now() + 60_000).filter((r) => /^NL(8|9|10)?:/.test(r.id) || r.id.startsWith('NL'));
+  const nl8 = lad.find((r) => r.id === `NL8:final:team.lost:${LAD}`)!;
+  assert.equal(nl8.title, 'Dodgers lost to the Brewers', 'no "Successful Hate Watch!": that is for whoever tracks the team');
+  assert.equal(nl8.body, 'Down 0-1 in the NLCS. Final Score: 2 to 1');
+  assert.equal(nl8.source, 'tracker');
+  assert.equal(lad.filter((r) => r.id === nl8.id).length, 1, 'one row, however many devices got it');
+  // Ohtani's page: the Dodgers' loss, not a "their team lost" row of his own.
+  const ohtani = miseryRows(`player:mlb:${OHTANI}`, Date.now() + 60_000);
+  assert.ok(ohtani.some((r) => r.id === nl8.id));
+  assert.ok(!ohtani.some((r) => r.target_key.startsWith('player:')), 'nothing stored per player');
+  // The winner has no loss.
+  assert.ok(!miseryRows(`team:mlb:${MIL}`, Date.now() + 60_000).some((r) => r.id.startsWith('NL8:')));
 });

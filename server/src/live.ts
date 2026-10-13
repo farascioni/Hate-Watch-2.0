@@ -22,6 +22,7 @@ import { soccerType } from './event-types.ts';
 import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 import { divisionsOf } from './divisions.ts';
 import { weeklyRecaps } from './recap.ts';
+import { recordFinalOnBoard } from './misery.ts';
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -1106,6 +1107,7 @@ class LiveEngine {
           this.trackers.set(key, tr);
         }
         tr?.finishFromScoreboard({ home: Number(home.score), away: Number(away.score) }, ev); // with the series: a playoff loss can end their season
+        if (!tr) recordFinalOnBoard(lg, ev); // nobody tracks either team: Recent misery still has the loss (misery.ts), from this scoreboard read
       }
       if (tr && !relevant && !tr.finished) {
         tr.stop(); this.trackers.delete(key);
@@ -1131,6 +1133,7 @@ export async function scanYesterday(lg: League, now = Date.now()) {
     if (ev.status?.type?.state !== 'post') continue;
     const card = gameCard(lg, ev);
     if (card && !getGame(card.key)) upsertGame(card);
+    recordFinalOnBoard(lg, ev, now); // a final from before a restart (misery.ts: a tracked game's own row wins)
   }
 }
 
@@ -1344,7 +1347,7 @@ export function injuryEvents(lg: League, prev: InjuryReport, now: InjuryReport, 
     const title = was ? `${name} downgraded to ${cur.status}` : `${name} is injured (${cur.status})`;
     const id = `inj:${lg}:${athleteId}:${cur.status}:${day}`;
     const body = cur.detail || `${team?.shortName ?? ''} injury report`;
-    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at, meta: { athleteId } });
+    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at, meta: { athleteId, status: cur.status } });
     if (team) byTeam.set(team.key, [...(byTeam.get(team.key) ?? []), { athleteId, name, status: cur.status, downgrade: !!was, title, body, id }]);
   }
   for (const [key, changes] of byTeam) {

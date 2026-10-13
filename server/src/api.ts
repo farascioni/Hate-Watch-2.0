@@ -19,6 +19,7 @@ import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
 import { statsFor } from './stats.ts';
+import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
@@ -108,6 +109,13 @@ route('GET', '/targets/:key/stats', false, async (_r, _u, [key]) => {
   const page = await statsFor(decodeURIComponent(key));
   if (!page) throw new HttpError(404, 'no stats for this one');
   return page;
+});
+// A player's or team's Recent misery: the priority things that happened to them (a loss, an ejection, a bad race), the
+// same list for everyone (misery.ts). The last 30 days, newest first; no device token.
+route('GET', '/targets/:key/misery', false, (_r, _u, [key]) => {
+  const k = decodeURIComponent(key);
+  if (!targetDto(k)) throw new HttpError(404, 'not found');
+  return { items: miseryRows(k).map((r) => ({ ...feedItem({ ...r, detected_at: r.occurred_at, extra: r.lines } as Parameters<typeof feedItem>[0]), loss: r.kind === 'loss' })), days: MISERY_DAYS };
 });
 route('GET', '/targets/:key', false, (_r, _u, [key]) => {
   const k = decodeURIComponent(key);

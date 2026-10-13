@@ -39,7 +39,7 @@ if (input.tool_name === 'Bash') {
 }
 
 // Alert code: the duplicate alert docs, read in full since the latest user message (checked on every edit).
-const ALERT_CODE = /(?:^|\/)(?:(?:server\/)?src\/(?:detectors|live|fanout|revisions|event-types|push|f1|ufc|news|recap|cfb-poll|hate-watches|notices|clips|db|api)\.ts$|(?:server\/)?test\/[^/]+$|(?:app\/)?src\/lib\/store\.tsx$)/;
+const ALERT_CODE = /(?:^|\/)(?:(?:server\/)?src\/(?:detectors|live|fanout|revisions|event-types|push|f1|ufc|news|recap|cfb-poll|hate-watches|notices|clips|misery|db|api)\.ts$|(?:server\/)?test\/[^/]+$|(?:app\/)?src\/lib\/store\.tsx$)/;
 const DUP_DOC = /docs\/duplicate-alerts\.md|Duplicate alert protection\.md/;
 /** A full read of the duplicate alert docs: the Read tool on the whole file, cat/bat/less of it, or an Obsidian MCP call naming the note. */
 function readsDupDoc(name, inp = {}) {

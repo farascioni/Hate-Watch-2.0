@@ -11,6 +11,7 @@ import { db } from './db.ts';
 import { targetDto } from './catalog.ts';
 import { EVENT_TYPE_BY_ID } from './event-types.ts';
 import { feedItem, noticeLook, NOTICE_SENDER, NOTICE_TYPE } from './fanout.ts';
+import { miseryByCode } from './misery.ts';
 import { LEAGUES, type League } from './leagues.ts';
 import { sharePage } from './pages.ts';
 
@@ -30,7 +31,7 @@ export const appSiteAssociation = () => ({
 
 /** The shared alert as a feed item, for the app screen a share link opens. */
 export function sharedAlert(code: string) {
-  const row = db.prepare('SELECT * FROM events WHERE share_code = ?').get(code) as Parameters<typeof feedItem>[0] | undefined;
+  const row = (db.prepare('SELECT * FROM events WHERE share_code = ?').get(code) ?? miseryByCode(code)) as Parameters<typeof feedItem>[0] | undefined; // an alert, or a Recent misery row nobody was sent
   return row ? feedItem(row) : null;
 }
 
@@ -39,7 +40,7 @@ const PREVIEW_BOT = /bot|crawl|spider|facebookexternalhit|preview|slack|discord|
 const IOS = /\b(iPhone|iPad|iPod)\b/;
 
 interface EventRow { id: string; type: string; league: string; target_key: string; title: string; body: string; meta?: string | null }
-const findEvent = (code: string) => db.prepare('SELECT id, type, league, target_key, title, body, meta FROM events WHERE share_code = ?').get(code) as EventRow | undefined;
+const findEvent = (code: string) => (db.prepare('SELECT id, type, league, target_key, title, body, meta FROM events WHERE share_code = ?').get(code) ?? miseryByCode(code)) as EventRow | undefined;
 
 export interface Reply { status: number; headers: Record<string, string>; body: string | Buffer }
 

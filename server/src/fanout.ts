@@ -5,6 +5,7 @@ import { catalog, targetDto } from './catalog.ts';
 import type { Detected } from './detectors.ts';
 import { LOSS_ABOUT, RECIPIENTS, hateWatchOf, hateWatchTally, isHateWatch, isLossAlert, recordHateWatch, watchedOfLast } from './hate-watches.ts';
 import { SOCCER, type League } from './leagues.ts';
+import { recordMisery, reviseMisery } from './misery.ts';
 import { clipShown } from './clips.ts';
 import { frameWithoutImages } from './images.ts';
 
@@ -448,6 +449,7 @@ export function publish(events: Detected[], league: League) {
     }
   }
   for (const e of events) {
+    recordMisery(e, league); // Recent misery is the same for everyone, so it keeps what nobody tracks (misery.ts); it never changes what is sent
     const fols = recipients(e.targetKey);
     if (!fols.length) continue; // nobody tracks this target: don't even store it
     const gameId = ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null; // F1: the session
@@ -567,6 +569,7 @@ export function reviseEvent(id: string, e: Pick<Detected, 'type' | 'aliases' | '
   if (!row) return false;
   const meta = { ...(row.meta ? JSON.parse(row.meta) : {}), ...e.meta, aliases: e.aliases, withdrawn: e.withdrawn || undefined };
   db.prepare('UPDATE events SET type = ?, title = ?, body = ?, meta = ? WHERE id = ?').run(e.type, e.title, e.body, JSON.stringify(meta), id);
+  reviseMisery(id, { ...e, meta, targetKey: (db.prepare('SELECT target_key FROM events WHERE id = ?').get(id) as { target_key: string }).target_key });
   if (e.withdrawn || !isHateWatch(e)) {
     const devices = db.prepare('SELECT device_id FROM hate_watches WHERE event_id = ?').all(id) as { device_id: string }[];
     db.prepare('DELETE FROM hate_watches WHERE event_id = ?').run(id);
