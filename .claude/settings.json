@@ -55,6 +55,11 @@
             "command": "f=\"$HOME/Documents/obsidian/hate-watch/.tools/sync.sh\"; [ -x \"$f\" ] && \"$f\" --hook; true",
             "async": true,
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/remind-vault-log.mjs\"",
+            "timeout": 10
           }
         ]
       }

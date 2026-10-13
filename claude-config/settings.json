@@ -40,5 +40,19 @@
   },
   "autoUpdatesChannel": "latest",
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$HOME/hate watch/.claude/hooks/remind-vault-log.mjs\"; [ -f \"$f\" ] && node \"$f\"; true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
