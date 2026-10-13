@@ -7,6 +7,9 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+SERVER
+- Behind the scenes: the server can now copy its database off its machine continuously and restore it onto a replacement, and it has a new check that tells the owner when its database, its ESPN reads, a game's polling or that backup has stopped. Nothing changes in the app.
+
 RECENT MISERY
 - The Recent misery tab on a player's or team's page is now the same list for everyone: the last 30 days of losses, with how they happened (a blown lead, overtime, a walk-off, losing as the favorite), and the worst of the rest, such as an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF or a UFC loss.
 - It no longer depends on what you track or your alert settings, and it works for teams and players nobody tracks.

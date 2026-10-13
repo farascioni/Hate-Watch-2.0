@@ -66,7 +66,7 @@ What each step does:
 cd server && fly deploy --remote-only
 ```
 
-`--remote-only` builds on Fly's builder (flyctl's default). The image is `node:24-slim` with `npm ci --omit=dev` and `src/` copied in. `server/.dockerignore` leaves out `node_modules`, `data` (the local dev database and game recordings), `test`, `*.log`, `fly.toml` and `.gitignore`. The image runs `node --disable-warning=ExperimentalWarning src/index.ts`. Node 24 strips the TypeScript types itself and has `node:sqlite` built in, so there is no build step. It runs as root on purpose, because Fly mounts volumes root-owned and a non-root user couldn't write to `/data`.
+`--remote-only` builds on Fly's builder (flyctl's default). The image is `node:24-slim` with `npm ci --omit=dev` and `src/` copied in. `server/.dockerignore` leaves out `node_modules`, `data` (the local dev database and game recordings), `test`, `*.log`, `fly.toml` and `.gitignore`. The image also carries Litestream 0.5.17 (docs/redundancy.md), and runs `server/start.sh`, which restores the database from the replica when the volume is empty, starts Litestream if `LITESTREAM_REPLICA_URL` is set, and then `exec`s `node --disable-warning=ExperimentalWarning src/index.ts`. Node 24 strips the TypeScript types itself and has `node:sqlite` built in, so there is no build step. It runs as root on purpose, because Fly mounts volumes root-owned and a non-root user couldn't write to `/data`.
 
 What a deploy looks like: Fly sends SIGTERM to the running machine. The server logs `[shutdown] SIGTERM`, closes the HTTP server, closes SQLite cleanly and exits. With `strategy = "immediate"`, the machine is replaced in place, and open apps lose their WebSocket for a few seconds and reconnect.
 
@@ -84,7 +84,7 @@ Why it's configured the way it is (`fly.toml`):
 
 **Secrets and switches on the running app:** `fly secrets set -a hate-watch-api NAME=value` sets a secret and restarts the app. `HW_FLAGS_OFF` (a comma-separated list) keeps server switches off for good. A switch flipped live with `flag-cli.ts` needs no restart (`CLAUDE.md`, "Release flow").
 
-**Backups:** before anything that changes production data, the database is copied with SQLite's `VACUUM INTO` into a new file under `/data` (`CLAUDE.md`, "Release flow", which shows one way to run it).
+**Backups:** before anything that changes production data, the database is copied with SQLite's `VACUUM INTO` into a new file under `/data` (`CLAUDE.md`, "Release flow", which shows one way to run it). That copy stays on the same volume, so it does not help if the volume is lost. **Replication:** with `LITESTREAM_REPLICA_URL` set, Litestream also streams the database to a Tigris bucket every second or so, and an empty volume restores from it on boot; setup, the monitor on `GET /health/deep` and the runbooks are in [docs/redundancy.md](redundancy.md). It is not set up in production yet.
 
 Cost is roughly a few US dollars a month for one shared-cpu-1x machine with 512 MB plus a 1 GB volume. Check Fly's current pricing.
 

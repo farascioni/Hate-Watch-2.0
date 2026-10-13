@@ -10,6 +10,9 @@ export const db = new DatabaseSync(DB_PATH);
 db.exec(`
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
+-- Litestream (docs/redundancy.md) takes the write lock for a moment at each checkpoint; without a wait, a write landing then
+-- throws "database is locked" at once (node:sqlite's default is 0). Its docs recommend 5 seconds.
+PRAGMA busy_timeout = 5000;
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS teams (

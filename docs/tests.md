@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 433 tests in 61 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 433 tests in 61 files, offline, in about 4 seconds, all passing on October 13, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 425 tests in 60 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 433 tests in 61 files, offline, in about 4 seconds, all passing on October 13, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 425 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 433 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -59,6 +59,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `game-start.test.ts` | "Hate Watch Starting" on the pre-game to live flip, through a real `GameTracker`; never for a game first seen under way; the loss wording |
 | `half-end-wait.test.ts` | A half-inning's end waits for a read with its third out, but only `HW_HALF_END_WAIT_MS` (the bottom of the 8th of ALDS Game 5, whose third out never came) |
 | `hate-watches.test.ts` | The Settings counter: every Successful Hate Watch per device, whatever its alert settings, surviving a cleared feed, and counted for losses from before it existed |
+| `health.test.ts` | `GET /health/deep` (`health.ts`): each check passing and failing (database, ESPN silence, a stalled game loop, the Litestream error counter and disk-full flag), the 2-minute boot grace, the metrics parser, and the ESPN-reply timestamp in `calls.ts` |
 | `highlights.test.ts` | The game screen's Highlights (`highlights.ts`): ESPN's clips newest first while they're up, and the key plays |
 | `images.test.ts` | The `images.*` switches: photos and logos taken out of responses and live frames, leaving the `badge://` every build draws |
 | `injuries.test.ts` | One team alert per injury report update, NFL game-day "Active" never alerting, and iOS stacking a team's notifications in one thread |

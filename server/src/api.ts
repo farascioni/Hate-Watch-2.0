@@ -24,6 +24,7 @@ import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
 import { divisionsOf } from './divisions.ts';
+import { deepHealth, liveDeps } from './health.ts';
 
 class Html {
   body: string;
@@ -56,6 +57,13 @@ function authDevice(header: string | undefined | null): string | undefined {
 
 // ─── Public ───────────────────────────────────────────────────────────────────────────────────
 route('GET', '/health', false, () => ({ ok: true, catalog: catalog.size(), live: engine.status(), calls: callStats() }));
+// The outside monitor's check (health.ts, docs/redundancy.md): 503 when the database, ESPN reads, a game's loop or the backup stopped.
+// Not Fly's check: that one stays on /health, since failing it would pull the only machine out of routing.
+route('GET', '/health/deep', false, async () => {
+  const trackers = engine.status().flatMap((t) => ('loopAt' in t ? [t] : [])); // the games; F1 and the UFC have their own engines
+  const h = await deepHealth(liveDeps(trackers));
+  return h.ok ? h : new Raw({ status: 503, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: Buffer.from(JSON.stringify(h)) });
+});
 // Each league's sport too: the app shows any soccer league's matches the soccer way.
 // `ui`: how the app shows each league (its color, filter, words: leagues.ts LeagueUi). `teamsOnly`: a league with no players (college football).
 route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ui: LEAGUES[id].ui, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));

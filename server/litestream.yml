@@ -1,0 +1,19 @@
+# Litestream (docs/redundancy.md): streams the SQLite database to object storage, so losing the Fly volume loses about a second
+# of data instead of a day. start.sh runs it only when the LITESTREAM_REPLICA_URL secret is set; ${...} comes from the environment.
+#
+#   fly storage create -a hate-watch-api -n hatewatch-backups     # sets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_ENDPOINT_URL_S3
+#   fly secrets set -a hate-watch-api 'LITESTREAM_REPLICA_URL=s3://hatewatch-backups/hatewatch?endpoint=fly.storage.tigris.dev&region=auto'
+
+# Prometheus metrics, for GET /health/deep (health.ts): sync errors and "disk full". Local to the machine.
+addr: "127.0.0.1:9090"
+
+dbs:
+  - path: ${HW_DB}
+    replica:
+      url: ${LITESTREAM_REPLICA_URL}
+
+# A full snapshot every day, kept a week: a point-in-time restore reaches back as far as the oldest snapshot
+# (docs/redundancy.md, "Restore to before a bad deploy").
+snapshot:
+  interval: 24h
+  retention: 168h

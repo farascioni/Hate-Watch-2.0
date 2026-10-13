@@ -244,6 +244,8 @@ export class GameTracker {
   private newAlerts = false;
   private clipsBusy = false;
   lastPollMs = 0;
+  /** When the poll loop last started a pass: `GET /health/deep` flags a tracker whose loop stopped turning (health.ts). */
+  loopAt = Date.now();
   // Football: ESPN's changes to plays and drives after it posts them (revisions.ts), and the score's: reads in a row
   // that had a side's score lower than announced, the score each side had taken back (and where, for 10 minutes: the
   // same side scoring on that drive is that score again), the header's score ahead of the plays (since when, and the
@@ -378,6 +380,7 @@ export class GameTracker {
   private async loop() {
     while (!this.stopped && !this.finished) {
       const t0 = Date.now();
+      this.loopAt = t0;
       try { await this.poll(); } catch (e) { log(`[${this.ctx.league} ${this.ctx.gameId}] poll error`, String(e)); }
       this.lastPollMs = Date.now() - t0;
       // Next poll starts LIVE_POLL_MS after the previous one *started* (never overlapping); a teams-only league's
@@ -1272,7 +1275,7 @@ class LiveEngine {
 
   status() {
     return [
-      ...[...this.trackers.values()].map((t) => ({ league: t.ctx.league, gameId: t.ctx.gameId, finished: t.finished, lastPollMs: t.lastPollMs })),
+      ...[...this.trackers.values()].map((t) => ({ league: t.ctx.league, gameId: t.ctx.gameId, finished: t.finished, lastPollMs: t.lastPollMs, loopAt: t.loopAt })),
       ...f1Status(),
       ...ufcStatus(),
     ];

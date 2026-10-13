@@ -13,6 +13,9 @@ const blank = (): Bucket => ({ calls: 0, retries: 0, errors: 0, notFound: 0, byt
 
 let buckets = new Map<string, Bucket>();
 let since = Date.now();
+/** When ESPN last answered any request (a 404 counts: it replied). `GET /health/deep` (health.ts) reads it to tell a dead poller from a quiet night. */
+let lastReplyAt = 0;
+export const lastEspnReplyAt = () => lastReplyAt;
 let lastLogged = new Map<string, Bucket>();
 
 /**
@@ -87,7 +90,7 @@ export function recordCall(url: string, outcome: CallOutcome, ms: number, retry:
   b.bytes += bytes;
   if (retry) b.retries++;
   if (outcome === 'error') b.errors++;
-  else if (outcome === 'notFound') b.notFound++;
+  else { lastReplyAt = Date.now(); if (outcome === 'notFound') b.notFound++; }
   if (print) {
     const id = withoutBust(url), before = lastPrint.get(id);
     if (before !== undefined) { b.compared++; if (before === print) b.same++; }
@@ -124,7 +127,7 @@ export function callStats() {
 }
 
 /** Forgets every count (tests). */
-export function resetCalls() { buckets = new Map(); lastLogged = new Map(); lastPrint.clear(); since = Date.now(); }
+export function resetCalls() { buckets = new Map(); lastLogged = new Map(); lastPrint.clear(); since = Date.now(); lastReplyAt = 0; }
 
 /** The calls since the last time this ran, as the lines logged each hour: a total, then the busiest `top` reads. */
 export function callLog(top = 15): string[] {
