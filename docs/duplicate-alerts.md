@@ -190,7 +190,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`seen`:** play ids already judged. A play is passed to the detectors (`PLAYER_DETECTORS[league]`) only on its
   first sighting, then `observePlay` updates the game's state (bases, goalies, the half-inning). An MLB result
   posted before its batter is on it waits (`waitForBatter`, `noBatter`, up to `HW_HALF_END_WAIT_MS`, 20 seconds) and
-  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
+  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds), and a hockey shot (20 seconds), penalty still typed "Penalty Shot Infraction" (2 minutes) or goal with no scorer in its text (20 seconds, with the score alerts past it: `goalHeld`) (`waitForHockey`, `noHockeyPlay`, `HOCKEY_WAIT_MS`). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
   says "Official Scorer Ruling Pending" (`HW_RULING_WAIT_MS`, 45 seconds; `settling`, `settleSince`): the version that
   settles is the one judged, and the plays after it are not judged until it is, so the state they build (bases, whose
   runner is whose) stays in order. An "End Inning" play two reads in a row lack, with the half not over, is forgotten
@@ -367,7 +367,7 @@ counts everyone who got any of the moment's loss alerts.
 **Rules:**
 
 - **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge, a
-  strikeout on a challenged pitch, a result waiting for the official scorer, and a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, held by design).
+  strikeout on a challenged pitch, a result waiting for the official scorer, a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, and a hockey shot, a penalty ESPN hasn't named and a goal with no scorer, which wait 20 seconds, 2 minutes and 20 seconds: all held by design).
 - **What ESPN changes afterwards is a revision of the alert that went out:** a line with no push on the alerts that
   no longer hold, and the alerts the play has now and didn't before sent as new. Never a second notification about
   the same play.
@@ -400,7 +400,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   even-strength goal, 6 plays taken out). A changed play is judged again: a line with no push on the alert it no longer has
   ("ESPN has since changed this: Leon Draisaitl scored."), the alert it has now goes out, a late empty-netter or short-handed
   goal sends the team's alert with no `alt` so it folds into the "scored on" alert as a line, a penalty's call is a line.
-  `nhl.goalie.pulled` is in `ONCE`. A goalie's shots faced and goals allowed are recounted with each version of a play
+  `nhl.goalie.pulled` is in `ONCE`. A shot, a penalty ESPN has not named and a goal with no scorer in its text wait to be judged (`awaitingHockey`; a shootout play and a new goalie's save never do), and a goal's alerts take ESPN's later text on their feed rows (`reviseKeyText`, no push), so the alert says what ESPN finally kept (TOR at UTA, 2026-10-13). A goalie's shots faced and goals allowed are recounted with each version of a play
   (`g.goalieSeen`, `observePlay`, `unobservePlay`). Details: docs/alerts.md, "Revisions: ESPN changes a hockey play after its alert".
 - **Football** (`server/src/revisions.ts`, `PlayLedger`, used by `GameTracker.poll` for college football and the
   NFL): for `REVISE_MS` (15 minutes) after it's first seen, each play and drive keeps the alerts it sent, by kind
@@ -527,7 +527,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 
 | Kept (database) | Forgotten (memory) |
 |---|---|
-| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `noShotType`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
+| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `noShotType`, `noHockeyPlay`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football, basketball and hockey revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
 

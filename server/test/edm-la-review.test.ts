@@ -116,7 +116,7 @@ test("a goal first posted as a missed shot: the shooter's alert gets a line, the
   await x.poll();
   const base = pushed('drai-fan');
   x.put(missed('m1', 'draisaitl', 'kuemper', { clock: 435 }));
-  await x.poll();
+  await x.poll(5); // the shot waits 20 seconds for ESPN to finish it (tor-uta-review.test.ts), here it is still a missed shot
   assert.deepEqual(feed('drai-fan'), [['nhl.shot_missed', 'Leon Draisaitl shot and missed', []]]);
   x.put(goal('m1', 'draisaitl', 1, 0, { clock: 436 }));
   await x.poll();
@@ -134,12 +134,12 @@ test("a shot ESPN retypes is a line on the shooter's alert; a play ESPN takes ou
   const x = game('G-RETYPE');
   await x.poll();
   x.put(core('k1', 'Missed', 'Missed Shot', LA, [[PEOPLE.kempe[0], 'shooter']], { clock: 400 }));
-  await x.poll();
+  await x.poll(5);
   x.put(core('k1', 'Blocked', 'Adrian Kempe shot blocked by Connor McDavid', LA, [[PEOPLE.kempe[0], 'shooter'], [PEOPLE.mcdavid[0], 'blocker']], { clock: 400 }));
   await x.poll();
   assert.deepEqual(feed('kempe-fan'), [['nhl.shot_missed', 'Adrian Kempe shot and missed', ['ESPN has since changed this: the shot was blocked.']]]);
   x.put(core('k2', 'Missed', 'Missed Shot', LA, [[PEOPLE.kempe[0], 'shooter']], { clock: 300 }));
-  await x.poll();
+  await x.poll(5);
   x.take('k2');
   await x.poll(8); // gone for GONE_MS
   const rows = feed('kempe-fan');
@@ -175,11 +175,11 @@ test('a penalty posted as "Penalty Shot Infraction": the call is a line on the a
   await x.poll();
   const base = pushed('doughty-fan');
   x.put(core('pn1', 'Penalty Shot Infraction', 'Drew Doughty Minor', LA, [[PEOPLE.doughty[0], null]], { pen: '2', clock: 464 }));
-  await x.poll();
-  assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, Penalty Shot Infraction)', []]]);
+  await x.poll(25); // a penalty ESPN has not named waits 2 minutes (tor-uta-review.test.ts); still the placeholder after that, it goes out as a minor
+  assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, minor)', []]]);
   x.put(core('pn1', 'Tripping', 'Drew Doughty Tripping against Kasperi Kapanen', LA, [[PEOPLE.doughty[0], null], ['3114775', null]], { pen: '2', clock: 464 }));
   await x.poll();
-  assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, Penalty Shot Infraction)', ['ESPN has since called it tripping against Kasperi Kapanen.']]]);
+  assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, minor)', ['ESPN has since called it tripping against Kasperi Kapanen.']]]);
   assert.equal(pushed('doughty-fan'), base + 1);
 });
 

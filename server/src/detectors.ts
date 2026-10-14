@@ -1681,6 +1681,24 @@ function teamFlags(g: GameCtx, p: NPlay): Detected[] {
 const UNKNOWN_SHOT = /\bdefault shot\b|^no shot\b/i;
 /** Basketball: a missed shot ESPN hasn't typed yet (and that isn't already a block) waits a few seconds for its type (live.ts, HW_SHOT_WAIT_MS). */
 export const awaitingShotType = (p: NPlay) => p.shooting && !p.scoring && UNKNOWN_SHOT.test(p.type) && /miss/i.test(p.text) && !/blocks/i.test(p.text);
+/** Hockey: ESPN's placeholder type for a penalty it hasn't named yet (text "<Player> Minor"), retyped 10 to 100 seconds later (TOR at UTA, 2026-10-13). */
+export const PENALTY_PLACEHOLDER = /^penalty shot infraction$/i;
+/** Hockey: a goal's first text can lack its scorer (", assists: Logan Cooley (6), Dylan Guenther (4)"); ESPN names him within a minute. */
+export const goalNamesScorer = (text: string) => !/^\s*(,|$)/.test(text);
+/**
+ * Hockey: a play ESPN is still filling in, and what it waits for (live.ts, HOCKEY_WAIT_MS): a shot (missed, blocked, saved: ESPN
+ * retypes it, and 4 of 9 goals were first a shot), a penalty still typed as the placeholder, a goal whose text has no scorer yet.
+ * Never in a shootout, and never a save by a goalie who isn't the one in net on a known team: that one is judged at once, so the
+ * pull alert is immediate and the goalie in net is right for the goal after it.
+ */
+export function awaitingHockey(g: GameCtx, p: NPlay): 'shot' | 'penalty' | 'goal' | undefined {
+  if (g.shootout) return undefined;
+  const [saver] = role(p, 'saver'), was = p.teamId ? g.goalies.get(p.teamId === g.homeId ? g.awayId : g.homeId) : undefined;
+  if (saver && was && saver !== was) return undefined;
+  if (p.scoring) return goalNamesScorer(p.text) ? undefined : 'goal';
+  if (p.penaltyMinutes) return PENALTY_PLACEHOLDER.test(p.type) ? 'penalty' : undefined;
+  return p.typeSlug?.startsWith('shot-') || /^(Missed|Blocked|Shot)$/.test(p.type) ? 'shot' : undefined;
+}
 /** ESPN's basketball shot types as a fan says them; any other is ESPN's own, lowercased, without "shot". */
 const SHOT_NAME: Record<string, string> = {
   'Jump Shot': 'jumper', 'Pullup Jump Shot': 'pull-up jumper', 'Step Back Jump Shot': 'step-back jumper', 'Fade Away Jump Shot': 'fadeaway',
@@ -1881,7 +1899,7 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
       ? mk(g, p, 'player.ejected', who, `${nameOf('nhl', who)} got ejected (${p.type.toLowerCase()})`, { aliases: ['nhl.penalty'], fold: `Ejected (${p.type.toLowerCase()}).`, ...moment })
       : fight !== null
         ? mk(g, p, 'nhl.fight', who, `${nameOf('nhl', who)} dropped the gloves${fight ? ` with ${fight}` : ''}`, { aliases: ['nhl.penalty'], fold: 'A fight.', ...moment })
-        : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${p.type})`, { fold: `${p.penaltyMinutes} minutes in the box.`, ...moment }));
+        : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${PENALTY_PLACEHOLDER.test(p.type) ? (p.penaltyMinutes === 5 ? 'major' : 'minor') : p.type})`, { fold: `${p.penaltyMinutes} minutes in the box.`, ...moment }));
   }
   return out;
 }

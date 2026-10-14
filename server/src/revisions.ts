@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { BASKETBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -398,7 +398,8 @@ export class PlayLedger {
       // A penalty ESPN posts as "Penalty Shot Infraction" ("Drew Doughty Minor") and names a few seconds later: the call, as a line.
       for (const [k, e] of want) {
         const sent = x.alerts.get(k);
-        if (!sent || sent.type !== 'nhl.penalty' || sent.title === e.title) continue;
+        // (ESPN can flip a penalty back to the placeholder for seconds: Ekman-Larsson, TOR at UTA. That is no call to write down.)
+        if (!sent || sent.type !== 'nhl.penalty' || sent.title === e.title || PENALTY_PLACEHOLDER.test(p.type)) continue;
         x.alerts.set(k, e);
         lines.push(...this.linesOn([sent], `ESPN has since called it ${p.type.toLowerCase()}${p.text.match(/\bagainst (.+)$/)?.[0] ? ` ${p.text.match(/\bagainst (.+)$/)![0]}` : ''}.`));
       }
@@ -426,6 +427,8 @@ export class PlayLedger {
   changed(p: NPlay, now: number): Revision | null {
     const x = this.plays.get(p.id);
     if (!x || x.sig === sigOf(p)) return null;
+    // Hockey: ESPN flips a penalty back to the placeholder for seconds (Ekman-Larsson, TOR at UTA). That is no change: a fight or an ejection already sent stays as it is.
+    if (this.g.league === 'nhl' && p.penaltyMinutes && PENALTY_PLACEHOLDER.test(p.type) && !PENALTY_PLACEHOLDER.test(x.play.type)) return null;
     return this.revise(x, p, now);
   }
 

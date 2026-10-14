@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, awaitingShotType, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
+  awaitingBatter, awaitingHockey, awaitingShotType, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -102,6 +102,16 @@ const HALF_END_TYPES = new Set(['mlb.team.stranded_risp', 'mlb.team.down_in_orde
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
 /** Basketball: how long a missed shot ESPN hasn't typed yet waits for its type before it's judged as it is (waitForShotType). ESPN typed 55 of 57 within 30 s, 44 within 10 (GS vs LAL, 2026-10-13). */
 const SHOT_WAIT_MS = Number(process.env.HW_SHOT_WAIT_MS ?? 15_000);
+/**
+ * Hockey: how long ESPN gets to finish a play before its first alert (waitForHockey, awaitingHockey). It posts a shot, then retypes it or makes it a goal 10 to 30
+ * seconds later (4 of 9 goals were first a shot), names a penalty 10 to 100 seconds after "Penalty Shot Infraction", and fills in a goal's scorer within a minute
+ * (TOR at UTA, 2026-10-13). Past the wait the play is judged as it is, and what ESPN changes after is a line or a rewrite.
+ */
+const HOCKEY_WAIT_MS = {
+  shot: Number(process.env.HW_NHL_SHOT_WAIT_MS ?? 20_000),
+  penalty: Number(process.env.HW_NHL_PENALTY_WAIT_MS ?? 120_000),
+  goal: Number(process.env.HW_NHL_GOAL_WAIT_MS ?? 20_000),
+};
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
 const KEY_REVISE_MS = 5 * 60_000;
 /** A read of ESPN slower than this is logged, with which feed (poll). */
@@ -184,6 +194,8 @@ export class GameTracker {
   private noBatter = new Map<string, number>();
   /** Basketball: missed shots ESPN hasn't typed yet, since when they've waited (waitForShotType). */
   private noShotType = new Map<string, number>();
+  /** Hockey: plays ESPN is still filling in (awaitingHockey), since when they've waited (waitForHockey). */
+  private noHockeyPlay = new Map<string, number>();
   /** MLB: results waiting to be judged since when: for the official scorer's ruling (RULING_WAIT_MS), or a strikeout's ABS review (ABS_SETTLE_MS): settling. */
   private settleSince = new Map<string, number>();
   /** MLB: each at-bat result's text and roles as last seen, to log ESPN's changes to a result after posting it. */
@@ -548,6 +560,12 @@ export class GameTracker {
     return now - since < SHOT_WAIT_MS;
   }
 
+  /** Hockey: whether to keep waiting for ESPN to finish a play (awaitingHockey), HOCKEY_WAIT_MS at most for its kind. */
+  private waitForHockey(p: NPlay, kind: keyof typeof HOCKEY_WAIT_MS, now: number): boolean {
+    const since = this.noHockeyPlay.get(p.id) ?? (this.noHockeyPlay.set(p.id, now), now);
+    return now - since < HOCKEY_WAIT_MS[kind];
+  }
+
   /** MLB: whether to keep waiting for the batter on an at-bat's result (awaitingBatter), HALF_END_WAIT_MS at most. */
   private waitForBatter(p: NPlay, now: number): boolean {
     const since = this.noBatter.get(p.id);
@@ -778,6 +796,7 @@ export class GameTracker {
     const plays = league === 'mlb' ? this.withStrikeThrees(merged, Date.now()) : merged;
     if (plays.length) this.plays = plays;
     if (soccer) this.reviseKeyText([...sitePlays, ...touchPlays], Date.now());
+    if (league === 'nhl') this.reviseKeyText(plays, Date.now());
 
     const events: Detected[] = [];
     const now = Date.now();
@@ -839,14 +858,19 @@ export class GameTracker {
     let score = { home: 0, away: 0 };
     const led = { home: 0, away: 0 }; // each side's biggest lead before this play ("blew a big lead")
     let held = false; // MLB: a result ahead of this play is settling
+    let goalHeld = false; // hockey: a goal ahead of this play (or this one) has no scorer in its text yet: no score is announced past it
     for (const p of plays) {
       bump(led, score);
       const prev = score;
       score = nextScore(prev, p);
       // History from before we attached updates state but is never notified.
       const history = this.first && p.at < cutoff;
+      // Hockey: a shot, a penalty still typed as the placeholder and a goal with no scorer in its text wait for ESPN to finish them (HOCKEY_WAIT_MS).
+      const wait = league === 'nhl' && !history && !final && !this.seen.has(p.id) ? awaitingHockey(this.ctx, p) : undefined;
+      const hockeyWait = !!wait && this.waitForHockey(p, wait, now);
+      if (hockeyWait && wait === 'goal') goalHeld = true;
       // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
-      const waiting = (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
+      const waiting = hockeyWait || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
         || (BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingShotType(p) && this.waitForShotType(p, now));
       // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
       // after it wait their turn, so the game's state (bases, who is on) is built in order.
@@ -901,7 +925,7 @@ export class GameTracker {
         if (prev && !fresh && !history && (before !== sig || prev.scoring !== p.scoring)) this.revisedResult(prev, p, plays, now, events, changed);
       }
       const up = (s: 'home' | 'away') => score[s] > this.announced[s];
-      if (up('home') || up('away')) {
+      if (!goalHeld && (up('home') || up('away'))) {
         // A side already announced at this score (its goal was counted from a later play first)
         // doesn't move on this play, so it gets no second alert.
         const from = { home: up('home') ? prev.home : score.home, away: up('away') ? prev.away : score.away };
@@ -1056,13 +1080,18 @@ export class GameTracker {
     const { league, gameId } = this.ctx;
     for (const p of plays) {
       if (!p.text) continue;
+      // Hockey: a goal's alerts take its text once it names its scorer (goalNamesScorer), and any change counts (ESPN takes an assist away, credits another scorer).
+      const hockey = league === 'nhl';
+      if (hockey && !p.scoring) continue;
       const was = this.keyTexts.get(p.id);
       if (!was) { this.keyTexts.set(p.id, { text: p.text, at: now }); continue; }
-      if (p.text === was.text || p.text.length <= was.text.length || now - was.at > KEY_REVISE_MS) continue;
+      if (p.text === was.text || (hockey ? !goalNamesScorer(p.text) : p.text.length <= was.text.length) || now - was.at > KEY_REVISE_MS) continue;
       const prefix = `${gameId}:${p.id}:`;
       const rows = db.prepare('SELECT id, type, title, body, meta FROM events WHERE id >= ? AND id < ?').all(prefix, `${prefix}\uffff`) as { id: string; type: string; title: string; body: string; meta: string | null }[];
       for (const r of rows) {
         if (!r.body.startsWith(`${was.text} — `)) continue;
+        // Hockey: the goal's own alerts only: the shot alert from before it was a goal keeps its words (it has a line), and so does a revision's line.
+        if (hockey && (/^nhl\.shot_/.test(r.type) || r.id.includes(':changed:'))) continue;
         const meta = r.meta ? JSON.parse(r.meta) : {};
         const title = r.type === soccerType(league, 'red_card') && / was sent off/.test(r.title) ? sentOffTitle(r.title.replace(/ was sent off.*$/, ''), p.text) : r.title;
         reviseEvent(r.id, { type: r.type, aliases: meta.aliases, title, body: `${p.text}${r.body.slice(was.text.length)}`, meta: {} });

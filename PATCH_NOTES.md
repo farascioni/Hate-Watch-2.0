@@ -31,6 +31,9 @@ HOCKEY
 - A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"), and other shots ESPN changes (blocked, saved, missed, another player's, taken out) get a line too, with no extra push.
 - An empty-net goal ESPN first posted as an even-strength one is no longer charged to the goalie: the goalie's alert says nobody was in net, and the team's says "Into an empty net."
 - A penalty ESPN first posted as "Penalty Shot Infraction" gets its real call as a line.
+- Hockey alerts now wait for ESPN to finish the play: a shot 20 seconds, a penalty ESPN has not named up to 2 minutes, a goal with no scorer in its text 20 seconds. A goal that was first a shot no longer gets a wrong shot alert, a penalty says what it was (slashing, hooking) instead of "Penalty Shot Infraction", and fights are no longer hidden behind it.
+- Not changed: a second copy of a shot that ESPN posts while the first is still there can still alert twice; ESPN usually takes one out a minute later and the alert gets a line.
+- A goal's alerts take ESPN's later text on the feed (a different scorer, an assist taken away): the Maple Leafs' short-handed goal was first Barrett Hayton's and is Mikhail Sergachev's.
 - The final score of a game is the higher of ESPN's score and its period scores, so a header that trails by a goal no longer gives a loss "3 to 1" when it ended 4-1.
 
 FOOTBALL
