@@ -55,8 +55,9 @@ test('blowing an 18-point lead, live: one alert instead of "falls behind", once 
   };
   const tracker = new GameTracker('nba', 'K1', '2', '18');
   let n = 0;
+  // A scoring play names its scorer (a basket with no one named waits for him: ind-okc-review.test.ts).
   const shot = (home: number, away: number, text: string, period = 2) => ({ id: `K1-${n++}`, type: { text: 'Jump Shot' }, text, scoringPlay: true, homeScore: home, awayScore: away,
-    period: { number: period }, clock: { displayValue: '5:00' }, team: { id: home > away ? '2' : '18' }, participants: [], wallclock: new Date().toISOString() });
+    period: { number: period }, clock: { displayValue: '5:00' }, team: { id: home > away ? '2' : '18' }, participants: [{ athlete: { id: '1' } }], wallclock: new Date().toISOString() });
   state.plays = [shot(30, 12, 'Jayson Tatum makes 26-foot three point jumper')]; // up 18
   await tracker.poll();
   state.plays.push(shot(30, 30, 'Jalen Brunson makes driving layup', 3), shot(30, 32, 'Jalen Brunson makes 25-foot three point jumper', 3));

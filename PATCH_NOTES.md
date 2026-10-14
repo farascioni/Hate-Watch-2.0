@@ -8,37 +8,46 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SERVER
-- Behind the scenes: the database is now copied off the server continuously, and a new check tells the owner when it, ESPN reads, a game's polling or that backup stops. Nothing changes in the app.
+- The database is now copied off the server continuously, and a new check tells the owner when it, ESPN reads, a game's polling or that backup stops.
 
 RECENT MISERY
-- The Recent misery tab on a player's or team's page is now the same list for everyone: the last 30 days of losses, with how they happened (a blown lead, overtime, a walk-off, losing as the favorite), and the worst of the rest: an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF.
-- It no longer depends on what you track or your alert settings, and works for teams and players nobody tracks. A player's page also shows their team's losses. A loss says "Successful Hate Watch!" only if you track that team or player.
-- A soccer loss by 3 or more goals keeps its score and margin on the list (it was dropped before), and a corrected final score refreshes them.
+- The Recent misery tab on a player's or team's page is now one list for everyone: the last 30 days of losses (a blown lead, overtime, a walk-off, losing as the favorite) and the worst of the rest: an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF.
+- It no longer depends on what you track or your settings, works for teams and players nobody tracks, and a player's page also shows their team's losses. "Successful Hate Watch!" is only for a team or player you track.
+- A soccer loss by 3+ goals keeps its score and margin on the list.
 
 MLB
-- A strikeout on a challenged pitch waits 30 seconds, so one ESPN turns into a walk is never sent.
-- A pickoff error is no "got picked off", and its pitcher alerts come once.
-- A lost replay challenge ESPN adds later is sent once it holds; "Official Scorer Ruling Pending" is waited out.
-- A homer's corrected distance and an error ESPN moves to another fielder become lines on the alerts sent.
-- A run is the pitcher's whose runner scores, as in the box score; a run a review gives back alerts the pitcher too.
+- A strikeout on a challenged pitch waits 30 seconds, so one that becomes a walk is never sent.
+- A pickoff error is no "got picked off".
+- A lost replay challenge ESPN adds later is sent once it holds; a pending scorer's ruling is waited out.
+- A corrected homer distance and an error moved to another fielder become lines on the alerts sent.
+- A run is the pitcher's whose runner scores, as in the box score.
 - A third out a review overturns gets a line, and the inning's real end is judged. A strikeout ESPN never posts is made from the third strike.
 
 HOCKEY
-- A goalie is no longer shown as pulled when a play ESPN took out a few seconds later had him replaced, and a real pull now counts the goals against him ("3 goals on 7 shots").
-- A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"), and other shots ESPN changes or takes out get a line too, with no extra push.
-- An empty-net goal ESPN first posted as an even-strength one is no longer charged to the goalie: the goalie's alert says nobody was in net, and the team's says "Into an empty net."
-- Hockey alerts now wait for ESPN to finish the play: a shot 20 seconds, a penalty it has not named up to 10 minutes, a goal with no scorer 20 seconds. A goal that was first a shot gets no wrong shot alert, and a penalty says what it was (slashing, hooking), not "Penalty Shot Infraction".
-- A shot ESPN posts minutes late no longer alerts and shows the score now, and a play it takes out and posts again within 45 minutes is one alert. A fight title drops "served by". Still twice: a copy of a shot posted while the first is there.
-- A goal's alerts take ESPN's later text on the feed (a different scorer, an assist taken away): the Maple Leafs' short-handed goal was first Barrett Hayton's and is Mikhail Sergachev's.
-- The final score of a game is the higher of ESPN's score and its period scores, so a trailing header never gives a loss "3 to 1" when it ended 4-1.
+- A goalie is not shown as pulled when a play ESPN took out had him replaced; a real pull counts the goals against him ("3 goals on 7 shots").
+- A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"); other shots ESPN changes or takes out get a line too, no push.
+- An empty-net goal ESPN first posted as even-strength is no longer charged to the goalie ("Into an empty net.").
+- Hockey alerts wait for ESPN to finish the play: a shot 20 seconds, an unnamed penalty up to 10 minutes, a goal with no scorer 20 seconds. A penalty says what it was (slashing), not "Penalty Shot Infraction".
+- A shot ESPN posts minutes late no longer alerts; a play it takes out and posts again within 45 minutes is one alert.
+- A goal's alerts take ESPN's later text (scorer, assists).
+- The final score is the higher of ESPN's score and its period scores (never "3 to 1" for a 4-1 game).
 
 FOOTBALL
-- A score that ties the game says so ("Rams tied the game, 34-34."), as a line on the alert with no push; when the extra point is what ties it, the line comes a few seconds after the touchdown.
+- A score that ties the game says so ("Rams tied the game, 34-34."), as a line with no push, also when the extra point ties it.
 - A sack on a failed two-point try reads "got sacked on the two-point try".
-- Track an NFL team and its flags reach your feed too, even when no player is named: "Bills were flagged: Illegal Shift". It is the same "Commits a penalty" setting (now on a team's page as well), and a team's flags never push.
-- College football: a flag no longer takes the place of a score or a three-and-out (it is its own feed row, never a push), and an alert shows ESPN's corrected words and score (a sack's yards, an extra point).
-- A safety is pushed as a safety ("Delaware gave up a safety and fell behind MTSU"), also when ESPN first posted the play as a sack.
-- College football: a blocked or missed extra point is an alert ("Delaware had an extra point blocked"); the setting is now "Misses a kick".
+- Track an NFL team and its flags reach your feed, even with no player named ("Bills were flagged: Illegal Shift"): the same "Commits a penalty" setting, never pushed.
+- College football: a flag no longer takes the place of a score or a three-and-out (its own feed row, never a push), and an alert shows ESPN's corrected words and score.
+- A safety is pushed as a safety ("Delaware gave up a safety and fell behind MTSU"), also when ESPN first posted a sack.
+- College football: a blocked or missed extra point is an alert; the setting is now "Misses a kick".
+
+NBA AND WNBA
+- A technical's free throw is no "picked up a technical"; a traveling turnover is a turnover; an offensive charge is a foul.
+- A play is corrected for 45 minutes (was 15); a block that becomes a plain miss says the shot was not blocked; a shot ESPN later changes gets a silent line.
+- A missed shot waits up to 15 seconds for ESPN to name it ("missed a driving layup"); an offensive foul and its turnover are one alert.
+- A late play shows the game's score now. A defensive 3-seconds call is not a pushed technical.
+- A basket with no scorer named waits up to 20 seconds, so one ESPN takes back is never "took the lead"; a basket taken back later gets a line.
+- A foul ESPN re-posts up to 15 seconds off is one alert. A shot ESPN has not typed no longer says "0.0 seconds left".
+- A player in the box score on no roster (a two-way or camp player) is added to the catalog, so you can track him.
 
 ## Build 13 (October 12, 2026)
 
@@ -83,14 +92,6 @@ NBA AND WNBA
 - A play ESPN changes after posting is judged again: a line, no push, and the right player's alert.
 - A shot not yet typed reads "missed a 29-foot three"; a block never goes to the blocker.
 - Falling behind again within 2 minutes is a line on the earlier alert.
-- The free throw a technical gives is no "picked up a technical" for its shooter; a traveling turnover is a turnover.
-- A play is corrected for 45 minutes (was 15), so a turnover ESPN moves to another player late still is; a block that becomes a plain miss only says the play changed.
-- An offensive charge is a foul: it alerts, counts toward fouling out, and "fouled out" no longer comes a foul late.
-- A play ESPN posts minutes late shows the game's score now, not an old one.
-- A defensive 3-seconds call reads "called for defensive 3 seconds" and no longer pushes as a technical.
-- A missed shot ESPN later calls something else (a three that was a two, 2+ feet off) gets a silent line saying so.
-- A missed shot waits up to 15 seconds for ESPN to name it, so the alert says "missed a driving layup" (or "got sent back") instead of "missed a shot".
-- An offensive foul and its turnover are one alert, with the other as a line.
 
 EVERYWHERE
 - Soccer goals, cards, fouls come sooner, in ESPN's fuller words.

@@ -1694,6 +1694,8 @@ function teamFlags(g: GameCtx, p: NPlay): Detected[] {
 const UNKNOWN_SHOT = /\bdefault shot\b|^no shot\b/i;
 /** Basketball: a missed shot ESPN hasn't typed yet (and that isn't already a block) waits a few seconds for its type (live.ts, HW_SHOT_WAIT_MS). */
 export const awaitingShotType = (p: NPlay) => p.shooting && !p.scoring && UNKNOWN_SHOT.test(p.type) && /miss/i.test(p.text) && !/blocks/i.test(p.text);
+/** Basketball: a basket ESPN posted before it names who scored waits a few seconds for him (live.ts, HW_SCORER_WAIT_MS): once it was a miss 10 seconds later (IND at OKC, 2026-10-13). */
+export const awaitingScorer = (p: NPlay) => p.scoring && !p.participants.length;
 /** Hockey: ESPN's placeholder type for a penalty it hasn't named yet (text "<Player> Minor"), retyped 10 to 100 seconds later (TOR at UTA, 2026-10-13). */
 export const PENALTY_PLACEHOLDER = /^penalty shot infraction$/i;
 /** Hockey: a goal's first text can lack its scorer (", assists: Logan Cooley (6), Dylan Guenther (4)"); ESPN names him within a minute. */
@@ -1747,10 +1749,13 @@ export function missedShot(g: GameCtx, p: NPlay, name: string): string | null {
   return `${name} missed ${/^(8|11|18|8\d)-|^[aeiou]/i.test(what) ? 'an' : 'a'} ${what}${lateAndClose(g, p, three ? 3 : 2)}`;
 }
 
-/** The last 30 seconds of the 4th or overtime, and the shot would have tied it or given them the lead: " for the lead with 2 seconds left". */
+/**
+ * The last 30 seconds of the 4th or overtime, and the shot would have tied it or given them the lead: " for the lead with 2 seconds left".
+ * Not on a shot ESPN hasn't typed whose clock reads 0.0: that is its first guess (Keba Keita's putback with 2.0 left was "0.0 seconds left" for 25 seconds).
+ */
 function lateAndClose(g: GameCtx, p: NPlay, points: number): string {
   const left = p.clockSec;
-  if ((p.periodNum ?? 0) < 4 || left == null || left > 30 || !p.teamId) return '';
+  if ((p.periodNum ?? 0) < 4 || left == null || left > 30 || !p.teamId || (left === 0 && UNKNOWN_SHOT.test(p.type))) return '';
   const home = p.teamId === g.homeId;
   const mine = home ? p.home : p.away, theirs = home ? p.away : p.home;
   if (mine > theirs || mine + points < theirs) return '';

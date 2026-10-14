@@ -30,9 +30,11 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  * took out has its alerts taken back. A play with no shooter yet alerts nothing until ESPN names one. Fouls are
  * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right. Basketball watches a play for
  * BASKETBALL_REVISE_MS (45 minutes, not 15: a turnover moved to another player 20 minutes on, CLE at ORL, October 13 2026),
- * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it).
+ * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it; its line says "the shot was not blocked").
  * A missed shot ESPN describes differently later gets a silent line when the new words contradict the alert (`shotDisagrees`: a three
  * that is not one, or 2 feet), and an offensive charge is a foul like "Offensive Foul" (POR at SAC, October 13 2026).
+ * A basket ESPN takes back (the score going down, its play no longer scoring) puts a line on its team alerts (`addScores`, `takeBack`; IND at OKC,
+ * October 13 2026), and a foul re-posted up to FOUL_REPOST_S off its clock is the same foul (`samePlay`).
  *
  * Hockey uses it too (EDM at LA, October 13 2026): every goal was first posted as a missed or saved shot, 6 of 7 penalties as
  * "Penalty Shot Infraction", the empty-netter as an even-strength goal, and 6 plays were taken out. A changed play is judged
@@ -65,6 +67,9 @@ const startOf = (p: NPlay) => { const m = p.text.match(/^\((\d+):(\d+)\)/); retu
 /** The player a play is about: the first its text names ("#3 G.Lopez", "P.Mahomes"). */
 const actorOf = (p: NPlay) => p.text.replace(/^\(\d+:\d+\)\s*/, '').match(/(?:#\d+ )?\b([A-Z][A-Za-z]{0,2}\.\s?[A-Z][\w'.-]+)/)?.[1];
 
+/** Basketball: how far apart in game seconds a foul and its re-post can be (samePlay). */
+const FOUL_REPOST_S = 15;
+
 /**
  * The same play, re-posted: the same period, a start within 10 seconds, the same player (or, naming none, the same
  * type). A touchdown overturned on review comes back as "(12:21) … #3 G.Lopez pass complete … for 18 yards to the
@@ -73,7 +78,8 @@ const actorOf = (p: NPlay) => p.text.replace(/^\(\d+:\d+\)\s*/, '').match(/(?:#\
  */
 export function samePlay(a: NPlay, b: NPlay, basketball = false): boolean {
   const [x, y] = [startOf(a), startOf(b)];
-  if (a.periodNum !== b.periodNum || x == null || y == null || Math.abs(x - y) > 10) return false;
+  // A basketball foul comes back up to 15 seconds off (IND at OKC: posted at 8:15, back at 8:26, then edited to 8:15), a shot or turnover within 10.
+  if (a.periodNum !== b.periodNum || x == null || y == null || Math.abs(x - y) > (basketball && playKind(a) === 'foul' ? FOUL_REPOST_S : 10)) return false;
   if (basketball) {
     // The same player (the first ESPN lists: the shooter, the fouler, the one who turned it over) doing the same kind of
     // thing: the foul at 6:06 posted again at 6:06, the three at 11:24 and 11:26 whose distance and type ESPN fixed.
@@ -298,6 +304,7 @@ export class PlayLedger {
     if (other) return `ESPN has since credited this play to ${catalog.player(other.targetKey)?.name ?? 'another player'}.`;
     if (kind === 'missed_free_throw' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the free throw was made.';
     if (kind === 'missed_shot' && now.some((f) => /got_blocked$/.test(f.type))) return 'ESPN has since changed this: the shot was blocked.';
+    if (kind === 'got_blocked' && now.some((f) => /missed_shot$/.test(f.type) && f.targetKey === e.targetKey)) return 'ESPN has since changed this: the shot was not blocked.';
     if (kind === 'missed_shot' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the shot went in.';
     if (kind === 'turnover' && !p.participants.length) return 'ESPN has since made this a team turnover.';
     return undefined;
@@ -480,6 +487,7 @@ export class PlayLedger {
     for (const x of this.plays.values()) {
       const mine = x.scores.filter((e) => e.targetKey === on);
       if (!mine.length) continue;
+      if (BASKETBALL.has(this.g.league) && x.missingSince != null && !x.gone) continue; // a short read isn't a take-back: wait for the play to be gone
       if (this.stands(x, side, to)) {
         // Its points were over: ESPN counted a touchdown called back in the running score for a while ("Northwestern
         // scored 12", 38 to 50, then 45: Ball State at Northwestern, October 10 2026).
@@ -492,7 +500,9 @@ export class PlayLedger {
         continue;
       }
       x.scores = x.scores.filter((e) => e.targetKey !== on);
-      const why = x.header ? 'ESPN has since taken this score back.' : changeLine(this.g, x.missingSince != null ? null : x.play);
+      const why = x.header ? 'ESPN has since taken this score back.'
+        : BASKETBALL.has(this.g.league) && x.missingSince == null && !x.play.scoring ? `ESPN has since changed this: the ${/free throw/i.test(x.play.type) ? 'free throw' : 'shot'} did not go in.`
+        : changeLine(this.g, x.missingSince != null ? null : x.play);
       out.lines.push(...this.linesOn(mine, why));
       out.alerts.push(...mine);
       Object.assign(out, { drive: x.play.driveId, period: x.play.periodNum });

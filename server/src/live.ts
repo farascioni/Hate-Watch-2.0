@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
-import { catalog } from './catalog.ts';
+import { addBoxPlayers, catalog } from './catalog.ts';
 import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, awaitingHockey, awaitingShotType, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
+  awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -102,6 +102,8 @@ const HALF_END_TYPES = new Set(['mlb.team.stranded_risp', 'mlb.team.down_in_orde
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
 /** Basketball: how long a missed shot ESPN hasn't typed yet waits for its type before it's judged as it is (waitForShotType). ESPN typed 55 of 57 within 30 s, 44 within 10 (GS vs LAL, 2026-10-13). */
 const SHOT_WAIT_MS = Number(process.env.HW_SHOT_WAIT_MS ?? 15_000);
+/** Basketball: how long a basket ESPN posted with no scorer named waits for him (waitForScorer); the team's score alert goes out when it is named. ESPN named 1 of 2 within 4 s, the other was a miss at 14 s (IND at OKC, 2026-10-13). */
+const SCORER_WAIT_MS = Number(process.env.HW_SCORER_WAIT_MS ?? 20_000);
 /**
  * Hockey: how long ESPN gets to finish a play before its first alert (waitForHockey, awaitingHockey). It posts a shot, then retypes it or makes it a goal 10 to 30
  * seconds later (4 of 9 goals were first a shot), names a penalty 10 to 185 seconds after "Penalty Shot Infraction" (a placeholder ESPN never names is a play it takes out: COL at DAL,
@@ -197,6 +199,10 @@ export class GameTracker {
   private noBatter = new Map<string, number>();
   /** Basketball: missed shots ESPN hasn't typed yet, since when they've waited (waitForShotType). */
   private noShotType = new Map<string, number>();
+  /** Basketball: baskets ESPN posted with no scorer named, since when they've waited (waitForScorer). */
+  private noScorer = new Map<string, number>();
+  /** Basketball: box score players already checked against the catalog (addMissingPlayers). */
+  private boxChecked = new Set<string>();
   /** Hockey: plays ESPN is still filling in (awaitingHockey), since when they've waited (waitForHockey). */
   private noHockeyPlay = new Map<string, number>();
   /** MLB: results waiting to be judged since when: for the official scorer's ruling (RULING_WAIT_MS), or a strikeout's ABS review (ABS_SETTLE_MS): settling. */
@@ -563,6 +569,12 @@ export class GameTracker {
     return now - since < SHOT_WAIT_MS;
   }
 
+  /** Basketball: whether to keep waiting for ESPN to name who scored (awaitingScorer), SCORER_WAIT_MS at most: the play, and the score alert past it, wait. */
+  private waitForScorer(p: NPlay, now: number): boolean {
+    const since = this.noScorer.get(p.id) ?? (this.noScorer.set(p.id, now), now);
+    return now - since < SCORER_WAIT_MS;
+  }
+
   /** Hockey: whether to keep waiting for ESPN to finish a play (awaitingHockey), HOCKEY_WAIT_MS at most for its kind. */
   private waitForHockey(p: NPlay, kind: keyof typeof HOCKEY_WAIT_MS, now: number): boolean {
     const since = this.noHockeyPlay.get(p.id) ?? (this.noHockeyPlay.set(p.id, now), now);
@@ -826,6 +838,7 @@ export class GameTracker {
       if (s.header?.season?.type === 3) this.postseason = true;
       this.readPregame(s);
       this.box = s;
+      if (BASKETBALL.has(league)) this.addMissingPlayers(s);
       const comp = s.header?.competitions?.[0];
       const detail = String(comp?.status?.type?.detail ?? '');
       if (league === 'nhl' && /\/(OT|SO)\b/.test(detail)) this.overtime = /SO/.test(detail) ? 'so' : 'ot';
@@ -861,7 +874,7 @@ export class GameTracker {
     let score = { home: 0, away: 0 };
     const led = { home: 0, away: 0 }; // each side's biggest lead before this play ("blew a big lead")
     let held = false; // MLB: a result ahead of this play is settling
-    let goalHeld = false; // hockey: a goal ahead of this play (or this one) has no scorer in its text yet: no score is announced past it
+    let goalHeld = false; // hockey, basketball: a goal or basket ahead of this play (or this one) has no scorer yet: no score is announced past it
     for (const p of plays) {
       bump(led, score);
       const prev = score;
@@ -875,7 +888,10 @@ export class GameTracker {
       const hockeyWait = !!wait && this.waitForHockey(p, wait, now);
       if (hockeyWait && wait === 'goal') goalHeld = true;
       // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
-      const waiting = hockeyWait || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
+      // Basketball: a basket posted with no scorer is judged, and its score announced, once ESPN names him (or SCORER_WAIT_MS passes).
+      const scorerWait = BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingScorer(p) && this.waitForScorer(p, now);
+      if (scorerWait) goalHeld = true;
+      const waiting = hockeyWait || scorerWait || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
         || (BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingShotType(p) && this.waitForShotType(p, now));
       // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
       // after it wait their turn, so the game's state (bases, who is on) is built in order.
@@ -940,6 +956,7 @@ export class GameTracker {
         if (history) continue;
         const es = teamScoreEvents(this.ctx, from, p, { ...led });
         events.push(...(football ? this.footballScore(es, p, said, now, changed) : es));
+        if (BASKETBALL.has(league)) this.ledger.addScores(p.id, es); // so a basket ESPN takes back gets a line on its alerts (takeBack)
         if (!fresh && !waiting) {
           log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
@@ -954,6 +971,7 @@ export class GameTracker {
       changed.push(...this.ledger.sweep(now)); // plays ESPN took out
     }
     if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
+      if (BASKETBALL.has(league) && ledgered) for (const s of ['home', 'away'] as const) if (score[s] < this.announced[s]) changed.push(...this.ledger.takeBack(s, score[s]).lines);
       log(`[${league} ${gameId}] score went down to ${score.away}-${score.home} (a goal taken back?); the next one is news again`);
       this.announced = { home: Math.min(this.announced.home, score.home), away: Math.min(this.announced.away, score.away) };
     }
@@ -1233,6 +1251,20 @@ export class GameTracker {
     for (const id of before) if (!again.some((e) => e.id === id) && !fresh.some((e) => e.id === id)) log(`[${league} ${gameId}] alert ${id} no longer holds: the touches beside its play changed after it went out`);
     this.touchNext = Math.max(this.touchNext, this.touches.length - 1);
     return { fresh, again };
+  }
+
+  /** Basketball: players the box score lists that the catalog lacks are added once each (addBoxPlayers), so their alerts name them and they can be followed. */
+  private addMissingPlayers(s: any) {
+    const league = this.ctx.league;
+    for (const t of s.boxscore?.players ?? []) {
+      const missing = (t.statistics?.[0]?.athletes ?? []).map((x: any) => x?.athlete)
+        .filter((a: any) => a?.id && !this.boxChecked.has(String(a.id)) && !catalog.playerByEspn(league, String(a.id)));
+      for (const a of missing) this.boxChecked.add(String(a.id));
+      if (!missing.length) continue;
+      addBoxPlayers(league, String(t.team?.id), missing)
+        .then((added) => { if (added.length) log(`[${league} ${this.ctx.gameId}] box score players not in the catalog, added: ${added.map((p) => `${p.name} (${p.espnId})`).join(', ')}`); })
+        .catch((e) => log(`[${league} ${this.ctx.gameId}] adding box score players failed: ${e}`));
+    }
   }
 
   private seedGoalies(s: any) {

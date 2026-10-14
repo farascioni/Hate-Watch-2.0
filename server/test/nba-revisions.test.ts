@@ -8,7 +8,7 @@
 // preseason's standings table says nothing. From Cavaliers at Magic (October 13 2026): the free throw a technical
 // gives is not a technical on its shooter, a traveling turnover is a turnover, a turnover moved to another player
 // 20 minutes later is still corrected (basketball watches a play for 45 minutes), and a block that becomes a plain
-// miss gets only "ESPN has since changed this play."
+// miss gets only "ESPN has since changed this: the shot was not blocked."
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -376,7 +376,7 @@ test('a turnover ESPN moves to another player 20 minutes later is corrected (bas
   assert.equal(feed('late-mobley').length, 1, 'and Mobley gets nothing for it');
 });
 
-test('a block ESPN re-posts as a plain miss: the line only says the play changed, with no "missed" line; changed back, it says so', async () => {
+test('a block ESPN re-posts as a plain miss: the line says the shot was not blocked, with no "missed" line; changed back, it says so', async () => {
   device('blk-bane', [P('bane')], everything);
   const x = game('G-BLK2');
   await x.poll();
@@ -386,10 +386,10 @@ test('a block ESPN re-posts as a plain miss: the line only says the play changed
   assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', []]]);
   x.put(missPlay('k1', 'bane', 'Desmond Bane misses driving layup', 'Driving Layup Shot'));
   await x.poll();
-  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this play.']]], 'one alert, one line');
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked.']]], 'one alert, one line');
   x.put(block);
   await x.poll();
-  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this play.', 'ESPN has since changed this play back.']]]);
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked.', 'ESPN has since changed this play back.']]]);
 });
 
 // ─── From Trail Blazers at Kings (October 13 2026, preseason): the play types and wording are ESPN's, the players stand in ───

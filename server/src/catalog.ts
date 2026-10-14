@@ -78,6 +78,62 @@ export function loadCatalog() {
   buildSearchIndex();
 }
 
+// ─── Players the rosters lack ───────────────────────────────────────────────────────────────
+/** kv: players a live game's box score listed that no roster did (addBoxPlayers), kept across ingests for BOX_KEEP_MS: `{ [playerKey]: { p, at } }`. */
+const BOX_ADDED = 'catalog:box-added';
+const BOX_KEEP_MS = 30 * 86400_000;
+
+/**
+ * Basketball: players a game's box score lists that the catalog lacks are added on the team the box score gives, so they can be followed and
+ * their alerts have a name. Preseason rosters leave out two-way and camp players: Rienk Mast played 20 minutes and Keba Keita 10 for the
+ * Pacers at Thunder (2026-10-13) and are on none of ESPN's lists. The headshot is ESPN's if it has one, else the team's logo, as ingest does.
+ * The next ingest keeps them (BOX_ADDED) until a roster lists them or BOX_KEEP_MS passes. Returns the players added. `probe`: the image check (tests).
+ */
+export async function addBoxPlayers(lg: League, teamEspnId: string, athletes: any[], probe: typeof probePng = probePng): Promise<Player[]> {
+  const team = catalog.teamByEspn(lg, teamEspnId);
+  if (!team) return [];
+  const added: Player[] = [];
+  for (const a of athletes) {
+    const id = a?.id ? String(a.id) : '';
+    if (!id || !a.displayName || players.has(playerKey(lg, id))) continue;
+    const candidate = urls.headshot(lg, id), dims = await probe(candidate).catch(() => null);
+    const p: Player = {
+      key: playerKey(lg, id), league: lg, espnId: id, name: a.displayName, shortName: a.shortName ?? null,
+      position: a.position?.abbreviation && a.position.abbreviation !== 'NA' ? a.position.abbreviation : null, jersey: a.jersey ?? null, positions: null, teamKey: team.key,
+      ...(dims ? { image: candidate, imageW: dims.width, imageH: dims.height, imageKind: 'headshot' as const }
+        : { image: team.logo, imageW: team.logoW, imageH: team.logoH, imageKind: 'team_logo' as const }),
+    };
+    db.prepare(`INSERT INTO players (key, league, espn_id, name, short_name, position, positions, jersey, team_key, image, image_w, image_h, image_kind, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO NOTHING`)
+      .run(p.key, p.league, p.espnId, p.name, p.shortName, p.position, null, p.jersey, p.teamKey, p.image, p.imageW, p.imageH, p.imageKind, Date.now());
+    players.set(p.key, p);
+    if (!rosterByTeam.has(p.teamKey)) rosterByTeam.set(p.teamKey, []);
+    rosterByTeam.get(p.teamKey)!.push(p);
+    const text = normalize(p.name);
+    index.push({ key: p.key, kind: 'player', league: p.league, text, tokens: text.split(' '), boost: 0 });
+    added.push(p);
+  }
+  if (added.length) {
+    const kept = kvGet<Record<string, { p: Player; at: number }>>(BOX_ADDED) ?? {};
+    for (const p of added) kept[p.key] = { p, at: Date.now() };
+    kvSet(BOX_ADDED, kept);
+  }
+  return added;
+}
+
+/**
+ * The box score players (BOX_ADDED) the next ingest keeps, on the team they were added to: not older than BOX_KEEP_MS, on a team still in the
+ * catalog, and on no roster now (`rostered`). The expired are taken out of `kept`.
+ */
+export function keepBoxPlayers(kept: Record<string, { p: Player; at: number }>, rostered: Player[], teamKeys: Set<string>, now = Date.now()): Player[] {
+  const have = new Set(rostered.map((p) => p.key)), out: Player[] = [];
+  for (const [k, e] of Object.entries(kept)) {
+    if (now - e.at > BOX_KEEP_MS) delete kept[k];
+    else if (!have.has(e.p.key) && teamKeys.has(e.p.teamKey)) out.push(e.p);
+  }
+  return out;
+}
+
 // ─── Ingest from ESPN ─────────────────────────────────────────────────────────────────────────
 export const normalize = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -246,6 +302,10 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
     newPlayers.push(...lgPlayers);
     log(`[ingest] ${LEAGUES[lg].name}: ${stats.teams} teams, ${stats.players} players (${stats.injuredAdded} from injured lists, ${stats.headshotsVerified} headshots, ${stats.headshotFallbackToLogo} logo fallbacks, ${stats.duplicateIdsRemoved + stats.duplicateNamesRemoved} dupes removed)`);
   }
+
+  const boxAdded = kvGet<Record<string, { p: Player; at: number }>>(BOX_ADDED) ?? {};
+  newPlayers.push(...keepBoxPlayers(boxAdded, newPlayers, new Set(newTeams.map((t) => t.key))));
+  kvSet(BOX_ADDED, boxAdded);
 
   // Invariants before we commit anything.
   const keys = new Set<string>();
