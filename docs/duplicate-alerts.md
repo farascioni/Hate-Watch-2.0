@@ -389,7 +389,10 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   play is first seen, `BASKETBALL_REVISE_MS`; a block that becomes a plain miss for the same shooter sends no "missed" alert or line
   after "ESPN has since changed this play.", because "got sent back" already covers a miss), and a re-post
   (`samePlay(…, true)`: the same period, the clock within 10 seconds, the same first participant and kind of play) is one
-  alert. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
+  alert. A missed shot ESPN describes differently later keeps its alert and gets a silent line only when the new words contradict
+  the old (`shotDisagrees`: a three that is not one, 2 feet or more), measured against the alert as sent, with "changed back" when ESPN returns to it; a play
+  posted more than 60 seconds of game time late (`LATE_PLAY_SECS`) shows the game's score now in its body (`GameCtx.latest`); an
+  offensive charge is a foul (`FOUL_TYPE`), one with its turnover. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
   a new id isn't a 6th, and "fouled out" is never taken back. Details: docs/alerts.md, "Revisions: ESPN changes a
   basketball play after its alert".
 - **Hockey** goes through the same ledger, from a read that has the core feed. ESPN posts a hockey play half-finished (EDM at LA,
@@ -593,6 +596,7 @@ This is one reason for the decision **"No production restarts during live games"
   pushed): the push is kept, so the team's row stays beside it (8 of 34 added flags in the replays; the unpushed ones are one
   row with the player as a line). A weak flag's own "taken off" line is dropped when a pushed alert has since become the
   device's holder of the moment, so that row can stay as it was.
+- **A shot ESPN rewrites twice keeps the first correction.** Jrue Holiday's "missed a 26-foot three" got "it was a layup." when ESPN made it a layup, and ESPN's final word, a driving bank floater, adds no second line (it doesn't contradict the layup), so the device ends told "layup" (Trail Blazers at Kings, October 13 2026). A drift of a foot never gets a line.
 - **The same revision line twice on one alert** (a play taken back, put back, then taken back again) has the same id,
   so the second "taken back" is dropped at the insert. The alert's row already shows that line once.
 

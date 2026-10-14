@@ -29,6 +29,8 @@ import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, sco
  * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right. Basketball watches a play for
  * BASKETBALL_REVISE_MS (45 minutes, not 15: a turnover moved to another player 20 minutes on, CLE at ORL, October 13 2026),
  * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it).
+ * A missed shot ESPN describes differently later gets a silent line when the new words contradict the alert (`shotDisagrees`: a three
+ * that is not one, or 2 feet), and an offensive charge is a foul like "Offensive Foul" (POR at SAC, October 13 2026).
  *
  * Hockey uses it too (EDM at LA, October 13 2026): every goal was first posted as a missed or saved shot, 6 of 7 penalties as
  * "Penalty Shot Infraction", the empty-netter as an even-strength goal, and 6 plays were taken out. A changed play is judged
@@ -79,7 +81,20 @@ export function samePlay(a: NPlay, b: NPlay, basketball = false): boolean {
   return who ? who === actorOf(b) : !actorOf(b) && a.type === b.type;
 }
 /** What a basketball play is, for telling a re-post from another play at the same moment (the 3 free throws of a trip share a clock). */
-const playKind = (p: NPlay) => /free throw/i.test(p.type) ? `ft ${p.type}` : p.shooting ? 'shot' : /turnover|traveling/i.test(p.type) ? 'turnover' : /foul/i.test(p.type) ? 'foul' : p.type;
+const playKind = (p: NPlay) => /free throw/i.test(p.type) ? `ft ${p.type}` : p.shooting ? 'shot' : /turnover|traveling/i.test(p.type) ? 'turnover' : /foul|charge/i.test(p.type) ? 'foul' : p.type;
+
+/**
+ * A missed-shot alert's words against the same shot as ESPN now describes it: they disagree when a three became a two (or the
+ * other way round, unless the alert only said "a shot") or the distance moved 2 feet or more. A foot's shift is ESPN's usual
+ * tidying, and "a shot" typed later is the alert being less sure, not wrong: neither gets a line (POR at SAC, October 13 2026:
+ * Holiday's "26-foot three" became a "two point shot", 14 of 96 distances moved a foot or more).
+ */
+function shotDisagrees(was: string, now: string): boolean {
+  const three = (s: string) => /\bthree\b/.test(s), feet = (s: string) => Number(s.match(/(\d+)-foot/)?.[1]) || undefined;
+  if (three(was) !== three(now) && !/ missed a shot\b/.test(was)) return true;
+  const [a, b] = [feet(was), feet(now)];
+  return a != null && b != null && Math.abs(a - b) >= 2;
+}
 
 const REVIEW = /\bunder (?:automatic )?review\b|\breplay official\b|\b(?:call )?(?:overturned|reversed)\b/i;
 /** Alerts about a flag (a player's, a college team's): what changes is the flag, not the play. */
@@ -152,6 +167,7 @@ interface PlayEntry {
   header?: boolean;       // the header's score before the play was posted (live.ts): no play to read
   alerts: Map<string, Detected>; // its play alerts still standing, by kind
   dropped: Map<string, Detected>; // its play alerts taken back (a line said so), by kind
+  told?: Map<string, string>; // basketball: a missed shot's wording a line last gave, by kind, while ESPN's description differs from the alert's (shotLine)
   scores: Detected[];     // its score alerts still standing (teamScoreEvents)
   points: Partial<Record<Side, number>>; // each side's score its score alerts announced
   missingSince?: number;
@@ -385,6 +401,22 @@ export class PlayLedger {
         if (!sent || sent.type !== 'nhl.penalty' || sent.title === e.title) continue;
         x.alerts.set(k, e);
         lines.push(...this.linesOn([sent], `ESPN has since called it ${p.type.toLowerCase()}${p.text.match(/\bagainst (.+)$/)?.[0] ? ` ${p.text.match(/\bagainst (.+)$/)![0]}` : ''}.`));
+      }
+    }
+    // Basketball: ESPN rewrites a shot's description minutes after posting it. The alert keeps its words (its id is the play's), and a
+    // device that got it gets a line, with no push, when what ESPN says now contradicts them ("ESPN has since changed this: it was a driving bank floater.").
+    if (basketball && p) {
+      for (const [k, e] of want) {
+        const sent = x.alerts.get(k), told = x.told?.get(k);
+        if (!sent || !/\.missed_shot$/.test(e.type)) continue;
+        if (!shotDisagrees(sent.title, e.title)) {
+          // Back to words that fit the alert (ESPN rewrote a three as a jumper and then as a three again): one line, never a second description.
+          if (told) { x.told!.delete(k); lines.push(...this.linesOn([sent], 'ESPN has since changed this play back.')); }
+        } else if (e.title !== (told ?? sent.title) && shotDisagrees(told ?? sent.title, e.title)) {
+          // Against the alert as sent, and not again for what the last line already said (a layup that became a bank floater).
+          (x.told ??= new Map()).set(k, e.title);
+          lines.push(...this.linesOn([sent], `ESPN has since changed this: it was ${e.title.replace(/^.*? missed /, '').replace(/ (?:to tie it|for the lead) with .*$/, '')}.`));
+        }
       }
     }
     return { fresh, lines };

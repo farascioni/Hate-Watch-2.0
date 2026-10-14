@@ -83,6 +83,10 @@ NBA AND WNBA
 - Falling behind again within 2 minutes is a line on the earlier alert.
 - The free throw a technical gives is no "picked up a technical" for its shooter; a traveling turnover is a turnover.
 - A play is corrected for 45 minutes (was 15), so a turnover ESPN moves to another player late still is; a block that becomes a plain miss only says the play changed.
+- An offensive charge is a foul: it alerts, counts toward fouling out, and "fouled out" no longer comes a foul late.
+- A play ESPN posts minutes late shows the game's score now, not an old one.
+- A defensive 3-seconds call reads "called for defensive 3 seconds" and no longer pushes as a technical.
+- A missed shot ESPN later calls something else (a three that was a two, 2+ feet off) gets a silent line saying so.
 
 EVERYWHERE
 - Soccer goals, cards, fouls come sooner, in ESPN's fuller words.

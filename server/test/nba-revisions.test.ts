@@ -389,3 +389,93 @@ test('a block ESPN re-posts as a plain miss: the line only says the play changed
   await x.poll();
   assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this play.', 'ESPN has since changed this play back.']]]);
 });
+
+// ─── From Trail Blazers at Kings (October 13 2026, preseason): the play types and wording are ESPN's, the players stand in ───
+
+test('an offensive charge is a personal foul (Mogbo, 3Q 2:07): it alerts, counts toward fouling out, and is one foul with its turnover', async () => {
+  const run = (type: string, text: string) => D.PLAYER_DETECTORS.nba({ league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() } as any, D.fromCorePlay(core('c0', type, text, CLE, [[PEOPLE.mobley[0], 'fouler']]))).map((e) => [e.type, e.title]);
+  assert.deepEqual(run('Offensive Charge', 'Evan Mobley offensive charge'), [['nba.foul', 'Evan Mobley committed a foul']], 'it had been ignored: no "foul" in its type');
+  assert.deepEqual(run('Offensive Foul', 'Evan Mobley offensive foul'), [['nba.foul', 'Evan Mobley committed a foul']], 'an offensive foul as before');
+  device('chg-mobley', [P('mobley')], everything);
+  const x = game('G-CHG1');
+  await x.poll();
+  for (let i = 1; i <= 5; i++) x.put(core(`pf${i}`, 'Personal Foul', 'Evan Mobley personal foul', CLE, [[PEOPLE.mobley[0], 'fouler']]));
+  await x.poll();
+  assert.equal(feed('chg-mobley').length, 5, 'five fouls, five alerts');
+  // The charge is his 6th: fouled out (not "committed a foul"). The turnover ESPN logs for it at the same moment is its own play and alert, and not a 7th foul.
+  x.put(core('ch1', 'Offensive Charge', 'Evan Mobley offensive charge', CLE, [[PEOPLE.mobley[0], 'fouler']], { clock: 127 }));
+  x.put(core('ch2', 'Offensive Foul Turnover', 'Evan Mobley offensive foul turnover', CLE, [[PEOPLE.mobley[0], 'offense']], { clock: 127 }));
+  await x.poll();
+  assert.deepEqual(feed('chg-mobley').slice(5), [['nba.fouled_out', 'Evan Mobley fouled out', []], ['nba.turnover', 'Evan Mobley turned it over', []]]);
+});
+
+test('a play ESPN posts minutes late alerts with the game\'s score now; one a few seconds out of order keeps its own', async () => {
+  device('late-score', [P('harden')], everything);
+  const x = game('G-LATE2');
+  await x.poll();
+  // The 4th quarter at 6:59 and 102-78 (ORL away, CLE home), then Harden's turnover from 10:27 (97-69), then another from 7:05.
+  x.put(core('ls1', 'Jump Shot', 'Mario Hezonja makes 15-foot jumper', CLE, [[PEOPLE.hezonja[0], 'shooter']], { period: 4, clock: 419, home: 78, away: 102, scoring: true, shooting: true, value: 2 }));
+  x.put(core('ls2', 'Lost Ball Turnover', 'James Harden lost ball turnover (Desmond Bane steals)', CLE, [[PEOPLE.harden[0], 'offense']], { period: 4, clock: 627, home: 69, away: 97 }));
+  x.put(core('ls3', 'Bad Pass Turnover', 'James Harden bad pass turnover (Desmond Bane steals)', CLE, [[PEOPLE.harden[0], 'offense']], { period: 4, clock: 425, home: 77, away: 102 }));
+  await x.poll();
+  const bodies = (db.prepare('SELECT e.title, e.body FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? ORDER BY f.rowid').all('late-score') as any[]).map((r) => r.body);
+  assert.deepEqual(bodies, ['James Harden lost ball turnover (Desmond Bane steals) — ORL 102, CLE 78', 'James Harden bad pass turnover (Desmond Bane steals) — ORL 102, CLE 77']);
+});
+
+test('a defensive 3-seconds call is "called for defensive 3 seconds", feed only, with ESPN\'s trailing space gone', async () => {
+  device('d3s-mobley', [P('mobley')], everything);
+  const x = game('G-D3S');
+  await x.poll();
+  const before = pushed('d3s-mobley');
+  x.put(core('d3', 'Defensive 3-Seconds Technical', 'Evan Mobley defensive 3-seconds (technical foul) ', CLE, [[PEOPLE.mobley[0], 'fouler']], { home: 10, away: 21 }));
+  x.put(core('t9', 'Technical Foul', 'Evan Mobley technical foul', CLE, [[PEOPLE.mobley[0], 'fouler']]));
+  await x.poll();
+  assert.deepEqual(feed('d3s-mobley').map((r) => r[1]), ['Evan Mobley was called for defensive 3 seconds', 'Evan Mobley picked up a technical']);
+  const body = (db.prepare("SELECT e.body FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = 'd3s-mobley' ORDER BY f.rowid").get() as any).body;
+  assert.equal(body, 'Evan Mobley defensive 3-seconds (technical foul) — ORL 21, CLE 10');
+  assert.equal(pushed('d3s-mobley') - before, 1, 'the other technical pushes; the defensive 3 seconds does not');
+});
+
+test('a missed shot ESPN describes differently later gets a line only when it contradicts the alert: a three that is not, or 2 feet out', async () => {
+  device('shot-hezonja', [P('hezonja')], everything);
+  const x = game('G-SHOT');
+  await x.poll();
+  const shot = (id: string, text: string, type: string) => missPlay(id, 'hezonja', text, type);
+  x.put(shot('sh1', 'Mario Hezonja misses 26-foot three point jumper', 'Jump Shot'));
+  x.put(shot('sh2', 'Mario Hezonja misses 9-foot two point shot', 'Fade Away Bank Jump Shot'));
+  x.put(shot('sh3', 'Mario Hezonja misses 12-foot jumper', 'Jump Shot'));
+  x.put(shot('sh4', 'Mario Hezonja misses shot', 'No Shot (Default Shot)'));
+  await x.poll();
+  x.put(shot('sh1', 'Mario Hezonja misses two point shot', 'Driving Floating Bank Jump Shot'));
+  x.put(shot('sh2', 'Mario Hezonja misses 10-foot two point shot', 'Turnaround Fade Away Jump Shot'));
+  x.put(shot('sh3', 'Mario Hezonja misses 15-foot jumper', 'Jump Shot'));
+  x.put(shot('sh4', 'Mario Hezonja misses 22-foot three point jumper', 'Jump Shot'));
+  const before = pushed('shot-hezonja');
+  await x.poll();
+  assert.deepEqual(feed('shot-hezonja').map((r) => r[2]), [
+    ['ESPN has since changed this: it was a driving bank floater.'], // a 26-foot three that ESPN now calls a two point shot
+    [], // 9 feet became 10: ESPN's tidying
+    ['ESPN has since changed this: it was a 15-foot jumper.'], // 12 feet became 15
+    [], // "a shot" typed later is the alert being less sure
+  ]);
+  assert.equal(pushed('shot-hezonja'), before, 'a line never pushes');
+});
+
+test('a shot ESPN rewrites twice: against the alert as sent, once per real change, and "changed back" when it fits again (Herro, Holiday)', async () => {
+  device('rw-hezonja', [P('hezonja')], everything);
+  device('rw-harden', [P('harden')], everything);
+  const x = game('G-RW');
+  await x.poll();
+  const shot = (id: string, who: keyof typeof PEOPLE, text: string, type: string) => missPlay(id, who, text, type);
+  const steps: [string, string][] = [['Mario Hezonja misses 26-foot three point jumper', 'Jump Shot'], ['Mario Hezonja misses 22-foot jumper', 'Jump Shot'], ['Mario Hezonja misses 27-foot three point jumper', 'Jump Shot']];
+  const holiday: [string, string][] = [['James Harden misses 26-foot three point jumper', 'Jump Shot'], ['James Harden misses layup', 'Layup Shot'], ['James Harden misses two point shot', 'Driving Floating Bank Jump Shot']];
+  for (let i = 0; i < 3; i++) {
+    x.put(shot('rw1', 'hezonja', ...steps[i]));
+    x.put(shot('rw2', 'harden', ...holiday[i]));
+    await x.poll();
+  }
+  assert.deepEqual(feed('rw-hezonja'), [['nba.missed_shot', 'Mario Hezonja missed a 26-foot three', ['ESPN has since changed this: it was a 22-foot jumper.', 'ESPN has since changed this play back.']]],
+    'ESPN ends within a foot of the alert: the second description is "changed back", not another claim');
+  assert.deepEqual(feed('rw-harden'), [['nba.missed_shot', 'James Harden missed a 26-foot three', ['ESPN has since changed this: it was a layup.']]],
+    'a layup that becomes a bank floater adds nothing: it does not contradict what the last line said');
+});

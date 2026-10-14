@@ -72,6 +72,8 @@ export interface GameCtx {
   /** NBA, WNBA: each player's personal fouls so far (observePlay), for fouling out. */
   fouls?: Record<string, number>;
   foulKeys?: Set<string>; // basketball: each personal foul counted once (personalFoul)
+  /** NBA, WNBA: the play furthest along in the game seen so far and its score (observePlay), to tell a play ESPN posts late (lateScore). */
+  latest?: { elapsed: number; home: number; away: number };
   /** NBA, WNBA: the plays that vouch for each counted foul (an offensive foul and its turnover are one foul): a foul is un-counted when none is left (unobservePlay). */
   foulPlays?: Map<string, Set<string>>;
   /** NBA, WNBA: points scored in a row against each side, for "on a 14-0 run" (teamScoreEvents). */
@@ -111,7 +113,7 @@ export interface Detected {
    * not the first in the list: tracking Gerrit Cole and then Aaron Judge, a Yankees loss is Cole's.
    */
   firstFollowed?: boolean;
-  /** Never a push, whatever the device's settings: an alert found by the reads after a game's final (live.ts), where ESPN's data can still flip back. */
+  /** Never a push, whatever the device's settings: an alert found by the reads after a game's final (live.ts), where ESPN's data can still flip back; a team's NFL flag; basketball's defensive 3 seconds. */
   noPush?: boolean;
   /**
    * Published after the rest of its poll's alerts (live.ts), so on a moment it shares with a score alert it is dropped (it has
@@ -480,6 +482,8 @@ export function observePlay(g: GameCtx, p: NPlay) {
     if (saver && p.teamId && own && !counted) g.goalies.set(conceding, saver);
     if (/start of shootout/i.test(p.text)) g.shootout = true;
   }
+  const elapsed = BASKETBALL.has(g.league) ? elapsedOf(g.league, p) : undefined;
+  if (elapsed != null && elapsed >= (g.latest?.elapsed ?? 0)) g.latest = { elapsed, home: p.home, away: p.away };
   const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
   if (foul) {
     const vouch = (g.foulPlays ??= new Map()).get(foul.key) ?? g.foulPlays.set(foul.key, new Set()).get(foul.key)!;
@@ -1721,10 +1725,30 @@ function lateAndClose(g: GameCtx, p: NPlay, points: number): string {
   return `${mine + points === theirs ? ' to tie it' : ' for the lead'} with ${secs} left`;
 }
 
+/** Basketball: seconds played when a play happened (quarters of 12 minutes, the WNBA's 10; overtimes 5), from its period and the clock left. */
+function elapsedOf(league: League, p: Pick<NPlay, 'periodNum' | 'clockSec'>): number | undefined {
+  if (p.periodNum == null || p.clockSec == null) return undefined;
+  const q = league === 'wnba' ? 600 : 720;
+  if (p.periodNum < 1 || p.clockSec < 0 || p.clockSec > (p.periodNum > 4 ? 300 : q)) return undefined; // a bad clock never moves the game on
+  const before = Math.min(p.periodNum - 1, 4) * q + Math.max(p.periodNum - 5, 0) * 300;
+  return before + (p.periodNum > 4 ? 300 : q) - p.clockSec;
+}
+/** A play ESPN posts this much game time after the game moved on is late-posted (Plowden's free throw at 9:13 appeared at 6:59: 2:14). */
+const LATE_PLAY_SECS = 60;
+/** The game's score now, for a play posted late: its own score is the score of its moment, minutes old ("97-69" when it was 102-78: POR at SAC, October 13 2026). */
+function lateScore(g: GameCtx, p: NPlay): Pick<NPlay, 'home' | 'away'> | undefined {
+  const at = elapsedOf(g.league, p);
+  return at != null && g.latest && g.latest.elapsed - at > LATE_PLAY_SECS ? g.latest : undefined;
+}
+
+/** A basketball play that is a personal foul: ESPN types an offensive charge "Offensive Charge", with no "foul" in it. */
+const FOUL_TYPE = /foul|charge/i;
+
 /** NBA and WNBA (same play-by-play): alerts are `nba.*` or `wnba.*`, each league with its own switches. */
 function nba(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
   const lg = g.league, t = p.text;
+  const say = t.replace(/\s+/g, ' ').trim(); // ESPN's "defensive 3-seconds (technical foul) " ends in a space
   const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id;
   if (!actor && !/technical/i.test(p.type)) return out;
   if (p.shooting && !p.scoring) {
@@ -1742,8 +1766,13 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   } else if (/turnover/i.test(`${p.type} ${t}`) && actor && p.participants.length) { // a traveling turnover is typed just "Traveling"
     out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`));
   } else if ((/technical|flagrant/i.test(p.type) && !/free throw/i.test(p.type)) || /ejected/i.test(t)) { // the free throw a technical gives is its shooter's, not a call on him
-    for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) out.push(mk(g, p, `${lg}.technical`, x.id, `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`));
-  } else if (/foul/i.test(p.type) && actor) {
+    // A defensive 3-seconds call is ESPN's "technical" but a routine violation charged to the team: its own words, feed only (POR at SAC, October 13 2026).
+    const threeSeconds = /defensive 3/i.test(p.type);
+    for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) {
+      const title = threeSeconds ? `${nameOf(lg, x.id)} was called for defensive 3 seconds` : `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`;
+      out.push(mk(g, p, `${lg}.technical`, x.id, title, threeSeconds ? { noPush: true, body: `${say} — ${scoreLine(g, p)}` } : {}));
+    }
+  } else if (FOUL_TYPE.test(p.type) && actor) {
     out.push(mk(g, p, `${lg}.foul`, actor, `${nameOf(lg, actor)} committed a foul`));
   }
   // The 6th personal foul (technicals don't count): fouled out, in place of that foul's alert. First, so that
@@ -1754,6 +1783,9 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
     if (i >= 0) out.splice(i, 1);
     out.unshift(mk(g, p, `${lg}.fouled_out`, actor, `${nameOf(lg, actor)} fouled out`, { aliases: [`${lg}.foul`] }));
   }
+  // A play ESPN posted late alerts with the game's score now, not the old score of its moment.
+  const late = lateScore(g, p);
+  if (late) for (const e of out) e.body = `${say} — ${scoreLine(g, late)}`;
   return out;
 }
 
@@ -1763,7 +1795,7 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
  * Foul Turnover", one foul in the box score). The turnover is sometimes the only play for it.
  */
 function personalFoul(p: NPlay): string | undefined {
-  if (!/foul/i.test(p.type) || /technical/i.test(p.type)) return undefined;
+  if (!FOUL_TYPE.test(p.type) || /technical/i.test(p.type)) return undefined;
   return /offensive/i.test(p.type) ? `offensive:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` : p.id;
 }
 
