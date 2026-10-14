@@ -81,6 +81,8 @@ NBA AND WNBA
 - A play ESPN changes after posting is judged again: a line, no push, and the right player's alert.
 - A shot not yet typed reads "missed a 29-foot three"; a block never goes to the blocker.
 - Falling behind again within 2 minutes is a line on the earlier alert.
+- The free throw a technical gives is no "picked up a technical" for its shooter; a traveling turnover is a turnover.
+- A play is corrected for 45 minutes (was 15), so a turnover ESPN moves to another player late still is; a block that becomes a plain miss only says the play changed.
 
 EVERYWHERE
 - Soccer goals, cards, fouls come sooner, in ESPN's fuller words.

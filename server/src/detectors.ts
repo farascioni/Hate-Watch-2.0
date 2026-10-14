@@ -1739,9 +1739,9 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
       const title = missedShot(g, p, nameOf(lg, actor!));
       if (title) out.push(mk(g, p, `${lg}.missed_shot`, actor!, title));
     }
-  } else if (/turnover/i.test(p.type) && actor && p.participants.length) {
+  } else if (/turnover/i.test(`${p.type} ${t}`) && actor && p.participants.length) { // a traveling turnover is typed just "Traveling"
     out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`));
-  } else if (/technical|flagrant/i.test(p.type) || /ejected/i.test(t)) {
+  } else if ((/technical|flagrant/i.test(p.type) && !/free throw/i.test(p.type)) || /ejected/i.test(t)) { // the free throw a technical gives is its shooter's, not a call on him
     for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) out.push(mk(g, p, `${lg}.technical`, x.id, `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`));
   } else if (/foul/i.test(p.type) && actor) {
     out.push(mk(g, p, `${lg}.foul`, actor, `${nameOf(lg, actor)} committed a foul`));

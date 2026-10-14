@@ -26,7 +26,9 @@ import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, sco
  * re-posted under a new id. So a changed play is judged again on its latest version: a player's alert the play no
  * longer has gets a line (no push), the right player's alert goes out, a re-post is the same play, and a play ESPN
  * took out has its alerts taken back. A play with no shooter yet alerts nothing until ESPN names one. Fouls are
- * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right.
+ * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right. Basketball watches a play for
+ * BASKETBALL_REVISE_MS (45 minutes, not 15: a turnover moved to another player 20 minutes on, CLE at ORL, October 13 2026),
+ * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it).
  *
  * Hockey uses it too (EDM at LA, October 13 2026): every goal was first posted as a missed or saved shot, 6 of 7 penalties as
  * "Penalty Shot Infraction", the empty-netter as an even-strength goal, and 6 plays were taken out. A changed play is judged
@@ -37,6 +39,8 @@ import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, sco
 
 /** How long after we first see a play or a drive's result ESPN's changes to it are news. */
 export const REVISE_MS = 15 * 60_000;
+/** Basketball: ESPN's slowest edit to a player came 42 minutes after posting it (a turnover moved from Donovan Mitchell to Evan Mobley, CLE at ORL, October 13 2026). */
+export const BASKETBALL_REVISE_MS = 45 * 60_000;
 /** A play missing from the feed this long is gone. */
 export const GONE_MS = 30_000;
 
@@ -165,6 +169,9 @@ export class PlayLedger {
 
   constructor(g: GameCtx, log: (msg: string) => void) { this.g = g; this.log = log; }
 
+  /** How long a play's changes are news: longer in basketball, where ESPN names players late (BASKETBALL_REVISE_MS). */
+  private get reviseMs() { return BASKETBALL.has(this.g.league) ? BASKETBALL_REVISE_MS : REVISE_MS; }
+
   /** The detectors that only read the play, on a version of it (the quarterback pulled counts passes: never again). */
   private detect(p: NPlay): Detected[] {
     // NHL: a goalie coming on is judged once, as the play comes in, and this must not mark anyone pulled (`pulled` is a copy that already holds the goalies in net).
@@ -224,7 +231,7 @@ export class PlayLedger {
   repost(p: NPlay, now: number): PlayEntry | undefined {
     let best: [string, PlayEntry] | undefined;
     for (const [id, x] of this.plays) {
-      if (x.missingSince == null || x.header || now - x.missingSince > REVISE_MS || !samePlay(x.play, p, BASKETBALL.has(this.g.league) || this.g.league === 'nhl')) continue;
+      if (x.missingSince == null || x.header || now - x.missingSince > this.reviseMs || !samePlay(x.play, p, BASKETBALL.has(this.g.league) || this.g.league === 'nhl')) continue;
       if (!best || Math.abs(startOf(x.play)! - startOf(p)!) < Math.abs(startOf(best[1].play)! - startOf(p)!)) best = [id, x];
     }
     if (!best) return undefined;
@@ -314,7 +321,7 @@ export class PlayLedger {
     const was = x.play, back = x.back;
     x.back = false;
     if (p) { x.play = p; x.sig = sigOf(p); }
-    const stale = x.history || now - x.firstAt > REVISE_MS;
+    const stale = x.history || now - x.firstAt > this.reviseMs;
     // Basketball: the fouls, recounted around the judgment. The old version's foul stops counting first (a foul re-posted
     // under a new id is not a 6th), the new version is judged (its 6th foul is judged before it is counted), then counted.
     // Hockey: shots faced and goals allowed are recounted with each version (a shot that became a goal), and a play taken out stops counting.
@@ -336,6 +343,8 @@ export class PlayLedger {
       // Basketball: a foul whose 6th replaced it with "fouled out" is not sent again as a foul.
       if (/\.foul$/.test(e.type) && [...x.alerts.values()].some((f) => FOULED_OUT.test(f.type) && f.targetKey === e.targetKey)) continue;
       const sent = x.dropped.get(k);
+      // Basketball: a block that is a plain miss now is the same news for its shooter ("got sent back" covers "missed"): the line says the play changed, and no "missed" alert follows it.
+      if (!sent && /\.missed_shot$/.test(e.type) && [...x.dropped.values()].some((f) => /\.got_blocked$/.test(f.type) && f.targetKey === e.targetKey)) continue;
       if (sent) { x.dropped.delete(k); x.alerts.set(k, sent); again.push(sent); } else { x.alerts.set(k, e); fresh.push(e); }
     }
     // A flag's alert taken back while its play stands: the flag moved to another player (a false start charged to

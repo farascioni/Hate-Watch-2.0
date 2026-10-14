@@ -232,7 +232,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`mergePlays`:** ESPN's core and site feeds are merged by play id before detection, so a play in both is one
   play (README "Real-time": "Two sources per game"). College football's drive plays (`fromDrivePlays`) skip a play
   listed in two drives.
-- **The football, basketball and hockey ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (Layer 5).
+- **The football, basketball and hockey ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (basketball 45; Layer 5).
 - **The pregame facts in `kv`** (`pregame:${league}:${gameId}`: odds, records, the series), so the facts of a loss
   are the same after a restart.
 
@@ -385,7 +385,9 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   naming the wrong shooter for seconds, a foul or shot taken out and re-posted. So a changed play is judged again on its
   latest version (a play with no player alerts nothing until named): the alert it no longer has gets a line, no push
   ("ESPN has since credited this play to Paolo Banchero.", "ESPN has since changed this: the free throw was made.",
-  "…the shot was blocked.", "ESPN has since taken this play out."), the right player's alert goes out, and a re-post
+  "…the shot was blocked.", "ESPN has since taken this play out."), the right player's alert goes out (for 45 minutes after the
+  play is first seen, `BASKETBALL_REVISE_MS`; a block that becomes a plain miss for the same shooter sends no "missed" alert or line
+  after "ESPN has since changed this play.", because "got sent back" already covers a miss), and a re-post
   (`samePlay(…, true)`: the same period, the clock within 10 seconds, the same first participant and kind of play) is one
   alert. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
   a new id isn't a 6th, and "fouled out" is never taken back. Details: docs/alerts.md, "Revisions: ESPN changes a
@@ -577,7 +579,7 @@ This is one reason for the decision **"No production restarts during live games"
   times and went out as ESPN first wrote it ("Edman to first … Edman to second."); there is no general "ESPN rewrote this"
   line, because a sentence ESPN is still working on would write a line each time.
 - **A fold sentence is compared as text.** Two wordings of the same fact are two lines.
-- **A basketball play ESPN removes after 15 minutes** keeps its alert with no line (`REVISE_MS`; Franz Wagner's block alert in Magic at Cavaliers, removed 24 minutes later). A first alert on a play that ESPN fixes within seconds still goes out first (a free throw posted as "misses" that is flipped to "makes" a minute later): only its line corrects it.
+- **A basketball play ESPN removes or changes after 45 minutes** keeps its alert with no line (`BASKETBALL_REVISE_MS`; it was 15 minutes until October 14, 2026, when a turnover ESPN moved to another player 20 minutes later showed that was too short; the slowest change seen is 42 minutes, a rebound). Franz Wagner's block alert in Magic at Cavaliers, removed 24 minutes later, would get its line now. A first alert on a play that ESPN fixes within seconds still goes out first (a free throw posted as "misses" that is flipped to "makes" a minute later): only its line corrects it.
 - **A soccer foul that ESPN later marks "Penalty conceded"** is judged again (`fouls` in `GameTracker`), and the
   penalty's alerts have their own ids and moment (`soccerFoul`), so a device can get the foul (feed only) and then
   the penalty (pushed) as two alerts about one foul. Not changed by the Man City at Liverpool review's fixes (F1 to F5 don't

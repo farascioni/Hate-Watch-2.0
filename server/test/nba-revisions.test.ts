@@ -5,7 +5,10 @@
 // A play is judged again on its latest version: a line (no push) on an alert it no longer has, the right player's alert,
 // a re-post is one alert, a removed play is taken back, fouls are recounted. Also: a shot not yet typed is an unknown
 // shot, a block never goes to the blocker, a lead changing hands again within 2 minutes is a line, and the
-// preseason's standings table says nothing.
+// preseason's standings table says nothing. From Cavaliers at Magic (October 13 2026): the free throw a technical
+// gives is not a technical on its shooter, a traveling turnover is a turnover, a turnover moved to another player
+// 20 minutes later is still corrected (basketball watches a play for 45 minutes), and a block that becomes a plain
+// miss gets only "ESPN has since changed this play."
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -323,4 +326,66 @@ test('the preseason gate is for the sports whose type 1 is the preseason: the Pr
     liveDeps.getJson = async () => table(5); await scanStandings('epl');
   } finally { liveDeps.getJson = prev; }
   assert.deepEqual(feed('pre-liverpool').map((r) => [r[0], r[1]]), [['team.standings_drop', 'Liverpool dropped to 5th in the EPL']]);
+});
+
+// ─── Cavaliers at Magic, October 13 2026 ───
+
+test('the free throw a technical gives is its shooter\'s: the call alerts the fouler, the made free throw alerts nobody, the missed one is a missed free throw', () => {
+  const ctx: any = { league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() };
+  const run = (p: any) => D.PLAYER_DETECTORS.nba(ctx, D.fromCorePlay(p)).map((e) => [e.type, e.title]);
+  assert.deepEqual(run(core('t1', 'Technical Foul', 'Mario Hezonja technical foul', CLE, [[PEOPLE.hezonja[0], 'fouler']])), [['nba.technical', 'Mario Hezonja picked up a technical']]);
+  assert.deepEqual(run(core('t2', 'Free Throw - Technical', 'Desmond Bane makes technical free throw', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true, scoring: true, value: 1 })), [], 'Malaki Branham\'s free throw was pushed as "picked up a technical"');
+  assert.deepEqual(run(core('t3', 'Free Throw - Technical', 'Desmond Bane misses technical free throw', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true })), [['nba.missed_free_throw', 'Desmond Bane missed a free throw']]);
+  assert.deepEqual(run(core('t4', 'Free Throw - Flagrant 1 of 2', 'Desmond Bane makes flagrant free throw 1 of 2', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true, scoring: true, value: 1 })), []);
+  assert.deepEqual(run(core('t5', 'Flagrant Foul Type 1', 'Mario Hezonja flagrant foul type 1', CLE, [[PEOPLE.hezonja[0], 'fouler']])), [['nba.technical', 'Mario Hezonja picked up a technical']], 'the call itself still alerts');
+});
+
+test('a traveling turnover is a turnover: ESPN types it "Traveling", the text says turnover', () => {
+  const ctx: any = { league: 'nba', gameId: 'G', homeId: CLE, awayId: ORL, goalies: new Map() };
+  const run = (type: string, text: string) => D.PLAYER_DETECTORS.nba(ctx, D.fromCorePlay(core('v1', type, text, ORL, [[PEOPLE.cain[0], 'offense']]))).map((e) => e.title);
+  assert.deepEqual(run('Traveling', 'Jamal Cain traveling turnover'), ['Jamal Cain turned it over']);
+  assert.deepEqual(run('Bad Pass Turnover', 'Jamal Cain bad pass turnover (Evan Mobley steals)'), ['Jamal Cain turned it over'], 'a typed turnover as before');
+  assert.deepEqual(run('Defensive Rebound', 'Jamal Cain defensive rebound'), [], 'a play that does not say turnover');
+});
+
+test('a turnover ESPN moves to another player 20 minutes later is corrected (basketball watches a play for 45 minutes); 46 minutes later it is not', async () => {
+  device('late-harden', [P('harden')], everything);
+  device('late-mobley', [P('mobley')], everything);
+  const x = game('G-LATE1');
+  await x.poll();
+  const turnover = (id: string, who: keyof typeof PEOPLE, at: number) => core(id, 'Bad Pass Turnover', `${PEOPLE[who][1]} bad pass turnover (Desmond Bane steals)`, CLE, [[PEOPLE[who][0], 'offense']], { at });
+  const at = NOW;
+  x.put(turnover('to1', 'harden', at));
+  await x.poll();
+  assert.deepEqual(feed('late-harden'), [['nba.turnover', 'James Harden turned it over', []]]);
+  NOW += 20 * 60_000;
+  x.put(turnover('to1', 'mobley', at));
+  await x.poll();
+  assert.deepEqual(feed('late-harden'), [['nba.turnover', 'James Harden turned it over', ['ESPN has since credited this play to Evan Mobley.']]]);
+  assert.deepEqual(feed('late-mobley'), [['nba.turnover', 'Evan Mobley turned it over', []]]);
+  // Past the 45 minutes ESPN's change is not news: the alert stands as it was.
+  const later = NOW;
+  x.put(turnover('to2', 'harden', later));
+  await x.poll();
+  NOW += 46 * 60_000;
+  x.put(turnover('to2', 'mobley', later));
+  await x.poll();
+  assert.deepEqual(feed('late-harden').map((r) => r[2]), [['ESPN has since credited this play to Evan Mobley.'], []], 'the second turnover has no line');
+  assert.equal(feed('late-mobley').length, 1, 'and Mobley gets nothing for it');
+});
+
+test('a block ESPN re-posts as a plain miss: the line only says the play changed, with no "missed" line; changed back, it says so', async () => {
+  device('blk-bane', [P('bane')], everything);
+  const x = game('G-BLK2');
+  await x.poll();
+  const block = core('k1', 'Layup Shot', "Evan Mobley blocks Desmond Bane's 3-foot shot", ORL, [[PEOPLE.bane[0], 'shooter'], [PEOPLE.mobley[0], 'blocker']], { shooting: true });
+  x.put(block);
+  await x.poll();
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', []]]);
+  x.put(missPlay('k1', 'bane', 'Desmond Bane misses driving layup', 'Driving Layup Shot'));
+  await x.poll();
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this play.']]], 'one alert, one line');
+  x.put(block);
+  await x.poll();
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this play.', 'ESPN has since changed this play back.']]]);
 });
