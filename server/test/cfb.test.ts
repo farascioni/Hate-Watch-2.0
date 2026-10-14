@@ -204,6 +204,17 @@ test("the NFL's player alerts as a college team's, from ESPN's wording (October 
   const blocked = { ...play('k1', 'Blocked Field Goal', '(07:43) #88 B.Taylor field goal attempt from 58 yards NO GOOD blocked by #44 J.Hall', '238', 0, 7), team: { id: '238' } };
   assert.deepEqual(at(vg, blocked), [['cfb.team.kick_missed', 'team:cfb:238', 'Vanderbilt had a 58-yard field goal blocked']]);
   assert.deepEqual(at(vg, { ...blocked, type: { text: 'Field Goal Missed' }, text: '(07:49) #19 B.Craig field goal attempt from 50 yards NO GOOD' })[0][2], 'Vanderbilt missed a 50-yard field goal');
+  // An extra point is part of the touchdown's play (Delaware at Middle Tennessee, October 13 2026): blocked, missed, good, or a play wiped out.
+  const td = (kick: string) => ({ ...play('x1', 'Passing Touchdown', `(00:24) #0 B.Graves pass complete short left to #7 T.Bell caught at MTSU22, for 15 yards to the MTSU00 TOUCHDOWN, clock 00:20, 1ST DOWN ${kick}`, '238', 0, 6, { scoring: true }), team: { id: '238' } });
+  const kicks = (kick: string) => at(vg, td(kick), 'cfb.team.kick_missed');
+  assert.deepEqual(kicks('#31 T.Smack kick attempt failed ( blocked by #94 J.Williams) (H: #39 J.Cupitt, LS: #49 M.Sills), out of bounds at MTSU00'), [['cfb.team.kick_missed', 'team:cfb:238', 'Vanderbilt had an extra point blocked']]);
+  assert.deepEqual(kicks('#31 T.Smack kick attempt failed (H: #39 J.Cupitt)')[0][2], 'Vanderbilt missed an extra point');
+  assert.deepEqual(kicks('#31 T.Smack kick attempt good (H: #39 J.Cupitt, LS: #49 M.Sills)'), [], 'a good kick is no alert');
+  assert.deepEqual(kicks(''), [], 'a touchdown still waiting for its kick: none yet');
+  assert.deepEqual(kicks('#31 T.Smack kick attempt failed PENALTY UGA Holding 10 yards. NO PLAY'), [], 'wiped out');
+  const pickSix = { ...td('#91 B.Craig kick attempt failed ( blocked by #44 J.Hall)'), type: { text: 'Interception Return Touchdown' }, team: { id: '61' }, end: { team: { id: '238' } } };
+  assert.deepEqual(at(vg, pickSix, 'cfb.team.kick_missed').map((e) => [e[1], e[2]]), [['team:cfb:238', 'Vanderbilt had an extra point blocked']], 'a pick-six: the kick is the scoring side\'s, not the team that threw');
+  assert.deepEqual(at(vg, { ...td(''), type: { text: 'Blocked PAT' }, text: '#31 T.Smack extra point is no good, kick is blocked' }, 'cfb.team.kick_missed')[0][2], 'Vanderbilt had an extra point blocked', 'a play of its own');
 
   const as = g('333', '344'); // Alabama (home), Mississippi State: ESPN's codes "Bama", "State"
   const lost = { ...play('f1', 'Fumble Recovery (Opponent)', '(13:20) #1 K.Taylor sacked for loss of 9 yards, fumble by #1 K.Taylor recovered by Bama #90 L.Simmons', '344', 0, 0), team: { id: '344' }, end: { team: { id: '333' } } };

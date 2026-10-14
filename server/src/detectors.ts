@@ -130,6 +130,12 @@ export interface Detected {
   /** Only ever a line on another alert of its moment, never an alert of its own (a blown lead, at the final). */
   foldOnly?: boolean;
   /**
+   * A football revision line saying the alert it lands on no longer holds (a sack ESPN made a safety): that alert gives up its
+   * moment (publish), so the play's alert as it stands now goes out as an alert of its own, pushed if its settings push, and not
+   * as a silent line on the taken-back one.
+   */
+  releases?: boolean;
+  /**
    * Alternatives within a moment: a device gets at most one alert or line from each group, the first it
    * wants. A team blowing a lead, falling behind and being scored on, on one play, are one group.
    */
@@ -1515,6 +1521,10 @@ function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
   if (!wiped && /^(Field Goal Missed|Blocked Field Goal)$/i.test(ty)) {
     const yards = p.text.match(/field goal attempt from (\d+) yards/i)?.[1];
     team('cfb.team.kick_missed', offense, (n) => (/Blocked/i.test(ty) ? `${n} had a ${yards ? `${yards}-yard ` : ''}field goal blocked` : `${n} missed a ${yards ? `${yards}-yard ` : ''}field goal`));
+  } else if (!wiped && (/^(Blocked|Missed) PAT$/i.test(ty) || /\bkick attempt failed\b|\bextra point is no good\b|\bkick is blocked\b/i.test(p.text))) {
+    // An extra point is part of the touchdown's play ("TOUCHDOWN … #31 T.Smack kick attempt failed ( blocked by #94 J.Williams)"), which ESPN adds a poll or so after the play (DEL at MTSU, October 13 2026).
+    // The kicking team scored the touchdown: the side with the ball at the end of the play (a pick-six or a kick return starts with the other side).
+    team('cfb.team.kick_missed', /PAT$/i.test(ty) ? offense : ended ?? offense, (n) => (/blocked/i.test(`${ty} ${p.text}`) ? `${n} had an extra point blocked` : `${n} missed an extra point`));
   }
   // A player disqualified ("PENALTY CAL Targeting (#20 C.Sidney)… California #20 C.Sidney has been disqualified"): the
   // team's alert for that flag (it counts as a flag too), first, so it's the alert and not a line on another.
@@ -2369,9 +2379,11 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     if (fellBehind) {
       out.push({
         id: `${g.gameId}:${p.id}:team.fell_behind:${teamId}`, type: 'team.fell_behind',
-        title: safety ? `${team} gave up a safety and fell behind the ${oppName}`
+        title: safety ? `${team} gave up a safety and fell behind ${the(g.league, oppName)}`
           : rbi ? `${oppName} took the lead over ${the(g.league, team)} on ${rbi}` : `${oppName} ${what} to take the lead over ${the(g.league, team)}`,
         ...base, ...moment, fold: safety ? `${team} gave up a safety and fell behind.` : `${oppName} took the lead.`,
+        // A safety that puts them behind is the safety alert (pushed by default, and it says so): this one is for devices without it.
+        ...(safety ? { unless: footballType(g.league, 'safety') } : {}),
         // Basketball: a lead that changes hands again within FELL_AGAIN_MS is a line on the device's earlier "falls behind", not a card of its own.
         ...(BASKETBALL.has(g.league) ? { lateOn: { targetKey: base.targetKey, since: p.at - FELL_AGAIN_MS, types: ['team.fell_behind'], line: `${oppName} took the lead again: ${scoreLine(g, p)}.` } } : {}),
       });
@@ -2385,7 +2397,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     }
     if (safety) {
       // Replaces "opponent scored 2" for this play, and counts as that toggle too.
-      out.push({ id: `${g.gameId}:${p.id}:${footballType(g.league, 'safety')}:team-${teamId}`, type: footballType(g.league, 'safety'), aliases: ['team.opponent_scored'], title: `${team} gave up a safety`, ...base, ...unlessBehind, ...moment, fold: `${team} gave up a safety.` });
+      out.push({ id: `${g.gameId}:${p.id}:${footballType(g.league, 'safety')}:team-${teamId}`, type: footballType(g.league, 'safety'), aliases: ['team.opponent_scored'], title: `${team} gave up a safety${fellBehind ? ` and fell behind ${the(g.league, oppName)}` : ''}`, ...base, ...moment, fold: `${team} gave up a safety${fellBehind ? ' and fell behind' : ''}.` });
     } else if (delta > 0 && !BASKETBALL.has(g.league)) {
       // MLB, batted in: "Guardians tied the White Sox on Kwan's RBI single", "Guardians scored on Naylor's 2-run double against the White Sox".
       const batted = rbi ? (p[side] === p[opp] ? `${oppName} tied ${the(g.league, team)} on ${rbi}` : `${oppName} scored on ${rbi} against ${the(g.league, team)}`) : null;

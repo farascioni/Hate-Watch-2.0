@@ -8,13 +8,11 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SERVER
-- Behind the scenes: the server can now copy its database off its machine continuously and restore it onto a replacement, and it has a new check that tells the owner when its database, its ESPN reads, a game's polling or that backup has stopped. Nothing changes in the app.
+- Behind the scenes: the database is now copied off the server continuously, and a new check tells the owner when it, ESPN reads, a game's polling or that backup stops. Nothing changes in the app.
 
 RECENT MISERY
-- The Recent misery tab on a player's or team's page is now the same list for everyone: the last 30 days of losses, with how they happened (a blown lead, overtime, a walk-off, losing as the favorite), and the worst of the rest, such as an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF or a UFC loss.
-- It no longer depends on what you track or your alert settings, and it works for teams and players nobody tracks.
-- A player's page also shows their team's losses.
-- A loss says "Successful Hate Watch!" only if you track that team or player.
+- The Recent misery tab on a player's or team's page is now the same list for everyone: the last 30 days of losses, with how they happened (a blown lead, overtime, a walk-off, losing as the favorite), and the worst of the rest: an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF.
+- It no longer depends on what you track or your alert settings, and works for teams and players nobody tracks. A player's page also shows their team's losses. A loss says "Successful Hate Watch!" only if you track that team or player.
 - A soccer loss by 3 or more goals keeps its score and margin on the list (it was dropped before), and a corrected final score refreshes them.
 
 MLB
@@ -23,15 +21,13 @@ MLB
 - A lost replay challenge ESPN adds later is sent once it holds; "Official Scorer Ruling Pending" is waited out.
 - A homer's corrected distance and an error ESPN moves to another fielder become lines on the alerts sent.
 - A run is the pitcher's whose runner scores, as in the box score; a run a review gives back alerts the pitcher too.
-- A third out a review overturns gets a line, and the inning's real end is judged.
-- A strikeout ESPN never posts is made from the third strike.
+- A third out a review overturns gets a line, and the inning's real end is judged. A strikeout ESPN never posts is made from the third strike.
 
 HOCKEY
 - A goalie is no longer shown as pulled when a play ESPN took out a few seconds later had him replaced, and a real pull now counts the goals against him ("3 goals on 7 shots").
 - A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"), and other shots ESPN changes or takes out get a line too, with no extra push.
 - An empty-net goal ESPN first posted as an even-strength one is no longer charged to the goalie: the goalie's alert says nobody was in net, and the team's says "Into an empty net."
-- A penalty ESPN first posted as "Penalty Shot Infraction" gets its real call as a line.
-- Hockey alerts now wait for ESPN to finish the play: a shot 20 seconds, a penalty ESPN has not named up to 10 minutes, a goal with no scorer in its text 20 seconds. A goal that was first a shot no longer gets a wrong shot alert, a penalty says what it was (slashing, hooking) instead of "Penalty Shot Infraction", and fights are no longer hidden behind it.
+- Hockey alerts now wait for ESPN to finish the play: a shot 20 seconds, a penalty it has not named up to 10 minutes, a goal with no scorer 20 seconds. A goal that was first a shot gets no wrong shot alert, and a penalty says what it was (slashing, hooking), not "Penalty Shot Infraction".
 - A shot ESPN posts minutes late no longer alerts and shows the score now, and a play it takes out and posts again within 45 minutes is one alert. A fight title drops "served by". Still twice: a copy of a shot posted while the first is there.
 - A goal's alerts take ESPN's later text on the feed (a different scorer, an assist taken away): the Maple Leafs' short-handed goal was first Barrett Hayton's and is Mikhail Sergachev's.
 - The final score of a game is the higher of ESPN's score and its period scores, so a trailing header never gives a loss "3 to 1" when it ended 4-1.
@@ -41,6 +37,8 @@ FOOTBALL
 - A sack on a failed two-point try reads "got sacked on the two-point try".
 - Track an NFL team and its flags reach your feed too, even when no player is named: "Bills were flagged: Illegal Shift". It is the same "Commits a penalty" setting (now on a team's page as well), and a team's flags never push.
 - College football: a flag no longer takes the place of a score or a three-and-out (it is its own feed row, never a push), and an alert shows ESPN's corrected words and score (a sack's yards, an extra point).
+- A safety is pushed as a safety ("Delaware gave up a safety and fell behind MTSU"), also when ESPN first posted the play as a sack.
+- College football: a blocked or missed extra point is an alert ("Delaware had an extra point blocked"); the setting is now "Misses a kick".
 
 ## Build 13 (October 12, 2026)
 

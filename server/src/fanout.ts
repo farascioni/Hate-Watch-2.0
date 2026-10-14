@@ -490,6 +490,7 @@ export function publish(events: Detected[], league: League) {
           // a line about an alert this device doesn't have doesn't; and any other alert is an alert of its own, not a line without a
           // push on a flag (a pushed drive result arriving a poll after the flag would have lost its push).
           const aboutIt = !!e.foldOnly && e.id.startsWith(`${before.eventId}:changed:`);
+          if (e.releases && aboutIt) before.weak = true; // it was taken back (football): it no longer holds the moment
           if (e.foldOnly && (e.afterOthers || before.weak) && !aboutIt) continue;
           // The one thing a weak flag does hold: the same flag with its player named a poll later (ESPN adds the penalized player to
           // a play it posted without him), when that wouldn't push (its bell, or `noPush` after the final): it is a line on the

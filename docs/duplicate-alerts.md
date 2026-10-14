@@ -280,7 +280,7 @@ them per device, in the order the alerts are listed:
   falling behind and being scored on, all on one play, are the group `scored-on`).
 - **`unless: X`:** dropped for a device that wants X for the same target, which covers the same moment more
   specifically (stranded runners vs. NOBLETIGER; "opponent scores" vs. "falls behind" on the play that put them
-  behind).
+  behind; for a football safety the other way round, since the safety's alert says it fell behind: "falls behind" is `unless` the safety's type).
 - **`aliases`:** other settings that also cover this alert (a homer is "Gives up a home run" and "Gives up runs").
   It's still one alert, delivered if any of them is on.
 - **`firstFollowed`:** of a moment's alerts, a device gets the one about the target it followed first, by follow
@@ -308,6 +308,7 @@ them per device, in the order the alerts are listed:
   flag with its player named a poll later when that wouldn't push (`sameFlag`: its bell, or `noPush` after the final), which is
   a line on the team's row. A line about an alert the device doesn't hold (`afterOthers` lines, copied by `linesOn`) does
   not land on whatever holds the moment.
+- **`releases`, a taken-back alert gives up its moment** (football): the revision line an alert gets when the play no longer has it ("ESPN has since changed this play to a safety.") carries `releases`, and `publish` makes that alert weak for its device (`delivered`'s `weak`), as a flag is. What the play is now (a sack ESPN made a safety, a score) goes out as an alert of its own, pushed if its settings push, and not as a silent line on the card that was taken back. Not for a line that shares an `alt` with a new alert (hockey's retyped shot) or for basketball and hockey. Delaware at Middle Tennessee, October 13 2026.
 - **`recipients()`:** a team's alert goes to its trackers and to trackers of its players with "Get their team's
   alerts" on, once per device.
 - **A push per device per alert.** The device's alert is pushed if anything it carries would be. Its folded facts

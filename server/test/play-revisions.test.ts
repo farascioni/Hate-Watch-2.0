@@ -22,7 +22,8 @@ const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_na
 for (const [id, name, short, abbr] of [['84', 'Indiana Hoosiers', 'Indiana', 'IU'], ['158', 'Nebraska Cornhuskers', 'Nebraska', 'NEB'], ['12', 'Arizona Wildcats', 'Arizona', 'ARIZ'],
   ['277', 'West Virginia Mountaineers', 'West Virginia', 'WVU'], ['154', 'Wake Forest Demon Deacons', 'Wake Forest', 'WAKE'], ['152', 'NC State Wolfpack', 'NC State', 'NCSU'],
   ['245', 'Texas A&M Aggies', 'Texas A&M', 'TA&M'], ['142', 'Missouri Tigers', 'Missouri', 'MIZ'], ['2050', 'Ball State Cardinals', 'Ball State', 'BALL'], ['77', 'Northwestern Wildcats', 'Northwestern', 'NU'],
-  ['151', 'East Carolina Pirates', 'East Carolina', 'ECU'], ['242', 'Rice Owls', 'Rice', 'RICE'], ['57', 'Florida Gators', 'Florida', 'FLA'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC']])
+  ['151', 'East Carolina Pirates', 'East Carolina', 'ECU'], ['242', 'Rice Owls', 'Rice', 'RICE'], ['57', 'Florida Gators', 'Florida', 'FLA'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC'],
+  ['48', 'Delaware Blue Hens', 'Delaware', 'DEL'], ['2393', 'Middle Tennessee Blue Raiders', 'MTSU', 'MTSU']])
   team.run(`team:cfb:${id}`, 'cfb', id, name, short, abbr, short);
 team.run('team:cfb:16', 'cfb', '16', 'Sacramento State Hornets', 'Sacramento St', 'SAC', 'Sacramento State'); // ESPN's code: "Sac St"
 team.run('team:cfb:189', 'cfb', '189', 'Bowling Green Falcons', 'Bowling Green', 'BGSU', 'Bowling Green');
@@ -557,4 +558,26 @@ test('two players with one surname: a flag moves from Michael Wilson to Mack Wil
   const reviewed = D.fromCorePlay(corePlay('4018729821452', 'Fumble Recovery (Own)', `${lost.text}The Replay Official reviewed the ball was inbounds ruling, and the play was REVERSED.(Shotgun) D.Watson sacked at CLV 19 for 0 yards (W.McDonald). FUMBLES (W.McDonald), ball out of bounds at CLV 19.`, '5', [['passer', '3122840']], 0, 0));
   const r = ledger.changed(reviewed, NOW + 120_000)!;
   assert.deepEqual(r.lines.map((e) => e.fold), ['Overturned on review: the Browns kept the ball.']);
+});
+
+test('a safety that puts a college team behind is pushed as the safety, also when ESPN first posted the play as a sack (Delaware at Middle Tennessee, October 13 2026)', async () => {
+  device('del', 'team:cfb:48');
+  device('mtsu', 'team:cfb:2393');
+  const T = game('cfb', '401871067', '2393', '48', { away: 3, home: 3 });
+  await T.poll();
+  // The play as ESPN first posted it (a sack), then as it settled (the intentional-grounding safety, the score 3-5).
+  const sack = play('401871067139', 'Sack', 'No Huddle-Shotgun #7 T.Bell sacked for loss of 15 yards to the DELA00 (#22 G.Gaskins)', '48', 3, 3, { period: 1, clock: '3:25' });
+  T.g.current = { id: '4018710678', plays: [sack] };
+  await T.poll();
+  assert.deepEqual(feed('del').map((r) => r[1]), ['Delaware got sacked (T.Bell)']);
+  const safety = { ...sack, type: { text: 'Safety' }, text: 'No Huddle-Shotgun #7 T.Bell pass incomplete short right thrown to DELA10. Middle Tenn. SAFETY, clock 03:25 PENALTY DELA Intentional Grounding (#7 T.Bell)', end: { team: { id: '2393' } }, awayScore: 3, homeScore: 5, scoringPlay: true };
+  Object.assign(T.g, { home: 5 });
+  T.g.current.plays = [safety];
+  await T.poll(3);
+  const cards = feed('del');
+  assert.deepEqual(cards.map((r) => r[0]), ['cfb.team.sacked', 'cfb.safety'], 'the sack stays in the feed, the safety is its own card');
+  assert.equal(cards[1][1], 'Delaware gave up a safety and fell behind MTSU', 'no "the" before a school');
+  assert.deepEqual(pushed('del'), ['Delaware gave up a safety and fell behind MTSU'], 'pushed: "Gives up a safety" is on by default');
+  assert.ok(cards[0][2].some((l: string) => /changed this play to a safety/.test(l)), 'a line on the sack says what became of it');
+  assert.deepEqual(feed('mtsu'), [], 'the side that scored the points gets nothing');
 });

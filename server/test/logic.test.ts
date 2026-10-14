@@ -217,9 +217,10 @@ test('NFL: delay of game goes to the offense QB; safeties replace the generic al
   const types = team23.map((e) => e.type);
   assert.ok(types.includes('nfl.safety') && !types.includes('team.opponent_scored'), `got ${types}`);
   assert.match(team23.find((e) => e.type === 'nfl.safety')!.title, /Steelers gave up a safety/);
-  // It also put them behind 2-0: the safety alert yields to one combined "fell behind" alert.
-  assert.equal(team23.find((e) => e.type === 'nfl.safety')!.unless, 'team.fell_behind');
-  assert.match(team23.find((e) => e.type === 'team.fell_behind')!.title, /Steelers gave up a safety and fell behind the Browns/);
+  // It also put them behind 2-0: the safety alert (pushed by default) says so, and "falls behind" yields to it (DEL at MTSU, October 13 2026: the push was lost the other way round).
+  assert.match(team23.find((e) => e.type === 'nfl.safety')!.title, /Steelers gave up a safety and fell behind the Browns/);
+  assert.equal(team23.find((e) => e.type === 'nfl.safety')!.unless, undefined);
+  assert.equal(team23.find((e) => e.type === 'team.fell_behind')!.unless, 'nfl.safety');
   // Overturned: nothing.
   assert.equal(nfl({ type: 'Safety', scoring: false, text: 'N.Cross tackled in End Zone, SAFETY NULLIFIED by Penalty' }).filter((e) => e.type === 'nfl.safety').length, 0);
 });

@@ -207,10 +207,10 @@ export class PlayLedger {
    * new tracker (a game followed again) and could reuse a stored id, dropping a new line. The same words on the same
    * alert are the same fact, and a feed row shows a line once anyway (addLateLine).
    */
-  linesOn(es: Detected[], line: string, alt?: string): Detected[] {
+  linesOn(es: Detected[], line: string, alt?: string, releases = false): Detected[] {
     const key = createHash('sha256').update(line).digest('base64url').slice(0, 10);
     return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${key}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
-      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}),
+      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}), ...(releases ? { releases: true } : {}),
       // A line about a weak alert (a team's flag) lands on that alert only (publish).
       ...(e.afterOthers ? { afterOthers: true } : {}) }));
   }
@@ -389,7 +389,8 @@ export class PlayLedger {
         const retyped = hockey && /^nhl\.shot_/.test(e.type) ? fresh.filter((f) => /^nhl\.shot_/.test(f.type) && f.targetKey === e.targetKey) : [];
         const alt = retyped.length ? `shot-retyped:${p!.id}:${e.targetKey}` : undefined;
         for (const f of retyped) f.alt = alt;
-        lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why, alt));
+        // Football: the alert taken back gives up its moment, so what the play is now (a sack ESPN made a safety) goes out as an alert, not a silent line on it.
+        lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why, alt, FOOTBALL.has(this.g.league)));
         continue;
       }
       // The flag became an ejection on the same play (a disqualification, a targeting call): the ejection's own line says so.
