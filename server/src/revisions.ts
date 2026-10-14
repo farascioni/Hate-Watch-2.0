@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { BASKETBALL, FOOTBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ordinal, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -31,6 +31,7 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right. Basketball watches a play for
  * BASKETBALL_REVISE_MS (45 minutes, not 15: a turnover moved to another player 20 minutes on, CLE at ORL, October 13 2026),
  * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it; its line says "the shot was not blocked").
+ * A change that reaches us more than LATE_REVISION_MS (5 minutes) after the play is feed only and starts with the quarter and clock (a block added 12 minutes late, NY at TOR, October 13 2026).
  * A missed shot ESPN describes differently later gets a silent line when the new words contradict the alert (`shotDisagrees`: a three
  * that is not one, or 2 feet), and an offensive charge is a foul like "Offensive Foul" (POR at SAC, October 13 2026).
  * A basket ESPN takes back (the score going down, its play no longer scoring) puts a line on its team alerts (`addScores`, `takeBack`; IND at OKC,
@@ -48,6 +49,14 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
 export const REVISE_MS = 15 * 60_000;
 /** Basketball: ESPN's slowest edit to a player came 42 minutes after posting it (a turnover moved from Donovan Mitchell to Evan Mobley, CLE at ORL, October 13 2026). */
 export const BASKETBALL_REVISE_MS = 45 * 60_000;
+/** Basketball: an alert a revision makes for a play older than this goes to the feed with no push, and says where the play was (a block ESPN added 12 minutes late, NY at TOR, October 13 2026). */
+export const LATE_REVISION_MS = 5 * 60_000;
+/** Where a basketball play was: "1st quarter, 1:11", "overtime, 0:04". */
+const whereLabel = (p: NPlay) => {
+  const n = p.periodNum ?? 0, s = Math.floor(p.clockSec ?? 0);
+  const period = n <= 4 ? `${ordinal(n)} quarter` : n === 5 ? 'overtime' : `${ordinal(n - 4)} overtime`;
+  return `${period}, ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 /** A play missing from the feed this long is gone. */
 export const GONE_MS = 30_000;
 
@@ -442,6 +451,8 @@ export class PlayLedger {
         }
       }
     }
+    // Basketball: a change that reaches us long after the play is news for the feed, not the phone, and says when in the game it was.
+    if (basketball && p && p.periodNum && now - p.at > LATE_REVISION_MS) for (const e of fresh) if (!FOULED_OUT.test(e.type)) { e.noPush = true; e.body = `${whereLabel(p)}. ${e.body}`; } // a player fouling out is still news
     return { fresh, lines, ...(retext.length ? { retext } : {}) };
   }
 

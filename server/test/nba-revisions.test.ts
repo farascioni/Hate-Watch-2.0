@@ -512,3 +512,76 @@ test('an offensive foul and its turnover are one alert, whichever play comes fir
   await x.poll();
   assert.deepEqual(feed('off-harden'), [['nba.turnover', 'James Harden turned it over', ['James Harden committed a foul.']]]);
 });
+
+// ─── NY at TOR, October 13 2026 ───
+
+test('a block ESPN adds more than 5 minutes after the play is a feed row with no push that says where the play was; inside 5 minutes it pushes as before', async () => {
+  device('late5-cain', [P('cain')]); // misses are off by default; "got sent back" is on and pushed
+  const x = game('G-LATE5');
+  await x.poll();
+  const miss = (id: string, at: number) => missPlay(id, 'cain', 'Jamal Cain misses tip shot', 'Tip Shot', { at, period: 1, clock: 71 });
+  const block = (id: string, at: number) => core(id, 'Tip Shot', "Mario Hezonja blocks Jamal Cain's tip shot", ORL, [[PEOPLE.cain[0], 'shooter'], [PEOPLE.hezonja[0], 'blocker']], { shooting: true, at, period: 1, clock: 71 });
+  const body = (play: string) => (db.prepare(`SELECT body FROM events WHERE id LIKE ? AND type = 'nba.got_blocked'`).get(`G-LATE5:${play}:%`) as any)?.body as string;
+  const early = NOW;
+  x.put(miss('b1', early));
+  await x.poll();
+  NOW += 2 * 60_000;
+  x.put(block('b1', early));
+  await x.poll();
+  assert.equal(pushed('late5-cain'), 1, 'two minutes on: pushed');
+  assert.ok(!/quarter/.test(body('b1')), body('b1'));
+  const late = NOW;
+  x.put(miss('b2', late));
+  await x.poll();
+  NOW += 12 * 60_000;
+  x.put(block('b2', late));
+  await x.poll();
+  assert.equal(feed('late5-cain').length, 2);
+  assert.equal(pushed('late5-cain'), 1, 'twelve minutes on: feed only');
+  assert.ok(body('b2').startsWith('1st quarter, 1:11. Mario Hezonja blocks Jamal Cain'), body('b2'));
+});
+
+test('preseason: "their team lost" skips a followed player the box score does not list; the regular season sends it to everyone', async () => {
+  device('tl-banchero', [P('banchero')]);
+  device('tl-bane', [P('bane')]);
+  const box = (type: number) => ({
+    header: { season: { type } },
+    boxscore: { players: [{ team: { id: ORL }, statistics: [{ athletes: [{ athlete: { id: PEOPLE.banchero[0] } }, { athlete: { id: PEOPLE.dasilva[0] }, stats: [] }] }] }] },
+  });
+  const lost = (id: string, type: number) => { const t = game(id).tracker as any; t.box = box(type); t.finish({ home: 148, away: 98 }); };
+  lost('G-TL1', 1);
+  assert.deepEqual(feed('tl-banchero').map((r) => r[0]), ['player.team_lost'], 'he dressed');
+  assert.deepEqual(feed('tl-bane'), [], 'Bane did not');
+  lost('G-TL2', 2);
+  assert.equal(feed('tl-bane').length, 1, 'regular season: played or not');
+});
+
+test('a play ESPN first posts more than 2 minutes after its own wall clock goes to the feed with no push; one a minute late still pushes', async () => {
+  device('post-cain', [P('cain')]); // "got sent back" is on and pushed by default
+  const x = game('G-POST');
+  await x.poll();
+  const block = (id: string, at: number) => core(id, 'Tip Shot', "Mario Hezonja blocks Jamal Cain's tip shot", ORL, [[PEOPLE.cain[0], 'shooter'], [PEOPLE.hezonja[0], 'blocker']], { shooting: true, at });
+  x.put(block('p1', NOW - 60_000));
+  await x.poll();
+  assert.equal(pushed('post-cain'), 1, 'a minute late: pushed');
+  x.put(block('p2', NOW - 3 * 60_000));
+  await x.poll();
+  assert.equal(feed('post-cain').length, 2, 'both are in the feed');
+  assert.equal(pushed('post-cain'), 1, 'three minutes late: feed only');
+});
+
+test('a player fouling out is still pushed when ESPN names the fouler more than 5 minutes late', async () => {
+  device('fo-late', [P('harden')]); // "fouls out" is pushed
+  const x = game('G-FOLATE');
+  await x.poll();
+  const foul = (id: string, who: string | undefined, clock: number, at: number) => core(id, 'Personal Foul', `${who ? PEOPLE.harden[1] : ''} personal foul`.trim(), CLE, who ? [[who, 'fouler']] : [], { period: 2, clock, at });
+  for (let i = 0; i < 5; i++) { x.put(foul(`fo${i}`, PEOPLE.harden[0], 500 - i * 30, NOW)); await x.poll(); }
+  const at = NOW;
+  x.put(foul('fo5', undefined, 100, at)); // the 6th, no fouler named yet
+  await x.poll();
+  NOW += 7 * 60_000;
+  x.put(foul('fo5', PEOPLE.harden[0], 100, at));
+  await x.poll();
+  assert.ok(feed('fo-late').some((r) => r[0] === 'nba.fouled_out'), JSON.stringify(feed('fo-late')));
+  assert.equal(pushed('fo-late'), 1, 'pushed, though the change came 7 minutes after the play');
+});

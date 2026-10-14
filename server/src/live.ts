@@ -119,6 +119,8 @@ const HOCKEY_WAIT_MS = {
 const HOCKEY_STALE_SHOT_MS = Number(process.env.HW_NHL_STALE_SHOT_MS ?? 180_000);
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
 const KEY_REVISE_MS = 5 * 60_000;
+/** Basketball: a play first read this long after its own wall clock goes to the feed with no push. */
+const LATE_POST_MS = 2 * 60_000;
 /** A read of ESPN slower than this is logged, with which feed (poll). */
 const SLOW_READ_MS = 3000;
 /** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
@@ -909,6 +911,8 @@ export class GameTracker {
           this.retext(r.retext);
         } else {
           const es = history ? [] : PLAYER_DETECTORS[league](this.ctx, p);
+          // Basketball: a play ESPN posts minutes after it happened is news for the feed, not the phone (a turnover 4 and another 15 minutes late, NY at TOR, October 13 2026).
+          if (BASKETBALL.has(league)) for (const e of es) if (now - p.at > LATE_POST_MS) e.noPush = true;
           events.push(...es);
           // MLB: a half-inning's end is judged from its plays, on a read with its third out (halfInningEnds).
           const ended = league === 'mlb' && !history ? endedHalf(p) : undefined;
@@ -1313,7 +1317,10 @@ export class GameTracker {
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
     const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
     // Its lines (the facts, the last half-inning) reach those who track only a player on the team too, on "their team lost".
-    const tracked = trackedPlayersOn(lost.targetKey);
+    // Preseason basketball: a player the box score doesn't list never dressed (the starters sat: 8 of 21 in NY at TOR, October 13 2026), so no "their team lost" for him.
+    const dressed = BASKETBALL.has(this.ctx.league) && seasonType === 1
+      ? new Set<string>((this.box?.boxscore?.players ?? []).flatMap((t: any) => (t.statistics?.[0]?.athletes ?? []).map((a: any) => String(a?.athlete?.id)))) : null;
+    const tracked = trackedPlayersOn(lost.targetKey).filter((p) => !dressed?.size || dressed.has(p.espnId));
     const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...half.lines, ...playerTeamLostEvents(this.ctx, lost, tracked), ...playerLossLines([...facts, ...half.lines], tracked), ...players];
     // The loss's alerts get the winning play's clip (the play that put the winner ahead for good), else the recap (clips.ts).
     const winning = leadStory(this.plays, lost.meta?.winnerId === this.ctx.homeId ? 'home' : 'away').goAhead?.id;

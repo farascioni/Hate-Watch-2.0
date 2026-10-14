@@ -8,7 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SERVER
-- The database is now copied off the server continuously, and a new check tells the owner when it, ESPN reads, a game's polling or that backup stops.
+- The database is now copied off the server continuously, and a new check tells the owner when the backup, ESPN reads or a game's polling stops.
 
 RECENT MISERY
 - The Recent misery tab on a player's or team's page is now one list for everyone: the last 30 days of losses (a blown lead, overtime, a walk-off, losing as the favorite) and the worst of the rest: an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF.
@@ -33,21 +33,22 @@ HOCKEY
 - The final score is the higher of ESPN's score and its period scores (never "3 to 1" for a 4-1 game).
 
 FOOTBALL
-- A score that ties the game says so ("Rams tied the game, 34-34."), as a line with no push, also when the extra point ties it.
+- A score that ties the game says so ("Rams tied the game, 34-34."), a line with no push, also when the extra point ties it.
 - A sack on a failed two-point try reads "got sacked on the two-point try".
-- Track an NFL team and its flags reach your feed, even with no player named ("Bills were flagged: Illegal Shift"): the same "Commits a penalty" setting, never pushed.
+- An NFL team's flags reach its trackers' feeds even with no player named ("Bills were flagged: Illegal Shift"); never pushed.
 - College football: a flag no longer takes the place of a score or a three-and-out (its own feed row, never a push), and an alert shows ESPN's corrected words and score.
 - A safety is pushed as a safety ("Delaware gave up a safety and fell behind MTSU"), also when ESPN first posted a sack.
 - College football: a blocked or missed extra point is an alert; the setting is now "Misses a kick".
 
 NBA AND WNBA
 - A technical's free throw is no "picked up a technical"; a traveling turnover is a turnover; an offensive charge is a foul.
-- A play is corrected for 45 minutes (was 15); a block that becomes a plain miss says the shot was not blocked; a shot ESPN later changes gets a silent line.
+- A play is corrected for 45 minutes; a block that becomes a plain miss says the shot was not blocked; a shot ESPN later changes gets a silent line.
 - A missed shot waits up to 15 seconds for ESPN to name it ("missed a driving layup"); an offensive foul and its turnover are one alert.
 - A late play shows the game's score now. A defensive 3-seconds call is not a pushed technical.
 - A basket with no scorer named waits up to 20 seconds, so one ESPN takes back is never "took the lead"; a basket taken back later gets a line.
 - A foul ESPN re-posts up to 15 seconds off is one alert. A shot ESPN has not typed no longer says "0.0 seconds left".
 - A player in the box score on no roster (a two-way or camp player) is added to the catalog, so you can track him.
+- A play posted 2+ minutes late, or a change 5+ minutes late, is feed-only. Preseason: no "their team lost" for those who sat.
 
 ## Build 13 (October 12, 2026)
 

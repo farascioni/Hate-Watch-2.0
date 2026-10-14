@@ -24,7 +24,7 @@ The README's "Successful Hate Watch counter" has the summary; this is the full d
 **What counts** (`HATE_WATCH_TYPES` and `isHateWatch`):
 
 - `team.lost`: a team you track loses ("Successful Hate Watch! Eagles lost to the Bears"). That includes an elimination and a blowout, which are the loss with other words; an alert that counts as a loss through its aliases counts too.
-- `player.team_lost`: the team of a player you track loses ("Successful Hate Watch! Freddie Freeman and the Dodgers lost to the Giants").
+- `player.team_lost`: the team of a player you track loses ("Successful Hate Watch! Freddie Freeman and the Dodgers lost to the Giants") In a preseason NBA or WNBA game a player the box score doesn't list gets no such alert, so it adds nothing to the count for someone who tracks only him (Knicks at Raptors, October 13 2026: 8 of 21; `docs/alerts.md`, "Their team loses").
 - `<soccer league>.team.heavy_loss`: a 3+ goal loss ("Coventry were thrashed 5-0 by Brighton"), sent instead of the plain loss to those who want it.
 - `f1.team.no_points`: your constructor finishes outside the points, and `f1.team.double_dnf` (a double DNF), which is also a no-points finish.
 - `ufc.lost`: a fighter you track loses. A fighter has no team, so this one counts under the fighter (`player:ufc:<id>`), and the fighter gets a chip and a row in the list like a team does. That's on purpose: the counter is every loss you hate watched, teams and fighters.
