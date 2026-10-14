@@ -232,7 +232,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`mergePlays`:** ESPN's core and site feeds are merged by play id before detection, so a play in both is one
   play (README "Real-time": "Two sources per game"). College football's drive plays (`fromDrivePlays`) skip a play
   listed in two drives.
-- **The football, basketball and hockey ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (basketball 45; Layer 5).
+- **The football, basketball and hockey ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (basketball and hockey 45; Layer 5).
 - **The pregame facts in `kv`** (`pregame:${league}:${gameId}`: odds, records, the series), so the facts of a loss
   are the same after a restart.
 
@@ -367,7 +367,7 @@ counts everyone who got any of the moment's loss alerts.
 **Rules:**
 
 - **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge, a
-  strikeout on a challenged pitch, a result waiting for the official scorer, a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, and a hockey shot, a penalty ESPN hasn't named and a goal with no scorer, which wait 20 seconds, 2 minutes and 20 seconds: all held by design).
+  strikeout on a challenged pitch, a result waiting for the official scorer, a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, and a hockey shot, a penalty ESPN hasn't named and a goal with no scorer, which wait 20 seconds, 10 minutes and 20 seconds: all held by design; a hockey shot first seen more than 3 minutes after it happened is history, for state only).
 - **What ESPN changes afterwards is a revision of the alert that went out:** a line with no push on the alerts that
   no longer hold, and the alerts the play has now and didn't before sent as new. Never a second notification about
   the same play.
@@ -400,7 +400,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   even-strength goal, 6 plays taken out). A changed play is judged again: a line with no push on the alert it no longer has
   ("ESPN has since changed this: Leon Draisaitl scored."), the alert it has now goes out, a late empty-netter or short-handed
   goal sends the team's alert with no `alt` so it folds into the "scored on" alert as a line, a penalty's call is a line.
-  `nhl.goalie.pulled` is in `ONCE`. A shot, a penalty ESPN has not named and a goal with no scorer in its text wait to be judged (`awaitingHockey`; a shootout play and a new goalie's save never do), and a goal's alerts take ESPN's later text on their feed rows (`reviseKeyText`, no push), so the alert says what ESPN finally kept (TOR at UTA, 2026-10-13). A goalie's shots faced and goals allowed are recounted with each version of a play
+  `nhl.goalie.pulled` is in `ONCE`. A shot, a penalty ESPN has not named and a goal with no scorer in its text wait to be judged (`awaitingHockey`; a shootout play and a new goalie's save never do), a shot posted more than 3 minutes late is not judged at all (`HOCKEY_STALE_SHOT_MS`), a penalty whose text starts with the call and names no player who took it alerts nobody yet, the ledger watches a hockey play for 45 minutes, and a goal's alerts take ESPN's later text on their feed rows (`reviseKeyText`, no push), so the alert says what ESPN finally kept (TOR at UTA, 2026-10-13). A goalie's shots faced and goals allowed are recounted with each version of a play
   (`g.goalieSeen`, `observePlay`, `unobservePlay`). Details: docs/alerts.md, "Revisions: ESPN changes a hockey play after its alert".
 - **Football** (`server/src/revisions.ts`, `PlayLedger`, used by `GameTracker.poll` for college football and the
   NFL): for `REVISE_MS` (15 minutes) after it's first seen, each play and drive keeps the alerts it sent, by kind

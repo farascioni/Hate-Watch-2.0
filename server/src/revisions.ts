@@ -38,7 +38,8 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  * "Penalty Shot Infraction", the empty-netter as an even-strength goal, and 6 plays were taken out. A changed play is judged
  * again (`hockeyLine`: "ESPN has since changed this: Leon Draisaitl scored."), a goalie's shots and goals are recounted with
  * each version, a goalie coming on is judged once (`ONCE`), a late empty-netter sends the team's alert (`strengthGoal`) and a
- * penalty's call is a line.
+ * penalty's call is a line. Hockey watches a play for 45 minutes too (COL at DAL, October 13 2026: a blocked shot ESPN took out was
+ * posted again under a new id 28 minutes later, and a giveaway became a takeaway 26 minutes on).
  */
 
 /** How long after we first see a play or a drive's result ESPN's changes to it are news. */
@@ -188,8 +189,8 @@ export class PlayLedger {
 
   constructor(g: GameCtx, log: (msg: string) => void) { this.g = g; this.log = log; }
 
-  /** How long a play's changes are news: longer in basketball, where ESPN names players late (BASKETBALL_REVISE_MS). */
-  private get reviseMs() { return BASKETBALL.has(this.g.league) ? BASKETBALL_REVISE_MS : REVISE_MS; }
+  /** How long a play's changes are news: longer in basketball and hockey, where ESPN names players late and posts a play again long after (BASKETBALL_REVISE_MS). */
+  private get reviseMs() { return BASKETBALL.has(this.g.league) || this.g.league === 'nhl' ? BASKETBALL_REVISE_MS : REVISE_MS; }
 
   /** The detectors that only read the play, on a version of it (the quarterback pulled counts passes: never again). */
   private detect(p: NPlay): Detected[] {

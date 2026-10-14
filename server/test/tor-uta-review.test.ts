@@ -1,6 +1,6 @@
 // What the Maple Leafs at Mammoth recording (TOR at UTA, 2026-10-13, ESPN 401892500) found that ESPN's later edits only fixed after the alert
 // went out, through a real GameTracker on plays shaped like the recording's: a shot waits 20 seconds for ESPN to finish it, so a shot that
-// becomes a goal sends no shot alert (F3, F4); a penalty typed "Penalty Shot Infraction" waits up to 2 minutes for its call and goes out
+// becomes a goal sends no shot alert (F3, F4); a penalty typed "Penalty Shot Infraction" waits up to 10 minutes for its call and goes out
 // as a minor if ESPN never names it, and a flip back to the placeholder is no call (F2); a goal with no scorer in its text holds the goalie's
 // alert and the team's together, and the goals after it come in order (F1); a goal's alerts take ESPN's later text, shorter or longer, on
 // their feed rows with no push (F1). A shootout and a new goalie's first save are never held.
@@ -100,7 +100,7 @@ test('a shot waits 20 seconds for ESPN to finish it, and a shot that becomes a g
   assert.deepEqual(feed('kuemper-fan').map((r) => r[1]), ['Darcy Kuemper let one in 🥅'], 'the goalie and the team, one alert, as before the wait');
 });
 
-test('a penalty typed "Penalty Shot Infraction" waits for its call; unnamed after 2 minutes it goes out as a minor; a flip back is no call', async () => {
+test('a penalty typed "Penalty Shot Infraction" waits for its call; unnamed after 10 minutes it goes out as a minor; a flip back is no call', async () => {
   device('doughty-fan', [P('doughty')]);
   device('kempe-fan', [P('kempe')]);
   const x = game('G-PEN2');
@@ -119,9 +119,9 @@ test('a penalty typed "Penalty Shot Infraction" waits for its call; unnamed afte
   x.put(core('p1', 'Tripping', 'Drew Doughty Tripping against Kasperi Kapanen', LA, [[PEOPLE.doughty[0], null], ['3114775', null]], { pen: '2', clock: 464 }));
   await x.poll(2);
   assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, Tripping)', []]]);
-  // Never named: after 2 minutes it is a minor, and the call is a line when it comes.
+  // Never named: after 10 minutes it is a minor, and the call is a line when it comes.
   x.put(core('p2', 'Penalty Shot Infraction', 'Adrian Kempe Minor', LA, [[PEOPLE.kempe[0], null]], { pen: '2', clock: 300 }));
-  await x.poll(23); // 115 seconds
+  await x.poll(119); // 595 seconds
   assert.deepEqual(feed('kempe-fan'), []);
   await x.poll(2);
   assert.deepEqual(feed('kempe-fan'), [['nhl.penalty', 'Adrian Kempe went to the box (2 min, minor)', []]]);

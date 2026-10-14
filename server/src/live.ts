@@ -104,14 +104,17 @@ const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
 const SHOT_WAIT_MS = Number(process.env.HW_SHOT_WAIT_MS ?? 15_000);
 /**
  * Hockey: how long ESPN gets to finish a play before its first alert (waitForHockey, awaitingHockey). It posts a shot, then retypes it or makes it a goal 10 to 30
- * seconds later (4 of 9 goals were first a shot), names a penalty 10 to 100 seconds after "Penalty Shot Infraction", and fills in a goal's scorer within a minute
- * (TOR at UTA, 2026-10-13). Past the wait the play is judged as it is, and what ESPN changes after is a line or a rewrite.
+ * seconds later (4 of 9 goals were first a shot), names a penalty 10 to 185 seconds after "Penalty Shot Infraction" (a placeholder ESPN never names is a play it takes out: COL at DAL,
+ * the 2 placeholders still unnamed after 2 minutes were gone within 6), and fills in a goal's scorer within a minute (TOR at UTA, 2026-10-13). Past the wait the play is judged
+ * as it is, and what ESPN changes after is a line or a rewrite.
  */
 const HOCKEY_WAIT_MS = {
   shot: Number(process.env.HW_NHL_SHOT_WAIT_MS ?? 20_000),
-  penalty: Number(process.env.HW_NHL_PENALTY_WAIT_MS ?? 120_000),
+  penalty: Number(process.env.HW_NHL_PENALTY_WAIT_MS ?? 600_000),
   goal: Number(process.env.HW_NHL_GOAL_WAIT_MS ?? 20_000),
 };
+/** Hockey: a shot first seen this long after it happened is ESPN back-filling (COL at DAL: shots posted 8 to 31 minutes late), not news: it updates the game's state and alerts nobody. */
+const HOCKEY_STALE_SHOT_MS = Number(process.env.HW_NHL_STALE_SHOT_MS ?? 180_000);
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
 const KEY_REVISE_MS = 5 * 60_000;
 /** A read of ESPN slower than this is logged, with which feed (poll). */
@@ -863,8 +866,10 @@ export class GameTracker {
       bump(led, score);
       const prev = score;
       score = nextScore(prev, p);
-      // History from before we attached updates state but is never notified.
-      const history = this.first && p.at < cutoff;
+      // History from before we attached updates state but is never notified. Hockey: so is a shot ESPN back-fills long after it happened.
+      const stale = league === 'nhl' && !this.first && !final && !this.seen.has(p.id) && p.at > 0 && now - p.at > HOCKEY_STALE_SHOT_MS && awaitingHockey(this.ctx, p) === 'shot';
+      if (stale) log(`[nhl ${gameId}] shot ${p.id} first seen ${Math.round((now - p.at) / 1000)}s after it happened: not alerted`);
+      const history = (this.first && p.at < cutoff) || stale;
       // Hockey: a shot, a penalty still typed as the placeholder and a goal with no scorer in its text wait for ESPN to finish them (HOCKEY_WAIT_MS).
       const wait = league === 'nhl' && !history && !final && !this.seen.has(p.id) ? awaitingHockey(this.ctx, p) : undefined;
       const hockeyWait = !!wait && this.waitForHockey(p, wait, now);
@@ -899,7 +904,7 @@ export class GameTracker {
           const net = league === 'nhl' ? [this.ctx.goalies.get(this.ctx.homeId), this.ctx.goalies.get(this.ctx.awayId)] : [];
           observePlay(this.ctx, p);
           if (league === 'nhl' && (net[0] !== this.ctx.goalies.get(this.ctx.homeId) || net[1] !== this.ctx.goalies.get(this.ctx.awayId))) {
-            log(`[nhl ${gameId}] goalie in net changed on play ${p.id} (${p.periodNum}P ${p.clockSec}s left): home ${net[0]} → ${this.ctx.goalies.get(this.ctx.homeId)}, away ${net[1]} → ${this.ctx.goalies.get(this.ctx.awayId)}`);
+            log(`[nhl ${gameId}] goalie in net changed on play ${p.id} (${p.periodNum}P ${p.clockSec}s in): home ${net[0]} → ${this.ctx.goalies.get(this.ctx.homeId)}, away ${net[1]} → ${this.ctx.goalies.get(this.ctx.awayId)}`);
           }
           if (ledgered) this.ledger.add(p, es, { history }, now);
         }

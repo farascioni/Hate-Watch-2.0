@@ -22,7 +22,7 @@ export interface NPlay {
   period?: { type: string; number: number }; // MLB: { type: 'Top' | 'Bottom' | 'Mid' | 'End', number }
   clock?: string;          // soccer: the minute, "57'" or "90'+4'"
   periodNum?: number;      // quarter, period or inning number (every league; MLB's half is in `period`)
-  clockSec?: number;       // seconds left in the period (NBA, WNBA, NFL, NHL), from ESPN's game clock
+  clockSec?: number;       // seconds left in the period (NBA, WNBA, NFL), from ESPN's game clock; seconds played in it for the NHL (its clock counts up: 0:00 to 20:00)
   hits?: { home: number; away: number }; // MLB: each team's hits so far (the core feed only: the summary's plays don't say)
   strength?: string;       // NHL goals: "Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot"
   driveId?: string;        // football: the drive it's in (a score taken back and scored again on that drive is one score: live.ts)
@@ -482,7 +482,7 @@ export function observePlay(g: GameCtx, p: NPlay) {
     if (saver && p.teamId && own && !counted) g.goalies.set(conceding, saver);
     if (/start of shootout/i.test(p.text)) g.shootout = true;
   }
-  const elapsed = BASKETBALL.has(g.league) ? elapsedOf(g.league, p) : undefined;
+  const elapsed = BASKETBALL.has(g.league) || g.league === 'nhl' ? elapsedOf(g.league, p) : undefined;
   if (elapsed != null && elapsed >= (g.latest?.elapsed ?? 0)) g.latest = { elapsed, home: p.home, away: p.away };
   const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
   if (foul) {
@@ -1748,9 +1748,13 @@ function lateAndClose(g: GameCtx, p: NPlay, points: number): string {
   return `${mine + points === theirs ? ' to tie it' : ' for the lead'} with ${secs} left`;
 }
 
-/** Basketball: seconds played when a play happened (quarters of 12 minutes, the WNBA's 10; overtimes 5), from its period and the clock left. */
+/**
+ * Seconds played when a play happened. Basketball: quarters of 12 minutes, the WNBA's 10, overtimes 5, from the clock left. Hockey: ESPN's
+ * clock counts up (a goal at "11:31" of the 1st is 11:31 in), periods of 20 minutes; an overtime has no late-score check.
+ */
 function elapsedOf(league: League, p: Pick<NPlay, 'periodNum' | 'clockSec'>): number | undefined {
   if (p.periodNum == null || p.clockSec == null) return undefined;
+  if (league === 'nhl') return p.periodNum >= 1 && p.periodNum <= 3 && p.clockSec >= 0 && p.clockSec <= 1200 ? (p.periodNum - 1) * 1200 + p.clockSec : undefined;
   const q = league === 'wnba' ? 600 : 720;
   if (p.periodNum < 1 || p.clockSec < 0 || p.clockSec > (p.periodNum > 4 ? 300 : q)) return undefined; // a bad clock never moves the game on
   const before = Math.min(p.periodNum - 1, 4) * q + Math.max(p.periodNum - 5, 0) * 300;
@@ -1889,7 +1893,8 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
     out.push(mk(g, p, 'nhl.shot_saved', shooter, `${nameOf('nhl', shooter)} got stoned`));
   } else if (/giveaway/i.test(p.type) && p.participants[0]) {
     out.push(mk(g, p, 'nhl.giveaway', p.participants[0].id, `${nameOf('nhl', p.participants[0].id)} gave the puck away`));
-  } else if (p.penaltyMinutes && p.participants[0]) {
+  } else if (p.penaltyMinutes && p.participants[0] && !p.text.toLowerCase().startsWith(`${p.type.toLowerCase()} against`)) {
+    // (Not "Instigator against Radek Faksa": ESPN posts the call before the player who took it, and the one it names is the other side's, COL at DAL 2026-10-13; the ledger judges the play once it names him.)
     const who = p.participants[0].id;
     // Thrown out: a game misconduct or a match penalty (a plain misconduct is 10 minutes, then back). It's
     // their penalty alert too (aliases): one alert. An instigator's misconduct and game misconduct come as
@@ -1897,13 +1902,16 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
     const ejected = /game misconduct|match penalty|^match$/i.test(p.type);
     const moment = { moment: `${g.gameId}:penalty:${who}:${p.periodNum ?? ''}:${p.clockSec ?? p.id}` };
     // A fight ("Mathieu Olivier Fighting against Arber Xhekaj"): its own alert, counting as the penalty.
-    const fight = /\bfighting\b/i.test(p.text) ? p.text.match(/fighting against (.+?)$/i)?.[1] ?? '' : null;
+    const fight = /\bfighting\b/i.test(p.text) ? p.text.match(/fighting against (.+?)(?: served by .+)?$/i)?.[1] ?? '' : null; // "…against Radek Faksa served by Jaden Schwartz"
     out.push(ejected
       ? mk(g, p, 'player.ejected', who, `${nameOf('nhl', who)} got ejected (${p.type.toLowerCase()})`, { aliases: ['nhl.penalty'], fold: `Ejected (${p.type.toLowerCase()}).`, ...moment })
       : fight !== null
         ? mk(g, p, 'nhl.fight', who, `${nameOf('nhl', who)} dropped the gloves${fight ? ` with ${fight}` : ''}`, { aliases: ['nhl.penalty'], fold: 'A fight.', ...moment })
         : mk(g, p, 'nhl.penalty', who, `${nameOf('nhl', who)} went to the box (${p.penaltyMinutes} min, ${PENALTY_PLACEHOLDER.test(p.type) ? (p.penaltyMinutes === 5 ? 'major' : 'minor') : p.type})`, { fold: `${p.penaltyMinutes} minutes in the box.`, ...moment }));
   }
+  // A play ESPN posted late alerts with the game's score now, not the old score of its moment ("COL 0, DAL 0" 19 minutes on, when it was 1-1). Not a goal: its score is its own.
+  const late = p.scoring ? undefined : lateScore(g, p);
+  if (late) for (const e of out) e.body = e.body.replace(scoreLine(g, p), scoreLine(g, late));
   return out;
 }
 

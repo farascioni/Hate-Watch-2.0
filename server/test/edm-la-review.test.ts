@@ -175,7 +175,7 @@ test('a penalty posted as "Penalty Shot Infraction": the call is a line on the a
   await x.poll();
   const base = pushed('doughty-fan');
   x.put(core('pn1', 'Penalty Shot Infraction', 'Drew Doughty Minor', LA, [[PEOPLE.doughty[0], null]], { pen: '2', clock: 464 }));
-  await x.poll(25); // a penalty ESPN has not named waits 2 minutes (tor-uta-review.test.ts); still the placeholder after that, it goes out as a minor
+  await x.poll(121); // a penalty ESPN has not named waits 10 minutes (tor-uta-review.test.ts); still the placeholder after that, it goes out as a minor
   assert.deepEqual(feed('doughty-fan'), [['nhl.penalty', 'Drew Doughty went to the box (2 min, minor)', []]]);
   x.put(core('pn1', 'Tripping', 'Drew Doughty Tripping against Kasperi Kapanen', LA, [[PEOPLE.doughty[0], null], ['3114775', null]], { pen: '2', clock: 464 }));
   await x.poll();
