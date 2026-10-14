@@ -1,0 +1,645 @@
+{
+ "game": {
+  "title": "White Sox at Guardians, ALDS Game 5",
+  "lede": "Every alert Hate Watch could send for tonight's game: what production and the dev server actually sent, and a replay of the whole game through the live tracker for 45 test devices (each team, every player who appeared, combinations, and one with every alert type on). Guardians win 2-0 and take the series 3-2; the White Sox are eliminated.",
+  "linescore": {
+   "periods": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "totalLabel": "R",
+   "extraLabels": [
+    "H",
+    "E"
+   ],
+   "teams": [
+    {
+     "abbr": "CHW",
+     "points": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "total": 0,
+     "extras": [
+      3,
+      1
+     ],
+     "won": false
+    },
+    {
+     "abbr": "CLE",
+     "points": [
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      "x"
+     ],
+     "total": 2,
+     "extras": [
+      6,
+      0
+     ],
+     "won": true
+    }
+   ]
+  },
+  "facts": [
+   [
+    "Final",
+    "10:45 pm ET Oct 10"
+   ],
+   [
+    "W",
+    "Gavin Williams (5.2 IP, 12 K)"
+   ],
+   [
+    "L",
+    "Sean Burke"
+   ],
+   [
+    "S",
+    "Cade Smith"
+   ],
+   [
+    "Production sent",
+    "27 alerts to 3 devices"
+   ],
+   [
+    "Replay",
+    "102 alerts, 218 pushes, 45 devices"
+   ]
+  ]
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "severity": "high",
+   "kind": [
+    "Missing alert",
+    "You raised it"
+   ],
+   "title": "Loading the bases against a tracked team sends no alert of its own",
+   "sentLabel": "As sent (production)",
+   "sent": [
+    {
+     "time": "9:41:57 pm",
+     "title": "White Sox have runners on first and second against the Guardians",
+     "body": "Top 6th: Teel singled to right, C. Montgomery to second. — CHW 0, CLE 2",
+     "who": "Both Guardians devices on production (they predate the quiet defaults, so this alert is on for them)",
+     "pushed": true
+    },
+    {
+     "time": "9:44:56 pm",
+     "title": "(no alert)",
+     "who": "Same two devices: the earlier alert silently gained a line, no push",
+     "lines": "Bases loaded now, 2 outs."
+    },
+    {
+     "time": "10:27:49 pm",
+     "title": "Guardians have a runner on second against the White Sox",
+     "body": "Bottom 8th: Halpin doubled to center. — CHW 0, CLE 2",
+     "who": "The White Sox device on production",
+     "pushed": true,
+     "lines": "Later, silently: Bases loaded now, 1 out."
+    }
+   ],
+   "wrong": [
+    "When Vargas walked to load the bases with two outs in the 6th, nobody tracking the Guardians was told. \"Opponent has runners in scoring position\" has been off by default since the October quiet defaults, so a new install gets nothing at all. A device that has it on gets only a silent line on the alert from three minutes earlier.",
+    "The silent line was a deliberate choice: one RISP alert per half-inning, with the bases loading as a line on it. Your call tonight reverses that. Bases loaded is its own moment and should push."
+   ],
+   "change": [
+    "Add a team alert, \"Opponent loads the bases\": on and pushed by default, for new and existing devices, once per half-inning. It replaces the silent \"Bases loaded now\" line. The RISP alert stays as it is (off by default).",
+    "It shares its play's moment, so a device that also tracks the pitcher gets one alert, with the walk as a line on it instead of a second push."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "(Guardians tracker, default settings: nothing)",
+      "body": "With RISP on: a silent line \"Bases loaded now, 2 outs.\" on the 9:41 pm alert"
+     },
+     "after": {
+      "title": "White Sox loaded the bases against the Guardians",
+      "body": "Top 6th, 2 outs: Vargas walked, Teel to second, C. Montgomery to third. — CHW 0, CLE 2"
+     }
+    },
+    {
+     "before": {
+      "title": "(White Sox tracker, default settings: nothing)",
+      "body": ""
+     },
+     "after": {
+      "title": "Guardians loaded the bases against the White Sox",
+      "body": "Bottom 8th, 1 out: Ramírez intentionally walked, Kwan to second. — CHW 0, CLE 2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F2",
+   "severity": "high",
+   "kind": [
+    "Missed live",
+    "Unexplained"
+   ],
+   "title": "End-of-half-inning alerts went missing on both live servers, at different innings",
+   "sentLabel": "Not sent live (the replay sends each one)",
+   "sent": [
+    {
+     "time": "8:11 pm",
+     "title": "White Sox went down in order",
+     "body": "Top 1st: Antonacci lined out to left. Teel struck out swinging. Vargas grounded out to shortstop. — CHW 0, CLE 0",
+     "who": "Production never sent it. Its White Sox device got the later ones (8:41, 8:58, 9:22, 10:45 pm)."
+    },
+    {
+     "time": "8:33 pm",
+     "title": "Guardians went down in order",
+     "body": "Bottom 2nd: Adell fouled out to first. Lowe grounded out to second. Bazzana struck out swinging. — CHW 0, CLE 0",
+     "who": "Dev server never sent it; production did, at 8:33:23 pm"
+    },
+    {
+     "time": "10:37 pm",
+     "title": "Guardians left the bases loaded 🤦",
+     "body": "Bottom 8th: Adell grounded out to third. — CHW 0, CLE 2",
+     "who": "Dev server never sent it; production did, at 10:37:21 pm"
+    }
+   ],
+   "wrong": [
+    "Production sent 10 of the 11 end-of-half alerts it could store and missed the top of the 1st. The dev server, running the same MLB code, sent 3 of the 5 it tracks and missed the bottom of the 2nd and the 8th. A replay from my recording (one read every 5 seconds) sends all 11. All three misses are alerts the tracker works out when ESPN posts its \"End of the inning\" play, from what it has seen of that half-inning.",
+    "I haven't proven the cause. My recording never caught ESPN changing an at-bat's result after posting it. On dev, a result arriving after the \"End of the inning\" play would have left a \"left the bases loaded\" alert on DeLauter's play, and there isn't one, so that's ruled out too. The summary feed's results carry the runners, so falling back to it doesn't explain it either. The servers read every 2 seconds and catch ESPN's feed in states my 5-second recording doesn't. Tonight that included plays that vanished for one read and came back (see F11).",
+    "The batter's own alert on each third out (Vargas, Bazzana, Adell) couldn't be checked, because nobody tracked them. If a result can first arrive incomplete, pushed strikeout alerts could go missing the same way."
+   ],
+   "change": [
+    "Judge MLB at-bat results on their settled version. If a result's batter, runners or text appear or change after it was first seen, run its detectors again (alert ids already stop a repeat). Work out the end of a half-inning from that half's plays as they stand, on the read after the \"End of the inning\" play, not from what was collected as plays first appeared.",
+    "Also log what the tracker saw at each half-inning end (last result, plate appearances counted, anyone on) and every change to a result after it was posted, so the next game shows the real cause."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "Sometimes nothing",
+      "body": "3 of 16 end-of-half alerts missed across the two servers tonight"
+     },
+     "after": {
+      "title": "Guardians went down in order",
+      "body": "Bottom 2nd: Adell fouled out to first. Lowe grounded out to second. Bazzana struck out swinging. — CHW 0, CLE 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F3",
+   "severity": "medium",
+   "kind": [
+    "Missing alert",
+    "Bug"
+   ],
+   "title": "An error by \"C. Montgomery\" alerted nobody",
+   "sentLabel": "Not sent (would go to anyone tracking Colson Montgomery; nobody on production did)",
+   "sent": [
+    {
+     "time": "10:09:34 pm",
+     "title": "(no alert)",
+     "body": "Bottom 7th: Bazzana safe at first on fielding error by shortstop C. Montgomery. — CHW 0, CLE 2",
+     "who": "Replay, every device tracking Colson Montgomery"
+    }
+   ],
+   "wrong": [
+    "The White Sox have two Montgomerys, Colson and Braden, so ESPN writes \"C. Montgomery\". The error pattern takes the first word after the position as the surname, gets \"C.\", matches nobody, and drops the alert. \"Commits an error\" is on and pushed by default.",
+    "The same last-name lookup serves \"thrown out on the bases\" and \"passed ball\". With two players of that surname it finds two and gives up, even when the text names one of them."
+   ],
+   "change": [
+    "Read an optional first initial before the surname, and when two teammates share the surname, use the initial to pick the player."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "(nothing)",
+      "body": ""
+     },
+     "after": {
+      "title": "Colson Montgomery committed an error",
+      "body": "Bazzana safe at first on fielding error by shortstop C. Montgomery. — CHW 0, CLE 2"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F4",
+   "severity": "medium",
+   "kind": [
+    "Merge"
+   ],
+   "title": "The losing pitcher's tracker gets two pushes 30 seconds apart at the final",
+   "sentLabel": "As sent in the replay (would go to anyone tracking Sean Burke; nobody on production did)",
+   "sent": [
+    {
+     "time": "10:45:39 pm",
+     "title": "Successful Hate Watch! Sean Burke and the White Sox lost to the Guardians",
+     "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0",
+     "who": "Tracking Sean Burke",
+     "pushed": true
+    },
+    {
+     "time": "10:46:09 pm",
+     "title": "Sean Burke took the loss",
+     "body": "5.0 IP, 4 H, 2 ER, 0 BB, 4 K · now 1-1 — Final: CHW 0, CLE 2",
+     "who": "Same device, and devices tracking the White Sox and Burke (after \"White Sox are ELIMINATED\")",
+     "pushed": true
+    }
+   ],
+   "wrong": [
+    "The losing pitcher is always on the losing team, so \"took the loss\" always lands right after the loss alert. ESPN posted the decisions 16 seconds after the final, and the tracker reads them every 15 seconds."
+   ],
+   "change": [
+    "Give the pitcher's loss the loss's moment. A device that already has a loss alert gets it as a line, without a push. A device with \"Their team loses\" off still gets \"took the loss\" as its own alert."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "2 pushes: \"…Sean Burke and the White Sox lost to the Guardians\", then \"Sean Burke took the loss\"",
+      "body": ""
+     },
+     "after": {
+      "title": "Successful Hate Watch! Sean Burke and the White Sox are ELIMINATED ⚰️",
+      "body": "Took the loss: 5.0 IP, 4 H, 2 ER, now 1-1. Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F5",
+   "severity": "medium",
+   "kind": [
+    "Wording",
+    "Playoffs"
+   ],
+   "title": "\"Their team lost\" says \"lost to\" when the team was eliminated",
+   "sentLabel": "As sent in the replay (would go to anyone tracking a White Sox player; nobody on production did)",
+   "sent": [
+    {
+     "time": "10:45:39 pm",
+     "title": "Successful Hate Watch! Munetaka Murakami and the White Sox lost to the Guardians",
+     "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0",
+     "who": "Tracking Munetaka Murakami",
+     "pushed": true,
+     "lines": "Munetaka Murakami went 0-for-4 with 4 strikeouts."
+    }
+   ],
+   "wrong": [
+    "The team's own alert says \"White Sox are ELIMINATED ⚰️\". A player's tracker gets a title that reads like any other loss, with the elimination only in the body."
+   ],
+   "change": [
+    "In an elimination, the player version takes the same title: \"<Player> and the <Team> are ELIMINATED ⚰️\", or \"got SWEPT 🧹 and are ELIMINATED ⚰️\" for a sweep."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "Successful Hate Watch! Munetaka Murakami and the White Sox lost to the Guardians",
+      "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     },
+     "after": {
+      "title": "Successful Hate Watch! Munetaka Murakami and the White Sox are ELIMINATED ⚰️",
+      "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F6",
+   "severity": "low",
+   "kind": [
+    "Missing line"
+   ],
+   "title": "A player's tracker doesn't get the loss's facts (\"Shut out.\")",
+   "sentLabel": "As sent in the replay",
+   "sent": [
+    {
+     "time": "10:45:39 pm",
+     "title": "Successful Hate Watch! White Sox are ELIMINATED ⚰️",
+     "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0",
+     "who": "Tracking the White Sox",
+     "pushed": true,
+     "lines": "Shut out."
+    },
+    {
+     "time": "10:45:39 pm",
+     "title": "Successful Hate Watch! Munetaka Murakami and the White Sox lost to the Guardians",
+     "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0",
+     "who": "Tracking only Murakami",
+     "pushed": true,
+     "lines": "Munetaka Murakami went 0-for-4 with 4 strikeouts."
+    }
+   ],
+   "wrong": [
+    "The loss's facts (shut out, walk-off, blew a lead, lost as favorites, no-hit) are alerts about the team, so only the team's trackers get them as lines. Someone tracking only Murakami never hears his team was shut out."
+   ],
+   "change": [
+    "Add the facts as lines on \"their team lost\" too, for devices that want each fact. They would not be alerts of their own for player-only trackers, so nobody gets an extra push."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "…Munetaka Murakami and the White Sox lost to the Guardians",
+      "body": "Munetaka Murakami went 0-for-4 with 4 strikeouts. Lost the ALDS 3-2…"
+     },
+     "after": {
+      "title": "…Munetaka Murakami and the White Sox are ELIMINATED ⚰️",
+      "body": "Shut out. Munetaka Murakami went 0-for-4 with 4 strikeouts. Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F7",
+   "severity": "medium",
+   "kind": [
+    "Merge",
+    "Final"
+   ],
+   "title": "The last half-inning's alerts arrive alongside the loss",
+   "sentLabel": "As sent (production, the White Sox device)",
+   "sent": [
+    {
+     "time": "10:45:30 pm",
+     "title": "White Sox lost an ABS challenge",
+     "body": "Top 9th: Tristan Peters challenged strike 2 looking, and the call stands — CHW 0, CLE 2",
+     "who": "White Sox device",
+     "pushed": true
+    },
+    {
+     "time": "10:45:38 pm",
+     "title": "White Sox struck out in order 🌀",
+     "body": "Top 9th: Murakami struck out swinging. Benintendi struck out swinging. Peters struck out swinging. — CHW 0, CLE 2",
+     "who": "Same device",
+     "pushed": false
+    },
+    {
+     "time": "10:45:38 pm",
+     "title": "Successful Hate Watch! White Sox are ELIMINATED ⚰️",
+     "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0",
+     "who": "Same device",
+     "pushed": true,
+     "lines": "Shut out."
+    }
+   ],
+   "wrong": [
+    "The game's last half-inning has no \"End of the inning\" play, so its alerts (in order, stranded runners, NOBLETIGER) go out at the final, in the same second as the loss, as a separate alert. They are always about the losing team: the side that made the last three outs lost, or the game would have gone on."
+   ],
+   "change": [
+    "Give those alerts the loss's moment: a line on whichever loss alert the device gets, e.g. \"Struck out in order in the 9th.\" With the loss off, they stay their own alerts. The ABS challenge has its own moment and would stay a separate alert."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "White Sox struck out in order 🌀  +  Successful Hate Watch! White Sox are ELIMINATED ⚰️",
+      "body": "Two alerts, the same second"
+     },
+     "after": {
+      "title": "Successful Hate Watch! White Sox are ELIMINATED ⚰️",
+      "body": "Shut out. Struck out in order in the 9th. Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F8",
+   "severity": "medium",
+   "kind": [
+    "Timing",
+    "Production"
+   ],
+   "title": "Production's reads of ESPN timed out late in the game, delaying alerts",
+   "sentLabel": "As sent (production)",
+   "sent": [
+    {
+     "time": "9:05:14 pm",
+     "title": "Guardians scored 2 runs to take the lead over the White Sox",
+     "body": "Ramírez homered to right (348 feet), Kwan scored. — CHW 0, CLE 2",
+     "who": "White Sox device: 47 s after the swing, 26 s after the play was first readable from ESPN. No error logged.",
+     "pushed": true
+    },
+    {
+     "time": "9:57 to 10:37 pm",
+     "title": "8 polls of this game failed",
+     "body": "\"poll error TimeoutError\" at 9:57:22, 10:17:59, 10:18:16, 10:18:33, 10:32:21, 10:33:13, 10:35:56, 10:37:13 pm ET (both feeds over 4 s)",
+     "who": "Server log"
+    }
+   ],
+   "wrong": [
+    "Most alerts went out 0 to 4 s after the play was first readable from ESPN, which itself posts 10 to 25 s after the pitch. A handful came 11 to 26 s later than that, and one poll in 8 failed outright late in the game.",
+    "The NBA and college football trackers timed out at about the same times, which points at the connection from Fly to ESPN rather than this game's feed (about 500 KB each for the plays and the summary by the end, about 0.25 s from my Mac). A single feed failing is never logged, so the homer's delay left no trace."
+   ],
+   "change": [
+    "First: log each feed failure and each slow read, with which feed and how long it took, so the next game measures this. /health already shows each tracker's last poll time.",
+    "Then, if the logs confirm it: raise the per-feed timeout from 4 s to 8 s. A slow read then arrives late instead of being thrown away."
+   ]
+  },
+  {
+   "id": "F9",
+   "severity": "low",
+   "kind": [
+    "Noise"
+   ],
+   "title": "\"No quality start\" went out after a scoreless 12-strikeout start",
+   "sentLabel": "As sent in the replay (feed only by default; nobody on production tracked the starters)",
+   "sent": [
+    {
+     "time": "9:45:41 pm",
+     "title": "No quality start for Gavin Williams: pulled after 5.2 innings",
+     "body": "5.2 IP, 1 H, 0 ER, 2 BB, 12 K — CHW 0, CLE 2",
+     "who": "Tracking Gavin Williams",
+     "pushed": false
+    },
+    {
+     "time": "9:50:25 pm",
+     "title": "No quality start for Sean Burke: pulled after 5 innings",
+     "body": "5.0 IP, 4 H, 2 ER, 0 BB, 4 K — CHW 0, CLE 2",
+     "who": "Tracking Sean Burke",
+     "pushed": false
+    }
+   ],
+   "wrong": [
+    "By the definition Williams had no quality start, but being lifted with a lead after 5.2 scoreless innings isn't a bad night. A hater wouldn't enjoy it."
+   ],
+   "change": [
+    "For a starter pulled before 6 innings, send it only when he allowed 2 or more earned runs. Four earned runs (the other way to miss a quality start) still sends it any time. Tonight Williams gets nothing and Burke still gets his."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "No quality start for Gavin Williams: pulled after 5.2 innings",
+      "body": "5.2 IP, 1 H, 0 ER, 2 BB, 12 K — CHW 0, CLE 2"
+     },
+     "after": {
+      "title": "(nothing)",
+      "body": ""
+     }
+    }
+   ]
+  },
+  {
+   "id": "F10",
+   "severity": "low",
+   "kind": [
+    "Timing"
+   ],
+   "title": "Lost ABS challenges arrive about 90 seconds after the pitch",
+   "sentLabel": "As sent (production)",
+   "sent": [
+    {
+     "time": "8:37:49 pm",
+     "title": "Guardians lost an ABS challenge",
+     "body": "Top 3rd: ball 1 to Colson Montgomery stands (Gavin Williams pitching) — CHW 0, CLE 0",
+     "who": "Both Guardians devices, 93 s after the pitch",
+     "pushed": true
+    },
+    {
+     "time": "10:45:30 pm",
+     "title": "White Sox lost an ABS challenge",
+     "body": "Top 9th: Tristan Peters challenged strike 2 looking, and the call stands — CHW 0, CLE 2",
+     "who": "White Sox device, 91 s after the pitch and after Peters had already struck out",
+     "pushed": true
+    }
+   ],
+   "wrong": [
+    "A lost challenge waits 60 s after ESPN first posts it as \"Confirmed\", because ESPN swaps in an \"Overturned\" pitch when the call is reversed. Tonight both reversals came 10 and 15 s after the \"Confirmed\" version, and the hold correctly sent nothing for them.",
+    "The 60 s came from the Rays at Yankees game on Oct 7, with no timing recorded. Two reversals is too little to pick a new number."
+   ],
+   "change": [
+    "Log how long each reversal took, and choose a shorter wait (30 s would have caught both tonight) once a few more games are measured. No change to the wait yet."
+   ]
+  },
+  {
+   "id": "F11",
+   "severity": "low",
+   "kind": [
+    "Robustness",
+    "ESPN"
+   ],
+   "title": "ESPN served stale reads: plays vanished for one read and came back",
+   "sentLabel": null,
+   "sent": [],
+   "wrong": [
+    "Several times tonight, a read of ESPN's play-by-play was missing plays the previous read had: the challenged pitch at 8:37:03 pm, Doyle's at-bat at 8:38:58, another at 9:35:59. They were back 5 to 15 s later, so these look like cached copies. Nothing went wrong tonight.",
+    "One place it could: a lost ABS challenge being held is dropped as \"taken back\" if its pitch is missing from the read where the hold ends."
+   ],
+   "change": [
+    "Drop a held challenge as taken back only when its pitch is missing from two reads in a row. Scores are safe already: an alert never repeats, because alert ids are fixed."
+   ]
+  },
+  {
+   "id": "F12",
+   "severity": "low",
+   "kind": [
+    "Playoffs",
+    "Robustness"
+   ],
+   "title": "If ESPN's scoreboard is slow at a playoff final, the elimination is never said",
+   "sentLabel": "The replay with the scoreboard held back (the fallback path)",
+   "sent": [
+    {
+     "time": "10:47:37 pm",
+     "title": "Successful Hate Watch! White Sox lost to the Guardians",
+     "body": "Final Score: 2 to 0",
+     "who": "Tracking the White Sox",
+     "pushed": true,
+     "lines": "Shut out."
+    }
+   ],
+   "wrong": [
+    "Tonight the scoreboard showed the final with the series (3-2, completed) at 10:45:39, and the elimination went out right then. If it hasn't come within 2 minutes, the tracker finishes on its own and calls it a plain loss, and nothing corrects it later. The summary the tracker already reads had the series too (\"CLE wins series 3-2\", completed)."
+   ],
+   "change": [
+    "In that fallback, take the series from the summary, so the elimination still goes out."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "Successful Hate Watch! White Sox lost to the Guardians",
+      "body": "Final Score: 2 to 0"
+     },
+     "after": {
+      "title": "Successful Hate Watch! White Sox are ELIMINATED ⚰️",
+      "body": "Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0"
+     }
+    }
+   ]
+  },
+  {
+   "id": "F13",
+   "severity": "low",
+   "kind": [
+    "Weekly recap"
+   ],
+   "title": "The weekly recap's low point misses player trackers and can bury an elimination",
+   "sentLabel": "Monday's recap, as the replay's devices would get it",
+   "sent": [
+    {
+     "time": "Mon 9:00 am",
+     "title": "Your week in misery: 1 Successful Hate Watch",
+     "body": "White Sox 1. 10 alerts in all. Low point: White Sox are ELIMINATED ⚰️.",
+     "who": "Tracking the White Sox"
+    },
+    {
+     "time": "Mon 9:00 am",
+     "title": "Your week in misery: 1 Successful Hate Watch",
+     "body": "White Sox 1. 5 alerts in all.",
+     "who": "Tracking only Murakami (no low point)"
+    }
+   ],
+   "wrong": [
+    "The low point only looks at team loss alerts, so player-only trackers never get one. It also picks the biggest margin, so a 2-0 elimination loses to any bigger loss that week."
+   ],
+   "change": [
+    "Count \"their team lost\" alerts too, and always make an elimination the low point."
+   ],
+   "ba": [
+    {
+     "before": {
+      "title": "Your week in misery: 1 Successful Hate Watch",
+      "body": "White Sox 1. 5 alerts in all."
+     },
+     "after": {
+      "title": "Your week in misery: 1 Successful Hate Watch",
+      "body": "White Sox 1. 5 alerts in all. Low point: Munetaka Murakami and the White Sox are ELIMINATED ⚰️."
+     }
+    }
+   ]
+  }
+ ],
+ "right": [
+  "The elimination: \"Successful Hate Watch! White Sox are ELIMINATED ⚰️\" with \"Lost the ALDS 3-2 to the Guardians. Final Score: 2 to 0\" and \"Shut out.\" went out at 10:45:38 pm, as soon as ESPN marked the game final. It was right about the series (the scoreboard had 3-2, completed).",
+  "Successful Hate Watch counting: one per device for the White Sox loss, whether it tracked the team, players or both (production recorded its 1). \"N others got it too\" counted every device that got any alert of that loss (20 others in the replay).",
+  "Against an independent count of the plays, the replay alerted for all 28 strikeouts (hat tricks and the two golden sombreros included), the homer, the double play, the three walks and hit batter, three lost ABS challenges, and Halpin out on the bases twice. The two challenges ESPN reversed were correctly held back. The only miss was F3.",
+  "Merges worked: the homer and \"Guardians took the lead\" were one alert, a strikeout and \"went down in order\" one alert, DeLauter's fielder's choice and Halpin out at home one alert. A device tracking both teams got one game start.",
+  "Halpin's double in the 5th still counted as down in order (your call; noted for future reviews).",
+  "No standings side effects: the standings were unchanged 2 and 15 minutes after the final, so no drop or \"eliminated\" line was added to the loss.",
+  "Every player who appeared is in the catalog, on production too.",
+  "ESPN changed no at-bat results after posting them tonight, only pitch types (reclassified pitches and ABS reversals). No score was taken back.",
+  "Production's code, the dev server's and GitHub main (7de474d, deploying at 2:35 am ET) send identical MLB alerts for this game. Tonight's deploy changes nothing here."
+ ],
+ "method": [
+  "Recording: ESPN's core play-by-play, summary and scoreboard every 5 s from 8:11 pm ET (top of the 1st) to 5 minutes after the final, with every play as first posted and every later change, read cache-busted as the server reads them. The <b>recordings folder</b> in the main checkout has <code>mlb-401907994-2026-10-10*</code>.",
+  "Replay: the whole recording through the live tracker (GameTracker), read every 2 s as production does, the final through the scoreboard as production got it, and pitching decisions and timers on the game's clock. 45 devices: each team, every player who appeared, team+players in both follow orders, both teams, two hitters, a hitter with his team's alerts, and devices with every alert type on and pushed.",
+  "Checked against: the dev server's database (read-only; its web device tracks the Guardians and José Ramírez), production's log and its events and feeds (read-only, counts only, no device ids), and an independent count of the plays.",
+  "Times are Eastern. Alerts marked \"replay\" are what the server sends for that tracking choice; nobody on production tracked those players tonight."
+ ]
+}

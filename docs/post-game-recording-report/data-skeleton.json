@@ -1,0 +1,65 @@
+{
+  "game": {
+    "title": "Magic at Cavaliers, preseason",
+    "lede": "What was checked and the result, in two or three sentences: which feeds, which devices, what production sent, what the replay sent.",
+    "linescore": {
+      "periods": ["1", "2", "3", "4"],
+      "totalLabel": "T",
+      "teams": [
+        { "abbr": "ORL", "points": [24, 30, 22, 28], "total": 104, "won": false },
+        { "abbr": "CLE", "points": [30, 28, 27, 25], "total": 110, "won": true }
+      ]
+    },
+    "facts": [
+      ["Final", "9:05 pm ET Oct 11"],
+      ["Production sent", "N alerts to N devices"],
+      ["Replay", "N alerts, N pushes, N devices"]
+    ]
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "medium",
+      "kind": ["Wording", "Missing alert"],
+      "title": "One sentence naming the bug",
+      "sentLabel": "As sent (production)",
+      "sent": [
+        {
+          "time": "7:12:04 pm",
+          "title": "The alert's title exactly as sent",
+          "body": "The alert's body exactly as sent",
+          "who": "Who got it (which tracking choice, how many devices)",
+          "pushed": true,
+          "lines": "Later silent lines added to it, if any"
+        }
+      ],
+      "wrong": ["What is wrong with it, in plain words. One paragraph per array item."],
+      "change": ["The proposed change. One paragraph per array item."],
+      "ba": [
+        {
+          "before": { "title": "The alert as it is now (or: nothing)", "body": "" },
+          "after": { "title": "The alert as it would read", "body": "" }
+        }
+      ]
+    },
+    {
+      "id": "F2",
+      "severity": "note",
+      "kind": ["Timing"],
+      "title": "A finding with nothing sent (a note, or a robustness issue): sent can be empty and ba left out",
+      "sentLabel": null,
+      "sent": [],
+      "wrong": ["What happened."],
+      "change": ["What to do about it, or: no change yet, measure first."]
+    }
+  ],
+  "right": [
+    "What looked right, one line each: alerts that matched the final feed, merges that worked, counts that matched an independent count."
+  ],
+  "method": [
+    "Recording: which feeds, how often, from when to when, and the file names (<code>nba-&lt;id&gt;-2026-10-11*</code>). This line may use simple HTML.",
+    "Replay: the recording run through the live tracker (GameTracker), how many test devices and which tracking choices.",
+    "Checked against: production's log and events (read-only, only if the user allowed it), the dev server, an independent count of the plays.",
+    "Times are Eastern."
+  ]
+}
