@@ -139,8 +139,10 @@ test('a shot first credited to Desmond Bane and typed later is Paolo Banchero\'s
   const x = game('G-SHOT1');
   await x.poll();
   x.put(missPlay('s1', 'bane', 'Desmond Bane misses shot', 'No Shot (Default Shot)', { coordinate: { x: 25, y: 30 }, points: 3 }));
+  await x.poll(3);
+  assert.deepEqual(feed('shot-bane'), [], 'an untyped shot waits for its type');
   await x.poll();
-  assert.deepEqual(feed('shot-bane'), [['nba.missed_shot', 'Desmond Bane missed a 29-foot three', []]], 'the unknown shot, worded as one');
+  assert.deepEqual(feed('shot-bane'), [['nba.missed_shot', 'Desmond Bane missed a 29-foot three', []]], 'still untyped after 15 seconds: the unknown shot, worded as one');
   assert.deepEqual(feed('shot-banchero'), []);
   x.put(missPlay('s1', 'banchero', 'Paolo Banchero misses driving layup', 'Driving Layup Shot'));
   await x.poll();
@@ -402,11 +404,11 @@ test('an offensive charge is a personal foul (Mogbo, 3Q 2:07): it alerts, counts
   for (let i = 1; i <= 5; i++) x.put(core(`pf${i}`, 'Personal Foul', 'Evan Mobley personal foul', CLE, [[PEOPLE.mobley[0], 'fouler']]));
   await x.poll();
   assert.equal(feed('chg-mobley').length, 5, 'five fouls, five alerts');
-  // The charge is his 6th: fouled out (not "committed a foul"). The turnover ESPN logs for it at the same moment is its own play and alert, and not a 7th foul.
+  // The charge is his 6th: fouled out (not "committed a foul"). The turnover ESPN logs for it at the same moment is a line on it, and not a 7th foul.
   x.put(core('ch1', 'Offensive Charge', 'Evan Mobley offensive charge', CLE, [[PEOPLE.mobley[0], 'fouler']], { clock: 127 }));
   x.put(core('ch2', 'Offensive Foul Turnover', 'Evan Mobley offensive foul turnover', CLE, [[PEOPLE.mobley[0], 'offense']], { clock: 127 }));
   await x.poll();
-  assert.deepEqual(feed('chg-mobley').slice(5), [['nba.fouled_out', 'Evan Mobley fouled out', []], ['nba.turnover', 'Evan Mobley turned it over', []]]);
+  assert.deepEqual(feed('chg-mobley').slice(5), [['nba.fouled_out', 'Evan Mobley fouled out', ['Evan Mobley turned it over.']]]);
 });
 
 test('a play ESPN posts minutes late alerts with the game\'s score now; one a few seconds out of order keeps its own', async () => {
@@ -444,19 +446,16 @@ test('a missed shot ESPN describes differently later gets a line only when it co
   x.put(shot('sh1', 'Mario Hezonja misses 26-foot three point jumper', 'Jump Shot'));
   x.put(shot('sh2', 'Mario Hezonja misses 9-foot two point shot', 'Fade Away Bank Jump Shot'));
   x.put(shot('sh3', 'Mario Hezonja misses 12-foot jumper', 'Jump Shot'));
-  x.put(shot('sh4', 'Mario Hezonja misses shot', 'No Shot (Default Shot)'));
   await x.poll();
   x.put(shot('sh1', 'Mario Hezonja misses two point shot', 'Driving Floating Bank Jump Shot'));
   x.put(shot('sh2', 'Mario Hezonja misses 10-foot two point shot', 'Turnaround Fade Away Jump Shot'));
   x.put(shot('sh3', 'Mario Hezonja misses 15-foot jumper', 'Jump Shot'));
-  x.put(shot('sh4', 'Mario Hezonja misses 22-foot three point jumper', 'Jump Shot'));
   const before = pushed('shot-hezonja');
   await x.poll();
   assert.deepEqual(feed('shot-hezonja').map((r) => r[2]), [
     ['ESPN has since changed this: it was a driving bank floater.'], // a 26-foot three that ESPN now calls a two point shot
     [], // 9 feet became 10: ESPN's tidying
     ['ESPN has since changed this: it was a 15-foot jumper.'], // 12 feet became 15
-    [], // "a shot" typed later is the alert being less sure
   ]);
   assert.equal(pushed('shot-hezonja'), before, 'a line never pushes');
 });
@@ -478,4 +477,38 @@ test('a shot ESPN rewrites twice: against the alert as sent, once per real chang
     'ESPN ends within a foot of the alert: the second description is "changed back", not another claim');
   assert.deepEqual(feed('rw-harden'), [['nba.missed_shot', 'James Harden missed a 26-foot three', ['ESPN has since changed this: it was a layup.']]],
     'a layup that becomes a bank floater adds nothing: it does not contradict what the last line said');
+});
+
+test('a missed shot ESPN has not typed yet waits up to 15 seconds for its type, and a block is a block from the start (GS vs LAL, October 13 2026)', async () => {
+  device('wait-hezonja', [P('hezonja')], everything);
+  device('wait-cain', [P('cain')], everything);
+  const x = game('G-WAIT');
+  await x.poll();
+  x.put(missPlay('w1', 'hezonja', 'Mario Hezonja misses shot', 'No Shot (Default Shot)'));
+  x.put(missPlay('w2', 'cain', 'Jamal Cain misses shot', 'No Shot (Default Shot)'));
+  await x.poll();
+  x.put(missPlay('w1', 'hezonja', 'Mario Hezonja misses layup', 'Layup Shot'));
+  x.put(core('w2', 'No Shot (Default Shot)', "Mario Hezonja blocks Jamal Cain's 7-foot shot", ORL, [[PEOPLE.cain[0], 'shooter'], [PEOPLE.hezonja[0], 'blocker']], { shooting: true }));
+  await x.poll();
+  assert.deepEqual(feed('wait-hezonja'), [['nba.missed_shot', 'Mario Hezonja missed a layup', []]], 'named by the time it was judged');
+  assert.deepEqual(feed('wait-cain'), [['nba.got_blocked', 'Jamal Cain got sent back ✋', []]], 'no "missed a shot" first');
+  assert.equal(pushed('wait-cain'), 1);
+});
+
+test('an offensive foul and its turnover are one alert, whichever play comes first, the other a line with no second push (GS vs LAL, October 13 2026)', async () => {
+  device('off-mobley', [P('mobley')], everything);
+  device('off-harden', [P('harden')], everything);
+  const x = game('G-OFF');
+  await x.poll();
+  x.put(core('o1', 'Offensive Foul', 'Evan Mobley offensive foul', CLE, [[PEOPLE.mobley[0], 'fouler']], { period: 3, clock: 300 }));
+  await x.poll();
+  x.put(core('o2', 'Offensive Foul Turnover', 'Evan Mobley offensive foul turnover', CLE, [[PEOPLE.mobley[0], 'offense']], { period: 3, clock: 300 }));
+  await x.poll();
+  assert.deepEqual(feed('off-mobley'), [['nba.foul', 'Evan Mobley committed a foul', ['Evan Mobley turned it over.']]]);
+  assert.equal(pushed('off-mobley'), 1);
+  x.put(core('o3', 'Offensive Foul Turnover', 'James Harden offensive foul turnover', CLE, [[PEOPLE.harden[0], 'offense']], { period: 3, clock: 250 }));
+  await x.poll();
+  x.put(core('o4', 'Offensive Foul', 'James Harden offensive foul', CLE, [[PEOPLE.harden[0], 'fouler']], { period: 3, clock: 250 }));
+  await x.poll();
+  assert.deepEqual(feed('off-harden'), [['nba.turnover', 'James Harden turned it over', ['James Harden committed a foul.']]]);
 });

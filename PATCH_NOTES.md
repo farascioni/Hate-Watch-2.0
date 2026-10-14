@@ -87,6 +87,8 @@ NBA AND WNBA
 - A play ESPN posts minutes late shows the game's score now, not an old one.
 - A defensive 3-seconds call reads "called for defensive 3 seconds" and no longer pushes as a technical.
 - A missed shot ESPN later calls something else (a three that was a two, 2+ feet off) gets a silent line saying so.
+- A missed shot waits up to 15 seconds for ESPN to name it, so the alert says "missed a driving layup" (or "got sent back") instead of "missed a shot".
+- An offensive foul and its turnover are one alert, with the other as a line.
 
 EVERYWHERE
 - Soccer goals, cards, fouls come sooner, in ESPN's fuller words.

@@ -190,7 +190,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`seen`:** play ids already judged. A play is passed to the detectors (`PLAYER_DETECTORS[league]`) only on its
   first sighting, then `observePlay` updates the game's state (bases, goalies, the half-inning). An MLB result
   posted before its batter is on it waits (`waitForBatter`, `noBatter`, up to `HW_HALF_END_WAIT_MS`, 20 seconds) and
-  is judged once, when it's ready. So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
+  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
   says "Official Scorer Ruling Pending" (`HW_RULING_WAIT_MS`, 45 seconds; `settling`, `settleSince`): the version that
   settles is the one judged, and the plays after it are not judged until it is, so the state they build (bases, whose
   runner is whose) stays in order. An "End Inning" play two reads in a row lack, with the half not over, is forgotten
@@ -367,7 +367,7 @@ counts everyone who got any of the moment's loss alerts.
 **Rules:**
 
 - **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge, a
-  strikeout on a challenged pitch and a result waiting for the official scorer, held by design).
+  strikeout on a challenged pitch, a result waiting for the official scorer, and a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, held by design).
 - **What ESPN changes afterwards is a revision of the alert that went out:** a line with no push on the alerts that
   no longer hold, and the alerts the play has now and didn't before sent as new. Never a second notification about
   the same play.
@@ -389,10 +389,10 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   play is first seen, `BASKETBALL_REVISE_MS`; a block that becomes a plain miss for the same shooter sends no "missed" alert or line
   after "ESPN has since changed this play.", because "got sent back" already covers a miss), and a re-post
   (`samePlay(…, true)`: the same period, the clock within 10 seconds, the same first participant and kind of play) is one
-  alert. A missed shot ESPN describes differently later keeps its alert and gets a silent line only when the new words contradict
+  alert. A missed shot ESPN has not typed yet is not judged for up to 15 seconds (`waitForShotType`, `noShotType`, `SHOT_WAIT_MS`; never at the final), so its alert has the shot's name or is the block. A missed shot ESPN describes differently later keeps its alert and gets a silent line only when the new words contradict
   the old (`shotDisagrees`: a three that is not one, 2 feet or more), measured against the alert as sent, with "changed back" when ESPN returns to it; a play
   posted more than 60 seconds of game time late (`LATE_PLAY_SECS`) shows the game's score now in its body (`GameCtx.latest`); an
-  offensive charge is a foul (`FOUL_TYPE`), one with its turnover. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
+  offensive charge is a foul (`FOUL_TYPE`), and an offensive foul and its turnover share a moment (`${gameId}:foul:${actor}:${key}`, each title the other's fold), so a device gets one alert and a line. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
   a new id isn't a 6th, and "fouled out" is never taken back. Details: docs/alerts.md, "Revisions: ESPN changes a
   basketball play after its alert".
 - **Hockey** goes through the same ledger, from a read that has the core feed. ESPN posts a hockey play half-finished (EDM at LA,
@@ -527,7 +527,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 
 | Kept (database) | Forgotten (memory) |
 |---|---|
-| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
+| `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `noShotType`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football, basketball and hockey revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
 
@@ -597,6 +597,7 @@ This is one reason for the decision **"No production restarts during live games"
   row with the player as a line). A weak flag's own "taken off" line is dropped when a pushed alert has since become the
   device's holder of the moment, so that row can stay as it was.
 - **A shot ESPN rewrites twice keeps the first correction.** Jrue Holiday's "missed a 26-foot three" got "it was a layup." when ESPN made it a layup, and ESPN's final word, a driving bank floater, adds no second line (it doesn't contradict the layup), so the device ends told "layup" (Trail Blazers at Kings, October 13 2026). A drift of a foot never gets a line.
+- **An offensive foul's line can't push.** A device with custom settings that pushes "turned it over" but not "committed a foul" loses that push when the foul play comes first: the turnover is then a late line, and lines never push. Defaults are unaffected (fouled out, which always pushes, takes the moment whichever play comes first; the foul and the turnover are feed only).
 - **The same revision line twice on one alert** (a play taken back, put back, then taken back again) has the same id,
   so the second "taken back" is dropped at the insert. The alert's row already shows that line once.
 

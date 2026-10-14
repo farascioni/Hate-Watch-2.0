@@ -1679,6 +1679,8 @@ function teamFlags(g: GameCtx, p: NPlay): Detected[] {
 
 /** ESPN's placeholder shot type, until it types the shot ("No Shot (Default Shot)"). */
 const UNKNOWN_SHOT = /\bdefault shot\b|^no shot\b/i;
+/** Basketball: a missed shot ESPN hasn't typed yet (and that isn't already a block) waits a few seconds for its type (live.ts, HW_SHOT_WAIT_MS). */
+export const awaitingShotType = (p: NPlay) => p.shooting && !p.scoring && UNKNOWN_SHOT.test(p.type) && /miss/i.test(p.text) && !/blocks/i.test(p.text);
 /** ESPN's basketball shot types as a fan says them; any other is ESPN's own, lowercased, without "shot". */
 const SHOT_NAME: Record<string, string> = {
   'Jump Shot': 'jumper', 'Pullup Jump Shot': 'pull-up jumper', 'Step Back Jump Shot': 'step-back jumper', 'Fade Away Jump Shot': 'fadeaway',
@@ -1786,6 +1788,10 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   // A play ESPN posted late alerts with the game's score now, not the old score of its moment.
   const late = lateScore(g, p);
   if (late) for (const e of out) e.body = `${say} — ${scoreLine(g, late)}`;
+  // An offensive foul is two plays at one moment ("Offensive Foul", "Offensive Foul Turnover"; a charge likewise): one alert
+  // per device, whichever play came first, the other a line on it (GS vs LAL, October 13 2026).
+  const off = /offensive/i.test(p.type) ? foulOf(g, p) : undefined;
+  if (off) for (const e of out) { e.moment = `${g.gameId}:foul:${off.key}`; e.fold = asLine(e.title); }
   return out;
 }
 

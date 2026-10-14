@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
+  awaitingBatter, awaitingShotType, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -100,6 +100,8 @@ export const CHALLENGE_SETTLE_MS = Number(process.env.HW_CHALLENGE_SETTLE_MS ?? 
 const HALF_END_TYPES = new Set(['mlb.team.stranded_risp', 'mlb.team.down_in_order', 'mlb.team.nobletiger']);
 /** MLB: how long a half-inning's end waits for a read with its third out (halfInningEnds), and an at-bat's result for its batter. */
 const HALF_END_WAIT_MS = Number(process.env.HW_HALF_END_WAIT_MS ?? 20_000);
+/** Basketball: how long a missed shot ESPN hasn't typed yet waits for its type before it's judged as it is (waitForShotType). ESPN typed 55 of 57 within 30 s, 44 within 10 (GS vs LAL, 2026-10-13). */
+const SHOT_WAIT_MS = Number(process.env.HW_SHOT_WAIT_MS ?? 15_000);
 /** Soccer: ESPN rewrites a card's or goal's short first text within a minute or two; its alerts take the new words for this long (reviseKeyText). */
 const KEY_REVISE_MS = 5 * 60_000;
 /** A read of ESPN slower than this is logged, with which feed (poll). */
@@ -180,6 +182,8 @@ export class GameTracker {
   private halfEnds = new Map<string, { playId: string; since: number; seen: string }>();
   /** MLB: at-bat results ESPN posted without their batter, not judged until he's on them (or HALF_END_WAIT_MS passes). */
   private noBatter = new Map<string, number>();
+  /** Basketball: missed shots ESPN hasn't typed yet, since when they've waited (waitForShotType). */
+  private noShotType = new Map<string, number>();
   /** MLB: results waiting to be judged since when: for the official scorer's ruling (RULING_WAIT_MS), or a strikeout's ABS review (ABS_SETTLE_MS): settling. */
   private settleSince = new Map<string, number>();
   /** MLB: each at-bat result's text and roles as last seen, to log ESPN's changes to a result after posting it. */
@@ -538,6 +542,12 @@ export class GameTracker {
     return out;
   }
 
+  /** Basketball: whether to keep waiting for ESPN to type a missed shot (awaitingShotType), SHOT_WAIT_MS at most, so the alert names the shot (or the block). */
+  private waitForShotType(p: NPlay, now: number): boolean {
+    const since = this.noShotType.get(p.id) ?? (this.noShotType.set(p.id, now), now);
+    return now - since < SHOT_WAIT_MS;
+  }
+
   /** MLB: whether to keep waiting for the batter on an at-bat's result (awaitingBatter), HALF_END_WAIT_MS at most. */
   private waitForBatter(p: NPlay, now: number): boolean {
     const since = this.noBatter.get(p.id);
@@ -836,7 +846,8 @@ export class GameTracker {
       // History from before we attached updates state but is never notified.
       const history = this.first && p.at < cutoff;
       // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
-      const waiting = league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now);
+      const waiting = (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
+        || (BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingShotType(p) && this.waitForShotType(p, now));
       // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
       // after it wait their turn, so the game's state (bases, who is on) is built in order.
       const settle = league === 'mlb' && !history && !waiting && !held && !this.seen.has(p.id) && this.settling(p, now, !!final);
