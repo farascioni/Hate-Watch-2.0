@@ -1,7 +1,5 @@
 # Post game recording report: template and steps
 
-<!-- README section: the README has its summary and links here; the vault puts this text back in its place -->
-
 ## Index
 
 **Summary:** the post game recording report is the one report every recorded game gets when it ends, in every sport: a private claude.ai Artifact with a card per finding, where the user picks Approve, Change or Skip and the choice is saved with the page. This doc is its template: the page (`template.html`), a builder that checks the data (`build-report.mjs`), a blank data file, the ALDS Game 5 data as a worked example, the steps to publish, and what each data field means. The files are in `docs/post-game-recording-report/`.
@@ -14,7 +12,7 @@
 - **What the page shows**: header, tiles, filter chips, a card per finding, "What looked right", "How this was checked".
 - **Rules**: private by default, no device ids or tokens, production reads, asking before commit, push or deploy.
 
-The README's "Post game recording report: template and steps" has the summary; this is the full detail. Read this index first, then only the part you need.
+The README's "The post game recording report" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## When a report is owed
 

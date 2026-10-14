@@ -54,7 +54,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 458 tests in 62 files, offline, in about 4 seconds, all passing on October 13, 2026.
-- **Post game recording report: template and steps** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
+- **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
 The other docs: [docs/alerts.md](docs/alerts.md) (every alert in detail), [docs/duplicate-alerts.md](docs/duplicate-alerts.md), [docs/android-release.md](docs/android-release.md), and [docs/working-in-this-repo.md](docs/working-in-this-repo.md) (the explanations behind CLAUDE.md's rules).
@@ -155,7 +155,7 @@ The full detail: [docs/sharing.md](docs/sharing.md).
 
 The full detail: [docs/tests.md](docs/tests.md).
 
-## Post game recording report: template and steps
+## The post game recording report
 
 **In short:** every recorded game gets one report when it ends, in every sport (MLB, NBA, NHL, NFL, college football, EPL, F1, UFC): a private claude.ai Artifact with the score table, the facts, and a card per finding (the alert as it went out, what is wrong, the proposed change, before and after), where the user picks Approve, Change or Skip and the choice is saved with the page. Only approved findings are built. The page template, a builder that checks a report's data, a blank data file and the ALDS Game 5 data as a worked example are in `docs/post-game-recording-report/`, so a report is a copy of those files, not a rebuild.
 
