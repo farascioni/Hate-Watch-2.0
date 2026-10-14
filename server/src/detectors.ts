@@ -78,6 +78,10 @@ export interface GameCtx {
   run?: { home: number; away: number };
   /** NHL: each goalie's shots faced and goals allowed so far (observePlay), and the ones pulled. */
   goalieLine?: Record<string, { sa: number; ga: number }>;
+  /** NHL: the shot or goal each play counted into a goalie's line (observePlay), so a later version of the play replaces its count. */
+  goalieSeen?: Map<string, { goalie: string; goal: boolean }>;
+  /** NHL: the team each goalie in the box score plays for (seedGoalies): a save by one is never taken as the other side's goalie coming on. */
+  goalieTeam?: Map<string, string>;
   pulled?: Set<string>;
   /** NHL: the shootout has started. */
   shootout?: boolean;
@@ -432,7 +436,7 @@ export function keepers(summary: any): Map<string, string> {
  * `secondary` are placed right after the play that preceded them there. (ESPN's sequenceNumber
  * restarts every MLB at-bat, so sorting by it scrambles a baseball game.)
  */
-export function mergePlays(primary: NPlay[], secondary: NPlay[]): NPlay[] {
+export function mergePlays(primary: NPlay[], secondary: NPlay[], fillTeam = false): NPlay[] {
   const out = [...primary];
   const ids = new Set(out.map((p) => p.id));
   let anchor = -1;
@@ -441,6 +445,8 @@ export function mergePlays(primary: NPlay[], secondary: NPlay[]): NPlay[] {
       let j = anchor + 1;
       while (j < out.length && out[j].id !== p.id) j++;
       anchor = j < out.length ? j : out.findIndex((q) => q.id === p.id);
+      // NHL: the core copy of a play often lacks its team (51 of 320 plays, EDM at LA 2026-10-13); the summary's copy has it.
+      if (fillTeam && anchor >= 0 && !out[anchor].teamId && p.teamId) out[anchor] = { ...out[anchor], teamId: p.teamId };
       continue;
     }
     out.splice(anchor + 1, 0, p);
@@ -460,12 +466,18 @@ export function observePlay(g: GameCtx, p: NPlay) {
     const conceding = p.teamId === g.homeId ? g.awayId : g.homeId;
     // Shots faced and goals allowed by whoever is in net (an empty-net goal is nobody's).
     const inNet = saver ?? (p.scoring && p.strength !== 'Empty Net' ? g.goalies.get(conceding) : undefined);
+    // A play counts once: a later version of it (a shot that became a goal, a goal that became an empty-netter) replaces its count.
+    const counted = g.goalieSeen?.has(p.id);
+    if (counted) unobservePlay(g, p);
     if (inNet && p.teamId && (saver || p.scoring) && !g.shootout) {
       const line = ((g.goalieLine ??= {})[inNet] ??= { sa: 0, ga: 0 });
       line.sa++;
       if (p.scoring) line.ga++;
+      (g.goalieSeen ??= new Map()).set(p.id, { goalie: inNet, goal: p.scoring });
     }
-    if (saver && p.teamId) g.goalies.set(conceding, saver);
+    // A save puts its goalie in net for his own side. A play with no team moves nobody, nor does a goalie the box score puts on the other side.
+    const own = !saver || !g.goalieTeam?.has(saver) || g.goalieTeam.get(saver) === conceding;
+    if (saver && p.teamId && own && !counted) g.goalies.set(conceding, saver);
     if (/start of shootout/i.test(p.text)) g.shootout = true;
   }
   const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
@@ -1767,6 +1779,13 @@ function foulOf(g: GameCtx, p: NPlay): { actor: string; key: string } | undefine
  * play vouches for it, so a foul ESPN posted twice, or a ghost, doesn't bring a player's 6th foul early.
  */
 export function unobservePlay(g: GameCtx, p: NPlay) {
+  // NHL: a play ESPN took out (or re-posted under a new id) stops counting as a shot faced or a goal allowed.
+  const counted = g.goalieSeen?.get(p.id);
+  if (counted) {
+    const line = g.goalieLine?.[counted.goalie];
+    if (line) { line.sa--; if (counted.goal) line.ga--; }
+    g.goalieSeen!.delete(p.id);
+  }
   const foul = BASKETBALL.has(g.league) ? foulOf(g, p) : undefined;
   const vouch = foul && g.foulPlays?.get(foul.key);
   if (!foul || !vouch?.delete(p.id) || vouch.size) return;
@@ -1784,9 +1803,11 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
 
   // A new goalie making a save in regulation: the one before was pulled, if he'd faced shots (the box score's
   // first goalie at the first read can be the backup: then this is the starter's first save, not a pull).
-  const [saver] = role(p, 'saver'), was = g.goalies.get(other(p.teamId));
+  // Only on a play that names its team and its shooter: ESPN posts a save with neither, and takes it out seconds later (a "saved by Devon Levi" with
+  // no team made Kuemper "pulled" while he was in net, EDM at LA 2026-10-13), and other(undefined) is the home side.
+  const [saver] = role(p, 'saver'), was = p.teamId ? g.goalies.get(other(p.teamId)) : undefined;
   const line = was ? g.goalieLine?.[was] : undefined;
-  if (saver && was && saver !== was && (p.periodNum ?? 0) <= 3 && line && line.sa > 0 && !g.pulled?.has(was)) {
+  if (saver && shooter && was && saver !== was && (p.periodNum ?? 0) <= 3 && line && line.sa > 0 && !g.pulled?.has(was)) {
     (g.pulled ??= new Set()).add(was);
     out.push(mk(g, p, 'nhl.goalie.pulled', was, `${nameOf('nhl', was)} got pulled after allowing ${line.ga} goal${line.ga === 1 ? '' : 's'} on ${line.sa} shot${line.sa === 1 ? '' : 's'}`, { body: `${nameOf('nhl', saver)} is in net — ${scoreLine(g, p)}` }));
   }
@@ -1798,7 +1819,8 @@ function nhl(g: GameCtx, p: NPlay): Detected[] {
     return out;
   }
   if (slug === 'goal' || p.type === 'Goal') {
-    const goalie = g.goalies.get(other(p.teamId));
+    // No team, no goalie: the other side of an unknown team is a guess (the core copy of a goal can lack its team; the ledger judges it when it has one).
+    const goalie = p.teamId ? g.goalies.get(other(p.teamId)) : undefined;
     if (goalie && !/empty net/i.test(p.text) && p.strength !== 'Empty Net' && !g.shootout) out.push(mk(g, p, 'nhl.goalie.goal_allowed', goalie, `${nameOf('nhl', goalie)} let one in 🥅`));
   } else if (shooter && (slug === 'shot-missed' || p.type === 'Missed')) {
     out.push(mk(g, p, 'nhl.shot_missed', shooter, `${nameOf('nhl', shooter)} shot and missed${/post|crossbar/i.test(p.text) ? ' (rang iron)' : ''}`));

@@ -26,6 +26,7 @@
 import { db, kvGet, kvSet, shareCode, tx } from './db.ts';
 import { eliminationOf, gameLostEvent, heavyLossEvent, seriesStanding, type Detected } from './detectors.ts';
 import { SOCCER, type League } from './leagues.ts';
+import { competitorScore } from './scores.ts';
 import { marginFromBody, rateLoss, type LossRating } from './loss-rating.ts';
 
 export const MISERY_DAYS = 30;
@@ -173,7 +174,7 @@ function board(lg: League, ev: any, now: number): boolean {
   if (!home || !away || !ev.status?.type?.completed || onBoard.has(`${lg}:${ev.id}`)) return false;
   onBoard.add(`${lg}:${ev.id}`);
   if (onBoard.size > 5000) onBoard.clear();
-  const final = { home: Number(home.score), away: Number(away.score) };
+  const final = { home: competitorScore(lg, home), away: competitorScore(lg, away) };
   if (!Number.isFinite(final.home) || !Number.isFinite(final.away)) return false;
   const g = { league: lg, gameId: String(ev.id), homeId: String(home.id), awayId: String(away.id) };
   const at = Math.min(now, Date.parse(ev.date) + 3.5 * 3600_000); // the scoreboard has no end time: about when it ended

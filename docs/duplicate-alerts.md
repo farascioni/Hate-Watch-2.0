@@ -232,7 +232,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`mergePlays`:** ESPN's core and site feeds are merged by play id before detection, so a play in both is one
   play (README "Real-time": "Two sources per game"). College football's drive plays (`fromDrivePlays`) skip a play
   listed in two drives.
-- **The football and basketball ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (Layer 5).
+- **The football, basketball and hockey ledger** (`PlayLedger`, `revisions.ts`): what each play and drive sent, for 15 minutes (Layer 5).
 - **The pregame facts in `kv`** (`pregame:${league}:${gameId}`: odds, records, the series), so the facts of a loss
   are the same after a restart.
 
@@ -390,6 +390,13 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   alert. Fouls are recounted with each version (`unobservePlay`, `observePlay`, `g.foulPlays`), so a foul re-posted under
   a new id isn't a 6th, and "fouled out" is never taken back. Details: docs/alerts.md, "Revisions: ESPN changes a
   basketball play after its alert".
+- **Hockey** goes through the same ledger, from a read that has the core feed. ESPN posts a hockey play half-finished (EDM at LA,
+  2026-10-13: every goal first a missed or saved shot, 6 of 7 penalties as "Penalty Shot Infraction", the empty-netter as an
+  even-strength goal, 6 plays taken out). A changed play is judged again: a line with no push on the alert it no longer has
+  ("ESPN has since changed this: Leon Draisaitl scored."), the alert it has now goes out, a late empty-netter or short-handed
+  goal sends the team's alert with no `alt` so it folds into the "scored on" alert as a line, a penalty's call is a line.
+  `nhl.goalie.pulled` is in `ONCE`. A goalie's shots faced and goals allowed are recounted with each version of a play
+  (`g.goalieSeen`, `observePlay`, `unobservePlay`). Details: docs/alerts.md, "Revisions: ESPN changes a hockey play after its alert".
 - **Football** (`server/src/revisions.ts`, `PlayLedger`, used by `GameTracker.poll` for college football and the
   NFL): for `REVISE_MS` (15 minutes) after it's first seen, each play and drive keeps the alerts it sent, by kind
   (type and target). Each read compares them with the play as ESPN has it now (`changed`, when the play's text, type,
@@ -516,7 +523,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 | Kept (database) | Forgotten (memory) |
 |---|---|
 | `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
-| `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football and basketball revisions ledger |
+| `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations | `delivered` (late facts), the football, basketball and hockey revisions ledger |
 | | F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
 
 A restart, step by step:
@@ -545,7 +552,7 @@ What is lost:
 
 - **Late facts.** A fact that comes after a restart for a moment alerted before it has no `delivered` entry. If it
   has no `lateOn`, it can go out as an alert of its own rather than a line, and a `foldOnly` one is never shown.
-- **Revisions.** A football or basketball play edited after a restart can't be compared with what it sent before: the
+- **Revisions.** A football, basketball or hockey play edited after a restart can't be compared with what it sent before: the
   ledger is empty, and a revision line has no `delivered` entry to land on.
 - **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, a strikeout under an
   ABS review or a result waiting for the official scorer, from before the 90-second window is history. A line a rewrite would

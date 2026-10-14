@@ -19,7 +19,7 @@ import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
 import { flagOn } from './flags.ts';
 import type { Clip } from './highlights.ts';
 import { soccerType } from './event-types.ts';
-import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
+import { boxGoalies, boxPassers, boxPitchCounts, competitorScore, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
 import { divisionsOf } from './divisions.ts';
 import { weeklyRecaps } from './recap.ts';
 import { recordFinalOnBoard } from './misery.ts';
@@ -764,7 +764,7 @@ export class GameTracker {
     // Soccer: the touch feed has a goal, card or substitution before the summary's key events do (the same play id): the summary's
     // version is the play once it is there, the touch feed's until then.
     const touchPlays = soccer ? this.touchKeyPlays() : [];
-    const merged = mergePlays(corePlays, soccer ? mergePlays(sitePlays, touchPlays) : sitePlays);
+    const merged = mergePlays(corePlays, soccer ? mergePlays(sitePlays, touchPlays) : sitePlays, league === 'nhl');
     const plays = league === 'mlb' ? this.withStrikeThrees(merged, Date.now()) : merged;
     if (plays.length) this.plays = plays;
     if (soccer) this.reviseKeyText([...sitePlays, ...touchPlays], Date.now());
@@ -777,7 +777,9 @@ export class GameTracker {
     const changed: Detected[] = [];
     // Basketball: the same ledger, from a read that has the core feed (revisions.ts): ESPN posts its plays half-finished
     // and edits them (35 to 49% of October 11 2026's preseason plays), so a changed play is judged again.
-    const ledgered = football || (BASKETBALL.has(league) && plays.length > 0 && core.status === 'fulfilled');
+    // Hockey too (EDM at LA, 2026-10-13): every goal was posted as a missed or saved shot first, a penalty as "Penalty Shot Infraction", a goal
+    // as even strength before its empty net, and 6 plays were taken out; and a goalie's shots and goals follow the plays' latest versions.
+    const ledgered = football || ((BASKETBALL.has(league) || league === 'nhl') && plays.length > 0 && core.status === 'fulfilled');
     if (ledgered) this.ledger.read(new Set(plays.map((p) => p.id)), now);
     let header: Header | undefined; // football: the summary header's score while the game is on
     let final: { home: number; away: number } | null = null;
@@ -805,7 +807,7 @@ export class GameTracker {
         const round = this.postseason ? roundLabel(s.header?.gameNote ?? comp?.notes?.[0]?.headline ?? this.info.note) : undefined;
         events.push(...gameStartEvents(this.ctx, { ...this.info, round }, Date.now()));
       }
-      const c = (side: string) => Number(comp.competitors.find((x: any) => x.homeAway === side)?.score ?? 0);
+      const c = (side: string) => competitorScore(league, comp.competitors.find((x: any) => x.homeAway === side));
       if (comp?.status?.type?.completed) final = { home: c('home'), away: c('away') };
       else if (state === 'in' && FOOTBALL.has(league) && comp?.competitors) {
         header = { home: c('home'), away: c('away'), period: Number(comp.status?.period ?? 0), clock: clockSeconds({ displayValue: comp.status?.displayClock }) };
@@ -858,7 +860,11 @@ export class GameTracker {
             const h = this.ctx.half, r = this.ctx.lastResult; // what the plays as first seen made of it, for the log
             this.halfEnds.set(ended, { playId: p.id, since: now, seen: `${r?.id} pas=${h?.key === ended ? h.pas.length : 0} reached=${h?.key === ended && h.reached}` });
           }
+          const net = league === 'nhl' ? [this.ctx.goalies.get(this.ctx.homeId), this.ctx.goalies.get(this.ctx.awayId)] : [];
           observePlay(this.ctx, p);
+          if (league === 'nhl' && (net[0] !== this.ctx.goalies.get(this.ctx.homeId) || net[1] !== this.ctx.goalies.get(this.ctx.awayId))) {
+            log(`[nhl ${gameId}] goalie in net changed on play ${p.id} (${p.periodNum}P ${p.clockSec}s left): home ${net[0]} → ${this.ctx.goalies.get(this.ctx.homeId)}, away ${net[1]} → ${this.ctx.goalies.get(this.ctx.awayId)}`);
+          }
           if (ledgered) this.ledger.add(p, es, { history }, now);
         }
       } else if (ledgered) {
@@ -989,6 +995,8 @@ export class GameTracker {
       goalies: league === 'nhl' && summary.status === 'fulfilled' ? boxGoalies(summary.value, this.ctx.goalies) : undefined,
       passers: FOOTBALL.has(league) && summary.status === 'fulfilled' ? boxPassers(summary.value, league) : undefined,
     });
+    // Hockey: the header can trail the plays at the final (EDM 3 for five minutes after an empty-netter made it 4-1): a goal is only ever added.
+    if (final && league === 'nhl') final = { home: Math.max(final.home, score.home), away: Math.max(final.away, score.away) };
     if (this.heldFinal) this.finishWhenCurrent(this.heldFinal.final); // the scoreboard's final waits for a read that catches up: has this one?
     else if (final && this.postseason) {
       // The scoreboard's read (every 10s) finishes it with the series; this is the fallback.
@@ -1019,6 +1027,8 @@ export class GameTracker {
 
   /** The scoreboard's final, with the series (a playoff loss can end a season): finished now, or held (finishWhenCurrent) and stopped once it is. */
   finishFromScoreboard(final: { home: number; away: number }, ev: any) {
+    // Hockey: the plays can be ahead of the scoreboard (a goal is only ever added; see poll).
+    if (this.ctx.league === 'nhl') final = { home: Math.max(final.home, this.score.home), away: Math.max(final.away, this.score.away) };
     this.finishWhenCurrent(final, ev);
     if (this.finished) this.stop();
   }
@@ -1171,8 +1181,11 @@ export class GameTracker {
 
   private seedGoalies(s: any) {
     for (const t of s.boxscore?.players ?? []) {
-      const g = t.statistics?.find((x: any) => x.name === 'goalies')?.athletes?.[0]?.athlete?.id;
+      const goalies = t.statistics?.find((x: any) => x.name === 'goalies')?.athletes ?? [];
+      const g = goalies[0]?.athlete?.id;
       if (g) this.ctx.goalies.set(String(t.team.id), String(g));
+      // Every goalie the box score lists, with his team: a save by one is never read as the other side's goalie coming on.
+      for (const a of goalies) if (a?.athlete?.id) (this.ctx.goalieTeam ??= new Map()).set(String(a.athlete.id), String(t.team.id));
     }
   }
 
@@ -1332,7 +1345,7 @@ class LiveEngine {
           tr = new GameTracker(lg, ev.id, home.id, away.id);
           this.trackers.set(key, tr);
         }
-        tr?.finishFromScoreboard({ home: Number(home.score), away: Number(away.score) }, ev); // with the series: a playoff loss can end their season
+        tr?.finishFromScoreboard({ home: competitorScore(lg, home), away: competitorScore(lg, away) }, ev); // with the series: a playoff loss can end their season
         if (!tr) recordFinalOnBoard(lg, ev); // nobody tracks either team: Recent misery still has the loss (misery.ts), from this scoreboard read
       }
       if (tr && !relevant && !tr.finished) {

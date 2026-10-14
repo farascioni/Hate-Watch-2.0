@@ -26,6 +26,13 @@ MLB
 - A third out a review overturns gets a line, and the inning's real end is judged.
 - A strikeout ESPN never posts is made from the third strike.
 
+HOCKEY
+- A goalie is no longer shown as pulled when a play ESPN took out a few seconds later had him replaced, and a real pull now counts the goals against him ("3 goals on 7 shots").
+- A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"), and other shots ESPN changes (blocked, saved, missed, another player's, taken out) get a line too, with no extra push.
+- An empty-net goal ESPN first posted as an even-strength one is no longer charged to the goalie: the goalie's alert says nobody was in net, and the team's says "Into an empty net."
+- A penalty ESPN first posted as "Penalty Shot Infraction" gets its real call as a line.
+- The final score of a game is the higher of ESPN's score and its period scores, so a header that trails by a goal no longer gives a loss "3 to 1" when it ended 4-1.
+
 FOOTBALL
 - A score that ties the game says so ("Rams tied the game, 34-34."), as a line on the alert with no push; when the extra point is what ties it, the line comes a few seconds after the touchdown.
 - A sack on a failed two-point try reads "got sacked on the two-point try".

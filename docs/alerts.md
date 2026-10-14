@@ -639,17 +639,19 @@ How the soccer alerts follow a new league without new alert code.
 
 **Where the plays come from.** Both ESPN feeds every 2 seconds, merged by id. The detector is `nhl()` in `detectors.ts`. Roles: `shooter` and `saver`. The play's `strength` is ESPN's ("Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot").
 
-**Who is in net.** On the first read the tracker seeds each side's goalie from the box score's goalies (`seedGoalies`: the first listed). From then on `observePlay` follows the saves: a save by a goalie puts him in net for that side. Each goalie's shots faced and goals allowed are counted (`g.goalieLine`; an empty-net goal is nobody's). The goalie on the ice for a goal is inferred from the last save each goalie made; README "Known limits" says so.
+**Who is in net.** On the first read the tracker seeds each side's goalie from the box score's goalies (`seedGoalies`: the first listed). From then on `observePlay` follows the saves: a save by a goalie puts him in net for that side. Each goalie's shots faced and goals allowed are counted (`g.goalieLine`; an empty-net goal is nobody's). The goalie on the ice for a goal is inferred from the last save each goalie made; README "Known limits" says so. Three guards (EDM at LA, October 13, 2026): a play with no team moves nobody (ESPN posts a save with no team and no shooter, and takes it out seconds later; the core copy of a play lacks its team 16% of the time, so `mergePlays(…, true)` takes it from the summary's copy); a goalie the box score lists for the other side is not put in net (`g.goalieTeam`, from every goalie in the box score); and a play counts as a shot faced or a goal allowed once, whatever versions ESPN posts (`g.goalieSeen`, undone by `unobservePlay` when the play is replaced or taken out). The tracker logs "goalie in net changed on play …" whenever the goalie moves.
 
 ### Goalie allows a goal (goalies only)
 
 - **Trigger:** a goal (type "Goal" or slug `goal`) not into an empty net (neither "empty net" in the text nor `strength` Empty Net) and not in a shootout. The goalie is the conceding side's in `g.goalies`.
 - **Title:** "<Name> let one in 🥅".
-- **A late goal:** when a play becomes a scoring play after it was first published, the tracker logs "late score" and runs just this alert for it (`GameTracker.poll`).
+- **Needs the play's team:** with none, there is no goalie to name (the other side of an unknown team is a guess); the ledger judges the play again when ESPN names the team.
+- **A late goal:** when a play becomes a scoring play after it was first published, the ledger judges it again and the goalie's alert goes out (the tracker logs "late score"; without the core feed it runs just this alert for the play, `GameTracker.poll`). Every goal in EDM at LA went this way: each was a missed or saved shot first.
+- **An empty-netter ESPN first posts as an even-strength goal** (its strength changed 10 to 20 seconds later): the goalie's alert gets the line "ESPN has since marked this an empty-net goal: nobody was in net.", and the team gets `nhl.team.empty_net_goal` as a line on its "scored on" alert ("Into an empty net."), or as an alert for a device that wanted only that one (it carries no `alt`, so it can fold into the alert the device already holds).
 
 ### Gets pulled (goalies)
 
-- **Trigger:** a save in regulation (period 3 or earlier) by a different goalie from the one the tracker had in net for that side, when the one before had faced at least one shot, once per goalie (`g.pulled`). The first read's goalie can be the backup in the box score: then the starter's first save isn't a pull, because the backup faced no shots.
+- **Trigger:** a save in regulation (period 3 or earlier), on a play that names its team and its shooter, by a different goalie from the one the tracker had in net for that side, when the one before had faced at least one shot, once per goalie (`g.pulled`). A goal first posted as a missed shot counts as a shot and a goal against once ESPN makes it a goal, so the body's numbers are the box score's (Kuemper: "3 goals on 7 shots"). The first read's goalie can be the backup in the box score: then the starter's first save isn't a pull, because the backup faced no shots.
 - **Title:** "Tristan Jarry got pulled after allowing 2 goals on 3 shots". **Body:** "Alex Nedeljkovic is in net — NYR 2, PIT 0" (`test/sport-alerts.test.ts`).
 - Not for an extra attacker: that leaves the net empty, and the next save is the same goalie's.
 
@@ -669,6 +671,7 @@ How the soccer alerts follow a new league without new alert code.
 ### Gives the puck away (off by default)
 
 - **Trigger:** a play whose type has "giveaway". **Title:** "<Name> gave the puck away".
+- **It runs late.** ESPN posts a giveaway a median 132 seconds after it happened (54 to 224 seconds, 34 giveaways, EDM at LA), against 27 seconds for shots and 33 to 42 for goals. It is off by default and stays so; measure on more games before saying more.
 
 ### Penalties, fights and ejections
 
@@ -676,6 +679,7 @@ How the soccer alerts follow a new league without new alert code.
 - **Takes a penalty:** "<Name> went to the box (<minutes> min, <ESPN's penalty type>)", fold "<minutes> minutes in the box.".
 - **Drops the gloves:** the text has "fighting" ("Mathieu Olivier Fighting against Arber Xhekaj"): "Evgeni Malkin dropped the gloves with Artemi Panarin" (`test/sport-alerts.test.ts`), fold "A fight.", counting as the penalty (`aliases: ['nhl.penalty']`).
 - **Gets ejected:** the type is a game misconduct or a match penalty: "Evgeni Malkin got ejected (game misconduct)" (`test/new-alerts.test.ts`), fold "Ejected (game misconduct).", type `player.ejected` counting as the penalty. A plain misconduct (10 minutes, then back) isn't an ejection.
+- **ESPN names the call a few seconds later.** A penalty first posted as "Penalty Shot Infraction" with the text "<Name> Minor" (6 of 7 in EDM at LA, rewritten within 10 to 40 seconds) goes out as posted, and the call is a line with no push: "ESPN has since called it tripping against Kasperi Kapanen." (`revisions.ts`).
 - **One moment for one player's penalties at one moment:** `${gameId}:penalty:${athleteId}:${period}:${clock}`. An instigator's misconduct and a game misconduct come as two plays at the same moment (Olivier, 14:27 of the 3rd); the device gets the first, with the other as its line. A fact a poll later is a late line.
 
 ### Finishes -3 or worse (feed only by default)
@@ -693,6 +697,20 @@ How the soccer alerts follow a new league without new alert code.
 
 - **Trigger:** at the final, the loser's power play in the box score's team stats (`boxPowerPlay`): no goals on 4 or more chances (`PP_FAIL`).
 - **Only a line on the loss** (`foldOnly`): "0-for-<chances> on the power play.". Title, for the record: "<Team> went 0-for-<chances> on the power play and lost". About 13% of losses.
+
+### Revisions: ESPN changes a hockey play after its alert
+
+ESPN posts a hockey play before it has settled and edits it. In EDM at LA (314 plays) all 5 goals were first posted as a missed or saved shot, 6 of 7 penalties as "Penalty Shot Infraction", the empty-netter as an even-strength goal, 6 plays were taken out, and 27 of the 157 shot, giveaway and penalty alerts disagreed with ESPN's final play (the 6 placeholder penalties included). Hockey goes through the same ledger as basketball (`PlayLedger`, `revisions.ts`, from a read with the core feed): a changed play is judged again on its latest version for 15 minutes; the alert it no longer has gets a line with no push, the alert it has now goes out, a play gone for 30 seconds has its alerts taken back with a line.
+
+- **The lines** (`hockeyLine`): "ESPN has since changed this: Leon Draisaitl scored." (a shot that became a goal), "…the shot was blocked / saved / missed.", "ESPN has since credited this play to Erik Haula.", "ESPN has since marked this an empty-net goal: nobody was in net.", "ESPN has since taken this play out.". A retyped shot's line and the new kind's alert for the same shooter share an `alt` (`shot-retyped:…`), so a device gets one of them.
+- **Goalie lines are recounted** with each version (`observePlay` replaces a play's count, `unobservePlay` takes it back): a goal that was a missed shot is a shot faced and a goal against.
+- **A goalie coming on is judged once**, as the play comes in (`nhl.goalie.pulled` is in `ONCE`): a revised save never pulls anyone, and the ledger judges on a copy of the game's state that marks every goalie in net as already pulled.
+- **A re-post** under a new id is that play (`samePlay(…, true)`: the same period, the clock within 10 seconds, the same first participant, the same kind of play).
+- **An empty-netter or short-handed goal** that was a goal already: the team's alert for it is sent as a late alert (`strengthGoal`: `teamScoreEvents` filtered to `nhl.team.*`, with no `alt`).
+- **Not done:** holding a penalty until ESPN names the call (the placeholder alert goes out and the call is a line) and holding a goal until its strength settles.
+- **Tests:** `test/edm-la-review.test.ts`.
+
+**The final score.** ESPN's header and scoreboard can trail the plays: for at least five minutes after the Final they had Edmonton on 3 while its periods (3, 0, 1) and the plays said 4, and the Recent misery list recorded "Final Score: 3 to 1" for a game nobody tracked. The final is the higher of the header's score and the plays' last score, and every scoreboard score is the higher of ESPN's score and the sum of the period scores (`competitorScore` in `scores.ts`, used by the tracker, the Scores tab's cards and the Recent misery list); not with a fifth entry, which a shootout's doesn't add up.
 
 ### NHL and the shared team alerts
 

@@ -102,6 +102,19 @@ function sideTeam(lg: League, c: any): TeamDto {
 /** College football: a team's top-25 ranking on a scoreboard competitor (ESPN's 99 is unranked). */
 export const rankOf = (x: any): number | undefined => { const r = Number(x?.curatedRank?.current); return r >= 1 && r <= 25 ? r : undefined; };
 
+/**
+ * A side's score as ESPN's scoreboard or header gives it. Hockey: the sum of its period scores when that is more (EDM at LA,
+ * 2026-10-13: the score said 3 for at least five minutes after the Final, its periods 3, 0, 1 and the plays said 4). A goal is only
+ * ever added. Not with a fifth entry (a shootout's, or a second overtime): those don't add up to the score.
+ */
+export function competitorScore(lg: League, c: any): number {
+  const score = Number(c?.score ?? 0);
+  const ls: any[] = c?.linescores ?? [];
+  if (lg !== 'nhl' || !ls.length || ls.length > 4) return score;
+  const sum = ls.reduce((n, l) => n + Number(l?.displayValue ?? l?.value ?? 0), 0);
+  return Number.isFinite(sum) ? Math.max(score, sum) : score;
+}
+
 /** One game from a scoreboard event (NBA, MLB, NFL, NHL, EPL, college football). Pure, so it can be tested on real payloads. */
 export function gameCard(lg: League, ev: any): GameCard | null {
   const c = ev?.competitions?.[0];
@@ -114,7 +127,7 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     return {
       // A card's copy of the team: "#8 Indiana" on it (every build shows it), the catalog's own name untouched.
       team: rank ? { ...team, shortName: `#${rank} ${team.shortName}` } : team,
-      score: state === 'pre' || x.score == null || x.score === '' ? null : Number(x.score),
+      score: state === 'pre' || x.score == null || x.score === '' ? null : competitorScore(lg, x),
       ...(x.winner === true ? { winner: true } : {}),
       ...(rank ? { rank } : {}),
     };

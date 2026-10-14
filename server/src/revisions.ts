@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { BASKETBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -27,6 +27,12 @@ import { PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, sco
  * longer has gets a line (no push), the right player's alert goes out, a re-post is the same play, and a play ESPN
  * took out has its alerts taken back. A play with no shooter yet alerts nothing until ESPN names one. Fouls are
  * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right.
+ *
+ * Hockey uses it too (EDM at LA, October 13 2026): every goal was first posted as a missed or saved shot, 6 of 7 penalties as
+ * "Penalty Shot Infraction", the empty-netter as an even-strength goal, and 6 plays were taken out. A changed play is judged
+ * again (`hockeyLine`: "ESPN has since changed this: Leon Draisaitl scored."), a goalie's shots and goals are recounted with
+ * each version, a goalie coming on is judged once (`ONCE`), a late empty-netter sends the team's alert (`strengthGoal`) and a
+ * penalty's call is a line.
  */
 
 /** How long after we first see a play or a drive's result ESPN's changes to it are news. */
@@ -40,11 +46,11 @@ const kindOf = (e: Detected) => `${e.type}|${e.targetKey}`;
 /** Alerts by kind, the first of each (a play with two flags on a team is that team's first: publish keeps the first of an id). */
 const byKind = (es: Detected[]) => { const m = new Map<string, Detected>(); for (const e of es) if (!m.has(kindOf(e))) m.set(kindOf(e), e); return m; };
 /** Counted as the plays come in, so never re-run on a new version nor taken back: the starting quarterback pulled. */
-const ONCE = /qb[._]pulled$/;
+const ONCE = /qb[._]pulled$|nhl\.goalie\.pulled$/;
 /** Basketball: fouling out replaces the foul's alert and can't be judged twice (the foul is counted by then): never taken back. */
 const FOULED_OUT = /\.fouled_out$/;
 /** What a play says, for noticing that ESPN changed it. */
-const sigOf = (p: NPlay) => JSON.stringify([p.type, p.text, p.scoring, p.home, p.away, p.teamId, p.endTeamId, p.participants]);
+const sigOf = (p: NPlay) => JSON.stringify([p.type, p.text, p.scoring, p.home, p.away, p.teamId, p.endTeamId, p.participants, p.strength]);
 /** When in the period a play started: the "(12:21)" its text opens with, else its clock. */
 const startOf = (p: NPlay) => { const m = p.text.match(/^\((\d+):(\d+)\)/); return m ? Number(m[1]) * 60 + Number(m[2]) : p.clockSec; };
 /** The player a play is about: the first its text names ("#3 G.Lopez", "P.Mahomes"). */
@@ -76,10 +82,10 @@ const REVIEW = /\bunder (?:automatic )?review\b|\breplay official\b|\b(?:call )?
 const FLAG = /^(?:nfl\.penalty|cfb\.team\.penalty)$/;
 /** Why a play's alert no longer holds, from the play as it is now (none: ESPN took it out). */
 export function changeLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, now: NPlay | null): string {
-  if (!now) return BASKETBALL.has(g.league) ? 'ESPN has since taken this play out.' : 'ESPN has since taken this play back.';
+  if (!now) return BASKETBALL.has(g.league) || g.league === 'nhl' ? 'ESPN has since taken this play out.' : 'ESPN has since taken this play back.';
   if (/\bno play\b/i.test(ruled(now.text))) return wipedOutLine(g, ruled(now.text));
   if (REVIEW.test(now.text)) return 'Overturned on review.';
-  if (BASKETBALL.has(g.league)) return 'ESPN has since changed this play.';
+  if (BASKETBALL.has(g.league) || g.league === 'nhl') return 'ESPN has since changed this play.';
   return now.type ? `ESPN has since changed this play to ${plainType(now.type)}.` : 'ESPN has since changed this play.';
 }
 
@@ -161,7 +167,9 @@ export class PlayLedger {
 
   /** The detectors that only read the play, on a version of it (the quarterback pulled counts passes: never again). */
   private detect(p: NPlay): Detected[] {
-    return PLAYER_DETECTORS[this.g.league]({ ...this.g, qbPulled: new Set([this.g.homeId, this.g.awayId]) }, p).filter((e) => !ONCE.test(e.type));
+    // NHL: a goalie coming on is judged once, as the play comes in, and this must not mark anyone pulled (`pulled` is a copy that already holds the goalies in net).
+    const pulled = new Set([...(this.g.pulled ?? []), ...this.g.goalies.values()]);
+    return PLAYER_DETECTORS[this.g.league]({ ...this.g, qbPulled: new Set([this.g.homeId, this.g.awayId]), pulled }, p).filter((e) => !ONCE.test(e.type));
   }
 
   /**
@@ -216,7 +224,7 @@ export class PlayLedger {
   repost(p: NPlay, now: number): PlayEntry | undefined {
     let best: [string, PlayEntry] | undefined;
     for (const [id, x] of this.plays) {
-      if (x.missingSince == null || x.header || now - x.missingSince > REVISE_MS || !samePlay(x.play, p, BASKETBALL.has(this.g.league))) continue;
+      if (x.missingSince == null || x.header || now - x.missingSince > REVISE_MS || !samePlay(x.play, p, BASKETBALL.has(this.g.league) || this.g.league === 'nhl')) continue;
       if (!best || Math.abs(startOf(x.play)! - startOf(p)!) < Math.abs(startOf(best[1].play)! - startOf(p)!)) best = [id, x];
     }
     if (!best) return undefined;
@@ -238,6 +246,7 @@ export class PlayLedger {
    */
   private goneLine(e: Detected, p: NPlay, want: Map<string, Detected>): string | undefined {
     if (BASKETBALL.has(this.g.league)) return this.basketballLine(e, p, want);
+    if (this.g.league === 'nhl') return this.hockeyLine(e, p, want);
     if (/^(?:nfl|cfb\.team)\.fumble_lost$/.test(e.type) && [...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:nfl|cfb\.team)\.fumble$/.test(f.type))) {
       const team = e.targetKey.startsWith('player:') ? catalog.player(e.targetKey)?.teamKey : e.targetKey;
       const name = team ? catalog.team(team)?.shortName : undefined;
@@ -268,6 +277,34 @@ export class PlayLedger {
   }
 
   /**
+   * Hockey: why a player's alert no longer holds: the play is a goal now, the shot was blocked, saved or missed, it's another
+   * player's, or the goal went into an empty net (nobody was in goal).
+   */
+  private hockeyLine(e: Detected, p: NPlay, want: Map<string, Detected>): string | undefined {
+    const now = [...want.values()];
+    if (e.type === 'nhl.goalie.goal_allowed') return p.strength === 'Empty Net' || /empty net/i.test(p.text) ? 'ESPN has since marked this an empty-net goal: nobody was in net.' : undefined;
+    if (!/^nhl\.shot_/.test(e.type)) return undefined;
+    const other = now.find((f) => /^nhl\.shot_/.test(f.type) && f.targetKey !== e.targetKey);
+    if (other) return `ESPN has since credited this play to ${catalog.player(other.targetKey)?.name ?? 'another player'}.`;
+    const name = catalog.player(e.targetKey)?.name;
+    if (p.scoring) return `ESPN has since changed this: ${name && p.text.startsWith(name) ? `${name} scored` : 'this was a goal'}.`;
+    const kind = now.find((f) => f.targetKey === e.targetKey && /^nhl\.shot_/.test(f.type));
+    if (kind) return `ESPN has since changed this: the shot was ${kind.type === 'nhl.shot_blocked' ? 'blocked' : kind.type === 'nhl.shot_saved' ? 'saved' : 'missed'}.`;
+    return undefined;
+  }
+
+  /**
+   * The team alerts for a goal ESPN has since marked an empty-netter or short-handed (it posted it as an even-strength goal first: EDM
+   * at LA's empty-netter changed 20 seconds after the goal). The same alerts teamScoreEvents makes, with no `alt`: a device that got
+   * "scored on" for the goal gets this as a line on it ("Into an empty net."), one that wanted only this gets the alert.
+   */
+  private strengthGoal(p: NPlay): Detected[] {
+    const side = p.teamId === this.g.homeId ? 'home' : p.teamId === this.g.awayId ? 'away' : undefined;
+    if (!side) return [];
+    return teamScoreEvents(this.g, { home: p.home, away: p.away, [side]: p[side] - 1 }, p).filter((e) => /^nhl\.team\./.test(e.type)).map(({ alt: _alt, ...e }) => e);
+  }
+
+  /**
    * A play's alerts against a new version of it (null: ESPN took it out): the ones it no longer has get a line
    * (`lines`), the ones it has now go out (`fresh`). One taken back that it has again gets a line, never a second
    * alert (an interception wiped out by pass interference, then not: the flag overturned on review, Browns at
@@ -280,10 +317,11 @@ export class PlayLedger {
     const stale = x.history || now - x.firstAt > REVISE_MS;
     // Basketball: the fouls, recounted around the judgment. The old version's foul stops counting first (a foul re-posted
     // under a new id is not a 6th), the new version is judged (its 6th foul is judged before it is counted), then counted.
-    const basketball = BASKETBALL.has(this.g.league);
-    if (basketball) unobservePlay(this.g, was);
+    // Hockey: shots faced and goals allowed are recounted with each version (a shot that became a goal), and a play taken out stops counting.
+    const basketball = BASKETBALL.has(this.g.league), hockey = this.g.league === 'nhl';
+    if (basketball || (hockey && (!p || p.id !== was.id))) unobservePlay(this.g, was);
     const want = stale ? new Map<string, Detected>() : byKind(bundleByPlay(p ? this.detect(p) : []));
-    if (basketball && p) observePlay(this.g, p);
+    if ((basketball || hockey) && p) observePlay(this.g, p);
     if (stale) return { fresh: [], lines: [] };
     const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [], gone: Detected[] = [];
     for (const [k, e] of x.alerts) {
@@ -307,7 +345,14 @@ export class PlayLedger {
     // (A player's flags only: a team's `nfl.penalty` is the team being flagged, not another player to move this one to.)
     const flags = [...want.values()].filter((e) => e.type === 'nfl.penalty' && e.targetKey.startsWith('player:'));
     for (const e of gone) {
-      if (!p || !FLAG.test(e.type)) { lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why)); continue; }
+      if (!p || !FLAG.test(e.type)) {
+        // Hockey: a shot retyped (missed → blocked) is one change for the shooter: the line, and the new kind's alert for a device that never had the first, share an `alt`.
+        const retyped = hockey && /^nhl\.shot_/.test(e.type) ? fresh.filter((f) => /^nhl\.shot_/.test(f.type) && f.targetKey === e.targetKey) : [];
+        const alt = retyped.length ? `shot-retyped:${p!.id}:${e.targetKey}` : undefined;
+        for (const f of retyped) f.alt = alt;
+        lines.push(...this.linesOn([e], p ? this.goneLine(e, p, want) ?? why : why, alt));
+        continue;
+      }
       // The flag became an ejection on the same play (a disqualification, a targeting call): the ejection's own line says so.
       if ([...want.values()].some((f) => f.targetKey === e.targetKey && /^(?:player\.ejected|cfb\.team\.ejection)$/.test(f.type))) continue;
       const to = e.type === 'nfl.penalty' && e.targetKey.startsWith('player:') ? flags.filter((f) => f.targetKey !== e.targetKey) : [];
@@ -322,6 +367,17 @@ export class PlayLedger {
       this.log(`play ${was.id}${p && p.id !== was.id ? ` (now ${p.id})` : ''} changed: ${what}${lines.length ? ` (${why})` : ''}${again.length ? ` (${restoredLine})` : ''}`);
     }
     lines.push(...this.linesOn(again, restoredLine));
+    if (hockey && p) {
+      // A goal that was a goal already, now an empty-netter or a short-handed one: the team's alert says so.
+      if (p.scoring && was.scoring && was.strength !== p.strength && (p.strength === 'Empty Net' || p.strength === 'Shorthanded')) fresh.push(...this.strengthGoal(p));
+      // A penalty ESPN posts as "Penalty Shot Infraction" ("Drew Doughty Minor") and names a few seconds later: the call, as a line.
+      for (const [k, e] of want) {
+        const sent = x.alerts.get(k);
+        if (!sent || sent.type !== 'nhl.penalty' || sent.title === e.title) continue;
+        x.alerts.set(k, e);
+        lines.push(...this.linesOn([sent], `ESPN has since called it ${p.type.toLowerCase()}${p.text.match(/\bagainst (.+)$/)?.[0] ? ` ${p.text.match(/\bagainst (.+)$/)![0]}` : ''}.`));
+      }
+    }
     return { fresh, lines };
   }
 
