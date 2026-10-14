@@ -299,7 +299,7 @@ them per device, in the order the alerts are listed:
   card's moment, with no `fold`, when the card is in the same publish or already published: a device that gets the card
   doesn't get the foul, and one with cards off still does. A foul that came first never gets a later card's moment: the card
   would become a line on a feed-only foul and lose its push.
-- **`afterOthers`, a weak alert** (a team's NFL flag, `teamFlags`): published after the rest of its poll's alerts (`live.ts`
+- **`afterOthers`, a weak alert** (a team's NFL flag, `teamFlags`, and a college team's flag, `cfb.team.penalty`; FIU at Jax State, October 13 2026: a declined flag had taken the place of a tying touchdown): published after the rest of its poll's alerts (`live.ts`
   sorts `events` stably), with the play's moment for its team and no `fold`, so on a moment it shares with a score alert, a
   player's flag or a touchdown wiped out the device's alert is the other one and the flag is dropped. It never pushes
   (`noPush`), and a `noPush` alert that took a moment would silence the pushes folded into it, which is why it goes last.
@@ -442,6 +442,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
     its kick in the text, that levels the game puts the same line in the publish of its own alerts. The scored-on alert's
     fold has the same words, so a device with a player on the play too gets it once. A touchdown still waiting for its
     kick isn't said to tie.
+  - A play ESPN rewrites in place (the same id, new words or score) rewords the alerts it still has: the row's body becomes the new words and score, no line and no push (`retext` in `Revision`, applied by `GameTracker.retext` through `reviseEvent`; only a body that is exactly the play's old words and score, so alerts with a sentence of their own are left). A sack first read as "loss of 0 yards" and a touchdown first read at 6 points are the cases (FIU at Jax State). Titles stay as sent. An alert the play no longer has keeps its words and its line.
   - A finished drive's result is revised the same way (`drivesRead`): "ESPN has since changed how the drive ended:
     End of Half."
   - `ONCE` alerts (the starting quarterback pulled) are counted as they come and never re-run on a new version.

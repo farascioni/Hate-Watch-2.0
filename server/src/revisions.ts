@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
-import { BASKETBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
+import { BASKETBALL, FOOTBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
 import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
@@ -13,6 +13,8 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  *  - an alert the play no longer has gets a line on it, with no push ("Wiped out by a penalty on Indiana: Roughing
  *    The Passer."), never a second notification;
  *  - an alert it has now and didn't goes out (the flag added later, the incompletion that became an interception);
+ *  - an alert the play still has takes ESPN's rewrite of the play's words and score on its row (`retext`: a sack's yards, the extra
+ *    point on a touchdown), with no push and no line (FIU at Jax State, October 13 2026);
  *  - a play re-posted under a new id at the same spot (period, start, player) is that play, revised, not a new one;
  *  - a play gone from the feed for GONE_MS (one read can come back short) has its alerts taken back;
  *  - a finished drive's result the same way (three-and-out, turned over on downs, the red zone).
@@ -175,7 +177,8 @@ interface PlayEntry {
   back?: boolean;         // gone, and in the feed again (as it was or re-posted): read again
 }
 
-export interface Revision { fresh: Detected[]; lines: Detected[] }
+/** `retext`: football alerts a play still has, whose body (ESPN's words and the score) takes the play's new version on its row, with no push. */
+export interface Revision { fresh: Detected[]; lines: Detected[]; retext?: { id: string; body: string }[] }
 
 export class PlayLedger {
   private plays = new Map<string, PlayEntry>(); // by the play's id now (a re-post moves it)
@@ -347,6 +350,16 @@ export class PlayLedger {
     if ((basketball || hockey) && p) observePlay(this.g, p);
     if (stale) return { fresh: [], lines: [] };
     const why = changeLine(this.g, p), lines: Detected[] = [], fresh: Detected[] = [], again: Detected[] = [], gone: Detected[] = [];
+    // Football: ESPN rewrites a play's words after its alerts went out (a sack's yards 0 → 7, the extra point added to a touchdown,
+    // 6-7 → 7-7). The alerts the play still has take the new words and score on their rows; one it no longer has keeps its line.
+    const retext: { id: string; body: string }[] = [];
+    if (FOOTBALL.has(this.g.league) && p && p.id === was.id && (p.text !== was.text || p.home !== was.home || p.away !== was.away)) {
+      const before = `${was.text} — ${scoreLine(this.g, was)}`, body = `${p.text} — ${scoreLine(this.g, p)}`;
+      const swap = (e: Detected) => { if (e.body !== before) return e; retext.push({ id: e.id, body }); return { ...e, body }; };
+      for (const [k, e] of x.alerts) if (want.has(k)) x.alerts.set(k, swap(e));
+      // A score alert only while the play still has its points: a touchdown ESPN nullifies ("NO PLAY", the score back down) keeps its words until footballTakeBack says why.
+      if (p.home >= was.home && p.away >= was.away && !/\bNO PLAY\b/i.test(p.text)) x.scores = x.scores.map(swap);
+    }
     for (const [k, e] of x.alerts) {
       if (want.has(k) || ONCE.test(e.type) || FOULED_OUT.test(e.type)) continue;
       if (p && e.type === 'nfl.penalty' && flagStands(p, e.targetKey)) continue; // ESPN dropped his role, the flag stands
@@ -420,7 +433,7 @@ export class PlayLedger {
         }
       }
     }
-    return { fresh, lines };
+    return { fresh, lines, ...(retext.length ? { retext } : {}) };
   }
 
   /** A play already seen, as read now: revised if ESPN changed it. */

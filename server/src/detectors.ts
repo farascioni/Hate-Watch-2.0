@@ -1524,7 +1524,10 @@ function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
   for (const m of p.text.matchAll(CFB_FLAG)) {
     if (dq && m.index === dq.index) continue; // the ejection's flag: said
     const { teamId, what } = cfbFlag(g, m[1], m[2]);
-    team('cfb.team.penalty', teamId, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`);
+    // A weak alert, as the NFL's team flag (`teamFlags`): after the play's other alerts, with their moment and never a push, so a
+    // score or a three-and-out on the play is the device's alert and the flag a row of its own (FIU at Jax State, October 13 2026:
+    // a declined flag took the place of the tying touchdown and of the field goal that put Jax State ahead).
+    team('cfb.team.penalty', teamId, (n) => `${n} was flagged: ${what}${m[3] ? ' (declined)' : ''}`, { moment: teamId ? playMoment(g.gameId, p.id, teamKey(g.league, teamId)) : undefined, noPush: true, afterOthers: true });
   }
   // The starting quarterback pulled, once a game per team (the NFL's rule): in the first three quarters, after
   // his 5th pass, another passer throws twice in a row (one throw is a trick play). ESPN doesn't say why.

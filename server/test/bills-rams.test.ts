@@ -111,7 +111,7 @@ test('F1: a touchdown that ties on its own and is converted for the lead (19-19,
   await tracker.poll();
   const r = rows('bills-six', 'team.opponent_scored');
   assert.equal(r.length, 1);
-  assert.equal(r[0].body, 'M.Stafford pass short middle to D.Adams for 8 yards, TOUCHDOWN. — BUF 19, LAR 19');
+  assert.equal(r[0].body, 'M.Stafford pass short middle to D.Adams for 8 yards, TOUCHDOWN. H.Mevis extra point is GOOD. — BUF 19, LAR 20', 'the row takes the play as ESPN has it now, the kick and the score');
   assert.deepEqual(r[0].lines, [], 'level for 24 seconds, then a lead: no tying line left to go stale');
   tracker.stop();
 });

@@ -885,6 +885,7 @@ export class GameTracker {
           const r = this.ledger.revise(was, p, now);
           events.push(...r.fresh);
           changed.push(...r.lines);
+          this.retext(r.retext);
         } else {
           const es = history ? [] : PLAYER_DETECTORS[league](this.ctx, p);
           events.push(...es);
@@ -904,7 +905,7 @@ export class GameTracker {
         }
       } else if (ledgered) {
         const r = this.ledger.changed(p, now);
-        if (r) { events.push(...r.fresh); changed.push(...r.lines); }
+        if (r) { events.push(...r.fresh); changed.push(...r.lines); this.retext(r.retext); }
       }
       // A crew chief review can be added to an at-bat's result after it was posted ("Volpe homered…"
       // rewritten as "Volpe doubled, Lombard Jr. scored. Umpire review: HR call on the field was
@@ -1098,6 +1099,16 @@ export class GameTracker {
         log(`[${league} ${gameId}] ${r.id} takes ESPN's rewrite of play ${p.id}: "${was.text}" → "${p.text}"`);
       }
       this.keyTexts.set(p.id, { text: p.text, at: was.at });
+    }
+  }
+
+  /** Football: a play's alerts take ESPN's rewrite of the play (revisions.ts `retext`) on their rows and in the feed, with no push. */
+  private retext(rows: { id: string; body: string }[] | undefined) {
+    for (const { id, body } of rows ?? []) {
+      const row = db.prepare('SELECT type, title, body, meta FROM events WHERE id = ?').get(id) as { type: string; title: string; body: string; meta: string | null } | undefined;
+      if (!row || row.body === body) continue; // nobody tracked it, or the row already says it
+      reviseEvent(id, { type: row.type, aliases: row.meta ? JSON.parse(row.meta).aliases : undefined, title: row.title, body, meta: {} });
+      log(`[${this.ctx.league} ${this.ctx.gameId}] ${id} takes ESPN's rewrite of its play: "${row.body}" → "${body}"`);
     }
   }
 
