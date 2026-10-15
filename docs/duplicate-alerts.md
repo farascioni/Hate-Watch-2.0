@@ -190,7 +190,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`seen`:** play ids already judged. A play is passed to the detectors (`PLAYER_DETECTORS[league]`) only on its
   first sighting, then `observePlay` updates the game's state (bases, goalies, the half-inning). An MLB result
   posted before its batter is on it waits (`waitForBatter`, `noBatter`, up to `HW_HALF_END_WAIT_MS`, 20 seconds) and
-  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds) and a basket with no scorer named (`waitForScorer`, `noScorer`, up to `HW_SCORER_WAIT_MS`, 20 seconds, with the score alerts past it: `goalHeld`), and a hockey shot (20 seconds), penalty still typed "Penalty Shot Infraction" (2 minutes) or goal with no scorer in its text (20 seconds, with the score alerts past it: `goalHeld`) (`waitForHockey`, `noHockeyPlay`, `HOCKEY_WAIT_MS`). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`, 1.5 times that when the result carries the challenge sentence) and a result that
+  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds) and a basket with no scorer named (`waitForScorer`, `noScorer`, up to `HW_SCORER_WAIT_MS`, 20 seconds, with the score alerts past it: `goalHeld`), and a hockey shot (20 seconds; a repeat of one already alerted, 60), penalty still typed "Penalty Shot Infraction" (10 minutes) or goal with no scorer in its text (90 seconds, with the score alerts past it: `goalHeld`) (`waitForHockey`, `noHockeyPlay`, `HOCKEY_WAIT_MS`). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`, 1.5 times that when the result carries the challenge sentence) and a result that
   says "Official Scorer Ruling Pending" (`HW_RULING_WAIT_MS`, 45 seconds; `settling`, `settleSince`): the version that
   settles is the one judged, and the plays after it are not judged until it is, so the state they build (bases, whose
   runner is whose) stays in order. An "End Inning" play two reads in a row lack, with the half not over, is forgotten
@@ -368,7 +368,7 @@ counts everyone who got any of the moment's loss alerts.
 **Rules:**
 
 - **An alert goes out the moment a play is first seen.** Nothing waits for a review (except a lost ABS challenge, a
-  strikeout on a challenged pitch, a result waiting for the official scorer, a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, a basketball basket with no scorer named, 20 seconds, and a hockey shot, a penalty ESPN hasn't named and a goal with no scorer, which wait 20 seconds, 10 minutes and 20 seconds: all held by design; a hockey shot first seen more than 3 minutes after it happened is history, for state only).
+  strikeout on a challenged pitch, a result waiting for the official scorer, a basketball miss ESPN hasn't typed yet, which waits up to 15 seconds, a basketball basket with no scorer named, 20 seconds, and a hockey shot, a penalty ESPN hasn't named and a goal with no scorer, which wait 20 seconds (a repeat of one already alerted, 60), 10 minutes and 90 seconds: all held by design; a hockey shot first seen more than 3 minutes after it happened is history, for state only).
 - **What ESPN changes afterwards is a revision of the alert that went out:** a line with no push on the alerts that
   no longer hold, and the alerts the play has now and didn't before sent as new. Never a second notification about
   the same play.
@@ -402,7 +402,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   even-strength goal, 6 plays taken out). A changed play is judged again: a line with no push on the alert it no longer has
   ("ESPN has since changed this: Leon Draisaitl scored."), the alert it has now goes out, a late empty-netter or short-handed
   goal sends the team's alert with no `alt` so it folds into the "scored on" alert as a line, a penalty's call is a line.
-  `nhl.goalie.pulled` is in `ONCE`. A shot, a penalty ESPN has not named and a goal with no scorer in its text wait to be judged (`awaitingHockey`; a shootout play and a new goalie's save never do), a shot posted more than 3 minutes late is not judged at all (`HOCKEY_STALE_SHOT_MS`), a penalty whose text starts with the call and names no player who took it alerts nobody yet, the ledger watches a hockey play for 45 minutes, and a goal's alerts take ESPN's later text on their feed rows (`reviseKeyText`, no push), so the alert says what ESPN finally kept (TOR at UTA, 2026-10-13). A goalie's shots faced and goals allowed are recounted with each version of a play
+  `nhl.goalie.pulled` is in `ONCE`. A shot, a penalty ESPN has not named and a goal with no scorer in its text wait to be judged (`awaitingHockey`; a shootout play and a new goalie's save never do), a shot posted more than 3 minutes late is not judged at all (`HOCKEY_STALE_SHOT_MS`), a penalty whose text starts with the call and names no player who took it alerts nobody yet, the ledger watches a hockey play for 45 minutes, and a goal's alerts take ESPN's later text on their feed rows (`reviseKeyText`, no push), so the alert says what ESPN finally kept (TOR at UTA, 2026-10-13). MTL at WSH and DAL at COL (2026-10-14): a play id that already sent a shot alert never sends a second shooter's (ESPN recycles ids: one shot, three alerts), so the later versions are lines only, a shootout attempt excepted; a goal taken out after it pushed sends its own alert, `<game>:<play>:team.opponent_scored:off:<team>` in the moment `<game>:off:<play>:<team>` (`goneGoals`, `goalOffBoard`, kept in the ledger's memory); a corrected assist list is a line (`ESPN has since changed the assists.`, alert id `…:changed:<key>`, stored once), a shootout game is not finished from its End Game play alone, and the read that ends the game counts a play it lacks as gone. A goalie's shots faced and goals allowed are recounted with each version of a play
   (`g.goalieSeen`, `observePlay`, `unobservePlay`). Details: docs/alerts.md, "Revisions: ESPN changes a hockey play after its alert".
 - **Football** (`server/src/revisions.ts`, `PlayLedger`, used by `GameTracker.poll` for college football and the
   NFL): for `REVISE_MS` (15 minutes) after it's first seen, each play and drive keeps the alerts it sent, by kind
@@ -432,6 +432,21 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   - A play re-posted under a new id at the same spot (`samePlay`: the same period, a start within 10 seconds, the
     same player, or naming none, the same type) is that play, revised (`repost`), not a new one. One touchdown posted
     under three ids is one alert.
+  - A flag ESPN posts again as a play of its own is a line on the first card, not a second (college football;
+    `PlayLedger.flagCopy`, `FLAG_COPY_MS` 5 minutes). WKU at SHSU, 2026-10-14: play 731 ("Fumble Recovery (Own)", a sack
+    with "PENALTY SAM UNR: Unnecessary Roughness") went out as "Sam Houston was flagged: Unnecessary Roughness", and
+    2 minutes 15 seconds later ESPN added play 748, a "Penalty" row with only the flag and "NO PLAY", at the same period
+    and clock (4:08): a second card. Now a "Penalty" play whose flags (`cfb.team.penalty`, same target and title) are all
+    held by one earlier play of the same period and clock, first seen within the last 5 minutes and not from before the
+    attach, gets no card and no ledger entry: the first card gets "ESPN posted this flag again as a play of its own: 15
+    yards from WKU30 to WKU45, 1ST DOWN." (`linesOn`, so it keeps the flag's weak, no-push moment). A flag at a different
+    clock, or with a different title or team, is a flag of its own. `GameTracker.poll` calls it in the `fresh` branch
+    after `was` (re-post) and `twin`, only for plays seen live.
+  - A review's quoted original is no call (`standing()` in `detectors.ts`, college only): ESPN rewrites an overturned
+    review's play as the play that stands plus "CALL OVERTURNED. (Original Play: … PENALTY SAM Targeting …)", so the
+    college detectors read only the text before "(Original Play:". The flag inside the quote is not sent (WKU at SHSU,
+    play 375); a flag sent from the original play before the overturn still gets "Overturned on review." as above. The
+    alert's body still shows ESPN's full text. The NFL's texts carry no such quote.
   - A play missing for `GONE_MS` (30 seconds) has its alerts taken back (`sweep`). One short read doesn't count.
   - A score is taken back only when ESPN's plays, the score the latest plays carry and the header agree, two reads
     running. If the same side then scores on that drive within 10 minutes, the alert gets a line ("Then Wake Forest
@@ -608,6 +623,7 @@ This is one reason for the decision **"No production restarts during live games"
 - **A basketball twin shows no "put back" line, and its edits wait.** A copy kept as a twin (`PlayLedger.twin`) is never compared with ESPN's later edits to it until it takes the entry's place, and a copy that is the real second play is lost: two fouls by one player on the very same clock second (a foul twin must match the clock exactly) or two turnovers by one player within a game second count once. CHA at BOS had two real Queta fouls 0.4 seconds apart, which is why a foul needs the same clock. A twin is not alerted before its entry is deleted, so a turnover that exists only as the copy (ESPN keeps the copy, deletes the original within 30 seconds) is a line-less takeover, not a new alert.
 - **The same revision line twice on one alert** (a play taken back, put back, then taken back again) has the same id,
   so the second "taken back" is dropped at the insert. The alert's row already shows that line once.
+- **Hockey, October 14 2026 (MTL at WSH, DAL at COL):** the "goal taken off the board" alert is remembered in memory only (a restart between the goal and its deletion forgets it), reuses "Opponent scored" (a device with only "falls behind" on may miss it) and does not cover a goal retyped in place to a non-scoring play. A shootout game finishes only when the scoreboard says Final (no fallback). The final read's gone check skips a play newer than every play it has, judged by first-seen clocks. A goal that read alone drops gets no "taken off the board" alert (only the normal 30 seconds does). A correct shooter's correction on a recycled id is a line, not a new push. A repeat of a shot waits a minute, so a real repeat is that late.
 
 ## How to change alerts safely
 

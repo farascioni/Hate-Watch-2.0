@@ -23,7 +23,8 @@ for (const [id, name, short, abbr] of [['84', 'Indiana Hoosiers', 'Indiana', 'IU
   ['277', 'West Virginia Mountaineers', 'West Virginia', 'WVU'], ['154', 'Wake Forest Demon Deacons', 'Wake Forest', 'WAKE'], ['152', 'NC State Wolfpack', 'NC State', 'NCSU'],
   ['245', 'Texas A&M Aggies', 'Texas A&M', 'TA&M'], ['142', 'Missouri Tigers', 'Missouri', 'MIZ'], ['2050', 'Ball State Cardinals', 'Ball State', 'BALL'], ['77', 'Northwestern Wildcats', 'Northwestern', 'NU'],
   ['151', 'East Carolina Pirates', 'East Carolina', 'ECU'], ['242', 'Rice Owls', 'Rice', 'RICE'], ['57', 'Florida Gators', 'Florida', 'FLA'], ['2579', 'South Carolina Gamecocks', 'South Carolina', 'SC'],
-  ['48', 'Delaware Blue Hens', 'Delaware', 'DEL'], ['2393', 'Middle Tennessee Blue Raiders', 'MTSU', 'MTSU']])
+  ['48', 'Delaware Blue Hens', 'Delaware', 'DEL'], ['2393', 'Middle Tennessee Blue Raiders', 'MTSU', 'MTSU'],
+  ['98', 'Western Kentucky Hilltoppers', 'Western KY', 'WKU'], ['2534', 'Sam Houston Bearkats', 'Sam Houston', 'SHSU']])
   team.run(`team:cfb:${id}`, 'cfb', id, name, short, abbr, short);
 team.run('team:cfb:16', 'cfb', '16', 'Sacramento State Hornets', 'Sacramento St', 'SAC', 'Sacramento State'); // ESPN's code: "Sac St"
 team.run('team:cfb:189', 'cfb', '189', 'Bowling Green Falcons', 'Bowling Green', 'BGSU', 'Bowling Green');
@@ -580,4 +581,47 @@ test('a safety that puts a college team behind is pushed as the safety, also whe
   assert.deepEqual(pushed('del'), ['Delaware gave up a safety and fell behind MTSU'], 'pushed: "Gives up a safety" is on by default');
   assert.ok(cards[0][2].some((l: string) => /changed this play to a safety/.test(l)), 'a line on the sack says what became of it');
   assert.deepEqual(feed('mtsu'), [], 'the side that scored the points gets nothing');
+});
+
+test("a flag a review took back is no flag; a sack ESPN types as a fumble is a sack; a flag ESPN posts again as a play of its own is a line, not a second card (Western Kentucky at Sam Houston, October 14 2026)", async () => {
+  device('shsu', 'team:cfb:2534');
+  device('wku', 'team:cfb:98');
+  const T = game('cfb', '401871068', '2534', '98', { away: 10, home: 3 });
+  await T.poll();
+  // "CALL OVERTURNED. (Original Play: … PENALTY SAM Targeting …)": the penalty is the one that was taken back.
+  const overturned = play('401871068375', 'Pass Incompletion', '(00:55) No Huddle-Shotgun #11 B.Glenn pass incomplete short right to #80 J.Stafford Jr. thrown to WKU36 broken up by #8 T.Bailey. The previous play is under automatic review - "Targeting". CALL OVERTURNED. (Original Play: (00:55) No Huddle-Shotgun #11 B.Glenn pass complete short middle to #80 J.Stafford Jr. caught at WKU36, for 13 yards to the WKU36 (#8 T.Bailey), 1ST DOWN, PENALTY SAM Targeting (#8 T.Bailey) 15 yards from WKU36 to SAM49, 1ST DOWN)', '98', 10, 3, { period: 2, clock: '0:55' });
+  T.g.current = { id: '4018710689', plays: [overturned] };
+  await T.poll(3);
+  assert.deepEqual(feed('shsu'), [], 'no "Sam Houston was flagged: Targeting"');
+  // A sack with a fumble, typed "Fumble Recovery (Own)", with a flag on it; then the flag again, 2 minutes later, at the same clock.
+  const sack = play('401871068731', 'Fumble Recovery (Own)', '(04:19) Shotgun #11 B.Glenn sacked for loss of 14 yards to the WKU30 (#3 B.Henderson), fumble by #11 B.Glenn recovered by WKU  at WKU30, End Of Play PENALTY SAM UNR: Unnecessary Roughness (#98 J.Terrell) 15 yards from WKU30 to WKU45', '98', 16, 3, { period: 4, clock: '4:08' });
+  T.g.current.plays = [overturned, sack];
+  await T.poll(3);
+  assert.deepEqual(feed('wku').map((r) => r[1]), ['Western KY got sacked (B.Glenn)']);
+  assert.deepEqual(feed('shsu').map((r) => [r[0], r[1], r[2].length]), [['cfb.team.penalty', 'Sam Houston was flagged: Unnecessary Roughness', 0]]);
+  await T.poll(24);
+  const copy = play('401871068748', 'Penalty', 'PENALTY SAM UNR: Unnecessary Roughness (#98 J.Terrell) 15 yards from WKU30 to WKU45, 1ST DOWN. NO PLAY', '98', 16, 3, { period: 4, clock: '4:08' });
+  T.g.current.plays = [overturned, sack, copy];
+  await T.poll(3);
+  const cards = feed('shsu');
+  assert.equal(cards.length, 1, 'one card for the one flag');
+  assert.match(cards[0][2].join(' '), /^ESPN posted this flag again as a play of its own: 15 yards from WKU30 to WKU45, 1ST DOWN\.$/);
+  assert.deepEqual(pushed('shsu'), [], 'no push');
+});
+
+test("an extra point ESPN adds to a touchdown's play is no \"late score\" (Western Kentucky at Sam Houston, October 14 2026)", async () => {
+  const T = game('cfb', '401871069', '2534', '98');
+  await T.poll();
+  const td = play('401871069700', 'Passing Touchdown', '(10:12) No Huddle-Shotgun #11 B.Glenn pass complete short left to #87 C.Arends caught at SAM04, for 23 yards to the SAM00 TOUCHDOWN, clock 10:06, 1ST DOWN', '98', 6, 0, { period: 1, clock: '10:06', scoring: true });
+  Object.assign(T.g, { away: 6 });
+  T.g.current = { id: '4018710693', plays: [td] };
+  await T.poll(2);
+  const logs: string[] = [], was = console.log;
+  console.log = (...a: unknown[]) => { logs.push(a.join(' ')); };
+  try {
+    T.g.current.plays = [{ ...td, type: { text: 'Pass Reception' }, text: `${td.text} #99 K.Campbell kick attempt good (H: #43 J.Smith, LS: #49 N.Imhoff)`, awayScore: 7 }];
+    Object.assign(T.g, { away: 7 });
+    await T.poll(3);
+  } finally { console.log = was; }
+  assert.deepEqual(logs.filter((l) => /late score/.test(l)), []);
 });

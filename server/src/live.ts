@@ -9,12 +9,12 @@ import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, shootoutLossBody, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, impossibleTouchdown, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
+  awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, impossibleTouchdown, goalNamesScorer, goalOffBoard, goalWords, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
-import { PlayLedger, againLine } from './revisions.ts';
+import { BASKETBALL_REVISE_MS, PlayLedger, againLine } from './revisions.ts';
 import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
 import { flagOn } from './flags.ts';
 import type { Clip } from './highlights.ts';
@@ -29,6 +29,8 @@ import { recordFinalOnBoard } from './misery.ts';
 // (`holdGhost`, `ghosts`). A preseason loss skips players the box score lists as did not play, or does not list.
 // Football (KENN at MOST, October 14 2026): a scoring play whose words aren't a touchdown (`impossibleTouchdown`) waits SCORE_WORDS_WAIT_MS for ESPN's
 // rewrite (`waitForScoreWords`), and finish() announces a final score the plays never had (`scoreWithoutPlay`, `finalFloor`: never taken back).
+// Hockey (MTL at WSH, DAL at COL, October 14 2026): a goal with no scorer waits 90 s and a repeat of a shot 60 s (`HOCKEY_WAIT_MS`); a shootout game finishes only on the
+// scoreboard's Final, not the End Game play; the read that ends the game counts a missing play as gone (`ledger.sweep(now, atFinal)`), and `goneGoals()` sends `goalOffBoard`.
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -119,7 +121,9 @@ const SCORER_WAIT_MS = Number(process.env.HW_SCORER_WAIT_MS ?? 20_000);
 const HOCKEY_WAIT_MS = {
   shot: Number(process.env.HW_NHL_SHOT_WAIT_MS ?? 20_000),
   penalty: Number(process.env.HW_NHL_PENALTY_WAIT_MS ?? 600_000),
-  goal: Number(process.env.HW_NHL_GOAL_WAIT_MS ?? 20_000),
+  goal: Number(process.env.HW_NHL_GOAL_WAIT_MS ?? 90_000),
+  /** A shot that copies one already alerted (same shooter and result, within 30 game seconds; ESPN deletes the copy minutes later): feed only unless it is still in ESPN's feed this long after it was first read. */
+  copy: Number(process.env.HW_NHL_COPY_WAIT_MS ?? 60_000),
 };
 /** Hockey: a shot first seen this long after it happened is ESPN back-filling (COL at DAL: shots posted 8 to 31 minutes late), not news: it updates the game's state and alerts nobody. */
 const HOCKEY_STALE_SHOT_MS = Number(process.env.HW_NHL_STALE_SHOT_MS ?? 180_000);
@@ -919,8 +923,9 @@ export class GameTracker {
     // The play-by-play's end of the game, ahead of the summary's final. Football's only after a 4th-quarter play: ESPN
     // once put "End of Game" ("End of 4th quarter.") after the 3rd quarter's last play, then took it out (Texas A&M
     // at Missouri, October 10 2026), which would have ended the game there.
+    // Hockey: a shootout's End Game play carries the shootout's tally (DAL 2, COL 1), not the game's score, so the scoreboard's final (the winner's extra goal) finishes it (DAL at COL, 2026-10-14).
     const end = plays.findIndex((p) => /^End (of )?Game$/i.test(p.type));
-    if (!final && end >= 0 && (!FOOTBALL.has(league) || plays.slice(0, end).some((p) => (p.periodNum ?? 0) >= 4 && !/^End\b/i.test(p.type)))) {
+    if (!final && end >= 0 && !(league === 'nhl' && plays.some((p) => /start of shootout/i.test(p.text))) && (!FOOTBALL.has(league) || plays.slice(0, end).some((p) => (p.periodNum ?? 0) >= 4 && !/^End\b/i.test(p.type)))) {
       final = { home: Math.max(...plays.map((p) => p.home)), away: Math.max(...plays.map((p) => p.away)) };
     }
 
@@ -943,7 +948,8 @@ export class GameTracker {
       const history = (this.first && p.at < cutoff) || stale;
       // Hockey: a shot, a penalty still typed as the placeholder and a goal with no scorer in its text wait for ESPN to finish them (HOCKEY_WAIT_MS).
       const wait = league === 'nhl' && !history && !final && !this.seen.has(p.id) ? awaitingHockey(this.ctx, p) : undefined;
-      const hockeyWait = !!wait && this.waitForHockey(p, wait, now);
+      // A shot that copies one already alerted waits longer: ESPN deletes most copies within minutes (MTL at WSH: 2 of 4 repeats, 44 s and 4 minutes on).
+      const hockeyWait = !!wait && this.waitForHockey(p, wait === 'shot' && this.ledger.shotCopy(p) ? 'copy' : wait, now);
       if (hockeyWait && wait === 'goal') goalHeld = true;
       // MLB: an at-bat's result ESPN posts before its batter is on it isn't judged until he is (HALF_END_WAIT_MS at most).
       // Basketball: a basket posted with no scorer is judged, and its score announced, once ESPN names him (or SCORER_WAIT_MS passes).
@@ -966,7 +972,10 @@ export class GameTracker {
         const was = ledgered && !history ? this.ledger.repost(p, now) : undefined;
         // Basketball: a copy of a turnover or foul still in the feed (twin) is counted, not alerted: the entry takes it over if ESPN deletes its own.
         const twin = !was && ledgered && !history && this.ledger.twin(p);
-        if (twin) {
+        // College football: a standalone flag row that copies a flag a play just sent is a line on that card, not a second card.
+        const copy = !was && !twin && ledgered && !history ? this.ledger.flagCopy(p, now) : undefined;
+        if (twin || copy) {
+          if (copy) changed.push(...copy);
           observePlay(this.ctx, p);
         } else if (was) {
           const r = this.ledger.revise(was, p, now);
@@ -1026,7 +1035,9 @@ export class GameTracker {
         events.push(...(football ? this.footballScore(es, p, said, now, changed) : es));
         if (BASKETBALL.has(league)) this.ledger.addScores(p.id, es); // so a basket ESPN takes back gets a line on its alerts (takeBack)
         if (!fresh && !waiting) {
-          log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
+          // Football: an extra point or two-point try ESPN adds to a touchdown's play is no late score (WKU at SHSU, play 70).
+          const kick = football && !isSafety(p) && score.home - said.home + score.away - said.away <= 2;
+          if (!kick) log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
         }
       }
@@ -1037,7 +1048,11 @@ export class GameTracker {
       changed.push(...this.ledger.sweep(now), ...this.footballTakeBack(score, plays, header, now));
       events.push(...this.headerAhead(score, plays, header, led, now));
     } else if (ledgered) {
-      changed.push(...this.ledger.sweep(now)); // plays ESPN took out
+      changed.push(...this.ledger.sweep(now, !!final)); // plays ESPN took out
+      if (league === 'nhl') for (const g of this.ledger.goneGoals()) {
+        const off = goalOffBoard(this.ctx, g, score, now);
+        if (off) { events.push(off); log(`[nhl ${gameId}] goal ${g.id} (${g.text}) is off the board`); }
+      }
     }
     if (!FOOTBALL.has(league) && (score.home < this.announced.home || score.away < this.announced.away)) {
       if (BASKETBALL.has(league) && ledgered) for (const s of ['home', 'away'] as const) if (score[s] < this.announced[s]) changed.push(...this.ledger.takeBack(s, score[s]).lines);
@@ -1173,21 +1188,25 @@ export class GameTracker {
     const { league, gameId } = this.ctx;
     for (const p of plays) {
       if (!p.text) continue;
-      // Hockey: a goal's alerts take its text once it names its scorer (goalNamesScorer), and any change counts (ESPN takes an assist away, credits another scorer).
+      // Hockey: a goal's alerts take its text once it names its scorer (goalNamesScorer), and any change counts (ESPN takes an assist away, credits another scorer), for as long as the ledger watches the play. A penalty's take a longer text that starts with the old one ("... Interference" gets "against Boone Jenner").
       const hockey = league === 'nhl';
-      if (hockey && !p.scoring) continue;
+      const penalty = hockey && !p.scoring && !!p.penaltyMinutes;
+      if (hockey && !p.scoring && !penalty) continue;
       const was = this.keyTexts.get(p.id);
       if (!was) { this.keyTexts.set(p.id, { text: p.text, at: now }); continue; }
-      if (p.text === was.text || (hockey ? !goalNamesScorer(p.text) : p.text.length <= was.text.length) || now - was.at > KEY_REVISE_MS) continue;
+      const within = penalty || !hockey ? KEY_REVISE_MS : BASKETBALL_REVISE_MS;
+      if (penalty && p.text !== was.text && !p.text.startsWith(was.text)) { this.keyTexts.set(p.id, { text: p.text, at: was.at }); continue; } // ESPN named the call: that is the text to extend
+      if (p.text === was.text || (penalty ? !p.text.startsWith(was.text) : hockey ? !goalNamesScorer(p.text) : p.text.length <= was.text.length) || now - was.at > within) continue;
+      const shown = hockey ? goalWords(league, { scoring: p.scoring, text: was.text }) : was.text; // an unnamed goal went out as GOAL_UNNAMED
       const prefix = `${gameId}:${p.id}:`;
       const rows = db.prepare('SELECT id, type, title, body, meta FROM events WHERE id >= ? AND id < ?').all(prefix, `${prefix}\uffff`) as { id: string; type: string; title: string; body: string; meta: string | null }[];
       for (const r of rows) {
-        if (!r.body.startsWith(`${was.text} — `)) continue;
+        if (!r.body.startsWith(`${shown} — `)) continue;
         // Hockey: the goal's own alerts only: the shot alert from before it was a goal keeps its words (it has a line), and so does a revision's line.
         if (hockey && (/^nhl\.shot_/.test(r.type) || r.id.includes(':changed:'))) continue;
         const meta = r.meta ? JSON.parse(r.meta) : {};
         const title = r.type === soccerType(league, 'red_card') && / was sent off/.test(r.title) ? sentOffTitle(r.title.replace(/ was sent off.*$/, ''), p.text) : r.title;
-        reviseEvent(r.id, { type: r.type, aliases: meta.aliases, title, body: `${p.text}${r.body.slice(was.text.length)}`, meta: {} });
+        reviseEvent(r.id, { type: r.type, aliases: meta.aliases, title, body: `${p.text}${r.body.slice(shown.length)}`, meta: {} });
         log(`[${league} ${gameId}] ${r.id} takes ESPN's rewrite of play ${p.id}: "${was.text}" → "${p.text}"`);
       }
       this.keyTexts.set(p.id, { text: p.text, at: was.at });
@@ -1389,6 +1408,7 @@ export class GameTracker {
     const detail = String(ev?.status?.type?.detail ?? '');
     const periods = Math.max(0, ...this.plays.map((p) => p.periodNum ?? 0));
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
+    if (overtime === 'so') lost.body = shootoutLossBody(this.ctx, final); // every alert of the loss copies it
     const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
     // Its lines (the facts, the last half-inning) reach those who track only a player on the team too, on "their team lost".
     // Preseason basketball: a player the box score doesn't list, or lists as "did not play", never played (the starters sat: 8 of 21 in NY at TOR, October 13 2026; 6 Suns, 4 Nuggets and 5 Pelicans were listed DNP, October 14), so no "their team lost" for him. Only the explicit flag drops a listed player: an entry with no stats is kept.
