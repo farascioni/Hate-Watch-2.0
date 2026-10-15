@@ -85,6 +85,7 @@ The README's "Real-time: how fast is it?" has the summary; this is the full deta
 | MLB: being no-hit through 6 | until the box score agrees on zero hits | | the core feed's hit count can run ahead |
 | MLB: the pitcher's loss | the summary every 15s, up to 20 times (5 minutes), until ESPN posts the W/L | `HW_DECISION_RETRY_MS` | the decisions trail the last out (`finalPitching`) |
 | A playoff final | the scoreboard's next read with the series (every 10s), 120s at most, then the summary's series | `HW_PLAYOFF_FINAL_WAIT_MS` | to say whether the loss ended their season (`summaryEvent`) |
+| Football: a scoring play whose words aren't a touchdown ("yards loss to the MSU00 TOUCHDOWN") | up to 60s for ESPN to rewrite it; its score alert waits | `SCORE_WORDS_WAIT_MS` (`HW_SCORE_WORDS_WAIT_MS`) | ESPN posted a phantom touchdown for 15 seconds (KENN at MOST) |
 | Football: a score the header has before the plays | 60s with the header 3+ points ahead while the plays trail its game clock, then it goes out without its play | `HEADER_AHEAD_MS` | ESPN's drives can lag the score by minutes (`headerAhead`) |
 | Football: a score taken back | two reads in a row where the plays and the header agree | | one short read isn't a reversal (`footballTakeBack`) |
 | Soccer: losing the ball, giving it away | until the next touch is in (the next poll) | | each touch is judged by the one after (`soccerTouch`), and again for 6 minutes if either changes (`judgeTouches`) |

@@ -444,7 +444,7 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
     its kick in the text, that levels the game puts the same line in the publish of its own alerts. The scored-on alert's
     fold has the same words, so a device with a player on the play too gets it once. A touchdown still waiting for its
     kick isn't said to tie.
-  - A play ESPN rewrites in place (the same id, new words or score) rewords the alerts it still has: the row's body becomes the new words and score, no line and no push (`retext` in `Revision`, applied by `GameTracker.retext` through `reviseEvent`; only a body that is exactly the play's old words and score, so alerts with a sentence of their own are left). A sack first read as "loss of 0 yards" and a touchdown first read at 6 points are the cases (FIU at Jax State). Titles stay as sent. An alert the play no longer has keeps its words and its line.
+  - A play ESPN rewrites in place (the same id, new words or score) rewords the alerts it still has: the row's body becomes the new words and score, no line and no push (`retext` in `Revision`, applied by `GameTracker.retext` through `reviseEvent`; only a body that is exactly the play's old words and score, so alerts with a sentence of their own are left). A sack first read as "loss of 0 yards" and a touchdown first read at 6 points are the cases (FIU at Jax State). A title stays as sent, except "scored 6" to "scored 8" when a touchdown ESPN edits to carry a two-point try gains 2 more (`swapScore` in `revisions.ts`; the row takes the try, the score and the new title; a "NO PLAY" in the new words no longer blocks this when the score rose; Kennesaw State at Missouri State). An alert the play no longer has keeps its words and its line.
   - A finished drive's result is revised the same way (`drivesRead`): "ESPN has since changed how the drive ended:
     End of Half."
   - `ONCE` alerts (the starting quarterback pulled) are counted as they come and never re-run on a new version.
@@ -532,7 +532,7 @@ A deploy restarts the server. This is what keeps a restart from re-sending alert
 |---|---|
 | `events` (ids), `feed` (with each device's lines), `hate_watches` | `seen`, `announced`, `onceDone`, `pitching`, `fouls`, `halfEnds`, `absHeld`, `heldFinal`, `noBatter`, `noShotType`, `noScorer`, `ghosts`, `boxChecked`, `noHockeyPlay`, `settleSince`, `resultSigs`, `resultTexts`, `resultPlays`, `sent`, `sentById`, `challengeWatch`, `endInnings`, `halfJudged`, `strikeThrees`, `ctx.owner` (rebuilt from the history the tracker reads on attaching), soccer's touch feed, `touchSigs`, `keyTexts`, `cardMoments` |
 | `kv` baselines: standings (and their season type, `standings-season:${league}`), injuries, news, AP poll, notices, `streak-told`, the pregame facts, the one-time settings migrations; the players a box score added to the catalog (`catalog:box-added`) | `delivered` (late facts), the football, basketball and hockey revisions ledger |
-| | F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
+| | football's `noScoreWords` (a scoring play whose words aren't a touchdown, waiting for ESPN's rewrite), `led` (each side's biggest lead) and `finalFloor` (the final score finish() announced ahead of the plays); F1's `memo.sent`, `preSeen`, `resultsSeen`; football's `lastScored` (the side's latest score alerts, for a tying line when the kick is on another play) |
 
 A restart, step by step:
 

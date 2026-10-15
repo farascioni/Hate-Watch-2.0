@@ -11,7 +11,7 @@ import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
   PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
-  awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
+  awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, impossibleTouchdown, goalNamesScorer, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
@@ -27,6 +27,8 @@ import { recordFinalOnBoard } from './misery.ts';
 // Basketball ghosts (CHA at BOS, October 14 2026): a non-scoring play first seen more than GHOST_AGE_MS after its wall clock is held for
 // GHOST_HOLD_MS before it is judged, since ESPN stamps a play that never happened at a quarter's start and deletes it minutes later
 // (`holdGhost`, `ghosts`). A preseason loss skips players the box score lists as did not play, or does not list.
+// Football (KENN at MOST, October 14 2026): a scoring play whose words aren't a touchdown (`impossibleTouchdown`) waits SCORE_WORDS_WAIT_MS for ESPN's
+// rewrite (`waitForScoreWords`), and finish() announces a final score the plays never had (`scoreWithoutPlay`, `finalFloor`: never taken back).
 
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
@@ -140,6 +142,8 @@ const RECAP_MS = Number(process.env.HW_RECAP_MS ?? 15 * 60_000);
 const RESCORE_MS = 10 * 60_000;
 /** Football: the summary's header ahead of the plays by the same score this long, and the score alert goes out without its play. */
 const HEADER_AHEAD_MS = 60_000;
+/** Football: how long a scoring play whose words can't be a touchdown (impossibleTouchdown) waits for ESPN to rewrite or remove it: the catch it took back 15 seconds later (KENN at MOST, 2026-10-14). */
+const SCORE_WORDS_WAIT_MS = Number(process.env.HW_SCORE_WORDS_WAIT_MS ?? 60_000);
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 23), ...a);
 /** Each side's biggest lead so far, given the score now. */
@@ -216,6 +220,10 @@ export class GameTracker {
   private ghosts = new Map<string, number>();
   /** Basketball: baskets ESPN posted with no scorer named, since when they've waited (waitForScorer). */
   private noScorer = new Map<string, number>();
+  /** Football: scoring plays whose words can't be a touchdown, since when they've waited (waitForScoreWords). */
+  private noScoreWords = new Map<string, number>();
+  /** Football: each side's biggest lead as of the last poll, for the score alert finish() makes when the plays never had the last score. */
+  private led = { home: 0, away: 0 };
   /** Basketball: box score players already checked against the catalog (addMissingPlayers). */
   private boxChecked = new Set<string>();
   /** Hockey: plays ESPN is still filling in (awaitingHockey), since when they've waited (waitForHockey). */
@@ -297,6 +305,8 @@ export class GameTracker {
   private lastScored: Partial<Record<'home' | 'away', Detected[]>> = {};
   private ahead: Partial<Record<'home' | 'away', { value: number; since: number; period: number; clock?: number }>> = {};
   private noHeader = { home: 0, away: 0 };
+  /** The final's score where finish() announced it ahead of ESPN's plays: authoritative, so footballTakeBack never reads the plays' lower score as a take-back. */
+  private finalFloor = { home: 0, away: 0 };
 
   constructor(league: League, gameId: string, homeId: string, awayId: string, info: GameInfo = {}) {
     this.ctx = { league, gameId, homeId, awayId, goalies: new Map() };
@@ -612,6 +622,12 @@ export class GameTracker {
     return now - since < SCORER_WAIT_MS;
   }
 
+  /** Football: whether to keep holding a scoring play whose words can't be a touchdown (impossibleTouchdown), SCORE_WORDS_WAIT_MS at most: the play, and the score alert past it, wait. */
+  private waitForScoreWords(p: NPlay, now: number): boolean {
+    const since = this.noScoreWords.get(p.id) ?? (this.noScoreWords.set(p.id, now), now);
+    return now - since < SCORE_WORDS_WAIT_MS;
+  }
+
   /** Hockey: whether to keep waiting for ESPN to finish a play (awaitingHockey), HOCKEY_WAIT_MS at most for its kind. */
   private waitForHockey(p: NPlay, kind: keyof typeof HOCKEY_WAIT_MS, now: number): boolean {
     const since = this.noHockeyPlay.get(p.id) ?? (this.noHockeyPlay.set(p.id, now), now);
@@ -762,7 +778,7 @@ export class GameTracker {
   private footballTakeBack(score: { home: number; away: number }, plays: NPlay[], header: Header | undefined, now: number): Detected[] {
     const out: Detected[] = [], tail = plays.slice(-3);
     for (const s of ['home', 'away'] as const) {
-      const keep = Math.max(score[s], ...tail.map((p) => p[s]), header?.[s] ?? 0);
+      const keep = Math.max(score[s], ...tail.map((p) => p[s]), header?.[s] ?? 0, this.finalFloor[s]);
       if (keep >= this.announced[s]) { this.downReads[s] = 0; out.push(...this.ledger.carry(s, this.announced[s])); continue; }
       if (++this.downReads[s] < 2 || this.ledger.pending(s, keep)) continue; // a play that had them is missing: gone, or re-posted?
       this.downReads[s] = 0;
@@ -801,17 +817,22 @@ export class GameTracker {
       }
       if (now - was.since < HEADER_AHEAD_MS) continue;
       delete this.ahead[s];
-      const from = { ...this.announced }, to = { ...this.announced, [s]: v };
-      const p: NPlay = { id: `header-${s}-${v}`, type: 'Score', typeSlug: '', text: "ESPN's play-by-play doesn't have this play yet", participants: [],
-        scoring: true, scoreValue: v - from[s], home: to.home, away: to.away, at: now, shooting: false };
-      const es = teamScoreEvents(this.ctx, from, p, { ...led });
-      this.announced[s] = v;
-      this.ledger.add(p, [], { history: false, header: true }, now);
-      this.ledger.addScores(p.id, es);
       log(`[${this.ctx.league} ${this.ctx.gameId}] the header's ${s} score (${v}) has been ahead of the plays (${score[s]}) for ${HEADER_AHEAD_MS / 1000}s: its alert, without the play`);
-      out.push(...es);
+      out.push(...this.scoreWithoutPlay(s, v, led, now));
     }
     return out;
+  }
+
+  /** Football: `s`'s score alert for a score of `v` that ESPN's plays don't have (the header's, or the final's, finish()), as the play that isn't there yet. */
+  private scoreWithoutPlay(s: 'home' | 'away', v: number, led: { home: number; away: number }, now: number): Detected[] {
+    const from = { ...this.announced }, to = { ...this.announced, [s]: v };
+    const p: NPlay = { id: `header-${s}-${v}`, type: 'Score', typeSlug: '', text: "ESPN's play-by-play doesn't have this play yet", participants: [],
+      scoring: true, scoreValue: v - from[s], home: to.home, away: to.away, at: now, shooting: false };
+    const es = teamScoreEvents(this.ctx, from, p, { ...led });
+    this.announced[s] = v;
+    this.ledger.add(p, [], { history: false, header: true }, now);
+    this.ledger.addScores(p.id, es);
+    return es;
   }
 
   async poll() {
@@ -928,8 +949,11 @@ export class GameTracker {
       // Basketball: a basket posted with no scorer is judged, and its score announced, once ESPN names him (or SCORER_WAIT_MS passes).
       const scorerWait = BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingScorer(p) && this.waitForScorer(p, now);
       if (scorerWait) goalHeld = true;
+      // Football: a scoring play whose words can't be a touchdown waits for ESPN to rewrite or remove it (SCORE_WORDS_WAIT_MS), and the score alert with it.
+      const wordsWait = football && !history && !final && !this.seen.has(p.id) && impossibleTouchdown(p) && this.waitForScoreWords(p, now);
+      if (wordsWait) goalHeld = true;
       const ghost = BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && !p.scoring && p.at > 0 && now - p.at > GHOST_AGE_MS && this.holdGhost(p, now);
-      const waiting = hockeyWait || scorerWait || ghost || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
+      const waiting = hockeyWait || scorerWait || wordsWait || ghost || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
         || (BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingShotType(p) && this.waitForShotType(p, now));
       // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
       // after it wait their turn, so the game's state (bases, who is on) is built in order.
@@ -1009,6 +1033,7 @@ export class GameTracker {
     }
     if (football) {
       bump(led, score);
+      this.led = { ...led };
       changed.push(...this.ledger.sweep(now), ...this.footballTakeBack(score, plays, header, now));
       events.push(...this.headerAhead(score, plays, header, led, now));
     } else if (ledgered) {
@@ -1170,12 +1195,12 @@ export class GameTracker {
   }
 
   /** Football: a play's alerts take ESPN's rewrite of the play (revisions.ts `retext`) on their rows and in the feed, with no push. */
-  private retext(rows: { id: string; body: string }[] | undefined) {
-    for (const { id, body } of rows ?? []) {
+  private retext(rows: { id: string; body: string; title?: string }[] | undefined) {
+    for (const { id, body, title } of rows ?? []) {
       const row = db.prepare('SELECT type, title, body, meta FROM events WHERE id = ?').get(id) as { type: string; title: string; body: string; meta: string | null } | undefined;
-      if (!row || row.body === body) continue; // nobody tracked it, or the row already says it
-      reviseEvent(id, { type: row.type, aliases: row.meta ? JSON.parse(row.meta).aliases : undefined, title: row.title, body, meta: {} });
-      log(`[${this.ctx.league} ${this.ctx.gameId}] ${id} takes ESPN's rewrite of its play: "${row.body}" → "${body}"`);
+      if (!row || (row.body === body && row.title === (title ?? row.title))) continue; // nobody tracked it, or the row already says it
+      reviseEvent(id, { type: row.type, aliases: row.meta ? JSON.parse(row.meta).aliases : undefined, title: title ?? row.title, body, meta: {} });
+      log(`[${this.ctx.league} ${this.ctx.gameId}] ${id} takes ESPN's rewrite of its play: "${row.body}" → "${body}"${title ? ` (title "${row.title}" → "${title}")` : ''}`);
     }
   }
 
@@ -1326,6 +1351,15 @@ export class GameTracker {
     if (this.finished) return;
     this.finished = true;
     for (const id of [this.ctx.homeId, this.ctx.awayId]) staleUpNext(teamKey(this.ctx.league, id)); // their next game is another one now
+    // Football: the header (headerAhead) only runs while the game is on, so a last score ESPN's plays never got (Missouri State's winning field goal, KENN at MOST, 2026-10-14) is announced from the final, before the loss.
+    if (FOOTBALL.has(this.ctx.league) && this.plays.length > 0) {
+      for (const s of ['home', 'away'] as const) {
+        if (final[s] - this.announced[s] < 3 || final[s] <= this.noHeader[s]) continue;
+        log(`[${this.ctx.league} ${this.ctx.gameId}] the final's ${s} score (${final[s]}) is ahead of the plays (${this.announced[s]}): its alert, without the play`);
+        this.finalFloor[s] = final[s];
+        publish(this.scoreWithoutPlay(s, final[s], this.led, Date.now()), this.ctx.league);
+      }
+    }
     // The final half-inning gets no "End Inning" play: judged here, from every play. Its alerts about the team that lost
     // are lines on the loss (finalHalfOnLoss); any others go out like any half-inning's, on the last out's alert.
     const lastHalf = this.ctx.league === 'mlb' ? mlbFinalHalfInning(this.ctx, this.plays) : [];

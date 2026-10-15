@@ -1712,6 +1712,8 @@ const UNKNOWN_SHOT = /\bdefault shot\b|^no shot\b/i;
 export const awaitingShotType = (p: NPlay) => p.shooting && !p.scoring && UNKNOWN_SHOT.test(p.type) && /miss/i.test(p.text) && !/blocks/i.test(p.text);
 /** Basketball: a basket ESPN posted before it names who scored waits a few seconds for him (live.ts, HW_SCORER_WAIT_MS): once it was a miss 10 seconds later (IND at OKC, 2026-10-13). */
 export const awaitingScorer = (p: NPlay) => p.scoring && !p.participants.length;
+/** Football: a scoring play whose words can't be a touchdown ("for 54 yards loss to the MSU00 TOUCHDOWN", a catch ESPN took back 15 seconds later, KENN at MOST, 2026-10-14): held for ESPN's rewrite (live.ts, HW_SCORE_WORDS_WAIT_MS). */
+export const impossibleTouchdown = (p: NPlay) => p.scoring && /\byards? loss to the \w+ TOUCHDOWN\b/i.test(p.text);
 /** Hockey: ESPN's placeholder type for a penalty it hasn't named yet (text "<Player> Minor"), retyped 10 to 100 seconds later (TOR at UTA, 2026-10-13). */
 export const PENALTY_PLACEHOLDER = /^penalty shot infraction$/i;
 /** Hockey: a goal's first text can lack its scorer (", assists: Logan Cooley (6), Dylan Guenther (4)"); ESPN names him within a minute. */
@@ -2786,6 +2788,8 @@ export function nflDriveEvents(g: GameCtx, d: any): Detected[] {
   });
   const out: Detected[] = [];
   if (result === 'PUNT' && Number(d.offensivePlays) <= 3 && Number(d.yards) < 10) out.push(base(footballType(g.league, 'team.three_and_out'), `${name} went three-and-out`, 'Three-and-out.'));
+  // A drive that ends in kneel-downs ran the clock for a kick (ESPN labels it DOWNS: Missouri State's winning drive, KENN at MOST, 2026-10-14): not downs, not empty.
+  if (/\bkneel(s|ed)? down\b/i.test(String(last.text ?? ''))) return out;
   if (result === 'DOWNS') out.push(base(footballType(g.league, 'team.turnover_on_downs'), `${name} turned it over on downs`, 'Turned it over on downs.'));
   // A snap inside the other side's 20, from the down and distance ("1st & 10 at NYG 13"): ESPN's yardsToEndzone
   // is 0 on timeouts and wrong on punts (a punt from your own 36 says 36). A field code is the team's
