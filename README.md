@@ -53,7 +53,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 512 tests in 67 files, offline, in about 4 seconds, all passing on October 14, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 518 tests in 68 files, offline, in about 4 seconds, all passing on October 14, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
@@ -145,13 +145,13 @@ The full detail: [docs/developer-notices.md](docs/developer-notices.md).
 
 ## Sharing an alert
 
-**In short:** Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a 1200×630 picture of the alert that the server draws from its own data, so it looks like a screenshot. On an iPhone with Hate Watch installed, tapping it opens the app on that alert (a universal link); without the app it goes to the App Store; anywhere else it's a web page with the card and a download button. The code is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `server/src/db.ts`), and the server side is `server/src/share.ts`.
+**In short:** Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a 1200×630 picture of the alert that the server draws from its own data, so it looks like a screenshot. On an iPhone with Hate Watch installed, tapping it opens the app on that alert (a universal link); without the app it goes to the App Store; anywhere else it's a web page with the card and a download button. The code is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `server/src/db.ts`), and the server side is `server/src/share.ts`. An alert that has other looks (a ticket stub, a boarding pass, a parking ticket, a scratch-off, a torn ticket, a void stamp) asks which one to share first; each look is its own link, `/a/<code>?s=<style>`, and its own picture (`server/src/share-styles.ts`).
 
 The full detail: [docs/sharing.md](docs/sharing.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 512 tests in 67 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 518 tests in 68 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

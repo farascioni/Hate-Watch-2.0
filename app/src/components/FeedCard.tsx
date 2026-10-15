@@ -5,20 +5,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppAvatar, Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
-import { shareAlert } from '../lib/share';
 import { isNotice, openAlert, targetHref } from '../lib/alerts';
+import { useShare } from './ShareStyleSheet';
 import { colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 
 export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: FeedItem; now: number; fresh?: boolean }) {
-  const [copied, setCopied] = useState(false);
   const [pressed, setPressed] = useState(false);
-  const share = async () => {
-    if ((await shareAlert(item)) === 'copied') {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const { share, copied, sheet } = useShare(item);
 
   // The alert opens on its own screen, all of its text (here, three lines); its photo opens its player's or team's
   // page. Its clip sits below, outside that tap area, so playing the video (or its controls) never opens anything.
@@ -60,6 +54,7 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: Fee
           {copied ? <Text style={styles.copied}>Copied</Text> : null}
         </Pressable>}
       </Pressable>
+      {sheet}
       {item.clip ? <AlertClip clip={item.clip} /> : null}
     </View>
   );

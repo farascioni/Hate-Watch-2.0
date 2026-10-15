@@ -7,47 +7,50 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+SHARING
+- Share offers looks: a loss as a ticket stub, an elimination as a void stamp, an F1 position loss as a boarding pass, an ejection or penalty as a parking ticket, a favorite's loss as a scratch-off, a blown lead as a torn ticket. Tap share and pick one; the link previews as it.
+
 SERVER
-- The database is now copied off the server continuously, and a new check tells the owner when the backup, ESPN reads or a game's polling stops.
+- The database is copied off the server continuously, and a check tells the owner when the backup, ESPN reads or a game's polling stops.
 
 RECENT MISERY
-- The Recent misery tab on a player's or team's page is now one list for everyone: the last 30 days of losses (a blown lead, overtime, a walk-off, losing as the favorite) and the worst of the rest: an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF.
-- It no longer depends on what you track or your settings, works for teams and players nobody tracks, and a player's page also shows their team's losses. "Successful Hate Watch!" is only for a team or player you track.
+- Recent misery on a player's or team's page is one list for everyone: 30 days of losses (a blown lead, overtime, walk-off, losing as favorite) and the worst of the rest: an ejection, serious injury, pulled quarterback or goalie, red card, DNF.
+- It ignores what you track and your settings, covers teams and players nobody tracks, and a player's page also shows their team's losses. "Successful Hate Watch!" is only for what you track.
 - A soccer loss by 3+ goals keeps its score and margin on the list.
 
 MLB
-- A strikeout on a challenged pitch waits 30 seconds, so one that becomes a walk is never sent.
+- A strikeout on a challenged pitch waits 30 seconds, so one that becomes a walk is not sent.
 - A pickoff error is no "got picked off".
-- A lost replay challenge ESPN adds later is sent once it holds; a pending scorer's ruling is waited out.
+- A lost replay challenge ESPN adds later is sent once it holds; a pending scorer ruling is waited out.
 - A corrected homer distance and an error moved to another fielder become lines on the alerts sent.
 - A run is the pitcher's whose runner scores, as in the box score.
 - A third out a review overturns gets a line, and the inning's real end is judged. A strikeout ESPN never posts is made from the third strike.
 
 HOCKEY
 - A goalie is not shown as pulled when a play ESPN took out had him replaced; a real pull counts the goals against him ("3 goals on 7 shots").
-- A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert ("Leon Draisaitl scored"); other shots ESPN changes or takes out get a line too, no push.
-- An empty-net goal ESPN first posted as even-strength is no longer charged to the goalie ("Into an empty net.").
-- Hockey alerts wait for ESPN to finish the play: a shot 20 seconds, an unnamed penalty up to 10 minutes, a goal with no scorer 20 seconds. A penalty says what it was (slashing), not "Penalty Shot Infraction".
-- A shot ESPN posts minutes late no longer alerts; a play it takes out and posts again within 45 minutes is one alert.
+- A goal ESPN first posted as a missed or saved shot puts a line on the scorer's alert; other shots ESPN changes or takes out get a line too, no push.
+- An empty-net goal ESPN first posted as even-strength is no longer charged to the goalie.
 - A goal's alerts take ESPN's later text (scorer, assists).
-- The final score is the higher of ESPN's score and its period scores (never "3 to 1" for a 4-1 game).
+- Hockey waits for ESPN: a shot 20 seconds, an unnamed penalty up to 10 minutes, a goal with no scorer 20 seconds. A penalty says what it was (slashing), not "Penalty Shot Infraction".
+- A shot ESPN posts minutes late no longer alerts; a play it takes out and posts again within 45 minutes is one alert.
+- The final score is the higher of ESPN's score and its period scores (never "3 to 1" for 4-1).
 
 FOOTBALL
-- A score that ties the game says so ("Rams tied the game, 34-34."), a line with no push, also when the extra point ties it.
 - A sack on a failed two-point try reads "got sacked on the two-point try".
-- An NFL team's flags reach its trackers' feeds even with no player named ("Bills were flagged: Illegal Shift"); never pushed.
-- College football: a flag no longer takes the place of a score or a three-and-out (its own feed row, never a push), and an alert shows ESPN's corrected words and score.
-- A safety is pushed as a safety ("Delaware gave up a safety and fell behind MTSU"), also when ESPN first posted a sack.
+- A score that ties the game says so ("Rams tied the game, 34-34."), a line with no push, also on an extra point.
+- An NFL team's flags reach its trackers' feeds even with no player named; never pushed.
+- College football: a flag no longer takes the place of a score or a three-and-out (its own feed row, no push), and an alert shows ESPN's corrected words and score.
+- A safety is pushed as a safety, also when ESPN first posted a sack.
 - College football: a blocked or missed extra point is an alert; the setting is now "Misses a kick".
 
 NBA AND WNBA
 - A technical's free throw is no "picked up a technical"; a traveling turnover is a turnover; an offensive charge is a foul.
 - A play is corrected for 45 minutes; a block that becomes a plain miss says the shot was not blocked; a shot ESPN later changes gets a silent line.
 - A missed shot waits up to 15 seconds for ESPN to name it ("missed a driving layup"); an offensive foul and its turnover are one alert.
-- A late play shows the game's score now. A defensive 3-seconds call is not a pushed technical.
-- A basket with no scorer named waits up to 20 seconds, so one ESPN takes back is never "took the lead"; a basket taken back later gets a line.
+- A late play shows the score now. A defensive 3-seconds call is no technical push.
 - A foul ESPN re-posts up to 15 seconds off is one alert. A shot ESPN has not typed no longer says "0.0 seconds left".
-- A player in the box score on no roster (a two-way or camp player) is added to the catalog, so you can track him.
+- A basket with no scorer named waits up to 20 seconds, so one ESPN takes back is never "took the lead"; a basket taken back later gets a line.
+- A box score player on no roster (two-way, camp) joins the catalog, so you can track him.
 - A play posted 2+ minutes late, or a change 5+ minutes late, is feed-only. Preseason: no "their team lost" for those who sat.
 
 ## Build 13 (October 12, 2026)

@@ -1,13 +1,12 @@
-import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { isNotice, openedAlert, targetHref } from '../../lib/alerts';
-import { shareAlert } from '../../lib/share';
 import { AppAvatar, Avatar } from '../../components/Avatar';
 import { AlertClip } from '../../components/FeedCard';
 import { AlsoGot, LeagueTag, ago, subtitle, useNow } from '../../components/ui';
+import { useShare } from '../../components/ShareStyleSheet';
 import { colors, radius, space } from '../../theme';
 
 const DAY = 24 * 3600_000;
@@ -21,9 +20,9 @@ export default function AlertScreen() {
   const alertId = decoded(id);
   const { feed, ready } = useStore();
   const now = useNow();
-  const [copied, setCopied] = useState(false);
   // The feed's copy when it has one (a fact that comes later is added to it live), else the one tapped.
   const item = feed.find((f) => f.id === alertId) ?? openedAlert(alertId);
+  const { share, copied, sheet } = useShare(item);
   const header = <Stack.Screen options={{ title: 'Alert', headerBackTitle: 'Back' }} />;
 
   if (!item) {
@@ -43,17 +42,12 @@ export default function AlertScreen() {
   // Hate Watch itself: no page to open, no league, nothing to share.
   const notice = isNotice(item);
   const target = !notice && 'name' in item.target ? item.target : null;
-  const share = async () => {
-    if ((await shareAlert(item)) === 'copied') {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
   const when = new Date(item.occurredAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {header}
+      {sheet}
       {notice ? (
         <View style={styles.who}>
           <AppAvatar size={48} />

@@ -8,6 +8,7 @@ import { SOCCER, type League } from './leagues.ts';
 import { recordMisery, reviseMisery } from './misery.ts';
 import { clipShown } from './clips.ts';
 import { frameWithoutImages } from './images.ts';
+import { shareStyles } from './share-styles.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
 export interface Prefs {
@@ -309,6 +310,8 @@ export function feedItem(row: { id: string; type: string; league: string; target
   const meta = row.meta ? JSON.parse(row.meta) : null;
   const t = EVENT_TYPE_BY_ID.get(row.type) ?? (row.type === NOTICE_TYPE ? noticeLook(meta) : undefined);
   const clip = clipShown(row.clip ? JSON.parse(row.clip) : null, meta); // its play's clip, while ESPN has it up and clips are on
+  const shareUrl = `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`; // a page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts)
+  const styles = row.type === NOTICE_TYPE ? [] : shareStyles(row);
   return {
     ...(clip ? { clip } : {}),
     ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
@@ -317,8 +320,9 @@ export function feedItem(row: { id: string; type: string; league: string; target
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: withLines(row.body, row.extra ? JSON.parse(row.extra) : null), occurredAt: row.occurred_at, detectedAt: row.detected_at,
     target: row.type === NOTICE_TYPE ? NOTICE_SENDER : targetDto(row.target_key) ?? { kind: row.target_key.split(':')[0], key: row.target_key },
-    // A page whose link preview is a picture of this alert; tapping it opens the App Store (see share.ts).
-    shareUrl: `${PUBLIC_URL}/a/${row.share_code ?? shareCode(row.id)}`,
+    shareUrl,
+    // The other ways to share it (share-styles.ts): the link and its preview picture for each, classic first. Left out when classic is the only one.
+    ...(styles.length > 1 ? { shareStyles: styles.map((s) => ({ id: s.id, label: s.label, url: s.id === 'classic' ? shareUrl : `${shareUrl}?s=${s.id}`, image: `${shareUrl}/card.png${s.id === 'classic' ? '' : `?s=${s.id}`}` })) } : {}),
   };
 }
 

@@ -239,12 +239,12 @@ route('GET', '/support', false, () => new Html(supportPage()));
 // ─── Share links: a page whose preview is a picture of the alert (see share.ts) ───────────────
 const origin = (req: IncomingMessage) =>
   req.headers.host ? `${String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]}://${req.headers.host}` : PUBLIC_URL;
-route('GET', '/a/:code/card.png', false, async (_r, _u, [code]) => {
-  const png = await shareCard(code);
+route('GET', '/a/:code/card.png', false, async (_r, u, [code]) => {
+  const png = await shareCard(code, u.searchParams.get('s'));
   if (!png) throw new HttpError(404, 'no such alert');
   return new Raw({ status: 200, headers: { 'content-type': 'image/png', 'cache-control': 'public, max-age=86400' }, body: png });
 });
-route('GET', '/a/:code', false, (req, _u, [code]) => new Raw(shareLink(code, String(req.headers['user-agent'] ?? ''), origin(req))));
+route('GET', '/a/:code', false, (req, u, [code]) => new Raw(shareLink(code, String(req.headers['user-agent'] ?? ''), origin(req), u.searchParams.get('s'))));
 // Universal links: lets iOS open /a/* links in the app when it's installed.
 route('GET', '/.well-known/apple-app-site-association', false, () => appSiteAssociation());
 // The alert behind a share link, for the screen the app opens it on.

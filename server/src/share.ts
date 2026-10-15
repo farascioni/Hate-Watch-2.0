@@ -3,6 +3,8 @@
 // screenshot. Tapping it on an iPhone with Hate Watch installed opens the app on that alert (a universal
 // link: see appSiteAssociation); without the app it goes to the App Store; anywhere else the page shows
 // the card and a download button. The picture is drawn here from our own alert data (nothing is uploaded).
+// An alert can have other looks (share-styles.ts: ticket stub, boarding pass...): a link's ?s= picks one, and an
+// unknown or inapplicable one is the classic card.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import satori from 'satori';
@@ -14,6 +16,7 @@ import { feedItem, noticeLook, NOTICE_SENDER, NOTICE_TYPE } from './fanout.ts';
 import { miseryByCode } from './misery.ts';
 import { LEAGUES, type League } from './leagues.ts';
 import { sharePage } from './pages.ts';
+import { clip, h, initials, readableOn, shareStyles, styleTree, type El, type EventRow } from './share-styles.ts';
 
 export const APP_STORE_URL = process.env.HW_APP_STORE_URL ?? 'https://apps.apple.com/app/id6819054268';
 const APP_STORE_ID = APP_STORE_URL.match(/\/id(\d+)/)?.[1];
@@ -39,19 +42,26 @@ export function sharedAlert(code: string) {
 const PREVIEW_BOT = /bot|crawl|spider|facebookexternalhit|preview|slack|discord|whatsapp|telegram|embed/i;
 const IOS = /\b(iPhone|iPad|iPod)\b/;
 
-interface EventRow { id: string; type: string; league: string; target_key: string; title: string; body: string; meta?: string | null }
 const findEvent = (code: string) => (db.prepare('SELECT id, type, league, target_key, title, body, meta FROM events WHERE share_code = ?').get(code) ?? miseryByCode(code)) as EventRow | undefined;
 
 export interface Reply { status: number; headers: Record<string, string>; body: string | Buffer }
 
-/** The page behind a share link (or the App Store, for someone tapping it on an iPhone). */
-export function shareLink(code: string, ua: string, origin: string): Reply {
+/**
+ * The style a link asks for (`?s=`), or classic. The value comes from whoever built the link, so a style
+ * that is unknown or doesn't apply to this alert is classic, never an error (an old link keeps working).
+ */
+const styleFor = (e: EventRow, asked: string | null | undefined) => (asked && shareStyles(e).some((s) => s.id === asked) ? asked : 'classic');
+const withStyle = (url: string, style: string) => (style === 'classic' ? url : `${url}?s=${style}`);
+
+/** The page behind a share link (or the App Store, for someone tapping it on an iPhone). `style` is the link's `?s=`. */
+export function shareLink(code: string, ua: string, origin: string, style?: string | null): Reply {
   if (IOS.test(ua) && !PREVIEW_BOT.test(ua)) {
     return { status: 302, headers: { location: APP_STORE_URL, 'cache-control': 'no-store', vary: 'user-agent' }, body: '' };
   }
   const e = findEvent(code);
+  const s = e ? styleFor(e, style) : 'classic';
   const html = e
-    ? sharePage({ title: e.title, description: e.body, pageUrl: `${origin}/a/${code}`, imageUrl: `${origin}/a/${code}/card.png`, storeUrl: APP_STORE_URL, appId: APP_STORE_ID })
+    ? sharePage({ title: e.title, description: e.body, pageUrl: withStyle(`${origin}/a/${code}`, s), imageUrl: withStyle(`${origin}/a/${code}/card.png`, s), storeUrl: APP_STORE_URL, appId: APP_STORE_ID })
     : sharePage({ title: "This alert isn't available", description: 'Hate Watch alerts you the second the teams you hate mess up.', pageUrl: `${origin}/a/${code}`, imageUrl: null, storeUrl: APP_STORE_URL, appId: APP_STORE_ID });
   return { status: e ? 200 : 404, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300', vary: 'user-agent' }, body: html };
 }
@@ -77,19 +87,6 @@ function emoji(segment: string): Promise<string> {
   }
   return emojiCache.get(name)!;
 }
-
-/** Black or white text, whichever reads on this colour. */
-function readableOn(hex: string) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#0B0B0D' : '#FFFFFF';
-}
-const initials = (name: string) => name.split(/\s+/).filter((w) => !/^(jr|sr|ii|iii|iv)\.?$/i.test(w)).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
-
-type El = { type: string; props: { style?: Record<string, unknown>; children?: unknown } };
-// satori lays everything out with flexbox and wants it declared on every div.
-const h = (type: string, style: Record<string, unknown>, ...children: unknown[]): El =>
-  ({ type, props: { style: { display: 'flex', ...style }, children: children.length === 1 ? children[0] : children } });
 
 function cardTree(e: EventRow): El {
   // A developer notice is from Hate Watch: its red "HW" badge, and "News" where a league goes.
@@ -124,18 +121,19 @@ function cardTree(e: EventRow): El {
       h('div', { fontSize: 26, fontWeight: 800, color: '#FFFFFF', backgroundColor: '#E5232B', padding: '14px 28px', borderRadius: 40, flexShrink: 0 }, 'Get Hate Watch on the App Store')));
 }
 
-const cards = new Map<string, Buffer>(); // alerts never change, so neither do their cards
-export async function shareCard(code: string): Promise<Buffer | null> {
-  const hit = cards.get(code);
-  if (hit) return hit;
+const cards = new Map<string, Buffer>(); // alerts never change, so neither do their cards (one per alert and style)
+export async function shareCard(code: string, style?: string | null): Promise<Buffer | null> {
   const e = findEvent(code);
   if (!e) return null;
-  const svg = await satori(cardTree(e) as any, {
+  const s = styleFor(e, style), key = `${code}:${s}`;
+  const hit = cards.get(key);
+  if (hit) return hit;
+  const svg = await satori((styleTree(s, e) ?? cardTree(e)) as any, {
     width: 1200, height: 630, fonts: FONTS,
     loadAdditionalAsset: async (lang: string, segment: string) => (lang === 'emoji' ? emoji(segment) : []),
   });
   const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng();
   if (cards.size >= 300) cards.delete(cards.keys().next().value!);
-  cards.set(code, png);
+  cards.set(key, png);
   return png;
 }

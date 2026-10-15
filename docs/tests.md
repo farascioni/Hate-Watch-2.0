@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 512 tests in 67 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 518 tests in 68 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 512 tests in 67 files, offline, in about 4 seconds, all passing on October 14, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 518 tests in 68 files, offline, in about 4 seconds, all passing on October 14, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 512 tests in 67 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 518 tests in 68 files, offline, in about 4 seconds, all passing on October 14, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 512 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 518 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -90,6 +90,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
 | `share.test.ts` | Share links: the `/a/<code>` page, its preview picture, the iPhone redirect to the App Store, codes for old alerts |
+| `share-styles.test.ts` | Share looks (ticket stub, void, boarding pass, parking ticket, scratch-off, torn): which looks each alert can be shared in, that each draws a 1200×630 card, that an unknown or inapplicable `?s=` is the classic card, the link's `og:image`, and `shareStyles` on the feed item |
 | `soccer.test.ts` | Fouls and dives, penalties conceded, losing the ball, passes given away, and a 3+ goal loss (Coventry 0-5 Brighton, Fulham 1-1 Man United) |
 | `sport-alerts.test.ts` | The sport-by-sport alerts of October 2026 in ESPN's wording, each kept to one alert per device |
 | `stats.test.ts` | Stats pages for players and teams (Aaron Judge, Gerrit Cole, Trae Young, the Yankees, the EPL table) |

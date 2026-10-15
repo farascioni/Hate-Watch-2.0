@@ -39,6 +39,8 @@ export interface FeedItem {
   title: string; body: string; occurredAt: number; detectedAt: number; target: Target;
   /** A link whose preview is a picture of this alert; tapping it opens the App Store. */
   shareUrl?: string;
+  /** The looks this alert can be shared in (ticket stub, boarding pass...), classic first; absent when it has only one. Each has its own link and preview picture. */
+  shareStyles?: { id: string; label: string; url: string; image: string }[];
   /** The game (F1: session) it happened in, if any: links the alert to the Scores tab's game screen. */
   gameId?: string | null;
   /** A Successful Hate Watch: how many other people got this alert too. */
