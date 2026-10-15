@@ -18,6 +18,8 @@ import { PENALTY_PLACEHOLDER, goalNamesScorer, PLAYER_DETECTORS, bundleByPlay, n
  *  - a play re-posted under a new id at the same spot (period, start, player) is that play, revised, not a new one;
  *  - a play gone from the feed for GONE_MS (one read can come back short) has its alerts taken back;
  *  - a finished drive's result the same way (three-and-out, turned over on downs, the red zone).
+ *  - college football: a flag ESPN posts again as a "Penalty ... NO PLAY" play of its own, at the same period and clock as the play that
+ *    sent it, is that card's line, not a second card (`flagCopy`, FLAG_COPY_MS; WKU at SHSU, October 14 2026).
  * Scores are the tracker's (live.ts): it takes one back only when ESPN's plays and header agree it's gone, and asks
  * this which plays' score alerts that was (`takeBack`).
  *
@@ -74,6 +76,8 @@ const whereLabel = (p: NPlay) => {
 };
 /** A play missing from the feed this long is gone. */
 export const GONE_MS = 30_000;
+/** College football: how long after a flag's first card a standalone "Penalty" row for it is that card's copy (flagCopy). */
+export const FLAG_COPY_MS = 5 * 60_000;
 
 type Side = 'home' | 'away';
 /** An alert's kind: its type and who it's about. An edit's alerts keep their ids; a re-post's have new ones, the same kinds. */
@@ -333,6 +337,28 @@ export class PlayLedger {
       if (start != null && Math.abs(start - at) <= SHOT_COPY_S && [...x.alerts.values()].some((e) => /^nhl\.shot_/.test(e.type))) return true;
     }
     return false;
+  }
+
+  /**
+   * College football: a standalone "Penalty … NO PLAY" row, seen for the first time, whose flag a play from the last FLAG_COPY_MS
+   * already sent at the same clock in the same period (the same team, the same foul): ESPN wrote a dead-ball flag into the play and
+   * posted it again as its own row 2 minutes on (WKU at SHSU, 4:08 left in the 4th). It makes no card of its own: the line it
+   * adds (the yardage) goes on the first card's alert. Undefined: not a copy.
+   */
+  flagCopy(p: NPlay, now: number): Detected[] | undefined {
+    if (this.g.league !== 'cfb' || p.type !== 'Penalty' || p.clockSec == null) return undefined;
+    const mine = this.detect(p).filter((e) => e.type === 'cfb.team.penalty');
+    if (!mine.length) return undefined;
+    for (const x of this.plays.values()) {
+      const y = x.play;
+      if (x.header || x.history || x.missingSince != null || x.gone || y.id === p.id || y.periodNum !== p.periodNum || y.clockSec !== p.clockSec || now - x.firstAt > FLAG_COPY_MS) continue;
+      const held = mine.map((m) => x.alerts.get(kindOf(m))).filter((e): e is Detected => !!e && mine.some((m) => m.targetKey === e.targetKey && m.title === e.title));
+      if (held.length < mine.length) continue;
+      this.log(`flag on play ${p.id} is the one on ${y.id}`);
+      const yards = p.text.match(/\d+ yards from \w+ to \w+(?:, \d(?:ST|ND|RD|TH) DOWN)?/i)?.[0];
+      return this.linesOn(held, `ESPN posted this flag again as a play of its own${yards ? `: ${yards}` : ''}.`);
+    }
+    return undefined;
   }
 
   /**

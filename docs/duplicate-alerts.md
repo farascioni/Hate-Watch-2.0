@@ -432,6 +432,21 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
   - A play re-posted under a new id at the same spot (`samePlay`: the same period, a start within 10 seconds, the
     same player, or naming none, the same type) is that play, revised (`repost`), not a new one. One touchdown posted
     under three ids is one alert.
+  - A flag ESPN posts again as a play of its own is a line on the first card, not a second (college football;
+    `PlayLedger.flagCopy`, `FLAG_COPY_MS` 5 minutes). WKU at SHSU, 2026-10-14: play 731 ("Fumble Recovery (Own)", a sack
+    with "PENALTY SAM UNR: Unnecessary Roughness") went out as "Sam Houston was flagged: Unnecessary Roughness", and
+    2 minutes 15 seconds later ESPN added play 748, a "Penalty" row with only the flag and "NO PLAY", at the same period
+    and clock (4:08): a second card. Now a "Penalty" play whose flags (`cfb.team.penalty`, same target and title) are all
+    held by one earlier play of the same period and clock, first seen within the last 5 minutes and not from before the
+    attach, gets no card and no ledger entry: the first card gets "ESPN posted this flag again as a play of its own: 15
+    yards from WKU30 to WKU45, 1ST DOWN." (`linesOn`, so it keeps the flag's weak, no-push moment). A flag at a different
+    clock, or with a different title or team, is a flag of its own. `GameTracker.poll` calls it in the `fresh` branch
+    after `was` (re-post) and `twin`, only for plays seen live.
+  - A review's quoted original is no call (`standing()` in `detectors.ts`, college only): ESPN rewrites an overturned
+    review's play as the play that stands plus "CALL OVERTURNED. (Original Play: … PENALTY SAM Targeting …)", so the
+    college detectors read only the text before "(Original Play:". The flag inside the quote is not sent (WKU at SHSU,
+    play 375); a flag sent from the original play before the overturn still gets "Overturned on review." as above. The
+    alert's body still shows ESPN's full text. The NFL's texts carry no such quote.
   - A play missing for `GONE_MS` (30 seconds) has its alerts taken back (`sweep`). One short read doesn't count.
   - A score is taken back only when ESPN's plays, the score the latest plays carry and the header agree, two reads
     running. If the same side then scores on that drive within 10 minutes, the alert gets a line ("Then Wake Forest

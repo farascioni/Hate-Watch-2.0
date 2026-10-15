@@ -8,52 +8,52 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SHARING
-- Share offers looks (ticket stub, void stamp, boarding pass, parking ticket, scratch-off, torn ticket); the link previews as it. (Update)
+- Share offers looks (ticket stub, void stamp, boarding pass, parking ticket, scratch-off, torn ticket), and the link previews as it. (Update)
 
 SERVER
-- The database is backed up continuously, and a check tells the owner when the backup, ESPN reads or a game's polling stops.
+- The database is backed up continuously; a check alerts the owner when backup, ESPN reads or a game's polling stops.
 
 RECENT MISERY
 - Recent misery on a player's or team's page is one list for everyone: 30 days of losses (a blown lead, overtime, walk-off, losing as favorite) and the worst of the rest (ejection, serious injury, pulled quarterback or goalie, red card, DNF).
-- It ignores what you track and your settings, covers untracked teams and players, and a player's page also shows their team's losses.
+- It ignores what you track and your settings, covers untracked teams; a player's page adds their team's losses.
 - A soccer loss by 3+ goals keeps its score on the list.
 
 MLB
 - A strikeout on a challenged pitch waits 30 seconds, so one that becomes a walk is not sent.
 - A pickoff error is no "got picked off".
-- A lost replay challenge ESPN adds later is sent once it holds.
-- A corrected homer distance and an error moved to another fielder become lines on the alerts sent.
+- A lost replay challenge ESPN adds later is sent once it holds. A corrected homer distance or an error moved to another fielder becomes a line.
 - A run is the pitcher's whose runner scores, as in the box score.
 - A third out a review overturns gets a line. A strikeout ESPN never posts is made from the third strike.
 
 HOCKEY
-- A goalie is not shown as pulled when a play ESPN took out had him replaced; a real pull counts the goals against him.
+- A goalie is not shown as pulled when a play ESPN took out had him replaced; a real pull counts his goals against.
 - A goal ESPN first posted as a shot, and any shot it changes or takes out, gets a line, no push.
 - An empty-net goal first posted as even-strength is not charged to the goalie.
 - Hockey waits for ESPN: a shot 20 seconds, an unnamed penalty up to 10 minutes, a goal with no scorer 90 seconds (then "scorer to be named"). A penalty says what it was, not "Penalty Shot Infraction".
-- A shot ESPN posts minutes late no longer alerts; a play it takes out and posts again within 45 minutes is one alert. A repeat of a shot waits a minute.
+- A shot posted minutes late no longer alerts; a play taken out and posted again within 45 minutes is one alert. A repeat shot waits a minute.
 - A shootout game ends as a win and a loss, not a tie: "Lost to Dallas in a shootout. Final DAL 3, COL 2."
-- A goal ESPN takes out after it pushed gets "Goal taken off the board". A play ESPN reuses for a new shooter is a line, not a push.
-- Assists corrected hours later and a penalty's "against" follow ESPN as lines. A shot deleted just before the final gets its "taken out" line.
-- The final score is the higher of ESPN's score and its period scores.
+- A goal ESPN takes out after it pushed gets "Goal taken off the board". A play reused for a new shooter is a line, not a push.
+- Assists corrected hours later and a penalty's "against" follow ESPN as lines. A shot deleted before the final gets its "taken out" line.
+- The final score is the higher of ESPN's and its period scores.
 
 FOOTBALL
 - A sack on a failed two-point try reads "got sacked on the two-point try".
 - A score that ties the game says so ("Rams tied the game, 34-34."), a line with no push.
 - An NFL team's flags reach trackers' feeds even with no player named; never pushed.
-- College football: a flag no longer takes the place of a score or a three-and-out (its own feed row, no push), and an alert shows ESPN's corrected words and score.
+- College football: a flag no longer takes the place of a score or a three-and-out, and an alert shows ESPN's corrected words and score.
 - A safety is pushed as a safety, also when ESPN first posted a sack.
 - College football: a blocked or missed extra point is an alert; the setting is now "Misses a kick".
+- College football: a flag a review took back is no flag; a sack typed as a fumble is a sack; a flag posted again as its own play is a line on the first card.
 
 NBA AND WNBA
 - A technical's free throw is no "picked up a technical"; traveling is a turnover; an offensive charge is a foul.
-- A play is corrected for 45 minutes; a block that becomes a miss or goes to another player says so; a shot ESPN later changes gets a silent line.
+- A play is corrected for 45 minutes; a block that becomes a miss or goes to another player says so; a later shot change gets a silent line.
 - A missed shot waits up to 15 seconds for ESPN to name it; a basket with no scorer waits up to 20, so one ESPN takes back is never "took the lead"; one taken back later gets a line.
 - A late play shows the score now. A 3-seconds call is no technical push.
-- A turnover or foul ESPN posts twice is one alert; an offensive foul, its turnover and a retyped foul are one alert with lines. An untyped shot no longer says "0.0 seconds left".
-- A flagrant foul is titled one, not a technical. A turnover first called "No Turnover" shows its real words. A play stamped far back in the clock waits 3 minutes.
+- A turnover or foul ESPN posts twice is one alert; an offensive foul, its turnover and a retyped foul are one alert with lines. No "0.0 seconds left" on an untyped shot.
+- A flagrant foul is titled one, not a technical. A turnover first called "No Turnover" shows its real words. A play stamped far back waits 3 minutes.
 - A box score player on no roster joins the catalog.
-- A play or change 2+ minutes late is feed-only. Preseason: no "their team lost" for players who did not play.
+- A play or change 2+ minutes late is feed-only. Preseason: no "team lost" for players who did not play.
 
 ## Build 13 (October 12, 2026)
 

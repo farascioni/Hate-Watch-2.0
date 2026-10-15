@@ -932,7 +932,10 @@ export class GameTracker {
         const was = ledgered && !history ? this.ledger.repost(p, now) : undefined;
         // Basketball: a copy of a turnover or foul still in the feed (twin) is counted, not alerted: the entry takes it over if ESPN deletes its own.
         const twin = !was && ledgered && !history && this.ledger.twin(p);
-        if (twin) {
+        // College football: a standalone flag row that copies a flag a play just sent is a line on that card, not a second card.
+        const copy = !was && !twin && ledgered && !history ? this.ledger.flagCopy(p, now) : undefined;
+        if (twin || copy) {
+          if (copy) changed.push(...copy);
           observePlay(this.ctx, p);
         } else if (was) {
           const r = this.ledger.revise(was, p, now);
@@ -992,7 +995,9 @@ export class GameTracker {
         events.push(...(football ? this.footballScore(es, p, said, now, changed) : es));
         if (BASKETBALL.has(league)) this.ledger.addScores(p.id, es); // so a basket ESPN takes back gets a line on its alerts (takeBack)
         if (!fresh && !waiting) {
-          log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
+          // Football: an extra point or two-point try ESPN adds to a touchdown's play is no late score (WKU at SHSU, play 70).
+          const kick = football && !isSafety(p) && score.home - said.home + score.away - said.away <= 2;
+          if (!kick) log(`[${league} ${gameId}] late score: play ${p.id} became a scoring play after it was first published (${p.away}-${p.home})`);
           if (league === 'nhl') events.push(...PLAYER_DETECTORS.nhl(this.ctx, p).filter((e) => e.type === 'nhl.goalie.goal_allowed'));
         }
       }

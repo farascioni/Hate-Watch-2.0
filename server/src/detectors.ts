@@ -1520,6 +1520,13 @@ export function wipedOutLine(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, t
 }
 
 /**
+ * A play's text without the call a review overturned: ESPN rewrites it as "… CALL OVERTURNED. (Original Play: … PENALTY SAM
+ * Targeting …)", and only what's before the quote stands (WKU at SHSU, October 14 2026: the targeting flag that no longer
+ * stood went out). College only: the NFL's overturned plays carry no such quote.
+ */
+export const standing = (text: string) => text.split(/\s*\(Original Play:/i)[0];
+
+/**
  * College football's play alerts for a team (it has no players): an interception thrown, a fumble lost (or any
  * fumble), a sack, an incompletion, a field goal missed or blocked, a flag, a player disqualified (targeting), the
  * starting quarterback pulled. The team is the play's: the offense (`start`), and for a lost ball whichever side
@@ -1535,28 +1542,29 @@ function cfbTeamPlays(g: GameCtx, p: NPlay): Detected[] {
     out.push({ id: `${g.gameId}:${p.id}:${type}:${teamId}`, type, targetKey: teamKey(g.league, teamId), title: title(teamName(g.league, teamId)),
       body: `${p.text} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id }, ...x });
   };
-  const ty = p.type, wiped = /\bNO PLAY\b/i.test(p.text);
+  const ty = p.type, said = standing(p.text), wiped = /\bNO PLAY\b/i.test(said);
   const offense = ours(p.teamId), ended = ours(p.endTeamId);
   if (!wiped && /Interception/i.test(ty)) team('cfb.team.interception', offense, (n) => `${n} threw an interception${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`);
   if (!wiped && /Fumble Recovery \(Opponent\)|Fumble Return Touchdown/i.test(ty)) {
     team('cfb.team.fumble_lost', ended ? other(ended) : offense, (n) => `${n} lost a fumble${/Touchdown/i.test(ty) ? ' — returned for a TD 🙃' : ''}`, { aliases: ['cfb.team.fumble'] });
   } else if (!wiped && /^Fumble( Recovery \(Own\))?$/i.test(ty)) team('cfb.team.fumble', ended ?? offense, (n) => `${n} fumbled`);
-  if (!wiped && /^Sack$/i.test(ty)) { const qb = passerIn(p.text); team('cfb.team.sacked', offense, (n) => `${n} got sacked${qb ? ` (${qb})` : ''}`); }
+  // A sack ESPN types as a fumble ("Shotgun #11 B.Glenn sacked for loss of 14 yards … fumble … recovered by WKU": WKU at SHSU, October 14 2026).
+  if (!wiped && (/^Sack$/i.test(ty) || (/^Fumble( Recovery \(Own\))?$/i.test(ty) && /\bsacked for (?:a )?loss\b/i.test(said)))) { const qb = passerIn(p.text); team('cfb.team.sacked', offense, (n) => `${n} got sacked${qb ? ` (${qb})` : ''}`); }
   if (!wiped && /^Pass Incompletion$/i.test(ty)) team('cfb.team.incompletion', offense, (n) => `${n} threw incomplete`);
   if (!wiped && /^(Field Goal Missed|Blocked Field Goal)$/i.test(ty)) {
-    const yards = p.text.match(/field goal attempt from (\d+) yards/i)?.[1];
+    const yards = said.match(/field goal attempt from (\d+) yards/i)?.[1];
     team('cfb.team.kick_missed', offense, (n) => (/Blocked/i.test(ty) ? `${n} had a ${yards ? `${yards}-yard ` : ''}field goal blocked` : `${n} missed a ${yards ? `${yards}-yard ` : ''}field goal`));
-  } else if (!wiped && (/^(Blocked|Missed) PAT$/i.test(ty) || /\bkick attempt failed\b|\bextra point is no good\b|\bkick is blocked\b/i.test(p.text))) {
+  } else if (!wiped && (/^(Blocked|Missed) PAT$/i.test(ty) || /\bkick attempt failed\b|\bextra point is no good\b|\bkick is blocked\b/i.test(said))) {
     // An extra point is part of the touchdown's play ("TOUCHDOWN … #31 T.Smack kick attempt failed ( blocked by #94 J.Williams)"), which ESPN adds a poll or so after the play (DEL at MTSU, October 13 2026).
     // The kicking team scored the touchdown: the side with the ball at the end of the play (a pick-six or a kick return starts with the other side).
     team('cfb.team.kick_missed', /PAT$/i.test(ty) ? offense : ended ?? offense, (n) => (/blocked/i.test(`${ty} ${p.text}`) ? `${n} had an extra point blocked` : `${n} missed an extra point`));
   }
   // A player disqualified ("PENALTY CAL Targeting (#20 C.Sidney)… California #20 C.Sidney has been disqualified"): the
   // team's alert for that flag (it counts as a flag too), first, so it's the alert and not a line on another.
-  const dq = p.text.match(/PENALTY (\S+) ([^(]*?) \((#\d+ [^)]+)\)[^]*?has been disqualified/);
+  const dq = said.match(/PENALTY (\S+) ([^(]*?) \((#\d+ [^)]+)\)[^]*?has been disqualified/);
   if (dq) team('cfb.team.ejection', cfbFlag(g, dq[1], dq[2]).teamId, (n) => `${n} had a player ejected: ${dq[3].replace(/^#\d+ /, '')}${/targeting/i.test(dq[2]) ? ' (targeting)' : ''}`, { aliases: ['cfb.team.penalty'] });
   // Each other flag the play has: "PENALTY Bama Delay Of Game", "PENALTY VAN Holding declined", "PENALTY Sac St Offside".
-  for (const m of p.text.matchAll(CFB_FLAG)) {
+  for (const m of said.matchAll(CFB_FLAG)) {
     if (dq && m.index === dq.index) continue; // the ejection's flag: said
     const { teamId, what } = cfbFlag(g, m[1], m[2]);
     // A weak alert, as the NFL's team flag (`teamFlags`): after the play's other alerts, with their moment and never a push, so a
