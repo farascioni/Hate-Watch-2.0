@@ -60,7 +60,7 @@ decide which of several true alerts a device gets.
 - **Don't re-run detectors on a changed MLB result.** Some MLB ids are built from the play's text, and a rewrite
   would make a new id. `GameTracker.poll` logs the change instead. The exceptions are narrow and each has an id that
   cannot go out twice: a crew chief review, a home run's distance, an error moved to another fielder, a result that
-  became a scoring play, and a replay challenge's sentence written in later (`revisedResult`; below).
+  became a scoring play, a replay challenge's sentence written in later, and a strikeout rewritten (looking to swinging, the "upheld" sentence gone: a line on its alert) (`revisedResult`; below).
 - **Changing an id's shape re-sends.** A deploy that changes how an id is built sends every alert made again with
   the new shape as new: the last 5 minutes of each game in progress (a deploy is a restart: `atBoot`), and F1 results for sessions that started in
   the last 8 hours, which are read again after a restart.
@@ -120,7 +120,7 @@ doubled… Umpire review: HR call on the field was overturned…"), checked for 
 with the last one (`resultPlays`) and reaches only these: a home run's distance and an error moved to another fielder
 (a line, no push, on the alerts the play made, which `sent` remembers, or a new fielder's alert), a result that
 became a scoring play (the pitcher's run alert), and a replay challenge's sentence added to it (`challengeWatch`: believed
-after it has held 45 seconds, never from one version). The detectors are run on a copy of the game's state for this, and
+after it has held 45 seconds, never from one version), and a strikeout rewritten (a line on the batter's alert, `linesOnPlay`; NLCS Game 3). The detectors are run on a copy of the game's state for this, and
 only the alert types named are kept.
 
 **The same thing under a new id.** ESPN re-posts football plays under new ids when a review changes them (one
@@ -190,7 +190,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
 - **`seen`:** play ids already judged. A play is passed to the detectors (`PLAYER_DETECTORS[league]`) only on its
   first sighting, then `observePlay` updates the game's state (bases, goalies, the half-inning). An MLB result
   posted before its batter is on it waits (`waitForBatter`, `noBatter`, up to `HW_HALF_END_WAIT_MS`, 20 seconds) and
-  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds) and a basket with no scorer named (`waitForScorer`, `noScorer`, up to `HW_SCORER_WAIT_MS`, 20 seconds, with the score alerts past it: `goalHeld`), and a hockey shot (20 seconds), penalty still typed "Penalty Shot Infraction" (2 minutes) or goal with no scorer in its text (20 seconds, with the score alerts past it: `goalHeld`) (`waitForHockey`, `noHockeyPlay`, `HOCKEY_WAIT_MS`). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`) and a result that
+  is judged once, when it's ready; so does a basketball miss ESPN hasn't typed (`waitForShotType`, `noShotType`, up to `HW_SHOT_WAIT_MS`, 15 seconds) and a basket with no scorer named (`waitForScorer`, `noScorer`, up to `HW_SCORER_WAIT_MS`, 20 seconds, with the score alerts past it: `goalHeld`), and a hockey shot (20 seconds), penalty still typed "Penalty Shot Infraction" (2 minutes) or goal with no scorer in its text (20 seconds, with the score alerts past it: `goalHeld`) (`waitForHockey`, `noHockeyPlay`, `HOCKEY_WAIT_MS`). So does a strikeout on a challenged last pitch (`HW_ABS_SETTLE_MS`, 1.5 times that when the result carries the challenge sentence) and a result that
   says "Official Scorer Ruling Pending" (`HW_RULING_WAIT_MS`, 45 seconds; `settling`, `settleSince`): the version that
   settles is the one judged, and the plays after it are not judged until it is, so the state they build (bases, whose
   runner is whose) stays in order. An "End Inning" play two reads in a row lack, with the half not over, is forgotten
@@ -459,9 +459,9 @@ turnovers overturned on review, one touchdown posted under three ids), and chang
 - **MLB:** a changed at-bat result is logged, not judged again, but for the narrow cases of Layer 1 (`revisedResult`): a home
   run's distance becomes a line ("ESPN corrected the distance: 436 feet."), an error moved to another fielder a line on the
   first one's alert ("ESPN moved this error to Freddie Freeman.") and an alert for the new one, a taken-back third out a line on
-  the half's early alert ("A replay review overturned the third out; the inning went on."). A lost ABS challenge waits for the review
+  the half's early alert ("A replay review overturned the third out; the inning went on."), and a strikeout ESPN rewrote after its alert ("looking ... upheld" became "swinging" once the challenge overturned a pitch, NLCS Game 3, October 14 2026) a line on the batter's alert, "ESPN changed this to a strikeout swinging, and the challenge no longer reads upheld.", whose id is the alert's with the line's words hashed, so the same words never go out twice. A lost ABS challenge waits for the review
   (`holdAbs`): it goes out once a later play exists and `HW_ABS_SETTLE_MS` (30 seconds) have passed (at the final, at
-  once), and only if the pitch still reads Confirmed and, on an at-bat's last pitch, the result doesn't say the call
+  once) and the at-bat's own result is no longer settling (a challenged strikeout waits 45 seconds, so the two go out together), and only if the pitch still reads Confirmed and, on an at-bat's last pitch, the result doesn't say the call
   was overturned. A pitch missing from one read isn't taken back, because ESPN serves stale copies that drop the
   latest plays for a read (six times in ALDS Game 5, October 10 2026): it takes two reads in a row
   (`abs-settle.test.ts`).
@@ -565,7 +565,7 @@ What is lost:
 - **MLB holds.** A lost ABS challenge held at the restart, or an at-bat waiting for its batter, a strikeout under an
   ABS review or a result waiting for the official scorer, from before the 90-second window is history. A line a rewrite would
   put on an alert (a distance, a moved error, a taken-back third out) after a restart has no `sent` record to land on and is
-  not made.
+  not made (so is the strikeout line).
 - **Plays nobody read** (fixed October 11, 2026). The 90-second window counts from the play's own time (ESPN's
   wallclock), and ESPN posts plays well after that time: in production during ALDS Game 5, 10.9 to 92.7 seconds after it
   (median 23.9; README "Real-time", "What production measures"), plus the seconds the server is down for the deploy.
@@ -585,6 +585,9 @@ This is one reason for the decision **"No production restarts during live games"
   times and went out as ESPN first wrote it ("Edman to first … Edman to second."); there is no general "ESPN rewrote this"
   line, because a sentence ESPN is still working on would write a line each time.
 - **A fold sentence is compared as text.** Two wordings of the same fact are two lines.
+- **A strikeout ESPN flips more than once** (looking, swinging, looking) gets one line per distinct wording, and only the
+  strikeout's own alert is corrected: a "lost an ABS challenge" line already on it stays, and a device that follows only the
+  team that lost the challenge keeps whatever that team's alert said (NLCS Game 3, October 14, 2026).
 - **A basketball play ESPN removes or changes after 45 minutes** keeps its alert with no line (`BASKETBALL_REVISE_MS`; it was 15 minutes until October 14, 2026, when a turnover ESPN moved to another player 20 minutes later showed that was too short; the slowest change seen is 42 minutes, a rebound). Franz Wagner's block alert in Magic at Cavaliers, removed 24 minutes later, would get its line now. A first alert on a play that ESPN fixes within seconds still goes out first (a free throw posted as "misses" that is flipped to "makes" a minute later): only its line corrects it.
 - **A soccer foul that ESPN later marks "Penalty conceded"** is judged again (`fouls` in `GameTracker`), and the
   penalty's alerts have their own ids and moment (`soccerFoul`), so a device can get the foul (feed only) and then

@@ -69,7 +69,7 @@ To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, cata
 | `HW_DECISION_RETRY_MS` | 15000 | MLB: how often to look again for the winning and losing pitchers after a final, up to 20 times. |
 | `HW_TOUCH_MS` | 10000 | Soccer: the touch-by-touch feed, read only while someone tracks a player in the match. |
 | `HW_PLAYOFF_FINAL_WAIT_MS` | 120000 | How long a playoff final waits for the scoreboard to say whether the season is over. |
-| `HW_ABS_SETTLE_MS` | 30000 | How long a lost ABS challenge, and a strikeout on a challenged last pitch, wait in case ESPN overturns the call. |
+| `HW_ABS_SETTLE_MS` | 30000 | How long a lost ABS challenge, and a strikeout on a challenged last pitch (1.5 times this when its result carries the challenge sentence), wait in case ESPN overturns the call. |
 | `HW_RULING_WAIT_MS` | 45000 | MLB: how long a result that says "Official Scorer Ruling Pending" waits for the ruling before it is judged without that sentence. |
 | `HW_CHALLENGE_SETTLE_MS` | 45000 | MLB: how long a replay challenge's sentence ESPN adds to a posted result must hold, unchanged, before it is believed (three times as long if the game hasn't moved on to the next at-bat). |
 | `HW_HALF_END_WAIT_MS` | 20000 | MLB: how long the end of a half-inning waits for a read that has its third out, a final for plays that are behind it (the last out), and a strike three for the result ESPN may still post. |

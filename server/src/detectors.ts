@@ -1301,6 +1301,13 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
         out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', who, `${nameOf('mlb', who)} gave up ${n} run${n > 1 ? 's' : ''}`), ...(gift || twin ? { id: textId('mlb.pitcher.runs_allowed', who) } : {}) });
       }
     }
+    // The run handed over is the pitcher on the mound's alert; a runner who came against an earlier pitcher is that pitcher's run
+    // too (NLCS Game 3: Turang was Sasaki's, Wrobleski threw the wild pitch): he gets "gave up 1 run", as for any other run.
+    if ((gift && !/passed ball/i.test(gift[1])) || pushedIn) {
+      for (const [who, n] of chargedRuns(g, p, pitcher, runs, false) ?? []) {
+        if (who !== pitcher) out.push({ ...mk(g, p, 'mlb.pitcher.runs_allowed', who, `${nameOf('mlb', who)} gave up ${n} run${n > 1 ? 's' : ''}`), id: textId('mlb.pitcher.runs_allowed', who) });
+      }
+    }
     if (isResult && /\b(walked|hit by pitch)\b/i.test(t) && !pushedIn) out.push(mk(g, p, 'mlb.pitcher.walk', pitcher, `${pn} ${/hit by pitch/i.test(t) ? 'plunked a batter' : 'issued a walk'}`));
     // A passed ball that scores a run is the catcher's ("…on a passed ball by Langeliers").
     const pb = gift && /passed ball/i.test(gift[1]) ? t.match(new RegExp(String.raw`passed ball by ${INITIAL}([A-Z][\p{L}'.-]+(?: (?:Jr\.|Sr\.|II|III))?)`, 'u')) : null;

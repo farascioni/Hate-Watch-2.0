@@ -121,7 +121,7 @@ test('NLCS G2 F1: a challenged strikeout that stands is sent when the wait is ov
   const betts = idOf('Mookie Betts');
   await s.read(0);
   assert.equal(alerts(s.game).filter((a) => /struck out/.test(a.title)).length, 0);
-  await sleep(350); // HW_ABS_SETTLE_MS
+  await sleep(500); // 1.5 times HW_ABS_SETTLE_MS (300): the result carries the challenge sentence
   await s.read(0);
   assert.deepEqual(alerts(s.game).filter((a) => /struck out/.test(a.title)).map((a) => [a.target, a.title]), [[`player:mlb:${betts}`, 'Mookie Betts struck out looking 👀']]);
 });

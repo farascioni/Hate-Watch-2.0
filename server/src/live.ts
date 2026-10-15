@@ -441,7 +441,7 @@ export class GameTracker {
    * "- Confirmed" right away and, if the call is overturned, swaps in an "- Overturned" pitch in the same
    * place under a new id (Lombard Jr.'s strike 2 became ball 4, Rays @ Yankees, 2026-10-07: three alerts
    * that night were challenges won). So a loss goes out once the game has moved past that pitch and
-   * ABS_SETTLE_MS have passed (at the final, at once), and only if the pitch still reads Confirmed and,
+   * ABS_SETTLE_MS have passed (at the final, at once; not while the at-bat's result is still settling), and only if the pitch still reads Confirmed and,
    * on an at-bat's last pitch, the result doesn't say it was overturned. Returns what to send now.
    * A pitch missing from one read isn't taken back: ESPN serves stale copies that drop the latest plays for a read
    * (six times in ALDS Game 5, October 10 2026), so it takes two reads in a row without it. How long ESPN took to
@@ -465,9 +465,11 @@ export class GameTracker {
       const latest = versions.length ? plays.lastIndexOf(versions[versions.length - 1]) : -1;
       if (!over && (latest === plays.length - 1 || Date.now() - held.since < ABS_SETTLE_MS)) continue;
       if (!over && held.missing === 1) continue; // gone from one read: a stale copy, or taken back? the next read says
-      this.absHeld.delete(slot);
       const atBat = slot.slice(0, -2), pitchNo = slot.slice(-2);
       const inAtBat = (p: NPlay) => pitchSlot(p.id).length === slot.length && pitchSlot(p.id).startsWith(atBat);
+      // The at-bat's result is still settling (a challenged strikeout waits longer than the clock above): the challenge goes out with it, as a line on it.
+      if (!over && plays.some((p) => inAtBat(p) && !this.seen.has(p.id) && this.settleSince.has(p.id))) continue;
+      this.absHeld.delete(slot);
       const lastPitch = !plays.some((p) => inAtBat(p) && isPitch(p) && pitchSlot(p.id).slice(-2) > pitchNo);
       const result = plays.find((p) => inAtBat(p) && p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter'));
       const why = held.missing >= 2 ? 'was taken back'
@@ -483,7 +485,8 @@ export class GameTracker {
   /**
    * MLB: whether a result is still under review and must wait before it is judged. A strikeout on a challenged last pitch
    * waits ABS_SETTLE_MS (ESPN posts the challenged call "Confirmed" and can overturn it into a walk: Betts, NLCS Game 2,
-   * October 12 2026), and a result that says "Official Scorer Ruling Pending" waits RULING_WAIT_MS for the ruling, then is
+   * October 12 2026), 1.5 times that when the result carries the challenge sentence ("X challenged: call on the field was
+   * upheld."; ESPN rewrote Smith's strikeout 3 s after a 30 s wait ended, NLCS Game 3, October 14 2026), and a result that says "Official Scorer Ruling Pending" waits RULING_WAIT_MS for the ruling, then is
    * judged without that sentence. The settled version is the one judged. Nothing waits at the final.
    */
   private settling(p: NPlay, now: number, final: boolean): boolean {
@@ -495,7 +498,7 @@ export class GameTracker {
       this.settleSince.set(p.id, now);
       log(`[mlb ${this.ctx.gameId}] result ${p.id} ${pending ? 'is waiting for the official scorer' : 'is a strikeout under an ABS review'}: waiting ("${p.text}")`);
     }
-    const wait = pending ? RULING_WAIT_MS : ABS_SETTLE_MS;
+    const wait = pending ? RULING_WAIT_MS : /\bchallenged:/i.test(p.text) ? ABS_SETTLE_MS * 1.5 : ABS_SETTLE_MS;
     if (now - since < wait) return true;
     if (pending && RULING_PENDING.test(p.text)) {
       log(`[mlb ${this.ctx.gameId}] result ${p.id} still has no ruling after ${wait / 1000}s: judged without it`);
@@ -529,7 +532,8 @@ export class GameTracker {
    * again on a rewritten result (Layer 1: text-keyed ids), so only these, each with an id that cannot go out twice:
    * a home run's distance changed (a line on its alerts), an error moved to another fielder (a line on the first fielder's
    * alert, the new fielder's alert), a result that became a scoring play (the pitcher's run alert: the team's came from the
-   * score), and a replay challenge's sentence added to it (watched until it holds: challengeSettled).
+   * score), a replay challenge's sentence added to it (watched until it holds: challengeSettled), and a strikeout ESPN rewrote
+   * (looking to swinging, no longer a strikeout, the "upheld" sentence gone: a line on the batter's alert, no push).
    */
   private revisedResult(prev: NPlay, p: NPlay, plays: NPlay[], now: number, events: Detected[], changed: Detected[]) {
     const feet = (t: string) => t.match(/\((\d+) feet\)/)?.[1];
@@ -545,6 +549,18 @@ export class GameTracker {
       changed.push(...this.ledger.linesOn(errors, `ESPN moved this error to ${to}.`));
       events.push(...now2);
       log(`[mlb ${this.ctx.gameId}] result ${p.id}: the error moved to ${to}`);
+    }
+    // A strikeout ESPN rewrites after its alert went out (NLCS Game 3: "looking ... upheld" became "swinging" once the challenge
+    // overturned a pitch): a line on the batter's alert, no push. The alert's id is the play's, so nothing here can go out twice.
+    if (/struck out/i.test(prev.text)) {
+      const how = (t: string) => /struck out (looking|swinging)/i.exec(t)?.[1]?.toLowerCase(), upheld = (t: string) => challengeOutcome(t) === 'upheld';
+      const line = !/struck out/i.test(p.text) ? `ESPN now has this at-bat as: ${p.text.split(/(?<=\.)\s/)[0]}`
+        : how(prev.text) !== how(p.text) ? `ESPN changed this to a strikeout ${how(p.text) ?? 'with no call named'}${upheld(prev.text) && !upheld(p.text) ? ', and the challenge no longer reads upheld' : ''}.`
+        : upheld(prev.text) && !upheld(p.text) ? 'ESPN: the challenge no longer reads upheld.' : '';
+      if (line) {
+        changed.push(...this.linesOnPlay(p.id, line, (e) => e.type === 'mlb.batter.strikeout' || e.type === 'mlb.batter.multi_strikeout'));
+        log(`[mlb ${this.ctx.gameId}] result ${p.id}: the strikeout was rewritten (${line}): a line on its alert`);
+      }
     }
     const outcome = challengeOutcome(p.text);
     if (outcome && !challengeOutcome(prev.text)) {
