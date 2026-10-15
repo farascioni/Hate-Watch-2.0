@@ -31,9 +31,14 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  * recounted with each version (`unobservePlay`, `observePlay`), so fouling out stays right. Basketball watches a play for
  * BASKETBALL_REVISE_MS (45 minutes, not 15: a turnover moved to another player 20 minutes on, CLE at ORL, October 13 2026),
  * and a block that becomes a plain miss for the same shooter sends no "missed" alert (his "got sent back" covers it; its line says "the shot was not blocked").
- * A change that reaches us more than LATE_REVISION_MS (5 minutes) after the play is feed only and starts with the quarter and clock (a block added 12 minutes late, NY at TOR, October 13 2026).
+ * A change that reaches us more than LATE_REVISION_MS (2 minutes) after the play (measured from the play's wall clock at its first read, `PlayEntry.wall`, since ESPN rewrites it: AJ Johnson's free throw, NO at DAL, October 14 2026) is feed only and starts with the quarter and clock (a block added 12 minutes late, NY at TOR, October 13 2026).
  * A missed shot ESPN describes differently later gets a silent line when the new words contradict the alert (`shotDisagrees`: a three
  * that is not one, or 2 feet), and an offensive charge is a foul like "Offensive Foul" (POR at SAC, October 13 2026).
+ * October 14 2026's seven games added: a copy of a turnover or foul ESPN posts under a second id (the same period, first player and kind;
+ * a turnover within TWIN_S of the clock, a foul on the very same clock) is a twin, counted and never alerted, and takes the entry's place when
+ * ESPN deletes the entry's id (`twin`); a re-post is matched against the entry's earlier versions (`earlier`); a turnover first posted as
+ * "No Turnover" takes the typed words on its row (`retext`, basketball too); a block credited to another player or turned into a plain miss
+ * says so (`WHERE_PREFIX`, `basketballLine`); a made shot flipped to a miss is feed only.
  * A basket ESPN takes back (the score going down, its play no longer scoring) puts a line on its team alerts (`addScores`, `takeBack`; IND at OKC,
  * October 13 2026), and a foul re-posted up to FOUL_REPOST_S off its clock is the same foul (`samePlay`).
  *
@@ -49,8 +54,14 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
 export const REVISE_MS = 15 * 60_000;
 /** Basketball: ESPN's slowest edit to a player came 42 minutes after posting it (a turnover moved from Donovan Mitchell to Evan Mobley, CLE at ORL, October 13 2026). */
 export const BASKETBALL_REVISE_MS = 45 * 60_000;
-/** Basketball: an alert a revision makes for a play older than this goes to the feed with no push, and says where the play was (a block ESPN added 12 minutes late, NY at TOR, October 13 2026). */
-export const LATE_REVISION_MS = 5 * 60_000;
+/**
+ * Basketball: an alert a revision makes for a play older than this goes to the feed with no push, and says where the play was (a block
+ * ESPN added 12 minutes late, NY at TOR, October 13 2026). The same 2 minutes as a play posted late (`LATE_POST_MS`, live.ts): it was 5
+ * until October 15, when a foul re-credited 250 seconds on and a free throw 203 seconds on still pushed (BKN at MIA).
+ */
+export const LATE_REVISION_MS = 2 * 60_000;
+/** The start `whereLabel` gives a late alert's body. */
+const WHERE_PREFIX = /^(?:\d+(?:st|nd|rd|th) (?:quarter|overtime)|overtime), \d+:\d\d\. /;
 /** Where a basketball play was: "1st quarter, 1:11", "overtime, 0:04". */
 const whereLabel = (p: NPlay) => {
   const n = p.periodNum ?? 0, s = Math.floor(p.clockSec ?? 0);
@@ -76,6 +87,8 @@ const startOf = (p: NPlay) => { const m = p.text.match(/^\((\d+):(\d+)\)/); retu
 /** The player a play is about: the first its text names ("#3 G.Lopez", "P.Mahomes"). */
 const actorOf = (p: NPlay) => p.text.replace(/^\(\d+:\d+\)\s*/, '').match(/(?:#\d+ )?\b([A-Z][A-Za-z]{0,2}\.\s?[A-Z][\w'.-]+)/)?.[1];
 
+/** Basketball: how far apart in game seconds a turnover and its live copy can be (twin); a foul copy must have the same clock. */
+const TWIN_S = 1;
 /** Basketball: how far apart in game seconds a foul and its re-post can be (samePlay). */
 const FOUL_REPOST_S = 15;
 
@@ -181,6 +194,7 @@ interface PlayEntry {
   play: NPlay;            // as last read (a re-post's version once it has one)
   sig: string;
   firstAt: number;
+  wall: number;           // the play's wallclock at its first read (ESPN rewrites it later): a basketball change is late measured from this
   history: boolean;       // seen when the tracker attached: never alerted, never revised
   header?: boolean;       // the header's score before the play was posted (live.ts): no play to read
   alerts: Map<string, Detected>; // its play alerts still standing, by kind
@@ -188,12 +202,14 @@ interface PlayEntry {
   told?: Map<string, string>; // basketball: a missed shot's wording a line last gave, by kind, while ESPN's description differs from the alert's (shotLine)
   scores: Detected[];     // its score alerts still standing (teamScoreEvents)
   points: Partial<Record<Side, number>>; // each side's score its score alerts announced
+  earlier?: NPlay[];      // basketball: versions that named another player (a re-post is judged against these too: DET at MIN, a turnover credited to someone else for a while)
+  twins?: Map<string, NPlay>; // basketball: live copies ESPN posted of this play under other ids (twin); the entry moves to one when its own id goes
   missingSince?: number;
   gone?: boolean;
   back?: boolean;         // gone, and in the feed again (as it was or re-posted): read again
 }
 
-/** `retext`: football alerts a play still has, whose body (ESPN's words and the score) takes the play's new version on its row, with no push. */
+/** `retext`: football (and basketball turnover) alerts a play still has, whose body (ESPN's words and the score) takes the play's new version on its row, with no push. */
 export interface Revision { fresh: Detected[]; lines: Detected[]; retext?: { id: string; body: string }[] }
 
 export class PlayLedger {
@@ -232,7 +248,7 @@ export class PlayLedger {
 
   /** A play seen for the first time, and the alerts it sent. */
   add(p: NPlay, alerts: Detected[], o: { history: boolean; header?: boolean }, now: number) {
-    this.plays.set(p.id, { play: p, sig: sigOf(p), firstAt: now, history: o.history, ...(o.header ? { header: true } : {}), alerts: byKind(bundleByPlay(alerts)), dropped: new Map(), scores: [], points: {} });
+    this.plays.set(p.id, { play: p, sig: sigOf(p), firstAt: now, wall: p.at, history: o.history, ...(o.header ? { header: true } : {}), alerts: byKind(bundleByPlay(alerts)), dropped: new Map(), scores: [], points: {} });
   }
 
   get(id: string) { return this.plays.get(id); }
@@ -250,13 +266,47 @@ export class PlayLedger {
 
   /** Before a read's plays are gone through: which of the plays we know it doesn't have. One gone that's back is read again. */
   read(ids: Set<string>, now: number) {
-    for (const [id, x] of this.plays) {
+    for (const [id, x] of [...this.plays]) {
       if (x.header) continue;
+      if (x.twins) for (const [tid, t] of x.twins) if (!ids.has(tid)) { x.twins.delete(tid); unobservePlay(this.g, t); }
+      // ESPN took this play out while its copy stands: the copy is the play now (nothing was taken back).
+      const heir = !ids.has(id) && x.twins ? [...x.twins].find(([tid]) => ids.has(tid)) : undefined;
+      if (heir) {
+        x.twins!.delete(heir[0]);
+        this.plays.delete(id);
+        this.plays.set(heir[0], x);
+        unobservePlay(this.g, x.play);
+        x.play = heir[1];
+        x.sig = sigOf(heir[1]);
+        this.log(`play ${id} replaced by its copy ${heir[0]}`);
+        continue;
+      }
       if (!ids.has(id)) { x.missingSince ??= now; continue; }
       if (x.gone) { x.back = true; x.sig = ''; }
       x.missingSince = undefined;
       x.gone = false;
     }
+  }
+
+  /**
+   * Basketball: a turnover or foul seen for the first time that is a copy of one still in the feed (the same player, period and
+   * clock within a second, the same kind; never a technical or flagrant): ESPN posts one turnover twice for minutes (CHI at MIL, Jericho Sims),
+   * one foul as a personal foul and then a shooting foul (PHX at SA). It makes no alert of its own: the entry keeps it, and takes it as
+   * the play when ESPN deletes its own. A shot is never a copy (a putback is another shot 2 seconds on).
+   */
+  twin(p: NPlay): boolean {
+    if (!BASKETBALL.has(this.g.league) || /technical|flagrant|ejected/i.test(p.type)) return false;
+    const [who, kind, at] = [p.participants[0]?.id, playKind(p), startOf(p)];
+    if (!who || (kind !== 'turnover' && kind !== 'foul') || at == null) return false;
+    for (const x of this.plays.values()) {
+      const y = x.play, start = startOf(y);
+      if (x.header || x.history || x.missingSince != null || x.gone || y.periodNum !== p.periodNum || y.participants[0]?.id !== who || playKind(y) !== kind || /technical|flagrant|ejected/i.test(y.type)) continue;
+      if (start == null || Math.abs(start - at) > (kind === 'foul' ? 0.05 : TWIN_S)) continue; // shortcut: a foul copy has the very same clock (CHA at BOS: two real Queta fouls 0.4 s apart), a turnover's may differ by a tenth; a foul copy a tenth off is two alerts, upgrade if seen
+      (x.twins ??= new Map()).set(p.id, p);
+      this.log(`play ${p.id} is a copy of ${y.id}`);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -266,7 +316,7 @@ export class PlayLedger {
   repost(p: NPlay, now: number): PlayEntry | undefined {
     let best: [string, PlayEntry] | undefined;
     for (const [id, x] of this.plays) {
-      if (x.missingSince == null || x.header || now - x.missingSince > this.reviseMs || !samePlay(x.play, p, BASKETBALL.has(this.g.league) || this.g.league === 'nhl')) continue;
+      if (x.missingSince == null || x.header || now - x.missingSince > this.reviseMs || ![x.play, ...(x.earlier ?? [])].some((v) => samePlay(v, p, BASKETBALL.has(this.g.league) || this.g.league === 'nhl'))) continue;
       if (!best || Math.abs(startOf(x.play)! - startOf(p)!) < Math.abs(startOf(best[1].play)! - startOf(p)!)) best = [id, x];
     }
     if (!best) return undefined;
@@ -313,7 +363,13 @@ export class PlayLedger {
     if (other) return `ESPN has since credited this play to ${catalog.player(other.targetKey)?.name ?? 'another player'}.`;
     if (kind === 'missed_free_throw' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the free throw was made.';
     if (kind === 'missed_shot' && now.some((f) => /got_blocked$/.test(f.type))) return 'ESPN has since changed this: the shot was blocked.';
-    if (kind === 'got_blocked' && now.some((f) => /missed_shot$/.test(f.type) && f.targetKey === e.targetKey)) return 'ESPN has since changed this: the shot was not blocked.';
+    // A block ESPN turns into a plain miss sends no "missed" alert (his "got sent back" covers it), so the line says what the shot was (DEN at LAC: Whitmore's driving layup).
+    const missed = kind === 'got_blocked' ? now.find((f) => /missed_shot$/.test(f.type) && f.targetKey === e.targetKey) : undefined;
+    if (missed) {
+      const what = missed.title.replace(/^.*? missed /, '').replace(/ (?:to tie it|for the lead) with .*$/, '').replace(/^(an?) /, '$1 missed ');
+      return `ESPN has since changed this: the shot was not blocked, it was ${what}.`;
+    }
+    if (kind === 'foul' && /flagrant/i.test(p.type)) return 'ESPN has since called this a flagrant foul.';
     if (kind === 'missed_shot' && /\bmakes\b/i.test(p.text)) return 'ESPN has since changed this: the shot went in.';
     if (kind === 'turnover' && !p.participants.length) return 'ESPN has since made this a team turnover.';
     return undefined;
@@ -356,7 +412,10 @@ export class PlayLedger {
   revise(x: PlayEntry, p: NPlay | null, now: number): Revision {
     const was = x.play, back = x.back;
     x.back = false;
-    if (p) { x.play = p; x.sig = sigOf(p); }
+    if (p) {
+      if (BASKETBALL.has(this.g.league) && was.participants[0]?.id !== p.participants[0]?.id) x.earlier = [...(x.earlier ?? []), was].slice(-6);
+      x.play = p; x.sig = sigOf(p);
+    }
     const stale = x.history || now - x.firstAt > this.reviseMs;
     // Basketball: the fouls, recounted around the judgment. The old version's foul stops counting first (a foul re-posted
     // under a new id is not a 6th), the new version is judged (its 6th foul is judged before it is counted), then counted.
@@ -376,6 +435,18 @@ export class PlayLedger {
       for (const [k, e] of x.alerts) if (want.has(k)) x.alerts.set(k, swap(e));
       // A score alert only while the play still has its points: a touchdown ESPN nullifies ("NO PLAY", the score back down) keeps its words until footballTakeBack says why.
       if (p.home >= was.home && p.away >= was.away && !/\bNO PLAY\b/i.test(p.text)) x.scores = x.scores.map(swap);
+    }
+    // Basketball: a turnover ESPN posted untyped ("Tre Jones turnover Brayden Burries", type "No Turnover") takes the typed words once it has
+    // them ("Tre Jones bad pass turnover (Brayden Burries steals)"), in an edit or a re-post: no push, no line, the quarter and clock a late
+    // alert opened with kept (CHI at MIL, DET at MIN, October 14 2026). Only a turnover that was sent unfinished, so a typed one's words are left alone.
+    if (basketball && p && /^no turnover/i.test(was.type) && !/^no turnover/i.test(p.type)) {
+      for (const [k, e] of x.alerts) {
+        const next = want.get(k);
+        if (!next || !/\.turnover$/.test(e.type) || next.body === e.body.replace(WHERE_PREFIX, '')) continue;
+        const body = `${e.body.match(WHERE_PREFIX)?.[0] ?? ''}${next.body}`;
+        retext.push({ id: e.id, body });
+        x.alerts.set(k, { ...e, body });
+      }
     }
     for (const [k, e] of x.alerts) {
       if (want.has(k) || ONCE.test(e.type) || FOULED_OUT.test(e.type)) continue;
@@ -451,8 +522,19 @@ export class PlayLedger {
         }
       }
     }
+    // Basketball: ESPN changes who blocked a shot (Thompson became Wiggins, Ellis Sharpe: 3 of 13 blocks, BKN at MIA): a line on the shooter's "got sent back", which keeps the name it went out with.
+    if (basketball && p && p.id === was.id) {
+      const blocker = (q: NPlay) => q.text.match(/^(.+?) blocks /)?.[1];
+      const [before, after] = [blocker(was), blocker(p)];
+      for (const [k, e] of want) {
+        const sent = x.alerts.get(k);
+        if (sent && /\.got_blocked$/.test(e.type) && before && after && before !== after) lines.push(...this.linesOn([sent], `ESPN has since credited the block to ${after}.`));
+      }
+    }
+    // Basketball: a miss ESPN first posted as a made basket is not news yet (a dunk made, then missed, then deleted, was pushed as "Giannis missed a dunk", BKN at MIA): the feed has it, and the line follows if ESPN takes the play out.
+    if (basketball && p && was.scoring && !p.scoring) for (const e of fresh) if (/\.missed_(?:shot|free_throw)$/.test(e.type)) e.noPush = true;
     // Basketball: a change that reaches us long after the play is news for the feed, not the phone, and says when in the game it was.
-    if (basketball && p && p.periodNum && now - p.at > LATE_REVISION_MS) for (const e of fresh) if (!FOULED_OUT.test(e.type)) { e.noPush = true; e.body = `${whereLabel(p)}. ${e.body}`; } // a player fouling out is still news
+    if (basketball && p && p.periodNum && now - x.wall > LATE_REVISION_MS) for (const e of fresh) if (!FOULED_OUT.test(e.type)) { e.noPush = true; e.body = `${whereLabel(p)}. ${e.body}`; } // a player fouling out is still news
     return { fresh, lines, ...(retext.length ? { retext } : {}) };
   }
 

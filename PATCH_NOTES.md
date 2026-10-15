@@ -8,7 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SHARING
-- Share offers looks: a loss as a ticket stub, an elimination as a void stamp, an F1 place loss as a boarding pass, an ejection or penalty as a parking ticket, a favorite's loss as a scratch-off, a blown lead as a torn ticket. Tap share and pick one; the link previews as it. (Update)
+- Share offers looks (ticket stub, void stamp, boarding pass, parking ticket, scratch-off, torn ticket): tap share and pick one; the link previews as it. (Update)
 
 SERVER
 - The database is copied off the server continuously, and a check tells the owner when the backup, ESPN reads or a game's polling stops.
@@ -45,13 +45,13 @@ FOOTBALL
 
 NBA AND WNBA
 - A technical's free throw is no "picked up a technical"; a traveling turnover is a turnover; an offensive charge is a foul.
-- A play is corrected for 45 minutes; a block that becomes a plain miss says the shot was not blocked; a shot ESPN later changes gets a silent line.
-- A missed shot waits up to 15 seconds for ESPN to name it ("missed a driving layup"); an offensive foul and its turnover are one alert.
-- A late play shows the score now. A defensive 3-seconds call is no technical push.
-- A foul ESPN re-posts up to 15 seconds off is one alert. A shot ESPN has not typed no longer says "0.0 seconds left".
-- A basket with no scorer named waits up to 20 seconds, so one ESPN takes back is never "took the lead"; a basket taken back later gets a line.
-- A box score player on no roster (two-way, camp) joins the catalog, so you can track him.
-- A play posted 2+ minutes late, or a change 5+ minutes late, is feed-only. Preseason: no "their team lost" for those who sat.
+- A play is corrected for 45 minutes; a block that becomes a plain miss or goes to another player says so; a shot ESPN later changes gets a silent line.
+- A missed shot waits up to 15 seconds for ESPN to name it; a basket with no scorer waits up to 20, so one ESPN takes back is never "took the lead"; one taken back later gets a line.
+- A late play shows the score now. A 3-seconds call is no technical push.
+- A turnover or foul ESPN posts or re-posts twice is one alert; an offensive foul, its turnover and a retyped foul are one alert with lines. A shot ESPN has not typed no longer says "0.0 seconds left".
+- A flagrant foul is titled one, not a technical. A turnover first called "No Turnover" shows its real words. A play stamped far back in the clock waits 3 minutes in case ESPN deletes it.
+- A box score player on no roster joins the catalog, so you can track him.
+- A play or change 2+ minutes late is feed-only. Preseason: no "their team lost" for players who did not play.
 
 ## Build 13 (October 12, 2026)
 

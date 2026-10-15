@@ -2,6 +2,10 @@ import { athleteIdFromRef, teamIdFromRef } from './espn.ts';
 import { catalog, normalize } from './catalog.ts';
 import { BASKETBALL, FOOTBALL, LEAGUE_IDS, SOCCER, TEAMS_ONLY, footballType, playerKey, teamKey, type League } from './leagues.ts';
 
+// Basketball fouls (October 14 2026): a foul is keyed by its actor, period and clock (`GameCtx.foulSpots`, `foulOf`), so a personal foul ESPN retypes
+// as shooting, offensive, flagrant or technical, and its turnover, share one moment `${gameId}:foul:${key}`. A flagrant is titled
+// "committed a flagrant foul", not a technical.
+
 /** League-agnostic view of one play. */
 export interface NPlay {
   id: string;              // identical across the site and core APIs
@@ -76,6 +80,8 @@ export interface GameCtx {
   latest?: { elapsed: number; home: number; away: number };
   /** NBA, WNBA: the plays that vouch for each counted foul (an offensive foul and its turnover are one foul): a foul is un-counted when none is left (unobservePlay). */
   foulPlays?: Map<string, Set<string>>;
+  /** NBA, WNBA: where each counted foul was (who, period, clock): ESPN's second entry for the same stop (a personal foul, then its shooting foul or offensive foul turnover) is the same foul (foulOf). */
+  foulSpots?: { actor: string; period?: number; clock: number; key: string }[];
   /** NBA, WNBA: points scored in a row against each side, for "on a 14-0 run" (teamScoreEvents). */
   run?: { home: number; away: number };
   /** NHL: each goalie's shots faced and goals allowed so far (observePlay), and the ones pulled. */
@@ -494,7 +500,10 @@ export function observePlay(g: GameCtx, p: NPlay) {
   if (foul) {
     const vouch = (g.foulPlays ??= new Map()).get(foul.key) ?? g.foulPlays.set(foul.key, new Set()).get(foul.key)!;
     vouch.add(p.id);
-    if (!g.foulKeys?.has(foul.key)) { (g.foulKeys ??= new Set()).add(foul.key); (g.fouls ??= {})[foul.actor] = (g.fouls[foul.actor] ?? 0) + 1; }
+    if (!g.foulKeys?.has(foul.key)) {
+      (g.foulKeys ??= new Set()).add(foul.key); (g.fouls ??= {})[foul.actor] = (g.fouls[foul.actor] ?? 0) + 1;
+      if (p.clockSec != null) (g.foulSpots ??= []).push({ actor: foul.actor, period: p.periodNum, clock: p.clockSec, key: foul.key });
+    }
   }
   if (SOCCER.has(g.league) && p.teamId) {
     // Keepers start from the line-ups (keepers()); then a keeper comes on, or the one in goal is sent off.
@@ -1721,7 +1730,7 @@ const SHOT_NAME: Record<string, string> = {
   'Running Jump Shot': 'running jumper', 'Floating Jump Shot': 'floater', 'Driving Floating Jump Shot': 'driving floater',
   'Driving Floating Bank Jump Shot': 'driving bank floater', 'Fade Away Bank Jump Shot': 'fadeaway bank shot', 'Layup Shot': 'layup',
   'Driving Layup Shot': 'driving layup', 'Running Layup Shot': 'running layup', 'Cutting Layup Shot': 'cutting layup',
-  'Driving Finger Roll Layup': 'driving finger roll', 'Layup Driving Reverse': 'driving reverse layup', 'Layup Shot Putback': 'putback',
+  'Driving Finger Roll Layup': 'driving finger roll', 'Layup Driving Reverse': 'driving reverse layup', 'Layup Running Reverse': 'running reverse layup', 'Layup Shot Putback': 'putback',
   'Tip Shot': 'tip-in', 'Alley Oop Layup Shot': 'alley-oop layup', 'Driving Dunk Shot': 'driving dunk', 'Running Dunk Shot': 'running dunk',
   'Driving Hook Shot': 'driving hook', 'Turnaround Hook Shot': 'turnaround hook',
 };
@@ -1790,7 +1799,9 @@ const FOUL_TYPE = /foul|charge/i;
 function nba(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
   const lg = g.league, t = p.text;
-  const say = t.replace(/\s+/g, ' ').trim(); // ESPN's "defensive 3-seconds (technical foul) " ends in a space
+  let say = t.replace(/\s+/g, ' ').trim(); // ESPN's "defensive 3-seconds (technical foul) " ends in a space
+  // ESPN posts a turnover it has not typed yet as "Tre Jones turnover Brayden Burries" (type "No Turnover"): that name is a guess, often not the stealer.
+  if (/^no turnover/i.test(p.type)) say = say.replace(/(\bturnover)\s+\S.*$/i, '$1');
   const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id;
   if (!actor && !/technical/i.test(p.type)) return out;
   if (p.shooting && !p.scoring) {
@@ -1806,12 +1817,14 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
       if (title) out.push(mk(g, p, `${lg}.missed_shot`, actor!, title));
     }
   } else if (/turnover/i.test(`${p.type} ${t}`) && actor && p.participants.length) { // a traveling turnover is typed just "Traveling"
-    out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`));
+    out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`, say === t.replace(/\s+/g, ' ').trim() ? {} : { body: `${say} — ${scoreLine(g, p)}` }));
   } else if ((/technical|flagrant/i.test(p.type) && !/free throw/i.test(p.type)) || /ejected/i.test(t)) { // the free throw a technical gives is its shooter's, not a call on him
     // A defensive 3-seconds call is ESPN's "technical" but a routine violation charged to the team: its own words, feed only (POR at SAC, October 13 2026).
     const threeSeconds = /defensive 3/i.test(p.type);
     for (const x of p.participants.slice(0, /double/i.test(p.type) ? 2 : 1)) {
-      const title = threeSeconds ? `${nameOf(lg, x.id)} was called for defensive 3 seconds` : `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : 'picked up a technical'}`;
+      // A flagrant foul is its own words (same alert type, so whoever tracks technicals still gets it): "picked up a technical" over a body that says flagrant disagreed with itself (CHI at MIL, October 14 2026).
+      const flagrant = /flagrant/i.test(p.type) && !/ejected/i.test(t);
+      const title = threeSeconds ? `${nameOf(lg, x.id)} was called for defensive 3 seconds` : `${nameOf(lg, x.id)} ${/ejected/i.test(t) ? 'got ejected 🚪' : flagrant ? 'committed a flagrant foul' : 'picked up a technical'}`;
       out.push(mk(g, p, `${lg}.technical`, x.id, title, threeSeconds ? { noPush: true, body: `${say} — ${scoreLine(g, p)}` } : {}));
     }
   } else if (FOUL_TYPE.test(p.type) && actor) {
@@ -1819,8 +1832,8 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   }
   // The 6th personal foul (technicals don't count): fouled out, in place of that foul's alert. First, so that
   // on an offensive foul's turnover play it's the alert and "turned it over" a line on it (bundleByPlay).
-  const foul = personalFoul(p);
-  if (actor && foul && !g.foulKeys?.has(`${actor}:${foul}`) && (g.fouls?.[actor] ?? 0) + 1 === 6) {
+  const fo = foulOf(g, p);
+  if (actor && fo && !g.foulKeys?.has(fo.key) && (g.fouls?.[actor] ?? 0) + 1 === 6) {
     const i = out.findIndex((e) => e.type === `${lg}.foul` && e.targetKey === playerKey(lg, actor));
     if (i >= 0) out.splice(i, 1);
     out.unshift(mk(g, p, `${lg}.fouled_out`, actor, `${nameOf(lg, actor)} fouled out`, { aliases: [`${lg}.foul`] }));
@@ -1830,8 +1843,8 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   if (late) for (const e of out) e.body = `${say} — ${scoreLine(g, late)}`;
   // An offensive foul is two plays at one moment ("Offensive Foul", "Offensive Foul Turnover"; a charge likewise): one alert
   // per device, whichever play came first, the other a line on it (GS vs LAL, October 13 2026).
-  const off = /offensive/i.test(p.type) ? foulOf(g, p) : undefined;
-  if (off) for (const e of out) { e.moment = `${g.gameId}:foul:${off.key}`; e.fold = asLine(e.title); }
+  // Every foul play takes the foul's moment, so ESPN's second entry for the stop (DET at MIN: a personal foul, then 20 seconds on its offensive foul turnover) is a line on the first alert.
+  if (fo) for (const e of out) { e.moment = `${g.gameId}:foul:${fo.key}`; e.fold = asLine(e.title); }
   return out;
 }
 
@@ -1849,7 +1862,11 @@ function personalFoul(p: NPlay): string | undefined {
 function foulOf(g: GameCtx, p: NPlay): { actor: string; key: string } | undefined {
   const foul = personalFoul(p);
   const actor = foul ? onTeam(g, p, p.teamId) ?? p.participants[0]?.id : undefined;
-  return actor ? { actor, key: `${actor}:${foul}` } : undefined;
+  if (!actor) return undefined;
+  // The same player's foul in the same period on the same clock as one already counted is that foul (PHX at SA: "personal foul", then the "shooting foul" 4 seconds on).
+  // shortcut: two real fouls by one player on one clock second count once; none seen, upgrade if one shows up.
+  const spot = p.clockSec == null ? undefined : g.foulSpots?.find((s) => s.actor === actor && s.period === p.periodNum && s.clock === p.clockSec);
+  return { actor, key: spot?.key ?? `${actor}:${foul}` };
 }
 
 /**
@@ -1869,6 +1886,7 @@ export function unobservePlay(g: GameCtx, p: NPlay) {
   if (!foul || !vouch?.delete(p.id) || vouch.size) return;
   g.foulPlays!.delete(foul.key);
   g.foulKeys?.delete(foul.key);
+  if (g.foulSpots) g.foulSpots = g.foulSpots.filter((s) => s.key !== foul.key);
   if (g.fouls?.[foul.actor]) g.fouls[foul.actor]--;
 }
 

@@ -339,7 +339,7 @@ test('the free throw a technical gives is its shooter\'s: the call alerts the fo
   assert.deepEqual(run(core('t2', 'Free Throw - Technical', 'Desmond Bane makes technical free throw', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true, scoring: true, value: 1 })), [], 'Malaki Branham\'s free throw was pushed as "picked up a technical"');
   assert.deepEqual(run(core('t3', 'Free Throw - Technical', 'Desmond Bane misses technical free throw', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true })), [['nba.missed_free_throw', 'Desmond Bane missed a free throw']]);
   assert.deepEqual(run(core('t4', 'Free Throw - Flagrant 1 of 2', 'Desmond Bane makes flagrant free throw 1 of 2', ORL, [[PEOPLE.bane[0], 'shooter']], { shooting: true, scoring: true, value: 1 })), []);
-  assert.deepEqual(run(core('t5', 'Flagrant Foul Type 1', 'Mario Hezonja flagrant foul type 1', CLE, [[PEOPLE.hezonja[0], 'fouler']])), [['nba.technical', 'Mario Hezonja picked up a technical']], 'the call itself still alerts');
+  assert.deepEqual(run(core('t5', 'Flagrant Foul Type 1', 'Mario Hezonja flagrant foul type 1', CLE, [[PEOPLE.hezonja[0], 'fouler']])), [['nba.technical', 'Mario Hezonja committed a flagrant foul']], 'the call itself still alerts, in its own words (CHI at MIL: "picked up a technical" over a body that said flagrant)');
 });
 
 test('a traveling turnover is a turnover: ESPN types it "Traveling", the text says turnover', () => {
@@ -386,10 +386,10 @@ test('a block ESPN re-posts as a plain miss: the line says the shot was not bloc
   assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', []]]);
   x.put(missPlay('k1', 'bane', 'Desmond Bane misses driving layup', 'Driving Layup Shot'));
   await x.poll();
-  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked.']]], 'one alert, one line');
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked, it was a missed driving layup.']]], 'one alert, one line, saying what the shot was (BKN at MIA)');
   x.put(block);
   await x.poll();
-  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked.', 'ESPN has since changed this play back.']]]);
+  assert.deepEqual(feed('blk-bane'), [['nba.got_blocked', 'Desmond Bane got sent back ✋', ['ESPN has since changed this: the shot was not blocked, it was a missed driving layup.', 'ESPN has since changed this play back.']]]);
 });
 
 // ─── From Trail Blazers at Kings (October 13 2026, preseason): the play types and wording are ESPN's, the players stand in ───
@@ -401,7 +401,7 @@ test('an offensive charge is a personal foul (Mogbo, 3Q 2:07): it alerts, counts
   device('chg-mobley', [P('mobley')], everything);
   const x = game('G-CHG1');
   await x.poll();
-  for (let i = 1; i <= 5; i++) x.put(core(`pf${i}`, 'Personal Foul', 'Evan Mobley personal foul', CLE, [[PEOPLE.mobley[0], 'fouler']]));
+  for (let i = 1; i <= 5; i++) x.put(core(`pf${i}`, 'Personal Foul', 'Evan Mobley personal foul', CLE, [[PEOPLE.mobley[0], 'fouler']], { clock: 600 + i * 30 }));
   await x.poll();
   assert.equal(feed('chg-mobley').length, 5, 'five fouls, five alerts');
   // The charge is his 6th: fouled out (not "committed a foul"). The turnover ESPN logs for it at the same moment is a line on it, and not a 7th foul.
@@ -515,7 +515,7 @@ test('an offensive foul and its turnover are one alert, whichever play comes fir
 
 // ─── NY at TOR, October 13 2026 ───
 
-test('a block ESPN adds more than 5 minutes after the play is a feed row with no push that says where the play was; inside 5 minutes it pushes as before', async () => {
+test('a block ESPN adds more than 2 minutes after the play is a feed row with no push that says where the play was; inside 2 minutes it pushes as before', async () => {
   device('late5-cain', [P('cain')]); // misses are off by default; "got sent back" is on and pushed
   const x = game('G-LATE5');
   await x.poll();
@@ -525,10 +525,10 @@ test('a block ESPN adds more than 5 minutes after the play is a feed row with no
   const early = NOW;
   x.put(miss('b1', early));
   await x.poll();
-  NOW += 2 * 60_000;
+  NOW += 60_000;
   x.put(block('b1', early));
   await x.poll();
-  assert.equal(pushed('late5-cain'), 1, 'two minutes on: pushed');
+  assert.equal(pushed('late5-cain'), 1, 'a minute on: pushed');
   assert.ok(!/quarter/.test(body('b1')), body('b1'));
   const late = NOW;
   x.put(miss('b2', late));
@@ -546,7 +546,7 @@ test('preseason: "their team lost" skips a followed player the box score does no
   device('tl-bane', [P('bane')]);
   const box = (type: number) => ({
     header: { season: { type } },
-    boxscore: { players: [{ team: { id: ORL }, statistics: [{ athletes: [{ athlete: { id: PEOPLE.banchero[0] } }, { athlete: { id: PEOPLE.dasilva[0] }, stats: [] }] }] }] },
+    boxscore: { players: [{ team: { id: ORL }, statistics: [{ athletes: [{ athlete: { id: PEOPLE.banchero[0] }, stats: ['12'] }, { athlete: { id: PEOPLE.dasilva[0] }, stats: [] }] }] }] },
   });
   const lost = (id: string, type: number) => { const t = game(id).tracker as any; t.box = box(type); t.finish({ home: 148, away: 98 }); };
   lost('G-TL1', 1);

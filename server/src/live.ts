@@ -24,6 +24,10 @@ import { divisionsOf } from './divisions.ts';
 import { weeklyRecaps } from './recap.ts';
 import { recordFinalOnBoard } from './misery.ts';
 
+// Basketball ghosts (CHA at BOS, October 14 2026): a non-scoring play first seen more than GHOST_AGE_MS after its wall clock is held for
+// GHOST_HOLD_MS before it is judged, since ESPN stamps a play that never happened at a quarter's start and deletes it minutes later
+// (`holdGhost`, `ghosts`). A preseason loss skips players the box score lists as did not play, or does not list.
+
 /** Seam for tests (test/game-start.test.ts feeds a game fake ESPN responses). Production never changes it. */
 export const liveDeps = {
   getJson: getJson as (url: string, opts?: { timeoutMs?: number; bust?: boolean }) => Promise<any>,
@@ -121,6 +125,13 @@ const HOCKEY_STALE_SHOT_MS = Number(process.env.HW_NHL_STALE_SHOT_MS ?? 180_000)
 const KEY_REVISE_MS = 5 * 60_000;
 /** Basketball: a play first read this long after its own wall clock goes to the feed with no push. */
 const LATE_POST_MS = 2 * 60_000;
+/**
+ * Basketball: ESPN posts plays that do not exist, stamped at a quarter's start, and deletes them minutes later (CHA at BOS: a Tatum turnover and an
+ * Anderson miss stamped 29 minutes back, gone 4 minutes on; the same turnover for real arrived 2 minutes after). A non-scoring play first seen more
+ * than GHOST_AGE_MS after its own wall clock is judged only once it has stood GHOST_HOLD_MS (holdGhost). Every real late post that night was under 4 minutes late.
+ */
+const GHOST_AGE_MS = Number(process.env.HW_GHOST_AGE_MS ?? 10 * 60_000);
+const GHOST_HOLD_MS = Number(process.env.HW_GHOST_HOLD_MS ?? 3 * 60_000);
 /** A read of ESPN slower than this is logged, with which feed (poll). */
 const SLOW_READ_MS = 3000;
 /** How often to check for weekly recaps to send (Monday 9 am in each device's time zone, recap.ts). */
@@ -201,6 +212,8 @@ export class GameTracker {
   private noBatter = new Map<string, number>();
   /** Basketball: missed shots ESPN hasn't typed yet, since when they've waited (waitForShotType). */
   private noShotType = new Map<string, number>();
+  /** Basketball: plays first seen long after their wall clock, since when they've been held (holdGhost). */
+  private ghosts = new Map<string, number>();
   /** Basketball: baskets ESPN posted with no scorer named, since when they've waited (waitForScorer). */
   private noScorer = new Map<string, number>();
   /** Basketball: box score players already checked against the catalog (addMissingPlayers). */
@@ -571,6 +584,12 @@ export class GameTracker {
     return now - since < SHOT_WAIT_MS;
   }
 
+  /** Basketball: whether a play first seen long after it happened (GHOST_AGE_MS) is still held, GHOST_HOLD_MS at most: a ghost ESPN deletes in that time is never judged. */
+  private holdGhost(p: NPlay, now: number): boolean {
+    const since = this.ghosts.get(p.id) ?? (this.ghosts.set(p.id, now), now);
+    return now - since < GHOST_HOLD_MS;
+  }
+
   /** Basketball: whether to keep waiting for ESPN to name who scored (awaitingScorer), SCORER_WAIT_MS at most: the play, and the score alert past it, wait. */
   private waitForScorer(p: NPlay, now: number): boolean {
     const since = this.noScorer.get(p.id) ?? (this.noScorer.set(p.id, now), now);
@@ -893,7 +912,8 @@ export class GameTracker {
       // Basketball: a basket posted with no scorer is judged, and its score announced, once ESPN names him (or SCORER_WAIT_MS passes).
       const scorerWait = BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingScorer(p) && this.waitForScorer(p, now);
       if (scorerWait) goalHeld = true;
-      const waiting = hockeyWait || scorerWait || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
+      const ghost = BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && !p.scoring && p.at > 0 && now - p.at > GHOST_AGE_MS && this.holdGhost(p, now);
+      const waiting = hockeyWait || scorerWait || ghost || (league === 'mlb' && !history && !this.seen.has(p.id) && awaitingBatter(p) && this.waitForBatter(p, now))
         || (BASKETBALL.has(league) && !history && !final && !this.seen.has(p.id) && awaitingShotType(p) && this.waitForShotType(p, now));
       // MLB: a result still under review (a challenged strikeout, a ruling pending) is judged once it settles, and the plays
       // after it wait their turn, so the game's state (bases, who is on) is built in order.
@@ -904,7 +924,11 @@ export class GameTracker {
         this.seen.add(p.id);
         // A play ESPN took out and re-posted under a new id is that play again, revised (already counted).
         const was = ledgered && !history ? this.ledger.repost(p, now) : undefined;
-        if (was) {
+        // Basketball: a copy of a turnover or foul still in the feed (twin) is counted, not alerted: the entry takes it over if ESPN deletes its own.
+        const twin = !was && ledgered && !history && this.ledger.twin(p);
+        if (twin) {
+          observePlay(this.ctx, p);
+        } else if (was) {
           const r = this.ledger.revise(was, p, now);
           events.push(...r.fresh);
           changed.push(...r.lines);
@@ -1317,9 +1341,9 @@ export class GameTracker {
     const overtime = this.ctx.league !== 'nhl' ? null : this.overtime ?? (/\/SO\b/.test(detail) ? 'so' : /\/\d*OT\b/.test(detail) ? 'ot' : periods >= 5 && !postseason ? 'so' : periods >= 4 ? 'ot' : null);
     const facts = lossFacts(this.ctx, lost, final, { plays: this.plays, pre: this.pre, overtime, postseason, box: seasonType !== 1 ? this.box : undefined });
     // Its lines (the facts, the last half-inning) reach those who track only a player on the team too, on "their team lost".
-    // Preseason basketball: a player the box score doesn't list never dressed (the starters sat: 8 of 21 in NY at TOR, October 13 2026), so no "their team lost" for him.
+    // Preseason basketball: a player the box score doesn't list, or lists as "did not play", never played (the starters sat: 8 of 21 in NY at TOR, October 13 2026; 6 Suns, 4 Nuggets and 5 Pelicans were listed DNP, October 14), so no "their team lost" for him. Only the explicit flag drops a listed player: an entry with no stats is kept.
     const dressed = BASKETBALL.has(this.ctx.league) && seasonType === 1
-      ? new Set<string>((this.box?.boxscore?.players ?? []).flatMap((t: any) => (t.statistics?.[0]?.athletes ?? []).map((a: any) => String(a?.athlete?.id)))) : null;
+      ? new Set<string>((this.box?.boxscore?.players ?? []).flatMap((t: any) => (t.statistics?.[0]?.athletes ?? []).filter((a: any) => !a?.didNotPlay).map((a: any) => String(a?.athlete?.id)))) : null;
     const tracked = trackedPlayersOn(lost.targetKey).filter((p) => !dressed?.size || dressed.has(p.espnId));
     const loss = [...(heavy ? [heavy] : []), lost, ...facts, ...half.lines, ...playerTeamLostEvents(this.ctx, lost, tracked), ...playerLossLines([...facts, ...half.lines], tracked), ...players];
     // The loss's alerts get the winning play's clip (the play that put the winner ahead for good), else the recap (clips.ts).
