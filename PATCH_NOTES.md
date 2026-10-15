@@ -8,7 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 SHARING
-- Share offers looks: a loss as a ticket stub, an elimination as a void stamp, an F1 position loss as a boarding pass, an ejection or penalty as a parking ticket, a favorite's loss as a scratch-off, a blown lead as a torn ticket. Tap share and pick one; the link previews as it.
+- Share offers looks: a loss as a ticket stub, an elimination as a void stamp, an F1 place loss as a boarding pass, an ejection or penalty as a parking ticket, a favorite's loss as a scratch-off, a blown lead as a torn ticket. Tap share and pick one; the link previews as it. (Update)
 
 SERVER
 - The database is copied off the server continuously, and a check tells the owner when the backup, ESPN reads or a game's polling stops.
