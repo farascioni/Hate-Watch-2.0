@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { BASKETBALL, FOOTBALL, TEAMS_ONLY, teamKey } from './leagues.ts';
-import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ordinal, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
+import { PENALTY_PLACEHOLDER, goalNamesScorer, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, observePlay, ordinal, ruled, scoreLine, teamScoreEvents, unobservePlay, wipedOutLine, type Detected, type GameCtx, type NPlay } from './detectors.ts';
 
 /**
  * Football: ESPN changes a play after it first posts it, and the game tracker sends a play's alerts the moment it
@@ -48,6 +48,10 @@ import { PENALTY_PLACEHOLDER, PLAYER_DETECTORS, bundleByPlay, nflDriveEvents, ob
  * each version, a goalie coming on is judged once (`ONCE`), a late empty-netter sends the team's alert (`strengthGoal`) and a
  * penalty's call is a line. Hockey watches a play for 45 minutes too (COL at DAL, October 13 2026: a blocked shot ESPN took out was
  * posted again under a new id 28 minutes later, and a giveaway became a takeaway 26 minutes on).
+ * October 14 2026's MTL at WSH and DAL at COL added: a shot that copies one already alerted (`shotCopy`) waits longer before it is its own alert; a play id
+ * ESPN recycles for another shooter sends no second shot alert (lines only, a shootout attempt excepted) and a line never carries a bare type
+ * (`BARE_TYPE`); a goal's assists corrected later are a line (a name that drops out, not a list filling in); the read that ends the game counts a
+ * play it lacks as gone (`sweep(now, atFinal)`); and a goal ESPN took out after its alerts went out is reported by `goneGoals` (live.ts sends it).
  */
 
 /** How long after we first see a play or a drive's result ESPN's changes to it are news. */
@@ -89,6 +93,10 @@ const actorOf = (p: NPlay) => p.text.replace(/^\(\d+:\d+\)\s*/, '').match(/(?:#\
 
 /** Basketball: how far apart in game seconds a turnover and its live copy can be (twin); a foul copy must have the same clock. */
 const TWIN_S = 1;
+/** ESPN's play text cut down to its type and nothing else ("Blocked Shot — DAL 0, COL 0"): a recycled play id's last version (COL at DAL). */
+const BARE_TYPE = /^(?:Blocked Shot|Missed Shot|Shot(?: On Goal)?|Save|Goal|Giveaway|Takeaway|Hit|Faceoff|Penalty)(?= — |$)/i;
+/** MTL at WSH: a hockey shot repeated by the same shooter with the same result within this many game-seconds is likely a copy ESPN deletes later (shotCopy). */
+const SHOT_COPY_S = 30;
 /** Basketball: how far apart in game seconds a foul and its re-post can be (samePlay). */
 const FOUL_REPOST_S = 15;
 
@@ -217,6 +225,7 @@ export class PlayLedger {
   private drives = new Map<string, { sig: string; firstAt: number; history: boolean; alerts: Map<string, Detected> }>();
   private readonly g: GameCtx;
   private readonly log: (msg: string) => void;
+  private goneGoalPlays: NPlay[] = []; // hockey goals that had alerts and went gone (goneGoals)
 
   constructor(g: GameCtx, log: (msg: string) => void) { this.g = g; this.log = log; }
 
@@ -241,7 +250,8 @@ export class PlayLedger {
   linesOn(es: Detected[], line: string, alt?: string, releases = false): Detected[] {
     const key = createHash('sha256').update(line).digest('base64url').slice(0, 10);
     return es.filter((e) => e.moment).map((e) => ({ id: `${e.id}:changed:${key}`, type: e.type, ...(e.aliases ? { aliases: e.aliases } : {}), targetKey: e.targetKey,
-      title: line, body: e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}), ...(releases ? { releases: true } : {}),
+      // Hockey: ESPN rewrites a recycled id's text down to its bare type ("Blocked Shot"); a line never carries that, the alert's own title does (COL at DAL, play 4520).
+      title: line, body: this.g.league === 'nhl' && BARE_TYPE.test(e.body) ? e.title : e.body, at: e.at, meta: { ...e.meta, changed: true }, moment: e.moment, fold: line, foldOnly: true, ...(alt ? { alt } : {}), ...(releases ? { releases: true } : {}),
       // A line about a weak alert (a team's flag) lands on that alert only (publish).
       ...(e.afterOthers ? { afterOthers: true } : {}) }));
   }
@@ -305,6 +315,22 @@ export class PlayLedger {
       (x.twins ??= new Map()).set(p.id, p);
       this.log(`play ${p.id} is a copy of ${y.id}`);
       return true;
+    }
+    return false;
+  }
+
+  /**
+   * Hockey: a shot seen for the first time that looks like a copy of one already alerted (the same shooter and result in the same period,
+   * within SHOT_COPY_S of its clock): ESPN posts some shots twice and deletes the copy minutes later (MTL at WSH, Wilson 3:32/3:34, Chychrun
+   * 13:40/13:59). live.ts holds it longer (HOCKEY_WAIT_MS.copy) before it is an alert of its own; a real repeat (Texier 2:44/2:45) just waits.
+   */
+  shotCopy(p: NPlay): boolean {
+    const [who, kind, at] = [p.participants[0]?.id, p.typeSlug || p.type, startOf(p)];
+    if (this.g.league !== 'nhl' || !who || at == null) return false;
+    for (const x of this.plays.values()) {
+      const y = x.play, start = startOf(y);
+      if (x.header || x.history || x.missingSince != null || x.gone || y.id === p.id || y.periodNum !== p.periodNum || y.participants[0]?.id !== who || (y.typeSlug || y.type) !== kind) continue;
+      if (start != null && Math.abs(start - at) <= SHOT_COPY_S && [...x.alerts.values()].some((e) => /^nhl\.shot_/.test(e.type))) return true;
     }
     return false;
   }
@@ -398,9 +424,13 @@ export class PlayLedger {
    * "scored on" for the goal gets this as a line on it ("Into an empty net."), one that wanted only this gets the alert.
    */
   private strengthGoal(p: NPlay): Detected[] {
+    return this.goalTeamAlerts(p).filter((e) => /^nhl\.team\./.test(e.type)).map(({ alt: _alt, ...e }) => e);
+  }
+
+  /** The team alerts a goal makes (teamScoreEvents, from the score before it): what a line about the goal lands on for a device that tracks the team. */
+  private goalTeamAlerts(p: NPlay): Detected[] {
     const side = p.teamId === this.g.homeId ? 'home' : p.teamId === this.g.awayId ? 'away' : undefined;
-    if (!side) return [];
-    return teamScoreEvents(this.g, { home: p.home, away: p.away, [side]: p[side] - 1 }, p).filter((e) => /^nhl\.team\./.test(e.type)).map(({ alt: _alt, ...e }) => e);
+    return side ? teamScoreEvents(this.g, { home: p.home, away: p.away, [side]: p[side] - 1 }, p) : [];
   }
 
   /**
@@ -455,8 +485,12 @@ export class PlayLedger {
       x.dropped.set(k, e);
       gone.push(e);
     }
+    // Hockey: ESPN recycles a play id for another shot (COL at DAL: id 4520 rewritten five times, a different shooter each time). A play that
+    // already sent a shot alert never sends a second shooter's: the old alert gets "credited this play to X" and that is all.
+    const shooters = hockey && p && p.id === was.id ? new Set([...x.alerts.values(), ...x.dropped.values()].filter((e) => /^nhl\.shot_/.test(e.type)).map((e) => e.targetKey)) : undefined;
     for (const [k, e] of want) {
       if (x.alerts.has(k)) continue;
+      if (shooters?.size && /^nhl\.shot_/.test(e.type) && !shooters.has(e.targetKey)) continue;
       // Basketball: a foul whose 6th replaced it with "fouled out" is not sent again as a foul.
       if (/\.foul$/.test(e.type) && [...x.alerts.values()].some((f) => FOULED_OUT.test(f.type) && f.targetKey === e.targetKey)) continue;
       const sent = x.dropped.get(k);
@@ -497,6 +531,14 @@ export class PlayLedger {
     if (hockey && p) {
       // A goal that was a goal already, now an empty-netter or a short-handed one: the team's alert says so.
       if (p.scoring && was.scoring && was.strength !== p.strength && (p.strength === 'Empty Net' || p.strength === 'Shorthanded')) fresh.push(...this.strengthGoal(p));
+      // MTL at WSH: ESPN corrects a goal's assists long after (Texier became Dobson, 38 minutes on): the goal's alerts get a line, the text follows on the feed rows (reviseKeyText).
+      if (p.id === was.id && p.scoring && was.scoring && goalNamesScorer(p.text) && goalNamesScorer(was.text)) {
+        const [before, after] = [was.text, p.text].map((t) => t.split(/, assists:/i));
+        // (An empty or "none" list filling in, or a second assist joining the first, is ESPN's usual lag: only a name that drops out is a correction.)
+        const named = (a?: string) => !!a && !/^\s*(none)?\s*$/i.test(a);
+        const names = (a: string) => a.split(/\s*\(\d+\)\s*,?\s*/).map((n) => n.trim()).filter(Boolean);
+        if (before[0] === after[0] && named(before[1]) && named(after[1]) && names(before[1]).some((n) => !names(after[1]).includes(n))) lines.push(...this.linesOn([...x.alerts.values(), ...this.goalTeamAlerts(p)], 'ESPN has since changed the assists.'));
+      }
       // A penalty ESPN posts as "Penalty Shot Infraction" ("Drew Doughty Minor") and names a few seconds later: the call, as a line.
       for (const [k, e] of want) {
         const sent = x.alerts.get(k);
@@ -547,16 +589,26 @@ export class PlayLedger {
     return this.revise(x, p, now);
   }
 
-  /** After a read: a play missing for GONE_MS is gone (unless it's re-posted later), its alerts taken back. */
-  sweep(now: number): Detected[] {
+  /**
+   * After a read: a play missing for GONE_MS is gone (unless it's re-posted later), its alerts taken back. `atFinal` (hockey): the read that
+   * ends the game, after which nothing is watched, counts a play it lacks as gone at once, unless it is newer than every play the read has
+   * (a short read drops the newest plays; MTL at WSH: a shot deleted 5 seconds before the final kept its alert).
+   */
+  sweep(now: number, atFinal = false): Detected[] {
     const lines: Detected[] = [];
+    const hockey = this.g.league === 'nhl';
+    const newest = atFinal && hockey ? Math.max(0, ...[...this.plays.values()].filter((x) => x.missingSince == null && !x.header).map((x) => x.wall)) : 0;
     for (const x of this.plays.values()) {
-      if (x.missingSince == null || x.gone || now - x.missingSince < GONE_MS) continue;
+      if (x.missingSince == null || x.gone || (now - x.missingSince < GONE_MS && !(atFinal && hockey && x.wall > 0 && x.wall < newest))) continue;
       x.gone = true;
+      if (hockey && x.play.scoring && !x.history && !x.header && x.alerts.size && now - x.missingSince >= GONE_MS) this.goneGoalPlays.push(x.play); // the final read's early "gone" is a line only: a short read must not push "disallowed"
       lines.push(...this.revise(x, null, now).lines);
     }
     return lines;
   }
+
+  /** The goals (plays) that had alerts and that ESPN has since taken out, once each: live.ts says so with an alert (goalOffBoard). */
+  goneGoals(): NPlay[] { return this.goneGoalPlays.splice(0); }
 
   /** A play's points still on the board at `to`: it's in the feed and still scores them (or it's the header's). */
   private stands(x: PlayEntry, side: Side, to: number) { return x.play[side] <= to && (x.header || (x.missingSince == null && x.play.scoring)); }

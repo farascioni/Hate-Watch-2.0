@@ -5,6 +5,8 @@ import { BASKETBALL, FOOTBALL, LEAGUE_IDS, SOCCER, TEAMS_ONLY, footballType, pla
 // Basketball fouls (October 14 2026): a foul is keyed by its actor, period and clock (`GameCtx.foulSpots`, `foulOf`), so a personal foul ESPN retypes
 // as shooting, offensive, flagrant or technical, and its turnover, share one moment `${gameId}:foul:${key}`. A flagrant is titled
 // "committed a flagrant foul", not a technical.
+// Hockey goals (October 14 2026): a goal with no scorer yet is "Goal, scorer to be named" (`GOAL_UNNAMED`), never text that starts with a comma (`goalWords`).
+// A goal ESPN later takes out, after its alert pushed, sends `goalOffBoard`: "Goal taken off the board", in the moment `${gameId}:off:${playId}:${team}`.
 
 /** League-agnostic view of one play. */
 export interface NPlay {
@@ -577,6 +579,20 @@ export function scoreLine(g: GameCtx, p: Pick<NPlay, 'home' | 'away'>) {
 }
 
 /**
+ * Hockey: a goal ESPN took out of the feed after its alert went out (DAL at COL, 2026-10-14: two, gone 3 and 4 minutes on). Its own alert,
+ * a push to the followers of the team it was scored on, as the goal's alert was (so they are told the news turned): "Colorado's goal was
+ * disallowed. Still DAL 0, COL 0." (`score`: the score now). A moment of its own, so it is not a line on the goal's alert. Undefined: the goal names no team.
+ */
+export function goalOffBoard(g: GameCtx, p: NPlay, score: Pick<NPlay, 'home' | 'away'>, at: number): Detected | undefined {
+  const scoring = p.teamId === g.homeId ? g.homeId : p.teamId === g.awayId ? g.awayId : undefined;
+  if (!scoring) return undefined;
+  const scoredOn = scoring === g.homeId ? g.awayId : g.homeId;
+  const team = catalog.teamByEspn(g.league, scoring);
+  return { id: `${g.gameId}:${p.id}:team.opponent_scored:off:${scoredOn}`, type: 'team.opponent_scored', targetKey: teamKey(g.league, scoredOn), title: 'Goal taken off the board',
+    body: `${team?.location ?? team?.shortName ?? 'The goal'}'s goal was disallowed. Still ${scoreLine(g, score)}.`, at, meta: { gameId: g.gameId, playId: p.id }, moment: `${g.gameId}:off:${p.id}:${scoredOn}` };
+}
+
+/**
  * Football: the line for a score that levels the game, "Rams tied the game, 34-34." (`scoringId`: the side that scored,
  * `p`: the play with the level score). The same words are the fold of the scored-on alert (teamScoreEvents) and the late
  * line live.ts puts on a touchdown's alerts when its extra point or two-point try is what levels it (footballScore): a
@@ -619,7 +635,7 @@ function mk(g: GameCtx, p: NPlay, type: string, athleteId: string, title: string
     type,
     targetKey: playerKey(g.league, athleteId),
     title,
-    body: `${p.text} — ${scoreLine(g, p)}`,
+    body: `${goalWords(g.league, p)} — ${scoreLine(g, p)}`,
     at: p.at,
     meta: { gameId: g.gameId, playId: p.id, athleteId },
     ...extra,
@@ -1709,6 +1725,9 @@ export const awaitingScorer = (p: NPlay) => p.scoring && !p.participants.length;
 export const PENALTY_PLACEHOLDER = /^penalty shot infraction$/i;
 /** Hockey: a goal's first text can lack its scorer (", assists: Logan Cooley (6), Dylan Guenther (4)"); ESPN names him within a minute. */
 export const goalNamesScorer = (text: string) => !/^\s*(,|$)/.test(text);
+/** What an alert's body says of a goal's text: a goal ESPN has not named is "Goal, scorer to be named", never ", assists: none" (DAL at COL, 2026-10-14: three goals pushed that way). */
+export const GOAL_UNNAMED = 'Goal, scorer to be named';
+export const goalWords = (league: string, p: { scoring?: boolean; text: string }) => league === 'nhl' && p.scoring && !goalNamesScorer(p.text) ? GOAL_UNNAMED : p.text;
 /**
  * Hockey: a play ESPN is still filling in, and what it waits for (live.ts, HOCKEY_WAIT_MS): a shot (missed, blocked, saved: ESPN
  * retypes it, and 4 of 9 goals were first a shot), a penalty still typed as the placeholder, a goal whose text has no scorer yet.
@@ -2237,6 +2256,13 @@ export function gameLostEvent(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 
   };
 }
 
+/** An NHL shootout loss's body, the winner's city first: "Lost to Dallas in a shootout. Final DAL 3, COL 2." (DAL at COL, 2026-10-14). */
+export function shootoutLossBody(g: Pick<GameCtx, 'league' | 'homeId' | 'awayId'>, final: { home: number; away: number }): string {
+  const [winnerId, loserId] = final.home > final.away ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
+  const city = catalog.teamByEspn(g.league, winnerId)?.location ?? teamName(g.league, winnerId);
+  return `Lost to ${city} in a shootout. Final ${teamAbbrev(g.league, winnerId)} ${Math.max(final.home, final.away)}, ${teamAbbrev(g.league, loserId)} ${Math.min(final.home, final.away)}.`;
+}
+
 /**
  * A tied NFL game (overtime can end level: Giants at Commanders, 27-27, October 11 2026): no loss, so no Successful Hate
  * Watch, but the end of it is news for both teams' trackers. Feed only; one alert per device (the moment).
@@ -2370,7 +2396,7 @@ export function teamScoreEvents(g: GameCtx, prev: { home: number; away: number }
     const oppId = side === 'home' ? g.awayId : g.homeId;
     const opp = side === 'home' ? 'away' : 'home';
     const delta = p[opp] - prev[opp];
-    const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${p.text} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
+    const base = { targetKey: teamKey(g.league, teamId), at: p.at, body: `${goalWords(g.league, p)} — ${scoreLine(g, p)}`, meta: { gameId: g.gameId, playId: p.id } };
     const [team, oppName] = [teamName(g.league, teamId), teamName(g.league, oppId)];
     const what = g.league === 'nhl' || SOCCER.has(g.league) ? 'scored' : g.league === 'mlb' ? `scored ${delta} run${delta > 1 ? 's' : ''}` : `scored ${delta}`;
     // MLB: the play that batted them in, when one did ("on Ramírez's 348-foot 2-run homer").
