@@ -19,17 +19,21 @@ import { GAME_LEAGUES, type League } from './leagues.ts';
  *  these and falls back to the raw fields if they're missing. */
 export type BoardGame = {
   k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string;
-  /** The detailed layout only (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
-   *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%"). */
+  /** The detailed layout (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
+   *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%").
+   *  The hero layout (`lay` 3) gives its first row `sub` (the count and outs, the down, the shots: the middle of the big game) and `bs` too. */
   sub?: string; sc?: string; bs?: string; wp?: number; wl?: string;
 };
 /** v: the props' version. Only ever add fields (an installed widget draws the ones it knows); mt: the "+N more" line, '' for none;
- *  lay: 0 the compact layout (one line a game), 1 the detailed one (two lines, a base diamond, a win chance bar; builds after 18). */
-export type BoardProps = { v: 1; lay: 0 | 1; games: BoardGame[]; more: number; mt: string };
-export type BoardLayout = 'compact' | 'detailed';
+ *  lay: 0 the compact layout (one line a game), 1 the detailed one (two lines, a base diamond, a win chance bar), 2 the grid (two
+ *  cells across, a short status each), 3 the hero (the top game big, the rest as lines); builds after 18. */
+export type BoardProps = { v: 1; lay: 0 | 1 | 2 | 3; games: BoardGame[]; more: number; mt: string };
+export type BoardLayout = 'compact' | 'detailed' | 'grid' | 'hero';
+/** `lay` is the index. */
+const LAYOUTS: BoardLayout[] = ['compact', 'detailed', 'grid', 'hero'];
 
-/** The lock screen has room for about four one-line games or three two-line ones; the rest are counted. */
-const MAX_GAMES = [4, 3];
+/** The lock screen has room for about four one-line games, three two-line ones, four grid cells or a hero and two lines; the rest are counted. */
+const MAX_GAMES = [4, 3, 4, 3];
 /** A final stays on the board this long after it ends. */
 const FINAL_KEEP_MS = 10 * 60_000;
 const MARKS = ['♥ ', '★ ', ''];
@@ -47,10 +51,10 @@ const outs = (n: number) => `${n} out${n === 1 ? '' : 's'}`;
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
 /** The right-hand text of a live row: ESPN's status plus what ESPN gives for the situation (baseball outs and count, football down and distance). */
-export function statusLine(g: GameCard): string {
+export function statusLine(g: GameCard, withCount = true): string {
   const parts = [g.detail];
   if (g.bases) parts.push(outs(g.bases.outs));
-  if (g.count) parts.push(`${g.count.balls}-${g.count.strikes}`);
+  if (g.count && withCount) parts.push(`${g.count.balls}-${g.count.strikes}`);
   const dd = g.downDistance?.split(' at ')[0];
   if (dd) parts.push(dd);
   return parts.join(' · ');
@@ -68,14 +72,22 @@ export function subLine(g: GameCard): string {
   return g.lastPlay ? clip(g.lastPlay, 40) : '';
 }
 
+/** The middle of the hero layout's big game, under its clock: baseball's count and outs, football's down and distance, hockey's shots. */
+export function heroLine(g: GameCard): string {
+  if (g.bases) return [g.count && `${g.count.balls}-${g.count.strikes}`, outs(g.bases.outs)].filter(Boolean).join(' · ');
+  if (g.downDistance) return g.downDistance.split(' at ')[0];
+  return g.shots ? `Shots ${g.shots.away}-${g.shots.home}` : '';
+}
+
 /** The device's board now, or null when no game of its teams is live (or just ended). */
 export function buildBoard(deviceId: string, now = Date.now()): BoardProps | null {
   const favs = new Set(favoritesOf(deviceId).map((f) => f.team_key));
   const tracked = deviceTeams(deviceId).teams;
   // A starred player stands for his team.
   const hated = new Set(mostHatedOf(rowOf(deviceId)).flatMap((k) => (k.startsWith('team:') ? [k] : [catalog.player(k)?.teamKey ?? ''])));
-  const lay = rowOf(deviceId)?.layout ? 1 : 0;
-  const rows: (BoardGame & { startsAt: number })[] = [];
+  const lay = (rowOf(deviceId)?.layout ?? 0) as BoardProps['lay'];
+  const gridCell = lay === 2, heroRow = (i: number) => lay === 3 && i === 0;
+  const rows: (BoardGame & { startsAt: number; card: GameCard })[] = [];
   for (const g of cardList()) {
     if (!g.home || !g.away || !(GAME_LEAGUES as League[]).includes(g.league)) continue;
     const live = g.state === 'in';
@@ -91,18 +103,22 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     rows.push({
       k: g.key, a, as: g.away.score, h, hs: g.home.score, st, live, t,
       l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: t === 2 ? WHITE : GOLD, rc: live ? RED : GREY,
-      ...(lay && {
+      ...(lay === 1 && {
         r: st, sub: live ? subLine(g) : '', sc: GREY, bs: g.bases ? [g.bases.first, g.bases.second, g.bases.third].map(Number).join('') : '',
         ...(chance !== null && { wp: chance, wl: `${own.team.abbrev} ${chance}%` }),
       }),
-      startsAt: g.startsAt,
+      ...(gridCell && live && { r: statusLine(g, false) }), // a half-width cell has no room for the count
+      startsAt: g.startsAt, card: g,
     });
   }
   if (!rows.length) return null;
   rows.sort((x, y) => x.t - y.t || +y.live - +x.live || x.startsAt - y.startsAt);
   const max = MAX_GAMES[lay];
   const more = Math.max(0, rows.length - max);
-  return { v: 1, lay, games: rows.slice(0, max).map(({ startsAt, ...r }) => r), more, mt: more ? `+${more} more` : '' };
+  const games = rows.slice(0, max).map(({ startsAt, card, ...r }, i) =>
+    // The hero's first row: the plain clock, the count/outs/down/shots under it and the bases; the others stay compact rows.
+    heroRow(i) ? { ...r, r: r.st, sub: r.live ? heroLine(card) : '', bs: card.bases ? [card.bases.first, card.bases.second, card.bases.third].map(Number).join('') : '' } : r);
+  return { v: 1, lay, games, more, mt: more ? `+${more} more` : '' };
 }
 
 /** What the app sends: any of the four fields, the rest of the row stays as it was. Returns the board for the first draw. */
@@ -113,7 +129,8 @@ export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; a
     : old?.most_hated ?? '[]';
   const token = typeof body.activityToken === 'string' && body.activityToken.length <= 400 ? body.activityToken : old?.activity_token ?? null;
   const sandbox = typeof body.sandbox === 'boolean' ? +body.sandbox : old?.sandbox ?? 0;
-  const layout = body.layout === 'detailed' ? 1 : body.layout === 'compact' ? 0 : old?.layout ?? 0; // anything else leaves it as it was
+  const named = LAYOUTS.indexOf(body.layout as BoardLayout);
+  const layout = named >= 0 ? named : old?.layout ?? 0; // anything else leaves it as it was
   db.prepare(`INSERT INTO live_activities (device_id, activity_token, sandbox, most_hated, layout, updated_at) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(device_id) DO UPDATE SET activity_token = excluded.activity_token, sandbox = excluded.sandbox, most_hated = excluded.most_hated, layout = excluded.layout, updated_at = excluded.updated_at`)
     .run(deviceId, token, sandbox, hated, layout, Date.now());

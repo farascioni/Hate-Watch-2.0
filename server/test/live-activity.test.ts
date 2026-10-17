@@ -16,7 +16,7 @@ loadCatalog();
 
 const { upsertGame, forgetDeviceTeams } = await import('../src/scores.ts');
 const { addFavorite } = await import('../src/favorites.ts');
-const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine, subLine } = await import('../src/live-activity.ts');
+const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine, subLine, heroLine } = await import('../src/live-activity.ts');
 const { setApnsSender, apnsJwt, apnsConfigured, tokenGone } = await import('../src/apns.ts');
 const { setFlag } = await import('../src/flags.ts');
 
@@ -173,6 +173,28 @@ test('the detailed layout adds a sub line, the bases and the win chance to a row
   const g = row(detailed);
   assert.deepEqual([g.r, g.sub, g.bs, g.wp, g.wl], ['Bot 8th', '3-2 · 1 out · P: G. Cole', '101', 62, 'SF 62%']);
   assert.equal(putLiveActivity('dev2', { layout: 'nonsense' as any })!.lay, 1, 'an unknown layout keeps the old one');
+  assert.equal(putLiveActivity('dev2', { layout: 'compact' })!.lay, 0);
+});
+
+test('the grid shortens each status to fit half a row; the hero gives only its first row a middle', () => {
+  upsertGame({
+    key: 'mlb:901', league: 'mlb', id: '901', state: 'in', startsAt: Date.now() - 2 * HOUR, detail: 'Top 3rd', away: side('LAD', 0), home: side('SF', 1),
+    bases: { first: false, second: true, third: false, outs: 2 }, count: { balls: 1, strikes: 1 },
+  } as any);
+  const rows = (b: any) => b.games.filter((g: any) => g.k === 'mlb:900' || g.k === 'mlb:901');
+  const grid = putLiveActivity('dev2', { layout: 'grid' })!;
+  assert.equal(grid.lay, 2);
+  assert.deepEqual(rows(grid).map((g: any) => g.r), ['Top 3rd · 2 outs', 'Bot 8th · 1 out'], 'no count, earlier start first');
+  assert.ok(grid.games.length <= 4);
+  const hero = putLiveActivity('dev2', { layout: 'hero' })!;
+  assert.equal(hero.lay, 3);
+  assert.deepEqual([hero.games[0].r, hero.games[0].sub, hero.games[0].bs], ['Top 3rd', '1-1 · 2 outs', '010']);
+  const other = hero.games.find((g) => g.k === 'mlb:900');
+  assert.deepEqual([other?.sub, other?.bs, other?.r], [undefined, undefined, 'Bot 8th · 1 out · 3-2'], 'the others are plain rows');
+  assert.ok(hero.games.length <= 3);
+  assert.equal(heroLine({ downDistance: '3rd & 6 at LAR 38' } as any), '3rd & 6');
+  assert.equal(heroLine({ shots: { away: 24, home: 19 } } as any), 'Shots 24-19');
+  assert.equal(heroLine({} as any), '');
   assert.equal(putLiveActivity('dev2', { layout: 'compact' })!.lay, 0);
 });
 

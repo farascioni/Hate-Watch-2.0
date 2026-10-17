@@ -7,34 +7,28 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
-- Startup guide: the Hate Watch Plus page now comes before "You're all set", which is the last page again.
-- Lock screen scoreboard: a live game's line now says more: baseball shows the outs and the count ("Bot 8th · 1 out · 3-2"), football the down and distance ("Q4 - 2:14 · 3rd & 6"). Server only, so it reaches Build 18 with no update.
-- Lock screen scoreboard: a new Settings switch, Detailed scoreboard (needs this build). It gives each game two lines: baseball's count, outs and pitcher, football's down and distance and red zone, hockey's shots, with the runners on base and each team's win chance as a small bar. It fits three games instead of four, and the long-pressed Dynamic Island shows the top game in full. Off keeps the one-line scoreboard.
-
-## Build 18 (October 17, 2026)
+## Build 19 (October 17, 2026)
 
 LOCK SCREEN SCOREBOARD
-- New in Settings, Delivery: Lock screen scoreboard (off until you switch it on; needs this build). A live scoreboard on the lock screen lists the live games of your teams: favorite teams first, then most hated, then the rest, with "+N more" past four games. Finals stay for 10 minutes.
-- To sort by most hated, the app sends your most hated list to Hate Watch while the scoreboard is on. Switching it off, a lapsed Plus and "Delete all my data" remove it. F1 and the UFC are not on the board yet.
+- New in Settings, Delivery: Lock screen scoreboard (off until you switch it on). A live scoreboard on the lock screen lists the live games of your teams: favorites first, then most hated, then the rest. Finals stay for 10 minutes. F1 and the UFC are not on it yet.
+- A game's line says more: baseball shows outs and count ("Bot 8th · 1 out · 3-2"), football the down and distance.
+- Scoreboard layout (Settings, once it is on): Compact, one line a game, four games. Detailed, two lines a game with the runners on base, the count and pitcher, down and distance or shots, and each team's win chance as a bar; three games. Grid, four games as cells two across. Hero, the top game big with its clock, bases and count in the middle, then the others as lines.
+- To sort by most hated, the app sends that list to Hate Watch while the scoreboard is on. Switching it off, a lapsed Plus and "Delete all my data" remove it.
 
 HATE WATCH PLUS
-- Favorite teams: tap the heart on a team in Search or on its page to root for it (Plus only; without Plus there is no heart). While your favorite plays, its opponent's alerts land in your Feed and push to your phone, and stop when the game ends. If you already track the team it plays, your settings for that team win. Without Plus, Settings shows the card locked. They are not hate watches. Settings, under Support Hate Watch, lists your favorites: a push switch for each, a gear to choose which alerts, and an X to remove.
-- The league you pick in the filter (NBA, MLB, F1 and the rest, and the full league list) lights up gold for subscribers instead of that league's color. (Update)
-- On the Scores tab, a game's card gets a gold border while a team on your most hated list is playing, or the team of a player on it (or, in F1, a driver or constructor on it). (Update)
+- Favorite teams: tap the heart on a team in Search or on its page (Plus only). While your favorite plays, its opponent's alerts land in your Feed and push to your phone, and stop when the game ends. If you already track the team it plays, your settings for that team win. Settings, under Support Hate Watch, lists your favorites: a push switch, a gear for which alerts, an X to remove.
+- The league you pick in the filter lights up gold for subscribers. (Update)
+- On the Scores tab, a game's card gets a gold border while a team (or a player's team, or an F1 driver or constructor) on your most hated list is playing. (Update)
+- Plus that is cancelled or not renewed ends everything it gave: favorites removed, most hated emptied, gold back to red. Checked each time you return to the app. (Update)
 
 STARTUP GUIDE
-- Hate Watch Plus that is cancelled or not renewed now ends everything it gave: favorite teams are removed and their hearts hidden, the most hated list is emptied and gold goes back to red. The app checks each time you return to it, not only at launch. (Update)
-- A new last page of the guide explains Hate Watch Plus and its four extras: gold accents, gold app icon, most hated and favorite teams. (Update)
-- The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
+- Hate Watch Plus has a page before "You're all set", explaining gold accents, the gold app icon, most hated and favorite teams. (Update)
+- The Tracking page shows the new team and athlete card and explains the star, bell, gear and Unfollow.
 
 TRACKING TAB
-- A new Layout button in the top right of the page lets you choose how the cards look: Classic (the default; anyone who picked a look keeps it), Colour bar, Banner game, Tiles (two per row) or Scoreboard. The other four also show the team's record and winning or losing streak (in the playoffs, the playoff streak), and its live, next or last game. Your choice is kept on your phone. (Update)
-- College football teams now show their record and winning or losing streak on the denser cards, plus where they stand in their conference (for example "3-0 in conference, T-1st"). (Update)
-- NBA teams and players now show their record and winning or losing streak on the cards, preseason included. F1 constructors show their place in the constructors' championship ("2nd in constructors") and points, and F1 drivers show their own place in the drivers' championship ("3rd in drivers") and points. A long conference standing wraps onto its own line so the gear and close buttons stay on the card. (Update)
-- Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
-- Each team and athlete has a thin border around it, so the rows are easier to tell apart. (Update)
-- Teams and athletes are now cards with a banner in their team's color: the league on the left, how many people hate them on the right, and the logo or photo sitting over the banner's edge. The name is larger, and the buttons run along the bottom with Unfollow on the right. The Classic layout is now about 40% shorter: a thinner banner, the logo or photo beside the name instead of above it, and the star, bell, settings and close buttons in a row on the right (the close button asks before it unfollows). (Update)
-- A team's card names its division after the city: "Cleveland · AL Central", "Boston · East · Atlantic", and a college team's conference ("Indiana · Big Ten"). Nothing extra for F1 or the EPL, which have none. (Update)
+- A Layout button in the top right: Classic (the default; anyone who picked a look keeps it), Colour bar, Banner game, Tiles (two per row) or Scoreboard. The other four show the record, winning or losing streak and live, next or last game. Kept on your phone. (Update)
+- College football teams show their record, streak and conference standing ("3-0 in conference, T-1st"). NBA teams and players show record and streak, preseason included. F1 constructors and drivers show their championship place and points. (Update)
+- Teams and athletes are cards with a banner in the team's color: the league on the left, how many people hate them on the right, the logo or photo over the banner's edge, a thin border, long names wrapped, buttons along the bottom with Unfollow on the right. Classic is about 40% shorter. A team names its division after the city ("Cleveland · AL Central"). (Update)
 
 ## Build 15 (October 17, 2026)
 

@@ -10,10 +10,13 @@ import { createLiveActivity } from 'expo-widgets';
  * (`l`, `r`, `lc`, `rc`, `mt`: text and colors, changed by a server deploy) and falls back to its own wording when a field is
  * missing. Every region is defined here for the same reason. Props only ever gain fields (`v`).
  *
- * Two layouts, chosen per device in Settings and sent as `lay`: 0 (or missing) is the compact one above, one line a game; 1 is
+ * Four layouts, chosen per device in Settings and sent as `lay`: 0 (or missing) is the compact one above, one line a game; 1 is
  * the detailed one: a second line per game (`sub`, in `sc`), a base diamond from `bs` ("101": first, second, third) and a win
- * chance bar from `wp` (0-100) labelled `wl`, and a fuller long-pressed Dynamic Island. The compact layout draws exactly as it
- * did before `lay` existed.
+ * chance bar from `wp` (0-100) labelled `wl`, and a fuller long-pressed Dynamic Island; 2 is the grid: games as cells two
+ * across, each with the away and home score on two lines and one short status (`r`); 3 is the hero: the first game big (each
+ * team's code and score either side, its clock `r`, bases `bs` and `sub` in the middle), the others as compact rows. Only the
+ * banner differs: the Dynamic Island and the small banner are the compact ones in layouts 0, 2 and 3. The compact layout draws
+ * exactly as it did before `lay` existed.
  */
 type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string };
 type Props = { v?: number; lay?: number; games: Game[]; more: number; mt?: string };
@@ -69,6 +72,31 @@ const ScoreboardActivity = (props: Props) => {
       </HStack>
     </VStack>
   );
+  // Grid layout: a cell is the away and home team on two lines, with the status under them.
+  const cell = (g: Game) => (
+    <VStack key={g.k} alignment="leading" spacing={1}>
+      <HStack>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{`${mark(g.t)}${g.a}`}</Text>
+        <Spacer />
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{score(g.as)}</Text>
+      </HStack>
+      <HStack>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{g.h}</Text>
+        <Spacer />
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{score(g.hs)}</Text>
+      </HStack>
+      <Text modifiers={[font({ size: 11 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
+    </VStack>
+  );
+  const pairs: Game[][] = [];
+  for (let i = 0; i < props.games.length; i += 2) pairs.push(props.games.slice(i, i + 2));
+  // Hero layout: the first game's team and score either side, its clock, bases and `sub` in the middle.
+  const heroSide = (name: string, n: number | null, color: string, trailing: boolean) => (
+    <VStack alignment={trailing ? 'trailing' : 'leading'} spacing={0}>
+      <Text modifiers={[font({ size: 13 }), foregroundStyle('#9A9AA2')]}>{name}</Text>
+      <Text modifiers={[font({ size: 34, weight: 'bold' }), foregroundStyle(color)]}>{score(n)}</Text>
+    </VStack>
+  );
   if (props.lay === 1) {
     return {
       banner: (
@@ -112,7 +140,7 @@ const ScoreboardActivity = (props: Props) => {
       ),
     };
   }
-  return {
+  const compact = {
     banner: (
       <VStack alignment="leading" spacing={4} modifiers={[padding({ all: 12 })]}>
         {props.games.map(row)}
@@ -137,6 +165,46 @@ const ScoreboardActivity = (props: Props) => {
       </VStack>
     ),
   };
+  if (props.lay === 2) {
+    return {
+      ...compact,
+      banner: (
+        <VStack alignment="leading" spacing={8} modifiers={[padding({ all: 12 })]}>
+          {pairs.map((pair) => (
+            <HStack key={pair[0].k} spacing={16}>
+              {pair.map(cell)}
+              {pair.length === 1 ? <Spacer /> : null}
+            </HStack>
+          ))}
+          {moreLine}
+        </VStack>
+      ),
+    };
+  }
+  if (props.lay === 3 && lead) {
+    const color = lead.lc ?? (lead.t === 2 ? '#FFFFFF' : '#F5C451');
+    return {
+      ...compact,
+      banner: (
+        <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 12 })]}>
+          <HStack>
+            {heroSide(`${mark(lead.t)}${lead.a}`, lead.as, color, false)}
+            <Spacer />
+            <VStack spacing={2}>
+              <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{lead.r ?? lead.st}</Text>
+              {lead.bs ? diamond(lead.bs) : null}
+              {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
+            </VStack>
+            <Spacer />
+            {heroSide(lead.h, lead.hs, color, true)}
+          </HStack>
+          {props.games.slice(1).map(row)}
+          {moreLine}
+        </VStack>
+      ),
+    };
+  }
+  return compact;
 };
 
 export default createLiveActivity('ScoreboardActivity', ScoreboardActivity);

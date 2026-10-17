@@ -10,7 +10,7 @@ import { Favorites } from '../../components/Favorites';
 import { setDevPlus, useDevPlus } from '../../lib/plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
-import { liveBoardSupported, setLiveBoard, setLiveDetailed, useLiveBoard, useLiveDetailed } from '../../lib/liveScoreboard';
+import { liveBoardSupported, LIVE_LAYOUTS, setLiveBoard, setLiveLayout, useLiveBoard, useLiveLayout, type LiveLayout } from '../../lib/liveScoreboard';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, radius, space } from '../../theme';
 import { bySection, type EventType, type League } from '../../lib/types';
@@ -40,7 +40,7 @@ function HourStepper({ label, value, onChange }: { label: string; value: string;
 
 export default function SettingsScreen() {
   const liveBoard = useLiveBoard();
-  const liveDetailed = useLiveDetailed();
+  const liveLayout = useLiveLayout();
   const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   // Each alert group folds up (all start folded, so the page isn't 69 rows long). The tab stays mounted, so this survives switching tabs.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -85,7 +85,19 @@ export default function SettingsScreen() {
         <SettingRow title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
         <SettingRow title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
         {liveBoardSupported ? <SettingRow title="Lock screen scoreboard" desc="The live scores of your teams on the lock screen: favorites first, then most hated, then the rest. Your most hated list is sent to Hate Watch so it can sort the board." value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
-        {liveBoardSupported && liveBoard ? <SettingRow title="Detailed scoreboard" desc="Two lines a game: the count, outs and pitcher, or the down and distance, with the bases and each team's win chance. Shows fewer games. Needs the newest version of the app." value={liveDetailed} onChange={(v) => { setLiveDetailed(v); }} /> : null}
+        {liveBoardSupported && liveBoard ? (
+          <View style={styles.layoutRow}>
+            <Text style={styles.layoutTitle}>Scoreboard layout</Text>
+            <Text style={styles.desc}>{LAYOUT_DESC[liveLayout]}{liveLayout === 'compact' ? '' : ' Needs the newest version of the app.'}</Text>
+            <View style={styles.layoutChips}>
+              {LIVE_LAYOUTS.map((l) => (
+                <Pressable key={l} onPress={() => { setLiveLayout(l); }} accessibilityRole="radio" aria-checked={l === liveLayout} style={[styles.layoutChip, l === liveLayout && styles.layoutChipOn]}>
+                  <Text style={[styles.layoutChipText, l === liveLayout && { color: colors.text }]}>{l[0].toUpperCase() + l.slice(1)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
         <SettingRow title="Quiet hours" desc="Silence pushes overnight. Everything still lands in your feed." value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
         {prefs.quietHours.enabled ? (
           <View style={styles.quiet}>
@@ -194,7 +206,20 @@ export default function SettingsScreen() {
   );
 }
 
+const LAYOUT_DESC: Record<LiveLayout, string> = {
+  compact: 'One line a game.',
+  detailed: 'Two lines a game: the count, outs and pitcher, or the down and distance, with the bases and each team\'s win chance. Shows fewer games.',
+  grid: 'Games in cells two across, each with its score and a short status.',
+  hero: 'The top game big, with its clock and the bases, count or down; the rest as lines.',
+};
+
 const styles = StyleSheet.create({
+  layoutRow: { paddingHorizontal: space(4), paddingVertical: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  layoutTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  layoutChips: { flexDirection: 'row', gap: space(2), marginTop: space(2.5) },
+  layoutChip: { flex: 1, alignItems: 'center', paddingVertical: space(2), borderRadius: radius.pill, backgroundColor: colors.surfaceHi, borderWidth: 1, borderColor: colors.border },
+  layoutChipOn: { borderColor: colors.hate },
+  layoutChipText: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   card: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   desc: { color: colors.textDim, fontSize: 13, marginTop: 2, lineHeight: 17 },
   groupHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingRight: space(4) },
