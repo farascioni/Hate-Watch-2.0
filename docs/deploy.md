@@ -198,7 +198,22 @@ The price is set in App Store Connect and Google Play, not in the app; the app a
 **Before Plus works:**
 
 1. **App Store Connect:** accept the **Paid Apps Agreement** and fill in tax and banking (Business → Agreements). Apple requires this even for free apps that sell in-app purchases.
-2. **App Store Connect → your app → Subscriptions:** create a **subscription group** ("Hate Watch Plus") and in it one auto-renewable subscription with exactly the ID above, a 1-month duration, a price, a display name and description, and a review screenshot (the Settings card is fine).
+2. **App Store Connect → your app → Monetization → Subscriptions:** create the group and the subscription with these values (limits from Apple's In-App Purchase reference: display name 2 to 30 characters, description up to 45, no emoji or markup):
+
+   | Field | Value |
+   |---|---|
+   | Group reference name / group display name | `Hate Watch Plus` (app name shown above it) |
+   | Subscription reference name | `Hate Watch Plus Monthly` |
+   | Product ID | `com.hatewatch.app.plus.monthly` (exactly `PLUS_SKU`; can't be changed or reused) |
+   | Duration | 1 month (can't change after review) |
+   | Price | the $4.99 tier, the closest Apple offers to $5; every country |
+   | Display name (English) | `Hate Watch Plus` |
+   | Description (English, 45 characters) | `Gold accents, gold app icon, most hated stars` |
+   | Family Sharing | off |
+   | Review screenshot | Settings with the Plus card in view (iPhone 6.5-inch size, like `app-store/screenshots-6.5in/`) |
+   | Review notes | the supporter-subscription paragraph of `app-store/app-review-notes.md` |
+
+   Then take the old tip products (`com.hatewatch.app.tip.*`) off sale.
 3. **Your first subscription must be submitted for review together with an app version.** On the version page, under "In-App Purchases and Subscriptions", add it before submitting. The card and the gold theme are JavaScript only, but the gold icon's plugin changed the native code, so they reach people in a new build, not over the air; the product still needs this review before anyone can subscribe.
 4. **The App Store description needs a Terms of Use (EULA) link** (or a custom EULA in App Store Connect) and the Privacy Policy link, since the app sells an auto-renewing subscription (guideline 3.1.2).
 5. **Google Play Console:** set up a payments profile, upload a build (the billing permission is added automatically), then create the subscription under **Monetize → Products → Subscriptions** with the same ID and one monthly base plan, and activate it ([android-release.md](android-release.md)).
