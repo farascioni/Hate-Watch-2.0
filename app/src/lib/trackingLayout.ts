@@ -16,7 +16,7 @@ export const LAYOUTS: { id: TrackingLayout; name: string; blurb: string }[] = [
 ];
 
 const KEY = 'hw.trackingLayout';
-let layout: TrackingLayout = 'classic';
+let layout: TrackingLayout = 'compact';
 const listeners = new Set<() => void>();
 const valid = (v: unknown): v is TrackingLayout => LAYOUTS.some((l) => l.id === v);
 
