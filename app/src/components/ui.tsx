@@ -148,9 +148,9 @@ export function TargetRow({ target, right, extra }: { target: Target; right?: Re
 
 /**
  * The Tracking tab's card: a banner in the team's colour (league on the left, hater count on the right), the avatar
- * overlapping it, the name wrapping freely, and `actions` along the bottom.
+ * overlapping it, the name wrapping freely, the subtitle (a team's division after its city), and `actions` along the bottom.
  */
-export function TargetCard({ target, actions }: { target: Target; actions: ReactNode }) {
+export function TargetCard({ target, division, actions }: { target: Target; division?: string; actions: ReactNode }) {
   const { leagueInfo } = useStore();
   const tint = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.border;
   const ink = readableOn(tint);
@@ -163,7 +163,7 @@ export function TargetCard({ target, actions }: { target: Target; actions: React
       <View style={styles.cardBody}>
         <View style={styles.cardAvatar}><Avatar target={target} size={56} /></View>
         <Text style={styles.cardTitle}>{target.name}</Text>
-        <Text style={styles.rowSub}>{subtitle(target)}</Text>
+        <Text style={styles.rowSub}>{[subtitle(target), division].filter(Boolean).join(' · ')}</Text>
         <View style={{ marginTop: space(3) }}>{actions}</View>
       </View>
     </Pressable>

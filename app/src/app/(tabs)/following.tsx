@@ -1,9 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useStore } from '../../lib/store';
+import { api } from '../../lib/api';
+import { leagueUi } from '../../lib/leagueUi';
 import { toggleMostHated, useIsMostHated, useMostHatedCount } from '../../lib/mostHated';
 import { usePlus } from '../../lib/plus';
 import { Empty, PrimaryButton, SectionHeader, TargetCard } from '../../components/ui';
@@ -37,6 +39,20 @@ export default function FollowingScreen() {
   const { follows, toggleFollow, prefs, updatePrefs, refreshTrackers } = useStore();
   // Other people follow and unfollow too: fresh counts each time the tab opens.
   useFocusEffect(useCallback(() => { refreshTrackers().catch(() => {}); }, [refreshTrackers]));
+  // Each team's division (MLB "AL East", college football's conference), from the same list Search sorts by.
+  const [divisions, setDivisions] = useState<Map<string, string>>(new Map());
+  useFocusEffect(useCallback(() => {
+    let live = true;
+    api.teams(undefined, true).then((r) => { if (live) setDivisions(new Map(r.teams.filter((t) => t.division).map((t) => [t.key, t.division as string]))); }).catch(() => {});
+    return () => { live = false; };
+  }, []));
+  const { leagueInfo } = useStore();
+  // Not for leagues without divisions (F1), nor where ESPN's only "division" is the league's own name (the EPL's table).
+  const divisionOf = (t: Target) => {
+    const d = t.kind === 'team' && leagueUi(t.league).divisions ? divisions.get(t.key) : undefined;
+    const full = leagueInfo(t.league)?.name ?? '';
+    return d && d !== full && !(leagueUi(t.league).fullName ?? '').includes(d) ? d : undefined;
+  };
   // A saved most-hated list keeps its stars working when the store can't confirm the subscription (offline).
   const { active: plus } = usePlus();
   const starred = useMostHatedCount();
@@ -75,6 +91,7 @@ export default function FollowingScreen() {
       renderItem={({ item }) => (
         <TargetCard
           target={item}
+          division={divisionOf(item)}
           actions={
             <View style={styles.actions}>
               <MostHatedStar target={item} allowed={starAllowed} />
