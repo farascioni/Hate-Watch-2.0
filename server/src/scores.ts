@@ -514,9 +514,16 @@ export function allGames(now = Date.now()): GameCard[] {
     .sort((a, b) => RANK[a.state] - RANK[b.state] || order(a) - order(b) || a.startsAt - b.startsAt);
 }
 
+/** Every card the server holds (the lock screen board, live-activity.ts, picks its games from them). */
+export const cardList = () => [...cards.values()];
+/** Called with a card each time it changes (live-activity.ts listens; scores.ts can't import it back). */
+const changeListeners: ((g: GameCard) => void)[] = [];
+export const onGameChange = (fn: (g: GameCard) => void) => { changeListeners.push(fn); };
+
 function broadcast(g: GameCard) {
   const frame = JSON.stringify({ kind: 'score', game: g });
   sendToConnected(frame, (deviceId) => involves(g, deviceTeams(deviceId)));
+  for (const fn of changeListeners) fn(g);
 }
 
 // ─── Play-by-play and box score for the game screen ───────────────────────────────────────────

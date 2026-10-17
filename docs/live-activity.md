@@ -1,0 +1,52 @@
+# Lock screen scoreboard
+
+<!-- README section: the README has its summary and links here; the vault puts this text back in its place -->
+
+## Index
+
+**Summary:** an iOS Live Activity ("the board") on the lock screen lists the live games of the teams a device tracks, favorites first, then most hated, then the rest, four lines and a "+N more". The server builds each device's board and pushes every change straight to Apple; the app starts the activity and hands the server its push token and its most hated list. Off by default (Settings), iOS only, and inert on the server until the APNs key and the `liveActivity` switch are set.
+
+**Sections:**
+- **What it shows**: who is on the board, the order, what a row says.
+- **How it works**: the app side, the server side, the routes and the table.
+- **Privacy**: what leaves the device that did not before.
+- **Setting it up**: the APNs key, the secrets, the switch, the first build.
+- **Limits**: what v1 does not do.
+
+The README's "Lock screen scoreboard" has the summary; this is the full detail. Read this index first, then only the part you need.
+
+## What it shows
+
+- **Games:** a game is on a device's board while it is live, and for 10 minutes after it ends (shown as "Final"). Games not started are not shown. F1 and the UFC are not on it (`GAME_LEAGUES` leaves them out).
+- **Order** (`buildBoard` in `server/src/live-activity.ts`): the games of a favorite team first (heart), then a most hated team's, or the team of a most hated player's (star), then the games of teams the device only tracks. Inside each, live before final, then the earlier start. Only a favorite's game appears without the team being tracked; a most hated team that is not tracked is left off.
+- **A row:** `♥/★ AWAY 3  HOME 2` and the status on the right (the inning, quarter or clock, in red while live; "Final" in grey). Four rows at most (the lock screen has room for about that many); the rest are counted in "+N more". In the Dynamic Island, the first game's teams and score.
+- **Dynamic Island and CarPlay/watch:** compact and minimal show the first game; expanded shows the first game across the middle and the rest below; the small banner (CarPlay, watch) shows the top two. All regions are defined in the first build because adding one later needs a build.
+- **Tapping** it opens the app.
+
+## How it works
+
+- **App** (`app/src/lib/liveScoreboard.ts`, `app/src/widgets/ScoreboardActivity.tsx`): `expo-widgets` draws the activity from props in the widget extension's own runtime (no hooks, no imports of ours). When the app opens or comes back to the foreground, and when the most hated list changes, it sends the list and asks the server for the board now (`PUT /me/live-activity`), then starts the activity (or updates the one already up, ending any extra), and sends the activity's push token (`getPushToken`, `addPushTokenListener`). No board means no live game: it ends the activity. Switching it off in Settings, and "Delete all my data", end it and call `DELETE /me/live-activity`.
+- **Server** (`server/src/live-activity.ts`, `apns.ts`): every game change (`onGameChange` in `scores.ts`, debounced one second) and a 30 second sweep (a final leaving the board) rebuild each device's board and send it if it differs from the last one sent. A change of score or of a game going final goes at APNs priority 10, a clock or inning change at 5 and at most every 30 seconds per device (ESPN's status text carries the clock, so it changes every few seconds; the sweep catches up). No board sends an `end`. Apple's 410, or 400 BadDeviceToken, clears the stored token. Nothing is sent unless `APNS_*` and the `liveActivity` switch (`server/src/flags.ts`) are set.
+- **Props and what updates without a build:** the widget's code is baked into each build (the extension loads `ExpoWidgets.bundle` from its own binary), so it only draws what the server sends. Each row carries its line already written and colored (`l` left text, `r` right text, `lc`, `rc` their colors) and the board `mt` (the "+N more" line, empty for none), with the raw fields (`a`, `as`, `h`, `hs`, `st`, `live`, `t`) beside them and `v: 1` the props' version. Wording, marks, colors and the row count (`MAX_GAMES`) change with a server deploy. The widget uses `l`/`r`/`lc`/`rc`/`mt` when present and its own formatting when not. Rule: props only gain fields, never change or lose one, since a build already out draws only the fields it knows. A new row layout, a new region or a bundled image needs a build.
+- **Routes:** `GET /me/live-activity` → `{board}`; `PUT /me/live-activity` with any of `mostHated` (keys), `activityToken`, `sandbox` → `{board}`; `DELETE /me/live-activity`. A `null` board also means the switch is off.
+- **Table:** `live_activities` (`device_id`, `activity_token`, `sandbox` for a development build's token, `most_hated` as JSON, `updated_at`), removed with the device.
+- **Alerts:** none. The board is not an alert and does not touch `publish()` or the duplicate protection.
+
+## Privacy
+
+Most hated lived only on the device (`docs/deploy.md`, Most hated). With the board on, the app sends those keys (teams and players, at most 200) to the server so it can sort. They are stored in `live_activities`, used for nothing else, and removed by switching the board off, by a Plus lapse (the list is emptied and the new empty list is sent), and by "Delete all my data". With the board off, nothing is sent.
+
+## Setting it up
+
+1. In the Apple Developer account, Keys, make a key with Apple Push Notifications service (APNs) enabled and download the `.p8` once. It is not the App Store Connect API key.
+2. `fly secrets set --stage -a hate-watch-api APNS_KEY_P8="$(cat AuthKey_XXXX.p8)" APNS_KEY_ID=<key id> APNS_TEAM_ID=<team id>` (a literal `\n` in place of newlines also works), then restart when no game is live (a secret change restarts the app).
+3. `fly ssh console -a hate-watch-api -C "node /app/src/flag-cli.ts liveActivity on"` turns it on or off, live. List the switches the same way.
+4. The app needs a new native build (the widget extension and the Live Activities entitlements: `expo-widgets` with `enablePushNotifications`, `NSSupportsLiveActivities` and `NSSupportsLiveActivitiesFrequentUpdates` in `app.json`). The first build needs the user's interactive Apple sign-in to register the extension target. Over-the-air updates cannot add it.
+5. Development builds use Apple's sandbox host (`sandbox: true` is sent from `__DEV__`); TestFlight and App Store builds use the production host.
+
+## Limits
+
+- **The app starts the board, not the server.** If the system ends it (after about eight hours, or the user swipes it away) it comes back the next time the app opens. Push-to-start (iOS 17.2) is not built.
+- **Not tried on a device.** The lock screen's height limit, Apple's update budget (frequent updates are requested, and the user can switch them off) and the activity's push token reaching the server need a real build to check.
+- **Only games:** F1 and the UFC are not on the board.
+- **Plus is checked on the device**, so a favorite or most hated exists only for a subscriber; the board itself is not a Plus perk.

@@ -17,6 +17,7 @@ export const FLAGS = {
   images: 'ESPN\'s player photos and team logos, everywhere below',
   'images.headshots': 'Player photos (a badge in the team\'s colour with its code and the jersey number instead)',
   'images.logos': 'Team logos (a badge in the team\'s colour with its code instead)',
+  liveActivity: 'The lock screen scoreboard (Live Activity): no board for the app to start, no updates sent',
 } as const;
 export type Flag = keyof typeof FLAGS;
 

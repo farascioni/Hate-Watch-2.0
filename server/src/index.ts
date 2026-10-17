@@ -5,6 +5,7 @@ import { startApi } from './api.ts';
 import { engine } from './live.ts';
 import { watchNotices } from './notices.ts';
 import { startCallLog } from './calls.ts';
+import { startLiveActivities } from './live-activity.ts';
 import { db, kvGet } from './db.ts';
 import { LEAGUE_IDS } from './leagues.ts';
 
@@ -30,6 +31,7 @@ const server = startApi(Number(process.env.PORT ?? 8787));
 engine.start();
 watchNotices(); // a developer notice sent from the shell (notice-cli.ts) reaches open apps within seconds
 startCallLog(); // once an hour, the ESPN calls made in it by league and kind of read (calls.ts)
+startLiveActivities(); // the lock screen scoreboard follows the games (live-activity.ts; inert without APNS_* and the flag)
 
 // Hosts (Fly, Docker) send SIGTERM on deploy/restart: stop accepting work and close SQLite cleanly.
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {

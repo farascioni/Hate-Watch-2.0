@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
+import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, LiveBoard, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 // Without it, a release build (a TestFlight build, or an over-the-air update published without it) uses production's,
@@ -84,6 +84,10 @@ export const api = {
   updateFavorite: (key: string, patch: FavoritePatch) => request<{ favorite: Favorite }>('PUT', `/me/favorites/${enc(key)}/settings`, patch),
   removeFavorite: (key: string) => request('DELETE', `/me/favorites/${enc(key)}`),
   clearFavorites: () => request('DELETE', '/me/favorites'),
+  /** The lock screen scoreboard: send what the server can't know (most hated, the activity's push token); it answers with the board now. */
+  putLiveActivity: (body: { mostHated?: string[]; activityToken?: string; sandbox?: boolean }) =>
+    request<{ board: LiveBoard | null }>('PUT', '/me/live-activity', body),
+  deleteLiveActivity: () => request('DELETE', '/me/live-activity'),
 
   prefs: () => request<Prefs>('GET', '/me/prefs'),
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),

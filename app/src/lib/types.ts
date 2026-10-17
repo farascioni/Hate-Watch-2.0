@@ -271,3 +271,11 @@ export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes' |
   /** null: back to the default (games shown, alerts off). */
   playerTeams?: Record<string, { scores?: boolean | null; alerts?: boolean | null }>;
 };
+
+/** The lock screen scoreboard; t: 0 a favorite's game, 1 most hated, 2 tracked only; l/r/lc/rc the line already written and colored (server/src/live-activity.ts). */
+export type LiveBoard = {
+  v?: number;
+  games: { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string }[];
+  more: number;
+  mt?: string;
+};

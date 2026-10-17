@@ -15,6 +15,7 @@ import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } fro
 import { allGames, deviceTeams, forgetDeviceTeams, gameDetail, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { forDevice } from './highlights.ts';
 import { flagOn } from './flags.ts';
+import { deleteLiveActivity, getLiveActivity, putLiveActivity } from './live-activity.ts';
 import { withoutImages } from './images.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
@@ -196,6 +197,11 @@ route('PUT', '/me/favorites/:key/settings', true, (req, _u, [key], body) => {
 });
 route('DELETE', '/me/favorites/:key', true, (req, _u, [key]) => { removeFavorite(req.deviceId!, decodeURIComponent(key)); return { ok: true }; });
 route('DELETE', '/me/favorites', true, (req) => { removeFavorite(req.deviceId!); return { ok: true }; }); // Plus lapsed
+
+// ─── Lock screen scoreboard (live-activity.ts): the Live Activity's push token, and the keys starred as most hated ──
+route('GET', '/me/live-activity', true, (req) => ({ board: getLiveActivity(req.deviceId!) }));
+route('PUT', '/me/live-activity', true, (req, _u, _p, body) => ({ board: putLiveActivity(req.deviceId!, body ?? {}) }));
+route('DELETE', '/me/live-activity', true, (req) => { deleteLiveActivity(req.deviceId!); return { ok: true }; }); // Plus lapsed, or the board turned off
 
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
 // upNext: each of the device's teams' next game (the app leaves out any already on the tab as a card).

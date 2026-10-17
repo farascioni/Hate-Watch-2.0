@@ -77,6 +77,14 @@ CREATE TABLE IF NOT EXISTS hate_watches (
   PRIMARY KEY (device_id, event_id)
 );
 
+-- Lock screen scoreboard (live-activity.ts): the push token of the device's running Live Activity, and the keys it starred
+-- as most hated (kept on the device otherwise) so the board can sort by them. sandbox: a development build's token.
+CREATE TABLE IF NOT EXISTS live_activities (
+  device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+  activity_token TEXT, sandbox INTEGER NOT NULL DEFAULT 0,
+  most_hated TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `);
 

@@ -10,6 +10,7 @@ import { Favorites } from '../../components/Favorites';
 import { setDevPlus, useDevPlus } from '../../lib/plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
+import { liveBoardSupported, setLiveBoard, useLiveBoard } from '../../lib/liveScoreboard';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, radius, space } from '../../theme';
 import { bySection, type EventType, type League } from '../../lib/types';
@@ -38,6 +39,7 @@ function HourStepper({ label, value, onChange }: { label: string; value: string;
 }
 
 export default function SettingsScreen() {
+  const liveBoard = useLiveBoard();
   const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   // Each alert group folds up (all start folded, so the page isn't 69 rows long). The tab stays mounted, so this survives switching tabs.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -81,6 +83,7 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <SettingRow title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
         <SettingRow title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
+        {liveBoardSupported ? <SettingRow title="Lock screen scoreboard" desc="The live scores of your teams on the lock screen: favorites first, then most hated, then the rest. Your most hated list is sent to Hate Watch so it can sort the board." value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
         <SettingRow title="Quiet hours" desc="Silence pushes overnight. Everything still lands in your feed." value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
         {prefs.quietHours.enabled ? (
           <View style={styles.quiet}>

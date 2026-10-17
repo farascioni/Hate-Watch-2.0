@@ -8,6 +8,7 @@ import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
 import { onLapse } from './plus';
+import { setLiveBoard } from './liveScoreboard';
 import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, Team, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -307,6 +308,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteAllData: async () => {
       // Server deletes the device (follows, prefs, feed, push token) and drops our socket;
       // we then start over as a brand-new anonymous device.
+      await setLiveBoard(false); // ends the lock screen board before the device goes
       await api.deleteMe();
       await forgetToken();
       clearMostHated();
