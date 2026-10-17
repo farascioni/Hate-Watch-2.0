@@ -7,6 +7,9 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+LOCK SCREEN SCOREBOARD
+- Each team now has its own color on the lock screen scoreboard: a favorite team is gold with a heart before its code, a most hated team is red with a star, and every other team is white. If you favorite one team and hate the other in the same game, each shows its own color. This applies to all four layouts (Compact, Detailed, Grid and Hero).
+
 ## Build 19 (October 17, 2026)
 
 LOCK SCREEN SCOREBOARD

@@ -19,6 +19,9 @@ import { GAME_LEAGUES, type League } from './leagues.ts';
  *  these and falls back to the raw fields if they're missing. */
 export type BoardGame = {
   k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string;
+  /** Each team's own look (builds after 19): the color of the away and home team (gold a favorite, red a most hated, white the rest)
+   *  and the mark before its code ('♥ ', '★ ' or ''). An older build ignores them and draws `l` in `lc`. */
+  ac?: string; hc?: string; am?: string; hm?: string;
   /** The detailed layout (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
    *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%").
    *  The hero layout (`lay` 3) gives its first row `sub` (the count and outs, the down, the shots: the middle of the big game) and `bs` too. */
@@ -38,6 +41,8 @@ const MAX_GAMES = [4, 3, 4, 3];
 const FINAL_KEEP_MS = 10 * 60_000;
 const MARKS = ['♥ ', '★ ', ''];
 const GOLD = '#F5C451', WHITE = '#FFFFFF', RED = '#E5232B', GREY = '#9A9AA2';
+/** By tier: a favorite gold, a most hated red, the rest white. */
+const TIER_COLORS = [GOLD, RED, WHITE];
 const DEBOUNCE_MS = 1000;
 const SWEEP_MS = 30_000;
 /** A clock or inning change alone is sent at most this often per device: ESPN's status carries the clock, so it changes every few seconds. */
@@ -95,6 +100,8 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     const keys = [g.home.team.key, g.away.team.key];
     const t = keys.some((k) => favs.has(k)) ? 0 : keys.some((k) => hated.has(k)) ? 1 : 2;
     if (t && !keys.some((k) => tracked.has(k))) continue; // only a favorite's game comes without tracking
+    const tier = (team: string) => (favs.has(team) ? 0 : hated.has(team) ? 1 : 2);
+    const ta = tier(g.away.team.key), th = tier(g.home.team.key);
     const a = g.away.team.abbrev, h = g.home.team.abbrev, st = live ? g.detail : 'Final';
     const score = (n: number | null) => (n === null ? '-' : String(n));
     // The detailed layout's bar is the chance the team that put the game on the board wins.
@@ -102,7 +109,8 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     const chance = live && g.winProb ? Math.round(100 * (own === g.home ? g.winProb.home : g.winProb.away)) : null;
     rows.push({
       k: g.key, a, as: g.away.score, h, hs: g.home.score, st, live, t,
-      l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: t === 2 ? WHITE : GOLD, rc: live ? RED : GREY,
+      l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: TIER_COLORS[t], rc: live ? RED : GREY,
+      ac: TIER_COLORS[ta], hc: TIER_COLORS[th], am: MARKS[ta], hm: MARKS[th],
       ...(lay === 1 && {
         r: st, sub: live ? subLine(g) : '', sc: GREY, bs: g.bases ? [g.bases.first, g.bases.second, g.bases.third].map(Number).join('') : '',
         ...(chance !== null && { wp: chance, wl: `${own.team.abbrev} ${chance}%` }),

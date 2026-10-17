@@ -17,19 +17,37 @@ import { createLiveActivity } from 'expo-widgets';
  * team's code and score either side, its clock `r`, bases `bs` and `sub` in the middle), the others as compact rows. Only the
  * banner differs: the Dynamic Island and the small banner are the compact ones in layouts 0, 2 and 3. The compact layout draws
  * exactly as it did before `lay` existed.
+ *
+ * Each team has its own look when the server sends it (`ac`/`hc` the away and home color, `am`/`hm` the mark before its code):
+ * a favorite gold with a heart, a most hated red with a star, the rest white. Without them (an older server) a row is one
+ * string `l` in one color `lc`, as before.
  */
-type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string };
+type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; ac?: string; hc?: string; am?: string; hm?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string };
 type Props = { v?: number; lay?: number; games: Game[]; more: number; mt?: string };
 
 const ScoreboardActivity = (props: Props) => {
   'widget';
   const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '★ ' : '');
   const score = (n: number | null) => (n === null ? '-' : String(n));
-  const row = (g: Game) => (
-    <HStack key={g.k}>
-      <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>
+  const base = (g: Game) => g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451');
+  const awayColor = (g: Game) => g.ac ?? base(g);
+  const homeColor = (g: Game) => g.hc ?? base(g);
+  const awayMark = (g: Game) => g.am ?? mark(g.t);
+  // The game's two teams on one line: each in its own color when the server sent them, else the whole line in one.
+  const teams = (g: Game) =>
+    g.ac !== undefined ? (
+      <HStack spacing={8}>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(awayColor(g))]}>{`${awayMark(g)}${g.a} ${score(g.as)}`}</Text>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(homeColor(g))]}>{`${g.hm ?? ''}${g.h} ${score(g.hs)}`}</Text>
+      </HStack>
+    ) : (
+      <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(base(g))]}>
         {g.l ?? `${mark(g.t)}${g.a} ${score(g.as)}  ${g.h} ${score(g.hs)}`}
       </Text>
+    );
+  const row = (g: Game) => (
+    <HStack key={g.k}>
+      {teams(g)}
       <Spacer />
       <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
     </HStack>
@@ -58,9 +76,7 @@ const ScoreboardActivity = (props: Props) => {
   const detailRow = (g: Game) => (
     <VStack key={g.k} alignment="leading" spacing={2}>
       <HStack>
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>
-          {g.l ?? `${mark(g.t)}${g.a} ${score(g.as)}  ${g.h} ${score(g.hs)}`}
-        </Text>
+        {teams(g)}
         <Spacer />
         <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
       </HStack>
@@ -76,14 +92,14 @@ const ScoreboardActivity = (props: Props) => {
   const cell = (g: Game) => (
     <VStack key={g.k} alignment="leading" spacing={1}>
       <HStack>
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{`${mark(g.t)}${g.a}`}</Text>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(awayColor(g))]}>{`${awayMark(g)}${g.a}`}</Text>
         <Spacer />
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{score(g.as)}</Text>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(awayColor(g))]}>{score(g.as)}</Text>
       </HStack>
       <HStack>
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{g.h}</Text>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(homeColor(g))]}>{`${g.hm ?? ''}${g.h}`}</Text>
         <Spacer />
-        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451'))]}>{score(g.hs)}</Text>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(homeColor(g))]}>{score(g.hs)}</Text>
       </HStack>
       <Text modifiers={[font({ size: 11 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
     </VStack>
@@ -93,7 +109,7 @@ const ScoreboardActivity = (props: Props) => {
   // Hero layout: the first game's team and score either side, its clock, bases and `sub` in the middle.
   const heroSide = (name: string, n: number | null, color: string, trailing: boolean) => (
     <VStack alignment={trailing ? 'trailing' : 'leading'} spacing={0}>
-      <Text modifiers={[font({ size: 13 }), foregroundStyle('#9A9AA2')]}>{name}</Text>
+      <Text modifiers={[font({ size: 13 }), foregroundStyle(color)]}>{name}</Text>
       <Text modifiers={[font({ size: 34, weight: 'bold' }), foregroundStyle(color)]}>{score(n)}</Text>
     </VStack>
   );
@@ -182,13 +198,12 @@ const ScoreboardActivity = (props: Props) => {
     };
   }
   if (props.lay === 3 && lead) {
-    const color = lead.lc ?? (lead.t === 2 ? '#FFFFFF' : '#F5C451');
     return {
       ...compact,
       banner: (
         <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 12 })]}>
           <HStack>
-            {heroSide(`${mark(lead.t)}${lead.a}`, lead.as, color, false)}
+            {heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false)}
             <Spacer />
             <VStack spacing={2}>
               <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{lead.r ?? lead.st}</Text>
@@ -196,7 +211,7 @@ const ScoreboardActivity = (props: Props) => {
               {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
             </VStack>
             <Spacer />
-            {heroSide(lead.h, lead.hs, color, true)}
+            {heroSide(`${lead.hm ?? ''}${lead.h}`, lead.hs, homeColor(lead), true)}
           </HStack>
           {props.games.slice(1).map(row)}
           {moreLine}
