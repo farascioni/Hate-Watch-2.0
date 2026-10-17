@@ -8,13 +8,17 @@ import { api } from '../../lib/api';
 import { leagueUi } from '../../lib/leagueUi';
 import { toggleMostHated, useIsMostHated, useMostHatedCount } from '../../lib/mostHated';
 import { usePlus } from '../../lib/plus';
-import { Empty, PrimaryButton, SectionHeader, TargetCard } from '../../components/ui';
+import { Empty, PrimaryButton, SectionHeader } from '../../components/ui';
+import { TrackingCard } from '../../components/TrackingCard';
+import { LayoutSheet } from '../../components/LayoutSheet';
+import { useTrackingLayout } from '../../lib/trackingLayout';
+import { gameInfo, teamKeyOf } from '../../lib/trackingInfo';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
 import { GOLD, colors, radius, space } from '../../theme';
-import type { Target } from '../../lib/types';
+import type { Target, Team } from '../../lib/types';
 
 /** Hate Watch Plus: marks one of your trackers as a most hated (a gold border on their alerts in the Feed). */
-function MostHatedStar({ target, allowed }: { target: Target; allowed: boolean }) {
+function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: boolean; compact?: boolean }) {
   const on = useIsMostHated(target.key);
   const press = () => {
     if (!allowed && !on) {
@@ -28,9 +32,9 @@ function MostHatedStar({ target, allowed }: { target: Target; allowed: boolean }
     toggleMostHated(target.key);
   };
   return (
-    <Pressable onPress={press} hitSlop={8} style={[styles.icon, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
+    <Pressable onPress={press} hitSlop={8} style={[styles.icon, compact && styles.iconSm, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
       accessibilityLabel={on ? `Remove ${target.name} from your most hated` : `Add ${target.name} to your most hated`}>
-      <Ionicons name={on ? 'star' : 'star-outline'} size={20} color={on ? GOLD : colors.text} />
+      <Ionicons name={on ? 'star' : 'star-outline'} size={compact ? 17 : 20} color={on ? GOLD : colors.text} />
     </Pressable>
   );
 }
@@ -40,16 +44,18 @@ export default function FollowingScreen() {
   // Other people follow and unfollow too: fresh counts each time the tab opens.
   useFocusEffect(useCallback(() => { refreshTrackers().catch(() => {}); }, [refreshTrackers]));
   // Each team's division (MLB "AL East", college football's conference), from the same list Search sorts by.
-  const [divisions, setDivisions] = useState<Map<string, string>>(new Map());
+  const [teams, setTeams] = useState<Map<string, Team>>(new Map());
   useFocusEffect(useCallback(() => {
     let live = true;
-    api.teams(undefined, true).then((r) => { if (live) setDivisions(new Map(r.teams.filter((t) => t.division).map((t) => [t.key, t.division as string]))); }).catch(() => {});
+    api.teams(undefined, true).then((r) => { if (live) setTeams(new Map(r.teams.map((t) => [t.key, t]))); }).catch(() => {});
     return () => { live = false; };
   }, []));
-  const { leagueInfo } = useStore();
+  const { leagueInfo, games, upNext } = useStore();
+  const layout = useTrackingLayout();
+  const [menu, setMenu] = useState(false);
   // Not for leagues without divisions (F1), nor where ESPN's only "division" is the league's own name (the EPL's table).
   const divisionOf = (t: Target) => {
-    const d = t.kind === 'team' && leagueUi(t.league).divisions ? divisions.get(t.key) : undefined;
+    const d = t.kind === 'team' && leagueUi(t.league).divisions ? teams.get(t.key)?.division : undefined;
     const full = leagueInfo(t.league)?.name ?? '';
     return d && d !== full && !(leagueUi(t.league).fullName ?? '').includes(d) ? d : undefined;
   };
@@ -61,14 +67,21 @@ export default function FollowingScreen() {
   const customized = new Set([...Object.keys(prefs?.targetTypes ?? {}), ...Object.keys(prefs?.targetPushTypes ?? {})]);
   const { filter, setFilter, active, reset } = useFilter();
 
-  const sections = useMemo((): { title: string; data: Target[] }[] => {
+  // Rows of cards: one each, two in the tiles layout (the section's count is of the cards, not the rows).
+  const per = layout === 'tiles' ? 2 : 1;
+  const sections = useMemo((): { title: string; count: number; data: Target[][] }[] => {
     const all = [...follows.values()].filter((t) => matchesFilter(filter, t)).sort((a, b) => a.name.localeCompare(b.name));
-    if (byWeightClass(filter)) return groupByWeightClass(all);
-    return [
+    const groups = byWeightClass(filter) ? groupByWeightClass(all) : [
       { title: 'Teams', data: all.filter((t) => t.kind === 'team') },
       { title: playersTitle(filter.league), data: all.filter((t) => t.kind === 'player') },
     ].filter((s) => s.data.length);
-  }, [follows, filter]);
+    return groups.map((g) => ({ title: g.title, count: g.data.length, data: Array.from({ length: Math.ceil(g.data.length / per) }, (_, i) => g.data.slice(i * per, i * per + per)) }));
+  }, [follows, filter, per]);
+
+  const confirmUnfollow = (t: Target) => Alert.alert(`Unfollow ${t.name}?`, 'You stop getting their alerts.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Unfollow', style: 'destructive', onPress: () => toggleFollow(t) },
+  ]);
 
   const toggleMute = (t: Target) => {
     const next = muted.has(t.key) ? [...muted].filter((k) => k !== t.key) : [...muted, t.key];
@@ -84,40 +97,54 @@ export default function FollowingScreen() {
     <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View>
     <SectionList
       sections={sections}
-      keyExtractor={(t) => t.key}
-      renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}</SectionHeader>}
+      keyExtractor={(row) => row.map((t) => t.key).join('|')}
+      renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
-      renderItem={({ item }) => (
-        <TargetCard
+      ListHeaderComponent={<View><Pressable onPress={() => setMenu(true)} hitSlop={8} style={styles.layoutBtn} accessibilityRole="button" accessibilityLabel="Choose how the cards look"><Ionicons name="grid-outline" size={14} color={colors.textDim} /><Text style={styles.layoutText}>Layout</Text></Pressable><Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow (✕ on the smaller cards) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text></View>}
+      renderItem={({ item: row }) => (
+        <View style={per > 1 ? styles.tiles : undefined}>
+        {row.map((item) => (
+        <TrackingCard
+          key={item.key}
           target={item}
-          division={divisionOf(item)}
-          actions={
+          layout={layout}
+          info={{ division: divisionOf(item), record: teams.get(teamKeyOf(item))?.record, streak: teams.get(teamKeyOf(item))?.streak, game: gameInfo(item, games, upNext) }}
+          actions={(compact) => (
             <View style={styles.actions}>
-              <MostHatedStar target={item} allowed={starAllowed} />
-              <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
-                <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
+              <MostHatedStar target={item} allowed={starAllowed} compact={compact} />
+              <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={[styles.icon, compact && styles.iconSm]} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
+                <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={compact ? 17 : 20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
               </Pressable>
               {/* Per-player/team alert choices. Red when this target has any that differ from the global settings. */}
               <Pressable
                 onPress={() => router.push(`/alerts/${encodeURIComponent(item.key)}`)}
                 hitSlop={8}
-                style={[styles.icon, customized.has(item.key) && styles.iconCustom]}
+                style={[styles.icon, compact && styles.iconSm, customized.has(item.key) && styles.iconCustom]}
                 accessibilityRole="button"
                 accessibilityLabel={`Alert settings for ${item.name}${customized.has(item.key) ? ' (customized)' : ''}`}
               >
-                <Ionicons name="settings-sharp" size={20} color={customized.has(item.key) ? colors.hate : colors.text} />
+                <Ionicons name="settings-sharp" size={compact ? 17 : 20} color={customized.has(item.key) ? colors.hate : colors.text} />
               </Pressable>
-              <Pressable onPress={() => toggleFollow(item)} hitSlop={8} style={styles.unfollow} accessibilityLabel={`Unfollow ${item.name}`}>
-                <Text style={styles.unfollowText}>Unfollow</Text>
-              </Pressable>
+              {compact ? (
+                <Pressable onPress={() => confirmUnfollow(item)} hitSlop={8} style={[styles.icon, styles.iconSm]} accessibilityLabel={`Unfollow ${item.name}`}>
+                  <Ionicons name="close" size={17} color={colors.textDim} />
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => toggleFollow(item)} hitSlop={8} style={styles.unfollow} accessibilityLabel={`Unfollow ${item.name}`}>
+                  <Text style={styles.unfollowText}>Unfollow</Text>
+                </Pressable>
+              )}
             </View>
-          }
+          )}
         />
+        ))}
+        {per > 1 && row.length < per ? <View style={{ flex: 1 }} /> : null}
+        </View>
       )}
       ListEmptyComponent={active ? <Empty emoji="🔎" title={`You're not tracking any ${describeFilter(filter)}`} body="Change the filter, or find some on the Search tab." action={<PrimaryButton label="Show everything" onPress={reset} />} /> : null}
       contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />
+    <LayoutSheet open={menu} onClose={() => setMenu(false)} />
     </View>
   );
 }
@@ -126,6 +153,10 @@ const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(2) },
+  tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },
+  layoutBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 4, marginRight: space(4), marginTop: space(3), paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  layoutText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
+  iconSm: { padding: space(1.5) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
   iconStar: { borderWidth: 1, borderColor: GOLD },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },

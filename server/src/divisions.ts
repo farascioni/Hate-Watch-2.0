@@ -1,15 +1,17 @@
 // Each team's division (MLB "AL East", NFL "AFC South", NBA "East · Atlantic", NHL "West · Pacific"; the
 // WNBA has conferences, the EPL one table), for the Search tab's "By division". From ESPN's standings at
-// division level, in ESPN's order (AL East, AL Central, AL West, NL East...), kept for 12 hours.
+// division level, in ESPN's order (AL East, AL Central, AL West, NL East...), kept for 15 minutes. The same
+// response gives each team's record and streak, for the Tracking tab's cards.
 import { getJson as espnGetJson } from './espn.ts';
 import { LEAGUES, urls, type League } from './leagues.ts';
 import { kvGet } from './db.ts';
 
 /** Seam for tests (test/divisions.test.ts). Production never changes it. */
 export const divisionsDeps = { getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number }) => Promise<any> };
-const TTL_MS = 12 * 3600_000;
+const TTL_MS = 15 * 60_000; // a record and a streak change with every game
 
-export interface Division { name: string; order: number }
+/** `record`: "82-80" (the NHL's "6-2-0"), `streak`: ESPN's "W2" / "L4"; each only where ESPN's standings have it. */
+export interface Division { name: string; order: number; record?: string; streak?: string }
 
 /** "East · Atlantic" from "Eastern Conference" and "Atlantic Division"; MLB's own short names ("AL East"). */
 function label(lg: League, group: any, parent: any): string {
@@ -28,7 +30,12 @@ export function parseDivisions(lg: League, res: any): Map<string, Division> {
   const walk = (n: any, parent?: any) => {
     if (n?.standings?.entries?.length) {
       const name = label(lg, n, parent), at = order++;
-      for (const e of n.standings.entries) if (e.team?.id != null) out.set(String(e.team.id), { name, order: at });
+      const stat = (e: any, k: string): string | undefined => e.stats?.find((s: any) => s.name === k)?.displayValue || undefined;
+      for (const e of n.standings.entries) {
+        if (e.team?.id == null) continue;
+        const record = stat(e, 'overall')?.split(',')[0].trim(), streak = stat(e, 'streak');
+        out.set(String(e.team.id), { name, order: at, ...(record ? { record } : {}), ...(streak ? { streak } : {}) });
+      }
     }
     for (const c of n?.children ?? []) walk(c, n);
   };

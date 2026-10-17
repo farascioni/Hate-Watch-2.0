@@ -16,7 +16,7 @@ for (const [lg, id, name, abbr] of [['mlb', '10', 'New York Yankees', 'NYY'], ['
   ['f1', '106', 'Ferrari', 'FER']]) team.run(`team:${lg}:${id}`, lg, id, name, name, abbr);
 loadCatalog();
 
-const group = (o: object, ids: string[]) => ({ ...o, standings: { entries: ids.map((id) => ({ team: { id } })) } });
+const group = (o: object, ids: string[], stats: object[] = []) => ({ ...o, standings: { entries: ids.map((id) => ({ team: { id }, stats })) } });
 const MLB = { children: [{ name: 'American League', children: [
   group({ name: 'American League East', shortName: 'AL East', abbreviation: 'ALE' }, ['10', '30']),
   group({ name: 'American League Central', shortName: 'AL Cent', abbreviation: 'ALC' }, ['5'])] }] };
@@ -29,6 +29,14 @@ test('division names the way fans say them', () => {
   assert.deepEqual(name('nhl', { children: [{ name: 'Western Conference', children: [group({ name: 'Pacific Division', abbreviation: 'PAC' }, ['6'])] }] }), ['6 West · Pacific #0']);
   assert.deepEqual(name('wnba', { children: [group({ name: 'Eastern Conference', abbreviation: 'E' }, ['20'])] }), ['20 Eastern Conference #0'], 'the WNBA: conferences');
   assert.deepEqual(name('epl', { name: 'English Premier League', children: [group({ name: '2026-27 English Premier League', abbreviation: '2026-2027' }, ['364'])] }), ['364 Premier League #0'], 'one table, named for the league, not the season');
+});
+
+test('record and streak come with the division, only where ESPN has them', () => {
+  const got = (lg: any, stats: object[]) => parseDivisions(lg, { children: [group({ name: 'Atlantic Division', abbreviation: 'AT' }, ['2'], stats)] }).get('2');
+  assert.deepEqual(got('mlb', [{ name: 'overall', displayValue: '93-68' }, { name: 'streak', displayValue: 'W1' }]), { name: 'AL East'.replace('AL East', got('mlb', [])!.name), order: 0, record: '93-68', streak: 'W1' });
+  assert.equal(got('nhl', [{ name: 'overall', displayValue: '6-2-0, 12 PTS' }])?.record, '6-2-0', "the NHL's points are cut off");
+  assert.equal(got('epl', [{ name: 'overall', displayValue: '7-0-0' }])?.streak, undefined, 'no streak, no key');
+  assert.equal('record' in got('nba', [])!, false);
 });
 
 test('GET /teams?by=division: by league (the app\'s order), then division, then name; F1\'s constructors together', async () => {

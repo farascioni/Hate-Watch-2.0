@@ -75,15 +75,18 @@ route('GET', '/search', false, (_r, url) => ({
     limit: Math.min(Number(url.searchParams.get('limit') ?? 40), 100),
   })),
 }));
-// ?by=division: each team says its division (`division`, and `divisionOrder`: ESPN's order of them), and
-// the list comes by league (the app's order), then division, then name. Otherwise A-Z.
+// ?by=division: each team says its division (`division`, and `divisionOrder`: ESPN's order of them) and, where
+// ESPN's standings have them, its `record` and `streak` ("W2", "L4"; the Tracking tab's cards), and the list comes by league (the app's order), then division, then name. Otherwise A-Z.
 route('GET', '/teams', false, async (_r, url) => {
   const lg = url.searchParams.get('league');
   const teams = catalog.allTeams().filter((t) => listed(t) && (!lg || t.league === lg)); // not the UFC's placeholder
   if (url.searchParams.get('by') !== 'division') return { teams: withHaters(teams.sort((a, b) => a.name.localeCompare(b.name)).map(teamDto)) };
   const leagues = [...new Set(teams.map((t) => t.league))];
   const div = new Map(await Promise.all(leagues.map(async (l) => [l, await divisionsOf(l)] as const)));
-  const rows = teams.map((t) => ({ ...teamDto(t), division: div.get(t.league)?.get(t.espnId)?.name ?? (t.league === 'f1' ? 'Constructors' : LEAGUES[t.league].name), divisionOrder: div.get(t.league)?.get(t.espnId)?.order ?? 99 }));
+  const rows = teams.map((t) => {
+    const d = div.get(t.league)?.get(t.espnId);
+    return { ...teamDto(t), division: d?.name ?? (t.league === 'f1' ? 'Constructors' : LEAGUES[t.league].name), divisionOrder: d?.order ?? 99, record: d?.record, streak: d?.streak };
+  });
   rows.sort((a, b) => LEAGUE_IDS.indexOf(a.league) - LEAGUE_IDS.indexOf(b.league) || a.divisionOrder - b.divisionOrder || a.name.localeCompare(b.name));
   return { teams: withHaters(rows) };
 });

@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 551 tests in 72 files, offline, in about 4 seconds, all passing on October 15, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 552 tests in 72 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 551 tests in 72 files, offline, in about 4 seconds, all passing on October 15, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 552 tests in 72 files, offline, in about 4 seconds, all passing on October 17, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 551 tests in 72 files, offline, in about 4 seconds, all passing on October 15, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 552 tests in 72 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 551 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 552 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -48,7 +48,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `city-liverpool-touch-reads.test.ts` | The touch feed's read schedule: the newest page on every poll, 250 touches back every `HW_TOUCH_MS` |
 | `clips.test.ts` | ESPN's clips: a play's clip goes onto its alerts later without a push; a loss gets the winning play's clip or the recap; the `clips.*` switches take them out |
 | `crew-chief-review.test.ts` | Crew chief reviews that overturn a call: Volpe's home run taken away for fan interference (Rays @ Yankees, 2026-10-07) and the season's other overturned reviews |
-| `divisions.test.ts` | Search's "By division": each team's division, named the way fans say it |
+| `divisions.test.ts` | Search's "By division": each team's division, named the way fans say it, and its record and streak |
 | `eliminated.test.ts` | A playoff knockout as that game's one Successful Hate Watch, from the scoreboard's series or an NFL playoff loss, including TB @ NYY (ALDS Game 3) through the live scoreboard scan |
 | `edm-la-review.test.ts` | What the Oilers at Kings report (EDM at LA, the first NHL game recorded, October 13 2026) found, through a real `GameTracker` on the plays ESPN posted: a play with no team and no shooter is no goalie change and no false pull, and the real pull counts goals first posted as missed shots ("3 goals on 5 shots"); a goal first posted as a missed shot is a line on the shooter's alert with no extra push and one goalie and team alert; a retyped or removed shot is a line; an empty-netter first posted as an even-strength goal says so on the goalie's alert and the team's (or is an alert for a device that wanted only that); a penalty's call is a line; a final the header has short of the plays is 4 to 1, and `competitorScore` adds the period scores (not with a fifth entry); the box score's goalies stay on their teams; `mergePlays` fills an NHL play's team |
 | `tor-uta-review.test.ts` | What the Maple Leafs at Mammoth report (TOR at UTA, October 13 2026) found, through a real `GameTracker`: a shot waits 20 seconds for ESPN to finish it, and one that becomes a goal in that time sends no shot alert; a penalty still typed "Penalty Shot Infraction" waits up to 10 minutes for its call, goes out as a minor if ESPN never names it, and a flip back to the placeholder is no call (a fight that flips back stays one fight alert, with no lines); a goal with no scorer in its text holds the goalie's alert and the team's score alerts together, and the goals after it are announced once, in order, with the goalie's push kept; a goal's alerts take ESPN's later text (shorter or longer) with no push while the shot alert from before keeps its words; a shootout shot and a new goalie's first save are never held. |

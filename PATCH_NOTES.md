@@ -14,6 +14,7 @@ STARTUP GUIDE
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
 
 TRACKING TAB
+- A new Layout button above the list lets you choose how the cards look: Classic (as now), Compact, Banner game, Tiles (two per row) or Scoreboard. The four denser ones also show the team's record and winning or losing streak, and its live, next or last game. Your choice is kept on your phone. (Update)
 - Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
 - Each team and athlete has a thin border around it, so the rows are easier to tell apart. (Update)
 - Teams and athletes are now cards with a banner in their team's color: the league on the left, how many people hate them on the right, and the logo or photo sitting over the banner's edge. The name is larger, and the buttons run along the bottom with Unfollow on the right. (Update)

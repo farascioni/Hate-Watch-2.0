@@ -14,6 +14,9 @@ export interface Team {
   /** In a team list sorted by division: "AL East", "East · Atlantic" ("Constructors" in F1), and ESPN's order of them. */
   division?: string;
   divisionOrder?: number;
+  /** With the division, where ESPN's standings have them: "93-68" (NHL "6-2-0") and the streak ("W2", "L4"). */
+  record?: string;
+  streak?: string;
   /** How many people track them, where the server includes it (Search, team lists, rosters, their page). */
   haters?: number;
 }
