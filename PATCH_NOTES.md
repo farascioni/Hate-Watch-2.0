@@ -8,7 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
-- The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star. The lock screen mark needs the server deploy.
+- The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star. (Update)
 - The Scores tab's Up next now lists the next game of each favorite team too.
 
 LOCK SCREEN SCOREBOARD
