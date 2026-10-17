@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 - Lock screen scoreboard: a live game's line now says more: baseball shows the outs and the count ("Bot 8th · 1 out · 3-2"), football the down and distance ("Q4 - 2:14 · 3rd & 6"). Server only, so it reaches Build 18 with no update.
+- Lock screen scoreboard: a new Settings switch, Detailed scoreboard (needs this build). It gives each game two lines: baseball's count, outs and pitcher, football's down and distance and red zone, hockey's shots, with the runners on base and each team's win chance as a small bar. It fits three games instead of four, and the long-pressed Dynamic Island shows the top game in full. Off keeps the one-line scoreboard.
 
 ## Build 18 (October 17, 2026)
 

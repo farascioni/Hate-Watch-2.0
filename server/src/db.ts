@@ -113,6 +113,10 @@ if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'fav')) {
   db.exec('ALTER TABLE feed ADD COLUMN fav INTEGER NOT NULL DEFAULT 0');
 }
+// 1 when the device chose the lock screen scoreboard's detailed layout (live-activity.ts): two lines a game.
+if (!(db.prepare('PRAGMA table_info(live_activities)').all() as { name: string }[]).some((c) => c.name === 'layout')) {
+  db.exec('ALTER TABLE live_activities ADD COLUMN layout INTEGER NOT NULL DEFAULT 0');
+}
 {
   const missing = db.prepare('SELECT id FROM events WHERE share_code IS NULL').all() as { id: string }[];
   const set = db.prepare('UPDATE events SET share_code = ? WHERE id = ?');

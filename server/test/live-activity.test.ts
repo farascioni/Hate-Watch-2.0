@@ -16,7 +16,7 @@ loadCatalog();
 
 const { upsertGame, forgetDeviceTeams } = await import('../src/scores.ts');
 const { addFavorite } = await import('../src/favorites.ts');
-const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine } = await import('../src/live-activity.ts');
+const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine, subLine } = await import('../src/live-activity.ts');
 const { setApnsSender, apnsJwt, apnsConfigured, tokenGone } = await import('../src/apns.ts');
 const { setFlag } = await import('../src/flags.ts');
 
@@ -151,6 +151,38 @@ test('a live row says what ESPN gives for the situation: baseball outs and count
   const card = (o: object) => ({ detail: 'Bot 8th', ...o }) as any;
   assert.equal(statusLine(card({})), 'Bot 8th');
   assert.equal(statusLine(card({ bases: { first: true, second: false, third: true, outs: 1 }, count: { balls: 3, strikes: 2 } })), 'Bot 8th · 1 out · 3-2');
-  assert.equal(statusLine(card({ bases: { first: false, second: false, third: false, outs: 0 } })), 'Bot 8th · 0 out', 'between batters there is no count');
+  assert.equal(statusLine(card({ bases: { first: false, second: false, third: false, outs: 2 } })), 'Bot 8th · 2 outs', 'between batters there is no count');
   assert.equal(statusLine(card({ detail: 'Q4 - 2:14', downDistance: '3rd & 6 at LAR 38' })), 'Q4 - 2:14 · 3rd & 6');
+});
+
+test('the detailed layout adds a sub line, the bases and the win chance to a row; the compact one carries none of them', () => {
+  db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev2', 's', 'ios', '{}');
+  follow.run('dev2', T.SF);
+  putLiveActivity('dev2', { mostHated: [] });
+  upsertGame({
+    key: 'mlb:900', league: 'mlb', id: '900', state: 'in', startsAt: Date.now() - HOUR, detail: 'Bot 8th', away: side('LAD', 3), home: side('SF', 4),
+    bases: { first: true, second: false, third: true, outs: 1 }, count: { balls: 3, strikes: 2 }, pitcher: { name: 'G. Cole' }, winProb: { home: 0.62, away: 0.38 },
+  } as any);
+  const row = (b: any) => b.games.find((g: any) => g.k === 'mlb:900');
+  const compact = buildBoard('dev2')!;
+  assert.equal(compact.lay, 0);
+  assert.equal(row(compact).sub, undefined, 'the compact row has no new fields');
+  assert.equal(row(compact).r, 'Bot 8th · 1 out · 3-2');
+  const detailed = putLiveActivity('dev2', { layout: 'detailed' })!;
+  assert.equal(detailed.lay, 1);
+  const g = row(detailed);
+  assert.deepEqual([g.r, g.sub, g.bs, g.wp, g.wl], ['Bot 8th', '3-2 · 1 out · P: G. Cole', '101', 62, 'SF 62%']);
+  assert.equal(putLiveActivity('dev2', { layout: 'nonsense' as any })!.lay, 1, 'an unknown layout keeps the old one');
+  assert.equal(putLiveActivity('dev2', { layout: 'compact' })!.lay, 0);
+});
+
+test('the sub line by sport, and three detailed rows stay far under Apple\'s limit', () => {
+  const t = (o: object) => ({ detail: 'x', away: side('BOS', 0), home: side('NYY', 0), ...o }) as any;
+  assert.equal(subLine(t({ downDistance: '3rd & 6 at LAR 38', possession: T.BOS, redZone: true })), 'BOS ball · 3rd & 6 at LAR 38 · Red zone');
+  assert.equal(subLine(t({ shots: { away: 24, home: 19 } })), 'Shots 24-19');
+  assert.equal(subLine(t({ lastPlay: 'x'.repeat(100) })).length, 40);
+  assert.equal(subLine(t({})), '');
+  const game3 = { k: 'mlb:123456', a: 'BOS', as: 10, h: 'NYY', hs: 12, st: 'Bot 12th', live: true, t: 0, l: '♥ BOS 10  NYY 12', r: 'Bot 12th', lc: '#F5C451', rc: '#E5232B', sub: 'x'.repeat(40), sc: '#9A9AA2', bs: '111', wp: 100, wl: 'NYY 100%' };
+  const props = { v: 1, lay: 1, games: [game3, game3, game3], more: 99, mt: '+99 more' };
+  assert.ok(JSON.stringify({ aps: { 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify(props) } } }).length < 1500);
 });

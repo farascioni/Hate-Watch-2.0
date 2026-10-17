@@ -17,12 +17,19 @@ import { GAME_LEAGUES, type League } from './leagues.ts';
 /** One line on the board. t: 0 favorite's game, 1 most hated, 2 tracked only. l/r/lc/rc: the line already written and colored
  *  (left text, right text, their colors), so wording and colors change with a deploy; the widget in the installed build draws
  *  these and falls back to the raw fields if they're missing. */
-export type BoardGame = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string };
-/** v: the props' version. Only ever add fields (an installed widget draws the ones it knows); mt: the "+N more" line, '' for none. */
-export type BoardProps = { v: 1; games: BoardGame[]; more: number; mt: string };
+export type BoardGame = {
+  k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string;
+  /** The detailed layout only (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
+   *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%"). */
+  sub?: string; sc?: string; bs?: string; wp?: number; wl?: string;
+};
+/** v: the props' version. Only ever add fields (an installed widget draws the ones it knows); mt: the "+N more" line, '' for none;
+ *  lay: 0 the compact layout (one line a game), 1 the detailed one (two lines, a base diamond, a win chance bar; builds after 18). */
+export type BoardProps = { v: 1; lay: 0 | 1; games: BoardGame[]; more: number; mt: string };
+export type BoardLayout = 'compact' | 'detailed';
 
-/** The lock screen has room for about four lines; the rest are counted. */
-const MAX_GAMES = 4;
+/** The lock screen has room for about four one-line games or three two-line ones; the rest are counted. */
+const MAX_GAMES = [4, 3];
 /** A final stays on the board this long after it ends. */
 const FINAL_KEEP_MS = 10 * 60_000;
 const MARKS = ['♥ ', '★ ', ''];
@@ -32,18 +39,33 @@ const SWEEP_MS = 30_000;
 /** A clock or inning change alone is sent at most this often per device: ESPN's status carries the clock, so it changes every few seconds. */
 const QUIET_GAP_MS = 30_000;
 
-type Row = { activity_token: string | null; sandbox: number; most_hated: string };
-const rowOf = (deviceId: string) => db.prepare('SELECT activity_token, sandbox, most_hated FROM live_activities WHERE device_id = ?').get(deviceId) as Row | undefined;
+type Row = { activity_token: string | null; sandbox: number; most_hated: string; layout: number };
+const rowOf = (deviceId: string) => db.prepare('SELECT activity_token, sandbox, most_hated, layout FROM live_activities WHERE device_id = ?').get(deviceId) as Row | undefined;
 const mostHatedOf = (r?: Row): string[] => { try { return JSON.parse(r?.most_hated ?? '[]'); } catch { return []; } };
+
+const outs = (n: number) => `${n} out${n === 1 ? '' : 's'}`;
+const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
 /** The right-hand text of a live row: ESPN's status plus what ESPN gives for the situation (baseball outs and count, football down and distance). */
 export function statusLine(g: GameCard): string {
   const parts = [g.detail];
-  if (g.bases) parts.push(`${g.bases.outs} out`);
+  if (g.bases) parts.push(outs(g.bases.outs));
   if (g.count) parts.push(`${g.count.balls}-${g.count.strikes}`);
   const dd = g.downDistance?.split(' at ')[0];
   if (dd) parts.push(dd);
   return parts.join(' · ');
+}
+
+/** The detailed layout's second line, by what ESPN gives for the sport: baseball's count, outs and pitcher, football's ball and down,
+ *  hockey's shots, otherwise the latest play. */
+export function subLine(g: GameCard): string {
+  if (g.bases) return [g.count && `${g.count.balls}-${g.count.strikes}`, outs(g.bases.outs), g.pitcher && `P: ${g.pitcher.name}`].filter(Boolean).join(' · ');
+  if (g.downDistance) {
+    const ball = g.possession && [g.away, g.home].find((s) => s?.team.key === g.possession)?.team.abbrev;
+    return [ball && `${ball} ball`, g.downDistance, g.redZone && 'Red zone'].filter(Boolean).join(' · ');
+  }
+  if (g.shots) return `Shots ${g.shots.away}-${g.shots.home}`;
+  return g.lastPlay ? clip(g.lastPlay, 40) : '';
 }
 
 /** The device's board now, or null when no game of its teams is live (or just ended). */
@@ -52,6 +74,7 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
   const tracked = deviceTeams(deviceId).teams;
   // A starred player stands for his team.
   const hated = new Set(mostHatedOf(rowOf(deviceId)).flatMap((k) => (k.startsWith('team:') ? [k] : [catalog.player(k)?.teamKey ?? ''])));
+  const lay = rowOf(deviceId)?.layout ? 1 : 0;
   const rows: (BoardGame & { startsAt: number })[] = [];
   for (const g of cardList()) {
     if (!g.home || !g.away || !(GAME_LEAGUES as League[]).includes(g.league)) continue;
@@ -62,29 +85,38 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     if (t && !keys.some((k) => tracked.has(k))) continue; // only a favorite's game comes without tracking
     const a = g.away.team.abbrev, h = g.home.team.abbrev, st = live ? g.detail : 'Final';
     const score = (n: number | null) => (n === null ? '-' : String(n));
+    // The detailed layout's bar is the chance the team that put the game on the board wins.
+    const own = [g.away, g.home].find((x) => (t === 0 ? favs : t === 1 ? hated : tracked).has(x!.team.key))!;
+    const chance = live && g.winProb ? Math.round(100 * (own === g.home ? g.winProb.home : g.winProb.away)) : null;
     rows.push({
       k: g.key, a, as: g.away.score, h, hs: g.home.score, st, live, t,
       l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: t === 2 ? WHITE : GOLD, rc: live ? RED : GREY,
+      ...(lay && {
+        r: st, sub: live ? subLine(g) : '', sc: GREY, bs: g.bases ? [g.bases.first, g.bases.second, g.bases.third].map(Number).join('') : '',
+        ...(chance !== null && { wp: chance, wl: `${own.team.abbrev} ${chance}%` }),
+      }),
       startsAt: g.startsAt,
     });
   }
   if (!rows.length) return null;
   rows.sort((x, y) => x.t - y.t || +y.live - +x.live || x.startsAt - y.startsAt);
-  const more = Math.max(0, rows.length - MAX_GAMES);
-  return { v: 1, games: rows.slice(0, MAX_GAMES).map(({ startsAt, ...r }) => r), more, mt: more ? `+${more} more` : '' };
+  const max = MAX_GAMES[lay];
+  const more = Math.max(0, rows.length - max);
+  return { v: 1, lay, games: rows.slice(0, max).map(({ startsAt, ...r }) => r), more, mt: more ? `+${more} more` : '' };
 }
 
-/** What the app sends: any of the three fields, the rest of the row stays as it was. Returns the board for the first draw. */
-export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; activityToken?: unknown; sandbox?: unknown }): BoardProps | null {
+/** What the app sends: any of the four fields, the rest of the row stays as it was. Returns the board for the first draw. */
+export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; activityToken?: unknown; sandbox?: unknown; layout?: unknown }): BoardProps | null {
   const old = rowOf(deviceId);
   const hated = Array.isArray(body.mostHated)
     ? JSON.stringify(body.mostHated.filter((k): k is string => typeof k === 'string' && k.length <= 64).slice(0, 200))
     : old?.most_hated ?? '[]';
   const token = typeof body.activityToken === 'string' && body.activityToken.length <= 400 ? body.activityToken : old?.activity_token ?? null;
   const sandbox = typeof body.sandbox === 'boolean' ? +body.sandbox : old?.sandbox ?? 0;
-  db.prepare(`INSERT INTO live_activities (device_id, activity_token, sandbox, most_hated, updated_at) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(device_id) DO UPDATE SET activity_token = excluded.activity_token, sandbox = excluded.sandbox, most_hated = excluded.most_hated, updated_at = excluded.updated_at`)
-    .run(deviceId, token, sandbox, hated, Date.now());
+  const layout = body.layout === 'detailed' ? 1 : body.layout === 'compact' ? 0 : old?.layout ?? 0; // anything else leaves it as it was
+  db.prepare(`INSERT INTO live_activities (device_id, activity_token, sandbox, most_hated, layout, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(device_id) DO UPDATE SET activity_token = excluded.activity_token, sandbox = excluded.sandbox, most_hated = excluded.most_hated, layout = excluded.layout, updated_at = excluded.updated_at`)
+    .run(deviceId, token, sandbox, hated, layout, Date.now());
   last.delete(deviceId); // whatever is on the lock screen may be stale: send the next board whole
   schedule();
   return flagOn('liveActivity') ? buildBoard(deviceId) : null;
@@ -113,7 +145,7 @@ export async function flush(nowMs = Date.now()) {
     const now = Math.floor(nowMs / 1000);
     const aps = board
       ? { timestamp: now, event: 'update', 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify(board) } }
-      : { timestamp: now, event: 'end', 'dismissal-date': now, 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify({ v: 1, games: [], more: 0, mt: '' }) } };
+      : { timestamp: now, event: 'end', 'dismissal-date': now, 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify({ v: 1, lay: 0, games: [], more: 0, mt: '' }) } };
     // A score or a final is worth waking the screen for; a clock or inning change is not.
     const prev = last.get(device_id);
     const urgent = !prev || scoreSig(JSON.parse(prev)) !== scoreSig(board);
