@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Hate Watch Plus: the players and teams a subscriber marks as their most hated (the star on the Tracking tab).
- * Their alerts get a gold border in the Feed. Kept on this device as a set of target keys (sent to the server only while the
+ * Their alerts get a red border in the Feed. Kept on this device as a set of target keys (sent to the server only while the
  * lock screen scoreboard is on, liveScoreboard.ts); a lapsed subscription clears it (lapsePlus) and so does deleting the device's data.
  */
 const KEY = 'hw.mostHated';

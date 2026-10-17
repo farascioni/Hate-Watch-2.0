@@ -21,7 +21,7 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
 export const GameCardView = memo(function GameCardView({ game, latest, now, big }: { game: GameCard; latest?: FeedItem; now: number; big?: boolean }) {
   const { follows } = useStore();
   const sides = trackedSides(game, follows);
-  // Hate Watch Plus: a gold border while a team (or a player or driver) on your most hated list is in this game. Not on the game screen's header.
+  // Hate Watch Plus: a red border while a team (or a player or driver) on your most hated list is in this game. Not on the game screen's header.
   const mostHated = useAnyMostHated(gameTargetKeys(game, follows)) && !big;
   const side: Side | undefined = sides.length === 1 ? sides[0] : undefined; // hating both sides: no "down 7"
   const tag = hateTag(game, side);

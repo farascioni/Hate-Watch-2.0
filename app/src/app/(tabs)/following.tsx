@@ -123,7 +123,7 @@ export default function FollowingScreen() {
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The ✕ (it asks first) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The ✕ (it asks first) stops tracking them entirely. With Hate Watch Plus, ❌ marks your most hated: their alerts get a red border in the Feed.</Text>}
       renderItem={({ item: row }) => (
         <View style={per > 1 ? styles.tiles : undefined}>
         {row.map((item) => (

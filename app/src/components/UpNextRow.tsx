@@ -4,16 +4,18 @@ import { Avatar } from './Avatar';
 import { LeagueTag } from './ui';
 import { useStore } from '../lib/store';
 import { upNextWhen } from '../lib/scores';
-import { colors, space } from '../theme';
+import { useAnyMostHated } from '../lib/mostHated';
+import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { NextGame } from '../lib/types';
 
 /**
  * One tracked team's next game in "Up next": "Falcons vs Ravens", "NBC", and when ("Sun" / "8:20 PM").
  * The tracked team comes first; two tracked teams in one game read "Saints at Falcons". Tapping it
- * opens the tracked team's page.
+ * opens the tracked team's page. Edged red while a most hated team (or a player's team) is in the game, gold when a favorite is
+ * (red wins), like the Feed and the game cards.
  */
 export function UpNextRow({ game, now }: { game: NextGame; now: number }) {
-  const { follows } = useStore();
+  const { follows, favorites } = useStore();
   const isMine = (key: string) => follows.has(key) || [...follows.values()].some((t) => t.kind === 'player' && t.teamKey === key);
   const both = isMine(game.home.key) && isMine(game.away.key);
   const homeIsMine = game.teamKey === game.home.key;
@@ -22,9 +24,12 @@ export function UpNextRow({ game, now }: { game: NextGame; now: number }) {
   // A team tracked through its players says whose: "Tracking Aaron Judge".
   const players = follows.has(mine.key) ? [] : [...follows.values()].filter((t) => t.kind === 'player' && t.teamKey === mine.key).map((t) => t.name);
   const sub = [players.length ? `Tracking ${players.join(', ')}` : '', game.note, game.tv].filter(Boolean).join(' · ');
+  const sides = [game.home.key, game.away.key];
+  const hated = useAnyMostHated([...sides, ...[...follows.values()].filter((t) => t.kind === 'player' && sides.includes(t.teamKey ?? '')).map((t) => t.key)]);
+  const edge = hated ? HATE_RED : sides.some((k) => favorites.has(k)) ? GOLD : null;
   const when = upNextWhen(game.startsAt, game.timeValid, now);
   return (
-    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(mine.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}
+    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(mine.key)}`)} style={({ pressed }) => [styles.row, edge && { ...styles.edged, borderColor: edge }, pressed && { backgroundColor: colors.surfaceHi }]}
       accessibilityRole="button" accessibilityLabel={`${title}, ${when.day} ${when.time}${sub ? `, ${sub}` : ''}`}>
       <Avatar target={mine} size={36} />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -44,6 +49,7 @@ export function UpNextRow({ game, now }: { game: NextGame; now: number }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(2.5) },
+  edged: { marginHorizontal: space(3), paddingHorizontal: space(1) / 2, borderWidth: 2, borderRadius: radius.lg },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   title: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
   sub: { color: colors.textDim, fontSize: 12, flexShrink: 1 },
