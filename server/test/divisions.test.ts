@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net';
 process.env.HW_DB = ':memory:';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { parseDivisions, postseasonStreaks, divisionsDeps } = await import('../src/divisions.ts');
+const { parseDivisions, postseasonStreaks, constructorStandings, driverStandings, divisionsDeps } = await import('../src/divisions.ts');
 const { urls } = await import('../src/leagues.ts');
 const { startApi } = await import('../src/api.ts');
 
@@ -48,12 +48,14 @@ test('a postseason streak replaces the regular season\'s, only for teams that pl
 });
 
 test('GET /teams?by=division: by league (the app\'s order), then division, then name; F1\'s constructors together', async () => {
-  divisionsDeps.getJson = async (url: string) => (url === `${urls.standings('mlb')}?level=3` ? MLB : url === `${urls.standings('nfl')}?level=3` ? NFL : {});
+  divisionsDeps.getJson = async (url: string) => (url === `${urls.standings('mlb')}?level=3` ? MLB : url === `${urls.standings('nfl')}?level=3` ? NFL : url === urls.standings('f1') ? { children: [{ name: "Constructors' Championship", standings: { entries: [{ team: { id: '106' }, stats: [{ name: 'rank', value: 3 }, { name: 'championshipPts', displayValue: '88' }] }] } }] } : {});
   const server = startApi(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const list = async (q: string) => (await (await fetch(`${base}/teams${q}`)).json()).teams.map((t: any) => `${t.abbrev}${t.division ? ` (${t.division})` : ''}`);
   assert.deepEqual(await list('?by=division'), ['NYY (AL East)', 'TB (AL East)', 'CLE (AL Central)', 'ATL (NFC South)', 'NO (NFC South)', 'FER (Constructors)']);
+  const fer = (await (await fetch(`${base}/teams?league=f1&by=division`)).json()).teams[0];
+  assert.deepEqual([fer.record, fer.standing], ['88 pts', '3rd in constructors'], "F1's constructors carry the championship");
   assert.deepEqual(await list('?league=mlb&by=division'), ['NYY (AL East)', 'TB (AL East)', 'CLE (AL Central)']);
   assert.deepEqual(await list('?league=mlb'), ['CLE', 'NYY', 'TB'], 'A-Z, as before');
   server.close();
@@ -70,10 +72,31 @@ test("college football: record, streak and a conference standing from the confer
   assert.equal(parseDivisions('mlb', MLB).get('10')?.standing, undefined, 'only college football');
 });
 
-test("a preseason table (the NBA in October) gives no streak: exhibitions aren't form", () => {
-  const e = { team: { id: '2' }, stats: [{ name: 'streak', displayValue: 'W4' }] };
-  const at = (lg: any, seasonType: number) => parseDivisions(lg, { children: [{ name: 'Atlantic', abbreviation: 'AT', standings: { seasonType, entries: [e] } }] }).get('2');
-  assert.equal(at('nba', 1)?.streak, undefined);
-  assert.equal(at('nba', 2)?.streak, 'W4');
-  assert.equal(at('epl', 1)?.streak, 'W4', "soccer's type 1 is its season");
+test("a preseason table (the NBA in October) has no overall: the record is its wins and losses, and its streak counts", () => {
+  const e = { team: { id: '2' }, stats: [{ name: 'wins', displayValue: '1' }, { name: 'losses', displayValue: '4' }, { name: 'streak', displayValue: 'W1' }] };
+  const at = (lg: any) => parseDivisions(lg, { children: [{ name: 'Atlantic', abbreviation: 'AT', standings: { seasonType: 1, entries: [e] } }] }).get('2');
+  assert.deepEqual([at('nba')?.record, at('nba')?.streak], ['1-4', 'W1']);
+  assert.equal(at('epl')?.record, undefined, "only basketball's record is wins-losses: soccer has draws");
+});
+
+test("F1's constructors: the place in the championship and the points", () => {
+  const res = { children: [{ name: "Constructors' Championship", standings: { season: 2026, entries: [
+    { team: { id: '106' }, stats: [{ name: 'rank', value: 2 }, { name: 'championshipPts', displayValue: '151' }] },
+    { team: { id: '107' }, stats: [{ name: 'rank', value: 1 }, { name: 'championshipPts', displayValue: '170' }] },
+  ] } }] };
+  const got = constructorStandings(res);
+  assert.deepEqual([got.get('106')?.standing, got.get('106')?.record], ['2nd in constructors', '151 pts']);
+  assert.equal(got.get('107')?.standing, '1st in constructors');
+  assert.equal(constructorStandings({}).size, 0, 'no table, no placement');
+});
+
+test("F1's drivers: their own place in the drivers' championship, not their constructor's", () => {
+  const res = { children: [{ name: "Drivers' Championship", standings: { season: 2026, entries: [
+    { athlete: { id: '5498' }, stats: [{ name: 'rank', value: 3 }, { name: 'championshipPts', displayValue: '88' }] },
+    { athlete: { id: '4665' }, stats: [{ name: 'rank', value: 1 }, { name: 'championshipPts', displayValue: '120' }] },
+  ] } }] };
+  const got = driverStandings(res);
+  assert.deepEqual(got.get('5498'), { record: '88 pts', standing: '3rd in drivers' });
+  assert.equal(got.get('4665')?.standing, '1st in drivers');
+  assert.equal(driverStandings({}).size, 0, 'no table, no placement');
 });

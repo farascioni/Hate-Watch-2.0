@@ -15,7 +15,7 @@ import { useTrackingLayout } from '../../lib/trackingLayout';
 import { gameInfo, teamKeyOf } from '../../lib/trackingInfo';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
 import { GOLD, colors, radius, space } from '../../theme';
-import type { Target, Team } from '../../lib/types';
+import type { Player, Target, Team } from '../../lib/types';
 
 /** Hate Watch Plus: marks one of your trackers as a most hated (a gold border on their alerts in the Feed). */
 function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: boolean; compact?: boolean }) {
@@ -50,6 +50,17 @@ export default function FollowingScreen() {
     api.teams(undefined, true).then((r) => { if (live) setTeams(new Map(r.teams.map((t) => [t.key, t]))); }).catch(() => {});
     return () => { live = false; };
   }, []));
+  // An F1 driver's card says their own place in the drivers' championship (the constructor's is on the team's card).
+  const hasDrivers = [...follows.values()].some((t) => t.kind === 'player' && t.league === 'f1');
+  const [drivers, setDrivers] = useState<Map<string, Player>>(new Map());
+  useFocusEffect(useCallback(() => {
+    if (!hasDrivers) return;
+    let live = true;
+    api.f1Drivers().then((r) => { if (live) setDrivers(new Map(r.drivers.map((d) => [d.key, d]))); }).catch(() => {});
+    return () => { live = false; };
+  }, [hasDrivers]));
+  const formOf = (t: Target): { record?: string; streak?: string; standing?: string } | undefined =>
+    t.kind === 'player' && t.league === 'f1' ? drivers.get(t.key) : teams.get(teamKeyOf(t));
   const { leagueInfo, games, upNext } = useStore();
   const layout = useTrackingLayout();
   const [menu, setMenu] = useState(false);
@@ -112,7 +123,7 @@ export default function FollowingScreen() {
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow (✕ on the smaller cards) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The ✕ (it asks first) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
       renderItem={({ item: row }) => (
         <View style={per > 1 ? styles.tiles : undefined}>
         {row.map((item) => (
@@ -120,7 +131,7 @@ export default function FollowingScreen() {
           key={item.key}
           target={item}
           layout={layout}
-          info={{ division: divisionOf(item), record: teams.get(teamKeyOf(item))?.record, streak: teams.get(teamKeyOf(item))?.streak, standing: teams.get(teamKeyOf(item))?.standing, game: gameInfo(item, games, upNext) }}
+          info={{ division: divisionOf(item), record: formOf(item)?.record, streak: formOf(item)?.streak, standing: formOf(item)?.standing, game: gameInfo(item, games, upNext) }}
           actions={(compact) => (
             <View style={styles.actions}>
               <MostHatedStar target={item} allowed={starAllowed} compact={compact} />
@@ -164,7 +175,7 @@ export default function FollowingScreen() {
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(2) },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(1.5) },
   tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },
   layoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: space(4), paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   layoutText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
@@ -172,6 +183,6 @@ const styles = StyleSheet.create({
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
   iconStar: { borderWidth: 1, borderColor: GOLD },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },
-  unfollow: { marginLeft: 'auto', paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  unfollow: { marginLeft: 'auto', paddingHorizontal: space(3), paddingVertical: space(1), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
 });

@@ -161,10 +161,14 @@ export function TargetCard({ target, division, actions }: { target: Target; divi
         <HaterCount target={target} tint={ink} />
       </View>
       <View style={styles.cardBody}>
-        <View style={styles.cardAvatar}><Avatar target={target} size={56} /></View>
-        <Text style={styles.cardTitle}>{target.name}</Text>
-        <Text style={styles.rowSub}>{[subtitle(target), division].filter(Boolean).join(' · ')}</Text>
-        <View style={{ marginTop: space(3) }}>{actions}</View>
+        <View style={styles.cardHead}>
+          <View style={styles.cardAvatar}><Avatar target={target} size={44} /></View>
+          <View style={styles.cardText}>
+            <Text style={styles.cardTitle}>{target.name}</Text>
+            <Text style={styles.rowSub}>{[subtitle(target), division].filter(Boolean).join(' · ')}</Text>
+          </View>
+          <View style={styles.cardActions}>{actions}</View>
+        </View>
       </View>
     </Pressable>
   );
@@ -256,10 +260,13 @@ const styles = StyleSheet.create({
   followText: { color: colors.onHate, fontWeight: '800', fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
   card: { marginHorizontal: space(3), marginVertical: space(1), borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, overflow: 'hidden' },
-  banner: { height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: space(4), paddingLeft: space(4) + 62 + space(3) }, // the left gap clears the avatar (56 + 2 × 3 padding) that overlaps the banner
+  banner: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: space(3), paddingLeft: space(3) + 50 + space(3) }, // the left gap clears the avatar (44 + 2 × 3 padding) that overlaps the banner
   bannerLeague: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  cardBody: { paddingHorizontal: space(4), paddingBottom: space(3), gap: 2 },
-  cardAvatar: { alignSelf: 'flex-start', marginTop: -28, marginBottom: space(1), padding: 3, borderRadius: radius.pill, backgroundColor: colors.surface },
+  cardBody: { paddingHorizontal: space(3), paddingBottom: space(2) },
+  cardActions: { width: 136, paddingTop: space(1) }, // room for the four small icons in one row
+  cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space(3) },
+  cardText: { flex: 1, minWidth: 0, gap: 1, paddingTop: space(1) },
+  cardAvatar: { marginTop: -16, padding: 3, borderRadius: radius.pill, backgroundColor: colors.surface },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, flexShrink: 1 },

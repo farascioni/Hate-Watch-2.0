@@ -34,11 +34,11 @@ const sub = (t: Target, info: CardInfo) => [subtitle(t), info.division].filter(B
 
 /**
  * The Tracking tab's card in the layout picked in its menu (lib/trackingLayout.ts). `actions(compact)` draws the
- * buttons: the full set with an Unfollow pill for the classic card, the icons alone for the denser ones.
+ * buttons: the icons alone (on the right of the name on the classic card).
  */
 export function TrackingCard({ target, layout, info, actions }: { target: Target; layout: TrackingLayout; info: CardInfo; actions: (compact: boolean) => ReactNode }) {
   const { leagueInfo } = useStore();
-  if (layout === 'classic') return <TargetCard target={target} division={info.division} actions={actions(false)} />;
+  if (layout === 'classic') return <TargetCard target={target} division={info.division} actions={actions(true)} />;
   const tint = tintOf(target), ink = readableOn(tint), g = info.game;
   const press = ({ pressed }: { pressed: boolean }) => pressed && { backgroundColor: colors.surfaceHi };
 

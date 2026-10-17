@@ -32,6 +32,9 @@ export interface Player {
   teamName: string | null; teamAbbrev: string | null; teamColor: string | null; teamLogo: string | null;
   /** How many people track them, where the server includes it (Search, rosters, their page). */
   haters?: number;
+  /** F1 drivers (`/f1/drivers`): their points and place in the drivers' championship, "444 pts" and "2nd in drivers". */
+  record?: string;
+  standing?: string;
 }
 
 export type Target = Team | Player;

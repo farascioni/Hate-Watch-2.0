@@ -23,7 +23,7 @@ import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
-import { divisionsOf } from './divisions.ts';
+import { divisionsOf, f1DriverStandings } from './divisions.ts';
 import { deepHealth, liveDeps } from './health.ts';
 
 class Html {
@@ -98,10 +98,14 @@ route('GET', '/ufc/weight-classes', false, () => ({
     .filter((c) => c.fighters.length),
 }));
 // Every F1 driver, by constructor (A-Z), each team's A-Z: Search's Drivers with nothing typed.
-route('GET', '/f1/drivers', false, () => ({
-  drivers: withHaters(catalog.allTeams().filter((t) => t.league === 'f1').sort((a, b) => a.name.localeCompare(b.name))
-    .flatMap((t) => [...catalog.roster(t.key)].sort((a, b) => a.name.localeCompare(b.name)).map(playerDto))),
-}));
+// Each says its own place in the drivers' championship (`record` "444 pts", `standing` "2nd in drivers"; the Tracking tab's cards).
+route('GET', '/f1/drivers', false, async () => {
+  const places = await f1DriverStandings();
+  return {
+    drivers: withHaters(catalog.allTeams().filter((t) => t.league === 'f1').sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((t) => [...catalog.roster(t.key)].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ ...playerDto(p), ...places.get(p.espnId) })))),
+  };
+});
 // An F1 weekend's preview: where, when, the grid once it's set, the championship (f1-preview.ts).
 route('GET', '/f1/events/:id/preview', false, async (_r, _u, [id]) => {
   const preview = await f1Preview(decodeURIComponent(id));

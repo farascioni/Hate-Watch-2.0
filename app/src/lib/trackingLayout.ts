@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 export type TrackingLayout = 'classic' | 'compact' | 'banner' | 'tiles' | 'strip';
 export const LAYOUTS: { id: TrackingLayout; name: string; blurb: string }[] = [
-  { id: 'classic', name: 'Classic', blurb: 'A banner in the team’s colour, roomy' },
+  { id: 'classic', name: 'Classic', blurb: 'A banner in the team’s colour' },
   { id: 'compact', name: 'Compact', blurb: 'Colour bar, the game on the right' },
   { id: 'banner', name: 'Banner game', blurb: 'The banner carries the game' },
   { id: 'tiles', name: 'Tiles', blurb: 'Two per row, the most on screen' },
@@ -16,7 +16,7 @@ export const LAYOUTS: { id: TrackingLayout; name: string; blurb: string }[] = [
 ];
 
 const KEY = 'hw.trackingLayout';
-let layout: TrackingLayout = 'compact';
+let layout: TrackingLayout = 'classic';
 const listeners = new Set<() => void>();
 const valid = (v: unknown): v is TrackingLayout => LAYOUTS.some((l) => l.id === v);
 

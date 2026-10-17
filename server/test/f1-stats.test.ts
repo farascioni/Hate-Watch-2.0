@@ -10,6 +10,7 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { urls } = await import('../src/leagues.ts');
 const F = await import('../src/f1-stats.ts');
+const { divisionsDeps } = await import('../src/divisions.ts');
 const { startApi } = await import('../src/api.ts');
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, logo, logo_w, logo_h, updated_at) VALUES (?, 'f1', ?, ?, ?, ?, 'badge://f1', 512, 512, 0)`);
@@ -69,6 +70,7 @@ F.f1StatsDeps.getJson = async (url: string) => {
   }
   throw new Error(`unexpected ${url}`);
 };
+divisionsDeps.getJson = F.f1StatsDeps.getJson; // /f1/drivers reads the same standings
 const show = (p: import('../src/stats.ts').StatsPage) => ({
   record: p.record && `${p.record.overall} · ${p.record.standing}`,
   tiles: p.groups.map((g) => `${g.title}: ${g.tiles.map((t) => `${t.label} ${t.value}${t.bad ? ' (red)' : ''}`).join(', ')}`),
@@ -126,13 +128,14 @@ test("a constructor's page: both cars, whoever drove them that day; the weekend'
   ], 'a car that didn\'t start isn\'t on it');
 });
 
-test('every driver at /f1/drivers, by constructor, with their haters: Search with nothing typed', async () => {
+test('every driver at /f1/drivers, by constructor, with their haters and their own place in the drivers\' championship: Search with nothing typed', async () => {
   const server = startApi(0);
   await new Promise((r) => server.once('listening', r));
   try {
     const { drivers } = await (await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/f1/drivers`)).json();
-    assert.deepEqual(drivers.map((d: any) => [d.teamName, d.name, d.haters]),
-      [['Racing Bulls', 'Arvid Lindblad', 0], ['Racing Bulls', 'Liam Lawson', 0], ['Red Bull', 'Isack Hadjar', 0], ['Red Bull', 'Max Verstappen', 0]]);
+    assert.deepEqual(drivers.map((d: any) => [d.teamName, d.name, d.haters, d.record, d.standing]),
+      [['Racing Bulls', 'Arvid Lindblad', 0, '12 pts', '4th in drivers'], ['Racing Bulls', 'Liam Lawson', 0, '43 pts', '2nd in drivers'],
+        ['Red Bull', 'Isack Hadjar', 0, '43 pts', '1st in drivers'], ['Red Bull', 'Max Verstappen', 0, '15 pts', '3rd in drivers']]);
   } finally { server.close(); }
 });
 
