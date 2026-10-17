@@ -20,7 +20,7 @@ import { GAME_LEAGUES, type League } from './leagues.ts';
 export type BoardGame = {
   k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string;
   /** Each team's own look (builds after 19): the color of the away and home team (gold a favorite, red a most hated, white the rest)
-   *  and the mark before its code ('♥ ', '★ ' or ''). An older build ignores them and draws `l` in `lc`. */
+   *  and the mark before its code ('♥ ', '❌ ' or ''). An older build ignores them and draws `l` in `lc`. */
   ac?: string; hc?: string; am?: string; hm?: string;
   /** The detailed layout (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
    *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%").
@@ -39,7 +39,7 @@ const LAYOUTS: BoardLayout[] = ['compact', 'detailed', 'grid', 'hero'];
 const MAX_GAMES = [4, 3, 4, 3];
 /** A final stays on the board this long after it ends. */
 const FINAL_KEEP_MS = 10 * 60_000;
-const MARKS = ['♥ ', '★ ', ''];
+const MARKS = ['♥ ', '❌ ', ''];
 const GOLD = '#F5C451', WHITE = '#FFFFFF', RED = '#E5232B', GREY = '#9A9AA2';
 /** By tier: a favorite gold, a most hated red, the rest white. */
 const TIER_COLORS = [GOLD, RED, WHITE];

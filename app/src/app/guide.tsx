@@ -153,7 +153,7 @@ const PAGES: Page[] = [
             <Text style={[styles.demoTitle, { fontSize: 17 }]}>Daniel Jones</Text>
             <Text style={styles.demoSub}>QB</Text>
             <View style={[styles.row, { marginTop: space(3) }]}>
-              <RoundIcon name="star-outline" />
+              <RoundIcon name="close-outline" />
               <RoundIcon name="notifications" />
               <RoundIcon name="settings-sharp" highlight />
               <View style={[styles.unfollowPill, { marginLeft: 'auto' }]}><Text style={styles.unfollowText}>Unfollow</Text></View>
@@ -161,7 +161,7 @@ const PAGES: Page[] = [
           </View>
         </View>
         <Explain icon="eye" text="How many people hate them, you included." />
-        <Explain icon="star" text="Star: with Hate Watch Plus, marks your most hated. Their alerts get a gold border in the Feed." />
+        <Explain mark="❌" text="Red X: with Hate Watch Plus, marks your most hated. Their alerts get a red border in the Feed." />
         <Explain icon="notifications" text="Bell: no notifications about just them. Their alerts still reach your feed." />
         <Explain icon="settings-sharp" text="Gear: pick exactly which alerts you get about them. It beats your global settings." />
         <Explain icon="close-circle" text="Unfollow: stop tracking them entirely." />
@@ -175,8 +175,8 @@ const PAGES: Page[] = [
       <View style={[styles.demoCard, { borderColor: GOLD, gap: space(4) }]}>
         <Explain icon="color-palette" color={GOLD} text="Gold accents: swaps the red for gold throughout the app." />
         <Explain icon="apps" color={GOLD} text="Gold app icon: a gold icon on your Home Screen." />
-        <Explain icon="star" color={GOLD} text="Most hated: star players and teams on the Tracking tab. Their alerts in the Feed, and their games on the Scores tab, get a gold border." />
-        <Explain icon="heart" color={GOLD} text="Favorite teams: tap the heart on a team in Search to root for it. While it plays, you get its opponent's alerts for that game." />
+        <Explain mark="❌" text="Most hated: mark players and teams on the Tracking tab. Their alerts in the Feed get a red border, and their games on the Scores tab get one too." />
+        <Explain icon="heart" color={GOLD} text="Favorite teams: tap the heart on a team in Search to root for it. While it plays, you get its opponent's alerts for that game, with a gold border in the Feed, and its next game shows in Up next." />
       </View>
     ),
   },
@@ -289,10 +289,10 @@ function ToggleRow({ label, on, push, note }: { label: string; on: boolean; push
     </View>
   );
 }
-function Explain({ icon, text, color = colors.hate }: { icon: Icon; text: string; color?: string }) {
+function Explain({ icon, mark, text, color = colors.hate }: { icon?: Icon; mark?: string; text: string; color?: string }) {
   return (
     <View style={[styles.row, { alignItems: 'flex-start' }]}>
-      <Ionicons name={icon} size={18} color={color} style={{ marginTop: 2 }} />
+      {mark ? <Text style={{ fontSize: 16, lineHeight: 22, width: 18, textAlign: 'center' }}>{mark}</Text> : <Ionicons name={icon!} size={18} color={color} style={{ marginTop: 2 }} />}
       <Text style={[styles.body, { flex: 1, textAlign: 'left', marginTop: 0 }]}>{text}</Text>
     </View>
   );

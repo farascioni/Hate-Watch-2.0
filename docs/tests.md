@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 578 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 579 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 578 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 579 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 578 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 579 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 578 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 579 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -38,6 +38,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `abs-settle.test.ts` | A lost ABS challenge waits for the review to settle, with ESPN's real plays and ids from October 7, 2026 (Rays @ Yankees, CLE @ CHW), when three alerts went out for challenges that were won |
 | `alds-game5.test.ts` | White Sox at Guardians, ALDS Game 5 (October 10, 2026), from the fixture: the bases loaded as its own alert; a half-inning judged from its plays as they stand; "C. Montgomery" found among two Montgomerys; the loss's lines at the final; ELIMINATED on "their team lost"; no quality start; a lost ABS challenge surviving a stale read; a slow scoreboard still eliminating; a failed read logged |
 | `bills-rams.test.ts` | Bills at Rams, Monday Night Football (October 12, 2026), through a real tracker, with the game's own wording, for the two fixes its post game recording report found: a score that levels the game says so ("Rams tied the game, 34-34." as a line, no push, whether a field goal, a touchdown with its kick, or the extra point that arrives later levels it; not for a touchdown that ties only until its kick makes it a lead; once for a device with a player on the play too), a sack in a failed two-point try ("Matthew Stafford got sacked on the two-point try", a sack on a down unchanged), and a team's flags for its trackers ("Bills were flagged: Illegal Shift" with no player named; one alert for a device with the team and the player, or with the player named a poll later; never a push, even for installs that keep flags pushed; a flag on the team that was scored on never takes the pushed "took the lead" from it; a moved flag, a taken-off flag, two flags on a play, a declined and an offsetting one) |
+| `favorites.test.ts` | Plus favorite teams: the opponent's alerts in a favorite's game, push and feed, the tracker's settings winning, and a favorite's feed item carrying `fav` (the gold edge) |
 | `fiu-jxst.test.ts` | FIU at Jax State (October 13, 2026), through a real tracker, for the three fixes its post game recording report found: a college team's flag is a weak alert (the tying touchdown, the go-ahead field goal and the three-and-out keep their own alerts, the flag never pushes), and the alerts a football play still has take ESPN's rewrite of its words and score (a sack's yards, the extra point on a touchdown). |
 | `box-score.test.ts` | The game screen's box score (`boxscore.ts`): a table per stat group, away team first, the bad numbers marked for red |
 | `bundling.test.ts` | One alert per play per device (`bundleByPlay`): the team's and its players' alerts become one with lines; `alt` gives one line; a later fact goes on the alert already sent, without a push |
@@ -103,7 +104,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `ufc-classes.test.ts` | The UFC's weight classes and who heads each, and `/ufc/weight-classes` |
 | `ufc-preview.test.ts` | A UFC card's preview, before (Allen vs. Duncan, October 10 2026) and after (UFC 332), the calendar, the routes |
 | `ufc.test.ts` | The UFC: fighters as players, a card watched poll by poll, and what a fighter's haters get (UFC 332 and a Fight Night, 2026-10-03 and 09-26) |
-| `upnext.test.ts` | "Up next" from each tracked team's ESPN schedule, including "If Necessary" games and a season that's over |
+| `upnext.test.ts` | "Up next" from each tracked team's and each Plus favorite's ESPN schedule, including "If Necessary" games and a season that's over |
 | `wnba.test.ts` | The WNBA: every NBA alert under its own switches, from the same detectors (NY @ ATL, 2026-10-04) |
 
 **Scripts that read live ESPN.** These aren't run by `npm test`, and they need the network:

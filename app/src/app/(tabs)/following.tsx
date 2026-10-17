@@ -14,15 +14,15 @@ import { LayoutSheet } from '../../components/LayoutSheet';
 import { useTrackingLayout } from '../../lib/trackingLayout';
 import { gameInfo, teamKeyOf } from '../../lib/trackingInfo';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
-import { GOLD, colors, radius, space } from '../../theme';
+import { HATE_RED, colors, radius, space } from '../../theme';
 import type { Player, Target, Team } from '../../lib/types';
 
-/** Hate Watch Plus: marks one of your trackers as a most hated (a gold border on their alerts in the Feed). */
+/** Hate Watch Plus: marks one of your trackers as a most hated (a red border on their alerts in the Feed). */
 function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: boolean; compact?: boolean }) {
   const on = useIsMostHated(target.key);
   const press = () => {
     if (!allowed && !on) {
-      Alert.alert('Most hated is a Plus perk', 'Hate Watch Plus subscribers can star their most hated players and teams, and their alerts get a gold border in the Feed.', [
+      Alert.alert('Most hated is a Plus perk', 'Hate Watch Plus subscribers can mark their most hated players and teams with a red X, and their alerts get a red border in the Feed.', [
         { text: 'Not now', style: 'cancel' },
         { text: 'See Plus', onPress: () => router.navigate('/settings') },
       ]);
@@ -34,7 +34,7 @@ function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: 
   return (
     <Pressable onPress={press} hitSlop={8} style={[styles.icon, compact && styles.iconSm, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
       accessibilityLabel={on ? `Remove ${target.name} from your most hated` : `Add ${target.name} to your most hated`}>
-      <Ionicons name={on ? 'star' : 'star-outline'} size={compact ? 17 : 20} color={on ? GOLD : colors.text} />
+      {on ? <Text style={{ fontSize: compact ? 15 : 18, lineHeight: compact ? 17 : 20 }}>❌</Text> : <Ionicons name="close-outline" size={compact ? 17 : 20} color={colors.text} />}
     </Pressable>
   );
 }
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   layoutText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   iconSm: { padding: space(1.5) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
-  iconStar: { borderWidth: 1, borderColor: GOLD },
+  iconStar: { borderWidth: 1, borderColor: HATE_RED },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },
   unfollow: { marginLeft: 'auto', paddingHorizontal: space(3), paddingVertical: space(1), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },

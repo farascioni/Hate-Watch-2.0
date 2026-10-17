@@ -13,7 +13,7 @@ team.run('team:mlb:5', 'mlb', '5', 'Cleveland Guardians', 'Guardians', 'CLE');
 team.run('team:mlb:10', 'mlb', '10', 'New York Yankees', 'Yankees', 'NYY');
 loadCatalog();
 
-const { DEFAULT_PREFS, publish, setPushSender, setPrefs } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS, publish, setPushSender, setPrefs, feedItem } = await import('../src/fanout.ts');
 const { addFavorite, updateFavorite, registerGame, favoriteTeamKeys, removeFavorite } = await import('../src/favorites.ts');
 const { gameLostEvent } = await import('../src/detectors.ts');
 const { hateWatchTally, RECIPIENTS } = await import('../src/hate-watches.ts');
@@ -52,6 +52,13 @@ test("the Rays' favorite gets the Guardians' alert in tonight's game, pushed unl
 test('tracking the team wins: one row, a hate watcher’s, not a favorite’s', () => {
   assert.deepEqual(feed('both').map((r) => r.fav), [0]);
   assert.equal(feed('tracker').length, 1);
+});
+
+test('a favorite’s feed item carries fav (the app draws it with the gold edge); a tracker’s does not', () => {
+  const item = (dev: string) => feedItem(db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(dev, 'G1:p1:team.opponent_scored:5') as any) as { fav?: boolean };
+  assert.equal(item('fan').fav, true);
+  assert.equal(item('both').fav, undefined);
+  assert.equal(item('tracker').fav, undefined);
 });
 
 test('a favorite’s alert choices decide: a type switched off for this favorite is not delivered', () => {

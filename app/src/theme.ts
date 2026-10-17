@@ -13,6 +13,8 @@ export const gold = (() => {
 })();
 /** Gold, as the accent when switched on and as the most-hated star and border. */
 export const GOLD = '#E0A800';
+/** Brand red, fixed (unlike colors.hate, which turns gold with the accent): a most hated team's edge in the feed, as on the lock screen scoreboard. */
+export const HATE_RED = '#E5232B';
 export const setGold = (on: boolean) => (on ? SecureStore.setItemAsync(GOLD_KEY, '1') : SecureStore.deleteItemAsync(GOLD_KEY));
 
 export const colors = {

@@ -9,6 +9,7 @@ process.env.HW_DB = ':memory:';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { nextFromSchedule, refreshUpNext, upNextFor, staleUpNext, upNextDeps } = await import('../src/upnext.ts');
+const { addFavorite } = await import('../src/favorites.ts');
 const { urls } = await import('../src/leagues.ts');
 const { startApi } = await import('../src/api.ts');
 
@@ -81,5 +82,10 @@ test("a device's scores carry its teams' next games", async () => {
   await fetch(`${base}/me/follows/${encodeURIComponent('team:epl:364')}`, { method: 'PUT', headers: auth });
   const scores = await (await fetch(`${base}/me/scores`, { headers: auth })).json();
   assert.deepEqual(scores.upNext.map((n: any) => `${n.home.shortName} vs ${n.away.shortName} · ${n.tv}`), ['Liverpool vs Man City · NBC']);
+  // A Plus favorite's next game is listed too, though the team is not tracked.
+  const id = (db.prepare('SELECT id FROM devices').get() as { id: string }).id;
+  addFavorite(id, 'team:nba:1');
+  const withFav = await (await fetch(`${base}/me/scores`, { headers: auth })).json();
+  assert.deepEqual(withFav.upNext.map((n: any) => n.key), ['epl:m1', 'nba:r1']);
   server.close();
 });

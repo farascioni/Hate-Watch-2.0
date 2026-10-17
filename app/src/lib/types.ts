@@ -51,6 +51,8 @@ export interface FeedItem {
   shareStyles?: { id: string; label: string; url: string; image: string }[];
   /** The game (F1: session) it happened in, if any: links the alert to the Scores tab's game screen. */
   gameId?: string | null;
+  /** True on a Plus favorite's copy: the opponent's alert in a favorite's game. The Feed tab edges it in gold. */
+  fav?: boolean;
   /** A Successful Hate Watch: how many other people got this alert too. */
   alsoGot?: number;
   /** Recent misery only: a loss, which says "Successful Hate Watch!" for a viewer who tracks the team or player (the server's title leaves it off). */

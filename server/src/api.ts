@@ -205,13 +205,13 @@ route('DELETE', '/me/live-activity', true, (req) => { deleteLiveActivity(req.dev
 
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
 // upNext: each of the device's teams' next game (the app leaves out any already on the tab as a card).
-route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend(), upNext: upNextFor(deviceTeams(req.deviceId!).teams) }));
+route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend(), upNext: upNextFor([...deviceTeams(req.deviceId!).teams, ...favoritesOf(req.deviceId!).map((f) => f.team_key)]) }));
 // "All games" on the Scores tab: every game live now or starting within a day, tracked or not.
 route('GET', '/me/scores/all', true, (req) => ({ games: withHateWatch(req.deviceId!, allGames()) }));
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');
-  const rows = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
+  const rows = db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[];
   const detail = await gameDetail(game).catch(() => null); // the score card still works if ESPN hiccups
   const mine = new Set(rows.map((r) => JSON.parse(r.meta ?? 'null')?.playId).filter(Boolean).map(String)); // the plays that sent this device alerts
@@ -247,7 +247,7 @@ route('GET', '/me/feed', true, (req, url) => {
   const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
   const after = Number(url.searchParams.get('after') ?? 0);
   const target = url.searchParams.get('target'); // one player's or team's alerts (their page's "Recent misery")
-  const rows = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
+  const rows = db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND f.occurred_at < ? AND f.occurred_at > ?${target ? ` AND e.target_key = ? AND e.type != '${RECAP_TYPE}'` : ''}
     ORDER BY f.occurred_at DESC, e.detected_at DESC LIMIT ?`)
     .all(req.deviceId!, before, after, ...(target ? [target] : []), limit) as any[];

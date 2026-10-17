@@ -307,7 +307,7 @@ export const withLines = (body: string, lines: string[] | null | undefined) => (
  * then says how many others got it too (`alsoGot`, the reader not counted). `extra`: the feed row's lines
  * for this device (other facts of the moment, folded in).
  */
-export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null; clip?: string | null }) {
+export function feedItem(row: { id: string; type: string; league: string; target_key: string; title: string; body: string; occurred_at: number; detected_at: number; meta: string | null; share_code?: string | null; game_id?: string | null; recipients?: number; extra?: string | null; clip?: string | null; fav?: number | null }) {
   const meta = row.meta ? JSON.parse(row.meta) : null;
   const t = EVENT_TYPE_BY_ID.get(row.type) ?? (row.type === NOTICE_TYPE ? noticeLook(meta) : undefined);
   const clip = clipShown(row.clip ? JSON.parse(row.clip) : null, meta); // its play's clip, while ESPN has it up and clips are on
@@ -317,6 +317,7 @@ export function feedItem(row: { id: string; type: string; league: string; target
     ...(clip ? { clip } : {}),
     ...(row.recipients != null && isLossAlert({ type: row.type, meta }) ? { alsoGot: Math.max(0, row.recipients - 1) } : {}),
     ...(row.type === NOTICE_TYPE && meta?.urgent ? { urgent: true } : {}),
+    ...(row.fav ? { fav: true } : {}), // a Plus favorite's copy (the opponent's alert in its game): the feed draws it with the gold edge
     id: row.id, type: row.type, emoji: t?.emoji ?? '😈', typeLabel: t?.label ?? row.type, league: row.league,
     gameId: row.game_id ?? null, // the game (F1: session) it happened in, for the Scores tab's game screen
     title: row.title, body: withLines(row.body, row.extra ? JSON.parse(row.extra) : null), occurredAt: row.occurred_at, detectedAt: row.detected_at,
@@ -554,7 +555,8 @@ export function publish(events: Detected[], league: League) {
       const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null, f.fav ? 1 : 0);
       const body = withLines(e.body, lines);
-      for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length ? JSON.stringify({ kind: 'event', item: { ...item, body } }) : frame);
+      const own = f.fav ? { ...item, fav: true } : item;
+      for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length || f.fav ? JSON.stringify({ kind: 'event', item: lines.length ? { ...own, body } : own }) : frame);
       if (willPush) pushes.push({
         to: f.push_token!, title: `${item.emoji} ${e.title}`, body, sound: prefs.sound ? 'default' : null,
         priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive', threadId: pushThread(e.targetKey),
@@ -584,14 +586,14 @@ function addLateLine(deviceId: string, eventId: string, line: string) {
   if (had.includes(line)) return;
   const lines = [...had, line];
   db.prepare('UPDATE feed SET extra = ? WHERE device_id = ? AND event_id = ?').run(JSON.stringify(lines), deviceId, eventId);
-  const item = db.prepare(`SELECT e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(deviceId, eventId) as Parameters<typeof feedItem>[0];
+  const item = db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(deviceId, eventId) as Parameters<typeof feedItem>[0];
   for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(item) }));
   console.log(`[event] late line on ${eventId} for ${deviceId.slice(0, 6)}…: ${line}`);
 }
 
 /** An alert changed after it went out (a clip of its play came): each feed that has it gets it again, live. No push. */
 export function eventChanged(eventId: string) {
-  const rows = db.prepare(`SELECT f.device_id, e.*, f.extra, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.event_id = ?`).all(eventId) as (Parameters<typeof feedItem>[0] & { device_id: string })[];
+  const rows = db.prepare(`SELECT f.device_id, e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.event_id = ?`).all(eventId) as (Parameters<typeof feedItem>[0] & { device_id: string })[];
   for (const r of rows) for (const ws of sockets.get(r.device_id) ?? []) ws.send(JSON.stringify({ kind: 'eventUpdate', item: feedItem(r) }));
 }
 

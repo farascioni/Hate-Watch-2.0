@@ -50,7 +50,7 @@ test('favorites first, then most hated, then tracked; finals for 10 minutes; gam
   assert.equal(b.more, 0);
   assert.deepEqual(b.games[0], { k: rays, a: 'MIA', as: 1, h: 'TB', hs: 2, st: 'Top 3rd', live: true, t: 0, l: '♥ MIA 1  TB 2', r: 'Top 3rd', lc: '#F5C451', rc: '#E5232B', ac: '#FFFFFF', hc: '#F5C451', am: '', hm: '♥ ' });
   assert.deepEqual([b.v, b.mt], [1, ''], 'the version, and no "+N more" line');
-  assert.deepEqual([b.games[1].l, b.games[1].lc], ['★ DET 0  CLE 0', '#E5232B']);
+  assert.deepEqual([b.games[1].l, b.games[1].lc], ['❌ DET 0  CLE 0', '#E5232B']);
   assert.deepEqual([b.games[2].l, b.games[2].lc], ['BOS 0  NYY 0', '#FFFFFF']);
   assert.equal(b.games[3].st, 'Final');
 });
@@ -62,19 +62,19 @@ test('a starred player stands for his team', () => {
   assert.deepEqual(buildBoard('dev')!.games.map((g) => g.t), [0, 1, 2, 2], 'the Yankees game moves up to most hated');
   assert.equal(buildBoard('dev')!.games[1].a, 'BOS');
   const g1 = buildBoard('dev')!.games[1];
-  assert.deepEqual([g1.ac, g1.am, g1.hc, g1.hm], ['#FFFFFF', '', '#E5232B', '★ '], "BOS@NYY: the player's team gets the star and red");
+  assert.deepEqual([g1.ac, g1.am, g1.hc, g1.hm], ['#FFFFFF', '', '#E5232B', '❌ '], "BOS@NYY: the player's team gets the red X");
   putLiveActivity('dev', { mostHated: [T.CLE] });
 });
 
 test('each team has its own color and mark: favorite gold with a heart, most hated red with a star, the rest white', () => {
   const b = buildBoard('dev')!;
   const look = (g: (typeof b.games)[number]) => [g.ac, g.am, g.hc, g.hm];
-  assert.deepEqual(look(b.games[1]), ['#FFFFFF', '', '#E5232B', '★ '], 'DET@CLE: only the most hated side is red, the other white');
+  assert.deepEqual(look(b.games[1]), ['#FFFFFF', '', '#E5232B', '❌ '], 'DET@CLE: only the most hated side is red, the other white');
   assert.deepEqual(look(b.games[2]), ['#FFFFFF', '', '#FFFFFF', ''], 'a game of tracked teams has no mark');
   db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev3', 's', 'ios', '{}');
   addFavorite('dev3', T.TB);
   putLiveActivity('dev3', { mostHated: [T.MIA, T.TB] }); // TB is both: the favorite wins
-  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '★ ', '#F5C451', '♥ '], 'MIA@TB: each team its own, a favorite that is also hated stays gold');
+  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '❌ ', '#F5C451', '♥ '], 'MIA@TB: each team its own, a favorite that is also hated stays gold');
 });
 
 test('past four games the rest are counted, and the payload stays small', () => {

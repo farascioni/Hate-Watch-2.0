@@ -6,7 +6,7 @@ import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
 import { useAnyMostHated } from '../lib/mostHated';
 import { fromGrid, gameTargetKeys, hateTag, loseChance, statusLine, stopsText, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
-import { GOLD, colors, radius, space } from '../theme';
+import { HATE_RED, colors, radius, space } from '../theme';
 import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 
@@ -244,7 +244,7 @@ export function Bases({ bases, count }: { bases: NonNullable<GameCard['bases']>;
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: space(3), marginBottom: space(2), padding: space(3), gap: space(2), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
-  mostHated: { borderColor: GOLD, borderWidth: 2 },
+  mostHated: { borderColor: HATE_RED, borderWidth: 2 },
   bigCard: { marginTop: space(3), padding: space(4) },
   team: { flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
   // Around a team's name: only as wide as the name, so the space after it still opens the game.

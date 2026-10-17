@@ -27,7 +27,7 @@ type Props = { v?: number; lay?: number; games: Game[]; more: number; mt?: strin
 
 const ScoreboardActivity = (props: Props) => {
   'widget';
-  const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '★ ' : '');
+  const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '❌ ' : '');
   const score = (n: number | null) => (n === null ? '-' : String(n));
   const base = (g: Game) => g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451');
   const awayColor = (g: Game) => g.ac ?? base(g);

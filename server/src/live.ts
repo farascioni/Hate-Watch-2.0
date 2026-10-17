@@ -1474,7 +1474,7 @@ class LiveEngine {
     every(CFB_POLL_MS, () => scanCfbPoll()); // college football's AP Top 25: see cfb-poll.ts
     every(RECAP_MS, async () => weeklyRecaps());
     for (const lg of LEAGUE_IDS) if (!TEAMS_ONLY.has(lg)) every(NEWS_MS, () => scanNews(lg));
-    this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
+    this.upNextKick = startUpNext(() => new Set([...watchedTeamKeys(), ...favoriteTeamKeys()])); // the Scores tab's "Up next": tracked teams and Plus favorites
   }
 
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */
