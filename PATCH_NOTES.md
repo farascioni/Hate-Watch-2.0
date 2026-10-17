@@ -7,7 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
-## Build 16 (October 17, 2026)
+## Build 18 (October 17, 2026)
 
 LOCK SCREEN SCOREBOARD
 - New in Settings, Delivery: Lock screen scoreboard (off until you switch it on; needs this build). A live scoreboard on the lock screen lists the live games of your teams: favorite teams first, then most hated, then the rest, with "+N more" past four games. Finals stay for 10 minutes.
