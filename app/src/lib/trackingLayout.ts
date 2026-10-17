@@ -3,13 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * How the Tracking tab draws its cards, picked in the tab's layout menu. Kept on this device only.
- * classic: the banner card; compact: colour bar, status on the right; banner: the game in the banner;
+ * classic: the banner card; compact: the "Colour bar" card (its id stays so saved choices keep working), status on the right; banner: the game in the banner;
  * tiles: two per row; strip: a scoreboard strip of record, form and the game.
  */
 export type TrackingLayout = 'classic' | 'compact' | 'banner' | 'tiles' | 'strip';
 export const LAYOUTS: { id: TrackingLayout; name: string; blurb: string }[] = [
   { id: 'classic', name: 'Classic', blurb: 'A banner in the team’s colour' },
-  { id: 'compact', name: 'Compact', blurb: 'Colour bar, the game on the right' },
+  { id: 'compact', name: 'Colour bar', blurb: 'A bar in the team’s colour, the game on the right' },
   { id: 'banner', name: 'Banner game', blurb: 'The banner carries the game' },
   { id: 'tiles', name: 'Tiles', blurb: 'Two per row, the most on screen' },
   { id: 'strip', name: 'Scoreboard', blurb: 'Record, form and game in a strip' },

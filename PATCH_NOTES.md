@@ -14,7 +14,7 @@ STARTUP GUIDE
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
 
 TRACKING TAB
-- A new Layout button in the top right of the page lets you choose how the cards look: Classic (the default; anyone who picked a look keeps it), Compact, Banner game, Tiles (two per row) or Scoreboard. The four denser ones also show the team's record and winning or losing streak (in the playoffs, the playoff streak), and its live, next or last game. Your choice is kept on your phone. (Update)
+- A new Layout button in the top right of the page lets you choose how the cards look: Classic (the default; anyone who picked a look keeps it), Colour bar, Banner game, Tiles (two per row) or Scoreboard. The other four also show the team's record and winning or losing streak (in the playoffs, the playoff streak), and its live, next or last game. Your choice is kept on your phone. (Update)
 - College football teams now show their record and winning or losing streak on the denser cards, plus where they stand in their conference (for example "3-0 in conference, T-1st"). (Update)
 - NBA teams and players now show their record and winning or losing streak on the cards, preseason included. F1 constructors show their place in the constructors' championship ("2nd in constructors") and points, and F1 drivers show their own place in the drivers' championship ("3rd in drivers") and points. A long conference standing wraps onto its own line so the gear and close buttons stay on the card. (Update)
 - Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
