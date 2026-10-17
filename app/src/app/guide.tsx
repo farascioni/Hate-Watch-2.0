@@ -169,10 +169,6 @@ const PAGES: Page[] = [
     ),
   },
   {
-    key: 'done', icon: 'checkmark-circle', title: "You're all set",
-    body: 'You can watch this guide again any time from Settings.',
-  },
-  {
     key: 'plus', icon: 'star', where: 'Settings tab', title: 'Hate Watch Plus',
     body: "A monthly subscription that keeps the servers running and the app ad free. It unlocks four extras, under Support Hate Watch in Settings:",
     demo: () => (
@@ -183,6 +179,10 @@ const PAGES: Page[] = [
         <Explain icon="heart" color={GOLD} text="Favorite teams: tap the heart on a team in Search to root for it. While it plays, you get its opponent's alerts for that game." />
       </View>
     ),
+  },
+  {
+    key: 'done', icon: 'checkmark-circle', title: "You're all set",
+    body: 'You can watch this guide again any time from Settings.',
   },
 ];
 
