@@ -75,6 +75,7 @@ export default function FollowingScreen() {
       renderItem={({ item }) => (
         <TargetRow
           target={item}
+          wrapName // a long name wraps instead of cutting off, and the buttons sit under it
           right={
             <View style={styles.actions}>
               <MostHatedStar target={item} allowed={starAllowed} />
@@ -108,7 +109,7 @@ export default function FollowingScreen() {
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(2) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
   iconStar: { borderWidth: 1, borderColor: GOLD },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },

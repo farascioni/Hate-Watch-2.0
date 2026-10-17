@@ -126,19 +126,21 @@ export function HaterCount({ target, size = 12 }: { target: Target; size?: numbe
 }
 
 /** A player or team in a list, with how many people hate them. `extra` replaces that line. */
-export function TargetRow({ target, right, extra }: { target: Target; right?: ReactNode; extra?: ReactNode }) {
+export function TargetRow({ target, right, extra, wrapName }: { target: Target; right?: ReactNode; extra?: ReactNode; wrapName?: boolean }) {
   return (
     <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Avatar target={target} size={48} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{target.name}</Text>
+        <Text style={styles.rowTitle} numberOfLines={wrapName ? undefined : 1}>{target.name}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
           <LeagueTag league={target.league} />
           <Text style={styles.rowSub} numberOfLines={1}>{subtitle(target)}</Text>
         </View>
         {extra ?? <HaterCount target={target} />}
+        {/* wrapName: the name wraps, and wide controls drop under it so the name keeps the row's width */}
+        {wrapName && right ? <View style={{ marginTop: space(2), alignSelf: 'flex-start' }}>{right}</View> : null}
       </View>
-      {right ?? <FollowButton target={target} />}
+      {wrapName && right ? null : right ?? <FollowButton target={target} />}
     </Pressable>
   );
 }
