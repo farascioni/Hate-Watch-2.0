@@ -7,6 +7,9 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+HATE WATCH PLUS
+- The league you pick in the filter (NBA, MLB, F1 and the rest, and the full league list) lights up gold for subscribers instead of that league's color. (Update)
+
 STARTUP GUIDE
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
 

@@ -4,14 +4,17 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar, readableOn } from './Avatar';
 import { useStore } from '../lib/store';
-import { colors, radius, space } from '../theme';
+import { GOLD, colors, radius, space } from '../theme';
+import { usePlus } from '../lib/plus';
 import type { Target } from '../lib/types';
 import { leagueColor } from '../lib/leagueUi';
 
 export function Chip({ label, active, onPress, color, style, accessibilityLabel }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
+  const { active: plus } = usePlus();
+  const fill = color && plus ? GOLD : color; // a chip with its own colour (a league) turns gold for Plus subscribers
   return (
-    <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }} accessibilityLabel={accessibilityLabel}>
-      <Text style={[styles.chipText, active && { color: color ? '#fff' : colors.onHate }]} numberOfLines={1}>{label}</Text>
+    <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: fill ?? colors.hate, borderColor: fill ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }} accessibilityLabel={accessibilityLabel}>
+      <Text style={[styles.chipText, active && { color: fill ? (fill === GOLD ? '#1A1200' : '#fff') : colors.onHate }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
