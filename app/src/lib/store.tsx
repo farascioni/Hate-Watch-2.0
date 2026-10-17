@@ -7,6 +7,7 @@ import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
+import { onLapse } from './plus';
 import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, Team, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -131,6 +132,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setPrefs(p);
     loaded.current = true;
   }, []);
+  // A lapsed Plus subscription has had its favorites cleared on the server (lapsePlus): drop ours too.
+  useEffect(() => onLapse(() => setFavorites(new Map())), []);
   const loadCoreRef = useRef(loadCore);
   loadCoreRef.current = loadCore;
   const leagueInfo = useCallback((id: string) => leagues.find((l) => l.id === id), [leagues]);

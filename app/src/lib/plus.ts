@@ -73,12 +73,18 @@ export const setDevPlus = (on: boolean) => {
 const devSubscribe = (l: () => void) => { devListeners.add(l); return () => { devListeners.delete(l); }; };
 export const useDevPlus = () => useSyncExternalStore(devSubscribe, () => __DEV__ && devOn);
 
+/** The store (lib/store.tsx) listens here to drop its copy of the favorites when a subscription lapses. */
+const lapseListeners = new Set<() => void>();
+export const onLapse = (l: () => void) => { lapseListeners.add(l); return () => { lapseListeners.delete(l); }; };
+
 /** A definite "not subscribed": gold goes back to red, the colours and the icon. Whatever was undone can only be redone by subscribing. */
 export async function lapsePlus() {
   await devLoaded;
   if (__DEV__ && devOn) return;
   clearMostHated();
-  api.clearFavorites().catch(() => {}); // the server stops sending their opponents' alerts
+  lapseListeners.forEach((l) => l());
+  // The server stops sending their opponents' alerts. A failed call (offline) is retried at the next launch or return to the app, while still lapsed.
+  api.clearFavorites().catch(() => {});
   // Colours first: changing the icon can close the app on Android before a later step runs.
   if (gold) await setGold(false).catch(() => {});
   if (goldIconOn()) await setGoldIcon(false).catch(() => {});

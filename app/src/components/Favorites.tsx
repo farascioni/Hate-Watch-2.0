@@ -15,7 +15,7 @@ export function Favorites() {
   const { favorites, updateFavorite, removeFavorite } = useStore();
   const { active } = usePlus();
   const list = [...favorites.values()].filter((f) => f.target).sort((a, b) => a.favoritedAt - b.favoritedAt);
-  if (!list.length && !active) {
+  if (!active) {
     return (
       <View style={[styles.card, styles.locked]}>
         <Text style={styles.title}>

@@ -1,6 +1,6 @@
 // Only loaded when expo-iap's native module is present (see app/_layout.tsx).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { isUserCancelledError, useIAP } from 'expo-iap';
 import { LEGACY_TIP_SKUS, PLUS_SKU, PlusContext, lapsePlus, type Plus } from '../lib/plus';
@@ -58,6 +58,15 @@ export function PlusStore({ children }: { children: ReactNode }) {
       if (yes === false) lapsePlus();
     });
   }, [connected, fetchProducts, refresh]);
+
+  // A cancelled or unrenewed subscription is noticed when the app returns to the foreground, not only at launch.
+  useEffect(() => {
+    if (!connected) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') refresh().then((yes) => { if (yes === false) lapsePlus(); });
+    });
+    return () => sub.remove();
+  }, [connected, refresh]);
 
   const product = subscriptions.find((p) => p.id === PLUS_SKU);
 

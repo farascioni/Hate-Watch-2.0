@@ -13,8 +13,8 @@ export function FavoriteButton({ target }: { target: Target }) {
   const { favorites, addFavorite, removeFavorite } = useStore();
   const { active } = usePlus();
   const on = favorites.has(target.key);
-  // Hidden without Plus; a lapsed subscriber who still has this favorite keeps the heart to remove it.
-  if (target.kind !== 'team' || target.league === 'f1' || target.league === 'ufc' || (!active && !on)) return null;
+  // Hidden until subscribed: a lapsed subscription has already cleared the favorites (lapsePlus).
+  if (target.kind !== 'team' || target.league === 'f1' || target.league === 'ufc' || !active) return null;
   const press = () => (on ? removeFavorite(target.key) : addFavorite(target)).catch(() => Alert.alert("Couldn't update favorites", 'Please try again.'));
   return (
     <Pressable onPress={press} hitSlop={8} style={[styles.icon, on && styles.on]} accessibilityRole="button" accessibilityState={{ selected: on }}

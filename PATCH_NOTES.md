@@ -13,6 +13,7 @@ HATE WATCH PLUS
 - On the Scores tab, a game's card gets a gold border while a team on your most hated list is playing, or the team of a player on it (or, in F1, a driver or constructor on it). (Update)
 
 STARTUP GUIDE
+- Hate Watch Plus that is cancelled or not renewed now ends everything it gave: favorite teams are removed and their hearts hidden, the most hated list is emptied and gold goes back to red. The app checks each time you return to it, not only at launch. (Update)
 - A new last page of the guide explains Hate Watch Plus and its four extras: gold accents, gold app icon, most hated and favorite teams. (Update)
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
 
