@@ -217,6 +217,10 @@ export interface GameDetail { game: GameCard; alerts: FeedItem[]; plays: PlayLin
 /** Settings counter: each time a team or UFC fighter you track lost (F1: your constructor scored no points), and per team (most first). */
 export interface HateWatchTally { total: number; teams: { target: Target; count: number }[] }
 
+/** Hate Watch Plus: a team you root for. Its current opponent's alerts reach you for that game only; `types` / `pushTypes` are your choices for them (alert type id → on/off). */
+export interface Favorite { key: string; favoritedAt: number; push: boolean; types: Record<string, boolean>; pushTypes: Record<string, boolean>; target: Team | null }
+export interface FavoritePatch { push?: boolean; types?: Record<string, boolean | null>; pushTypes?: Record<string, boolean | null> }
+
 /** The leaderboard: a player or team and how many people track them. `rank` is within the filter; ties share it (`tied`: shown "T-2"). */
 export interface LeaderboardEntry { rank: number; tied?: boolean; haters: number; target: Target }
 /** The top 100 in a filter. `total`: everyone in it; `moreTied`: tied with the last one shown but past the cut. Missing from older servers. */

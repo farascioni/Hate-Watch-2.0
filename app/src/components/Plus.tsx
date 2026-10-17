@@ -5,7 +5,7 @@ import { EULA_URL, MANAGE_URL, applyGold, goldIconOn, goldIconSupported, iapAvai
 import { SettingRow } from './SettingRow';
 import { colors, gold, radius, space } from '../theme';
 
-const BLURB = "Servers cost money and I'd like to keep the app ad free! Subscribing unlocks gold accents, a gold app icon, and the ability to add teams and athletes to your most hated list.";
+const BLURB = "Servers cost money and I'd like to keep the app ad free! Subscribing unlocks gold accents, a gold app icon, the ability to add teams and athletes to your most hated list, and favorite teams: root for a team and get its opponent's alerts for that game.";
 
 const open = (url: string) => Linking.openURL(url).catch(() => {});
 

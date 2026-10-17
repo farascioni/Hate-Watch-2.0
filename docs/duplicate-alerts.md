@@ -592,6 +592,7 @@ This is one reason for the decision **"No production restarts during live games"
 
 ## Known gaps
 
+- **A favorite team's copy** (`recipients()` adds `favoriters(opponentOf(...))`, `docs/favorites.md`) goes through the same moment rules, once per device: a device that tracks the team gets the ordinary alert, not a second copy for the favorite. The game registry (`registerGame`) is in memory, so after a restart a favorite gets nothing for a game until its tracker attaches again and registers it.
 - **Pushes have no collapse id.** Only the database rows keep a push single. A second `publish` of an id sends
   nothing, but code that pushed without going through `publish` would not be caught by anything.
 - **Text-keyed MLB ids** depend on ESPN's text staying the same. A re-judged rewritten result would make a new id,

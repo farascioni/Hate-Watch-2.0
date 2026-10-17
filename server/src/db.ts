@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS follows (
 );
 CREATE INDEX IF NOT EXISTS follows_target ON follows(target_key);
 
+-- Hate Watch Plus favorites: a team the device roots for. Not tracked: the alerts about whoever plays it in a game
+-- go to the device for that game only (favorites.ts). types / push_types are that team's own choices (typeId → on/off).
+CREATE TABLE IF NOT EXISTS favorites (
+  device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  team_key TEXT NOT NULL, created_at INTEGER NOT NULL,
+  push INTEGER NOT NULL DEFAULT 1, types TEXT NOT NULL DEFAULT '{}', push_types TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (device_id, team_key)
+);
+CREATE INDEX IF NOT EXISTS favorites_team ON favorites(team_key);
+
 -- id is a deterministic dedupe key (e.g. game:play:type:athlete) so re-polls never double-notify.
 -- share_code is the short public code in the alert's share link (/a/<code>), see shareCode().
 CREATE TABLE IF NOT EXISTS events (
@@ -90,6 +100,10 @@ if (!(db.prepare('PRAGMA table_info(events)').all() as { name: string }[]).some(
 // One device's lines on a feed alert: other facts of its moment folded into it (Detected.fold), as JSON.
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'extra')) {
   db.exec('ALTER TABLE feed ADD COLUMN extra TEXT');
+}
+// 1 on a favorite's row (favorites.ts): the device roots against this team's opponent, so it isn't a Successful Hate Watch and isn't counted in "N others got it" (RECIPIENTS).
+if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'fav')) {
+  db.exec('ALTER TABLE feed ADD COLUMN fav INTEGER NOT NULL DEFAULT 0');
 }
 {
   const missing = db.prepare('SELECT id FROM events WHERE share_code IS NULL').all() as { id: string }[];

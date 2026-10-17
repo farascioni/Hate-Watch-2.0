@@ -7,7 +7,7 @@ import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
-import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo, NextGame } from './types';
+import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, Team, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
 
@@ -40,6 +40,12 @@ interface Store {
   noteTrackers: (items: { key: string; haters?: number }[]) => void;
   isFollowing: (key: string) => boolean;
   toggleFollow: (t: Target) => Promise<void>;
+
+  /** Hate Watch Plus: the teams you root for (not tracked; their opponents' alerts reach you for one game). */
+  favorites: Map<string, Favorite>;
+  addFavorite: (t: Team) => Promise<void>;
+  removeFavorite: (key: string) => Promise<void>;
+  updateFavorite: (key: string, patch: FavoritePatch) => Promise<void>;
 
   prefs: Prefs | null;
   updatePrefs: (patch: PrefsPatch) => Promise<void>;
@@ -100,6 +106,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [upNext, setUpNext] = useState<NextGame[]>([]);
   const [unseen, setUnseen] = useState(0);
   const [follows, setFollows] = useState<Map<string, Target>>(new Map());
+  const [favorites, setFavorites] = useState<Map<string, Favorite>>(new Map());
   const [trackers, setTrackers] = useState<Map<string, number>>(new Map());
   const countsFrom = (list: { key: string; trackers?: number }[]) => new Map(list.filter((x) => x.trackers != null).map((x) => [x.key, x.trackers!]));
   // Merged, not replaced: the map also holds counts for players and teams you looked at but don't track.
@@ -114,12 +121,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   /** The initial load has worked (see "Initial load"). */
   const loaded = useRef(false);
   const loadCore = useCallback(async () => {
-    const [cat, f, p] = await Promise.all([api.eventTypes(), api.follows(), api.prefs()]);
+    const [cat, f, p, fav] = await Promise.all([api.eventTypes(), api.follows(), api.prefs(), api.favorites().catch(() => ({ favorites: [] as Favorite[] }))]);
     setEventTypes(cat.types);
     setLeagueUi(cat.leagues); // before the re-render the leagues bring, so it reads the server's look
     setLeagues(cat.leagues);
     setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
     setTrackers(countsFrom(f.follows));
+    setFavorites(new Map(fav.favorites.map((x) => [x.key, x])));
     setPrefs(p);
     loaded.current = true;
   }, []);
@@ -228,7 +236,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
+    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -251,6 +259,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         refreshScores().catch(() => {});
       }
       catch { setFollows((m) => { const n = new Map(m); was ? n.set(t.key, t) : n.delete(t.key); return n; }); }
+    },
+    addFavorite: async (t) => {
+      Haptics.selectionAsync().catch(() => {});
+      const { favorite } = await api.addFavorite(t.key);
+      setFavorites((m) => new Map(m).set(favorite.key, favorite));
+    },
+    removeFavorite: async (key) => {
+      const was = favorites.get(key);
+      setFavorites((m) => { const n = new Map(m); n.delete(key); return n; });
+      try { await api.removeFavorite(key); }
+      catch (e) { if (was) setFavorites((m) => new Map(m).set(key, was)); throw e; }
+    },
+    updateFavorite: async (key, patch) => {
+      // Optimistic like updatePrefs: null clears a choice; then take the server's copy.
+      const merge = (cur: Record<string, boolean>, p?: Record<string, boolean | null>) => {
+        const out = { ...cur };
+        for (const [id, v] of Object.entries(p ?? {})) { if (v === null) delete out[id]; else out[id] = v; }
+        return out;
+      };
+      setFavorites((m) => {
+        const f = m.get(key);
+        return f ? new Map(m).set(key, { ...f, push: patch.push ?? f.push, types: merge(f.types, patch.types), pushTypes: merge(f.pushTypes, patch.pushTypes) }) : m;
+      });
+      const { favorite } = await api.updateFavorite(key, patch);
+      setFavorites((m) => (m.has(key) ? new Map(m).set(key, favorite) : m));
     },
     updatePrefs: async (patch) => {
       // Optimistic: apply locally right away (same merge rules as the server), then take the server's copy.
@@ -275,6 +308,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await forgetToken();
       clearMostHated();
       setFollows(new Map());
+      setFavorites(new Map());
       setTrackers(new Map());
       setFeed([]);
       setUnseen(0);
@@ -283,7 +317,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, push, refreshFeed, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, refreshFeed, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

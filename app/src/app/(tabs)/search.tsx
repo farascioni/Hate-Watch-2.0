@@ -3,7 +3,8 @@ import { ActivityIndicator, Platform, Pressable, SectionList, StyleSheet, TextIn
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
-import { TargetRow, SectionHeader } from '../../components/ui';
+import { FollowButton, TargetRow, SectionHeader } from '../../components/ui';
+import { FavoriteButton } from '../../components/FavoriteButton';
 import { FilterBar, byWeightClass, groupByWeightClass, kindOf, playersWord, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Player, Target, Team, WeightClass } from '../../lib/types';
@@ -136,7 +137,7 @@ export default function SearchScreen() {
       <SectionList<Target, { title: string }>
         sections={sections}
         keyExtractor={(t) => t.key}
-        renderItem={({ item }) => <TargetRow target={item} />}
+        renderItem={({ item }) => <TargetRow target={item} right={<View style={styles.rowActions}><FavoriteButton target={item} /><FollowButton target={item} /></View>} />}
         renderSectionHeader={({ section }) => (section.title ? <SectionHeader>{section.title}{byDivision && showTeams ? ` · ${section.data.length}` : ''}</SectionHeader> : null)}
         ListHeaderComponent={classes && browsing && sections.length ? <Text style={styles.hint}>Each class's champion, then whoever has headlined and won the most lately. Type a name to find anyone else.</Text> : null}
         stickySectionHeadersEnabled={false}
@@ -155,6 +156,7 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: space(2), margin: space(3), marginBottom: space(2), paddingHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   // The browser focus ring is replaced by the red searchBox border above (web only; no-op on native).
   input: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: space(3), ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null) },

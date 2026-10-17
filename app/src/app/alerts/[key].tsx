@@ -13,12 +13,16 @@ import { leagueColor } from '../../lib/leagueUi';
 /**
  * Alert choices for ONE tracked player or team. Anything set here beats the global Settings tab for
  * this target only (e.g. no interception alerts for Daniel Jones while every other QB still sends them).
+ * With `?fav=1` it is a Hate Watch Plus favorite instead: the same alerts, but the ones about the favorite's
+ * opponent while they play, kept on the favorite (not in prefs.targetTypes).
  */
 export default function TargetAlertsScreen() {
-  const { key } = useLocalSearchParams<{ key: string }>();
+  const { key, fav } = useLocalSearchParams<{ key: string; fav?: string }>();
+  const isFav = fav === '1';
   const targetKey = decodeURIComponent(key);
-  const { follows, prefs, updatePrefs, eventTypes, refreshScores } = useStore();
-  const target = follows.get(targetKey);
+  const { follows, favorites, updateFavorite, prefs, updatePrefs, eventTypes, refreshScores } = useStore();
+  const favorite = isFav ? favorites.get(targetKey) : undefined;
+  const target = isFav ? favorite?.target ?? undefined : follows.get(targetKey);
 
   // Only the alerts that can actually fire for this kind of target in this league, and for a player, at
   // their positions: a pitcher has no hitting alerts, a skater no goalie ones (lib/positions.ts).
@@ -34,22 +38,23 @@ export default function TargetAlertsScreen() {
   }, [eventTypes, target]);
 
   if (!target || !prefs) {
-    return <View style={styles.center}><Text style={styles.dim}>You're no longer tracking this player or team.</Text></View>;
+    return <View style={styles.center}><Text style={styles.dim}>{isFav ? 'This team is no longer one of your favorites.' : "You're no longer tracking this player or team."}</Text></View>;
   }
 
-  const own = prefs.targetTypes?.[targetKey] ?? {};
-  const ownPush = prefs.targetPushTypes?.[targetKey] ?? {};
+  const own = (isFav ? favorite?.types : prefs.targetTypes?.[targetKey]) ?? {};
+  const ownPush = (isFav ? favorite?.pushTypes : prefs.targetPushTypes?.[targetKey]) ?? {};
   const globalOn = (t: EventType) => prefs.leagues[target.league] !== false && (prefs.types[t.id] ?? t.defaultOn);
   const globalPush = (t: EventType) => prefs.pushTypes?.[t.id] ?? t.defaultPush ?? true;
-  const setOne = (typeId: string, value: boolean | null) => updatePrefs({ targetTypes: { [targetKey]: { [typeId]: value } } });
-  const setPush = (typeId: string, value: boolean | null) => updatePrefs({ targetPushTypes: { [targetKey]: { [typeId]: value } } });
+  const setOne = (typeId: string, value: boolean | null) => (isFav ? updateFavorite(targetKey, { types: { [typeId]: value } }).catch(() => {}) : updatePrefs({ targetTypes: { [targetKey]: { [typeId]: value } } }));
+  const setPush = (typeId: string, value: boolean | null) => (isFav ? updateFavorite(targetKey, { pushTypes: { [typeId]: value } }).catch(() => {}) : updatePrefs({ targetPushTypes: { [targetKey]: { [typeId]: value } } }));
   // "Use global setting" and "Reset all" clear both the switch and the 🔔 overrides.
   const resetTypes = (ids: string[]) => {
     const nulls = (map: Record<string, boolean>) => Object.fromEntries(ids.filter((id) => id in map).map((id) => [id, null]));
-    updatePrefs({ targetTypes: { [targetKey]: nulls(own) }, targetPushTypes: { [targetKey]: nulls(ownPush) } });
+    if (isFav) updateFavorite(targetKey, { types: nulls(own), pushTypes: nulls(ownPush) }).catch(() => {});
+    else updatePrefs({ targetTypes: { [targetKey]: nulls(own) }, targetPushTypes: { [targetKey]: nulls(ownPush) } });
   };
   const customIds = [...new Set([...Object.keys(own), ...Object.keys(ownPush)])];
-  const muted = prefs.muted.includes(targetKey);
+  const muted = isFav ? favorite?.push === false : prefs.muted.includes(targetKey);
   const name = target.kind === 'player' ? target.shortName ?? target.name : target.name;
   const customCount = customIds.length;
   // A player's team: its games on the Scores tab (shown by default), its own alerts (off by default).
@@ -62,7 +67,7 @@ export default function TargetAlertsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `${name} alerts` }} />
+      <Stack.Screen options={{ title: isFav ? `${name} games` : `${name} alerts` }} />
       <ScrollView contentContainerStyle={{ paddingBottom: space(16) }} style={{ backgroundColor: colors.bg }}>
         <View style={styles.hero}>
           <Avatar target={target} size={64} />
@@ -75,16 +80,20 @@ export default function TargetAlertsScreen() {
           </View>
         </View>
         <Text style={styles.explain}>
-          Choices here apply to {target.name} only and override your global alert settings. Anything you haven't changed follows the Settings tab.
+          {isFav
+            ? `While the ${name} play, their opponent's alerts reach you, until the game ends. Choices here apply to those alerts only and override your global alert settings. Anything you haven't changed follows the Settings tab.`
+            : `Choices here apply to ${target.name} only and override your global alert settings. Anything you haven't changed follows the Settings tab.`}
         </Text>
 
         <SectionHeader>Delivery</SectionHeader>
         <View style={styles.card}>
           <SettingRow
             title="Push notifications"
-            desc={muted ? `Off: ${name}'s alerts still show up in your feed, without a push.` : `Alerts about ${name} are pushed to your phone.`}
+            desc={isFav
+              ? muted ? `Off: the alerts for ${name} games still show up in your feed, without a push.` : `The alerts for ${name} games are pushed to your phone.`
+              : muted ? `Off: ${name}'s alerts still show up in your feed, without a push.` : `Alerts about ${name} are pushed to your phone.`}
             value={!muted}
-            onChange={(on) => updatePrefs({ muted: on ? prefs.muted.filter((k) => k !== targetKey) : [...prefs.muted, targetKey] })}
+            onChange={(on) => (isFav ? updateFavorite(targetKey, { push: on }).catch(() => {}) : updatePrefs({ muted: on ? prefs.muted.filter((k) => k !== targetKey) : [...prefs.muted, targetKey] }))}
           />
         </View>
 
@@ -112,7 +121,7 @@ export default function TargetAlertsScreen() {
           </>
         ) : null}
 
-        <SectionHeader>Alerts for {name}</SectionHeader>
+        <SectionHeader>{isFav ? `Alerts in ${name} games` : `Alerts for ${name}`}</SectionHeader>
         {hidden && target.kind === 'player' ? (
           <Text style={styles.positionNote}>
             Showing the alerts that fit {name}'s position{positionsOf(target).length > 1 ? 's' : ''} ({positionsOf(target).join(', ')}). {hidden} that don't {hidden === 1 ? 'is' : 'are'} hidden.
@@ -134,7 +143,7 @@ export default function TargetAlertsScreen() {
                     push={{ on: ownPush[t.id] ?? globalPush(t), onChange: (v) => setPush(t.id, v) }}
                     footer={custom ? (
                       <View style={styles.footer}>
-                        <Text style={styles.custom}>Custom for {name}</Text>
+                        <Text style={styles.custom}>Custom for {isFav ? `${name} games` : name}</Text>
                         <Pressable onPress={() => resetTypes([t.id])} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Use the global setting for ${t.label}`}>
                           <Text style={styles.reset}>Use global setting</Text>
                         </Pressable>

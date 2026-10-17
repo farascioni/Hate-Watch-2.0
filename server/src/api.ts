@@ -5,7 +5,8 @@ import { db, kvGet } from './db.ts';
 import { catalog, search, teamDto, playerDto, targetDto, listed, type Player } from './catalog.ts';
 import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
-import { LEAGUES, LEAGUE_IDS, TEAMS_ONLY, type League } from './leagues.ts';
+import { LEAGUES, LEAGUE_IDS, GAME_LEAGUES, TEAMS_ONLY, type League } from './leagues.ts';
+import { addFavorite, favoriteOf, favoritesOf, removeFavorite, updateFavorite, registerGame, type FavoriteRow } from './favorites.ts';
 import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { callStats } from './calls.ts';
@@ -176,6 +177,26 @@ route('DELETE', '/me/follows/:key', true, (req, _u, [key]) => {
   return { ok: true, trackers: trackers(decodeURIComponent(key)) };
 });
 
+// ─── Favorites (Hate Watch Plus; favorites.ts): a team you root for, not track ─────────────────
+const favoriteDto = (r: FavoriteRow) => ({ key: r.team_key, favoritedAt: r.created_at, push: r.push, types: r.types, pushTypes: r.push_types, target: targetDto(r.team_key) });
+/** A map of alert type → on/off (null: back to the global setting); anything else in it is dropped. */
+const flagMap = (v: unknown): Record<string, boolean | null> => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([, x]) => x === null || typeof x === 'boolean')) as Record<string, boolean | null>;
+route('GET', '/me/favorites', true, (req) => ({ favorites: favoritesOf(req.deviceId!).map(favoriteDto) }));
+route('PUT', '/me/favorites/:key', true, (req, _u, [key]) => {
+  const k = decodeURIComponent(key), t = targetDto(k);
+  if (!t || t.kind !== 'team' || !(GAME_LEAGUES as League[]).includes(t.league)) throw new HttpError(404, 'a favorite is a team in a league of games');
+  addFavorite(req.deviceId!, k);
+  engine.kick(); // a game in progress for it is tracked right now
+  return { favorite: favoriteDto(favoriteOf(req.deviceId!, k)!) };
+});
+route('PUT', '/me/favorites/:key/settings', true, (req, _u, [key], body) => {
+  const row = updateFavorite(req.deviceId!, decodeURIComponent(key), { push: typeof body?.push === 'boolean' ? body.push : undefined, types: flagMap(body?.types), pushTypes: flagMap(body?.pushTypes) });
+  if (!row) throw new HttpError(404, 'not a favorite');
+  return { favorite: favoriteDto(row) };
+});
+route('DELETE', '/me/favorites/:key', true, (req, _u, [key]) => { removeFavorite(req.deviceId!, decodeURIComponent(key)); return { ok: true }; });
+route('DELETE', '/me/favorites', true, (req) => { removeFavorite(req.deviceId!); return { ok: true }; }); // Plus lapsed
+
 // ─── Scores tab: today's games for the teams (and players' teams) you track ─────────────────────
 // upNext: each of the device's teams' next game (the app leaves out any already on the tab as a card).
 route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend(), upNext: upNextFor(deviceTeams(req.deviceId!).teams) }));
@@ -265,7 +286,23 @@ route('GET', '/shared/:code', false, (_r, _u, [code]) => {
 if (process.env.HW_DEV === '1') {
   route('POST', '/dev/simulate', true, (req, _u, _p, body) => {
     const follows = db.prepare('SELECT target_key FROM follows WHERE device_id = ?').all(req.deviceId!) as { target_key: string }[];
-    const key = body?.targetKey ?? follows[Math.floor(Math.random() * follows.length)]?.target_key;
+    const favs = favoritesOf(req.deviceId!);
+    // No key given: one of the follows or favorites at random, so both get exercised.
+    const pick = Math.floor(Math.random() * (follows.length + favs.length));
+    const key = body?.targetKey ?? (pick < follows.length ? follows[pick].target_key : undefined);
+    if (!key && favs.length) {
+      // A favorite's test: it plays a made-up game against another team of its league, and that team's alert is published (fanout routes it to the favorite).
+      const fav = favs[Math.floor(Math.random() * favs.length)].team_key;
+      const league = (targetDto(fav) as { league: League }).league;
+      const rival = catalog.allTeams().find((x) => x.league === league && x.key !== fav);
+      if (!rival) throw new HttpError(400, 'no other team to play');
+      const gameId = `sim-game-${randomUUID()}`;
+      registerGame(league, gameId, fav, rival.key);
+      const pool = EVENT_TYPES.filter((e) => e.scope === 'team' && e.leagues.includes(league));
+      const type = body?.type ?? pool[Math.floor(Math.random() * pool.length)].id;
+      publish([{ id: `${gameId}:${randomUUID()}:${type}:${rival.key}`, type, targetKey: rival.key, title: `[TEST] ${rival.name}: ${EVENT_TYPES.find((e) => e.id === type)?.label}`, body: `Simulated: ${rival.name} play your favorite`, at: Date.now(), meta: { gameId } }], league);
+      return { ok: true, type, targetKey: rival.key, favorite: fav };
+    }
     if (!key) throw new HttpError(400, 'follow something first');
     const t = targetDto(key)!;
     const pool = EVENT_TYPES.filter((e) => e.scope === t.kind && e.leagues.includes(t.league));

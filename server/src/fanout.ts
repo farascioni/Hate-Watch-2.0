@@ -9,6 +9,7 @@ import { recordMisery, reviseMisery } from './misery.ts';
 import { clipShown } from './clips.ts';
 import { frameWithoutImages } from './images.ts';
 import { shareStyles } from './share-styles.ts';
+import { favoriters, opponentOf, type FavoriteRow } from './favorites.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
 export interface Prefs {
@@ -344,26 +345,43 @@ export const noticeLook = (meta: { urgent?: boolean } | null) => (meta?.urgent ?
 // ─── Publish: persist once, then fan out to every follower who wants it ───────────────────────
 const insEvent = () => db.prepare(`INSERT INTO events (id, type, league, game_id, target_key, title, body, occurred_at, detected_at, meta, share_code)
   VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`);
-const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed, extra) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING');
+const insFeed = () => db.prepare('INSERT INTO feed (device_id, event_id, occurred_at, pushed, extra, fav) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING');
 const followers = () => db.prepare('SELECT f.device_id, d.push_token, f.created_at FROM follows f JOIN devices d ON d.id = f.device_id WHERE f.target_key = ?');
 /** Devices tracking a player on a team, with which player (`via`). */
 const playerFollowers = () => db.prepare(`SELECT f.device_id, d.push_token, f.created_at, f.target_key AS via FROM follows f
   JOIN devices d ON d.id = f.device_id JOIN players p ON p.key = f.target_key WHERE p.team_key = ?`);
-type Recipient = { device_id: string; push_token: string | null; via?: string };
+type Recipient = { device_id: string; push_token: string | null; via?: string; fav?: FavoriteRow };
 /**
  * Who an alert goes to: everyone tracking its target, and for a team's alert, everyone tracking one of the
- * team's players with "Get their team's alerts" on (playerTeams). Once per device.
+ * team's players with "Get their team's alerts" on (playerTeams), and everyone who favorites the team's
+ * opponent in this game (`fav`: favorites.ts; their own choices decide, they're not hate watchers). Once per device.
  */
-function recipients(targetKey: string): Recipient[] {
-  const out = followers().all(targetKey) as Recipient[];
+function recipients(targetKey: string, league: League, gameId?: string): Recipient[] {
+  const out = followers().all(targetKey) as unknown as Recipient[];
   if (!targetKey.startsWith('team:')) return out;
   const have = new Set(out.map((f) => f.device_id));
-  for (const f of playerFollowers().all(targetKey) as Required<Recipient>[]) {
+  for (const f of playerFollowers().all(targetKey) as unknown as (Recipient & { via: string })[]) {
     if (have.has(f.device_id) || !getPrefs(f.device_id).playerTeams?.[f.via]?.alerts) continue;
     have.add(f.device_id);
     out.push(f);
   }
+  const rooted = gameId ? opponentOf(league, gameId, targetKey) : undefined;
+  if (rooted) for (const f of favoriters(rooted)) {
+    if (have.has(f.device_id)) continue; // tracking the team wins over rooting against it
+    have.add(f.device_id);
+    out.push({ device_id: f.device_id, push_token: f.push_token, fav: f.fav });
+  }
   return out;
+}
+
+/** A favorite's choices as the device's settings for the team it roots against: its alert types and push switch beat the global ones, quiet hours and the rest still apply. */
+function favoritePrefs(p: Prefs, targetKey: string, fav: FavoriteRow): Prefs {
+  return {
+    ...p,
+    targetTypes: { ...p.targetTypes, [targetKey]: fav.types },
+    targetPushTypes: { ...p.targetPushTypes, [targetKey]: fav.push_types },
+    muted: fav.push ? p.muted.filter((k) => k !== targetKey) : [...p.muted, targetKey],
+  };
 }
 
 export type PushMessage = { to: string; title: string; body: string; sound: 'default' | null; priority: 'high'; channelId: string; interruptionLevel: string; threadId: string; data: Record<string, unknown> };
@@ -454,9 +472,10 @@ export function publish(events: Detected[], league: League) {
   }
   for (const e of events) {
     recordMisery(e, league); // Recent misery is the same for everyone, so it keeps what nobody tracks (misery.ts); it never changes what is sent
-    const fols = recipients(e.targetKey);
-    if (!fols.length) continue; // nobody tracks this target: don't even store it
     const gameId = ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null; // F1: the session
+    // A favorite's opponent is found by the game: the alert's own game id, or the one every game alert's id starts with.
+    const fols = recipients(e.targetKey, league, gameId ?? e.id.split(':')[0]);
+    if (!fols.length) continue; // nobody tracks this target: don't even store it
     const res = insEvent().run(e.id, e.type, league, gameId, e.targetKey, e.title, e.body, e.at, detectedAt, JSON.stringify({ ...e.meta, aliases: e.aliases, unless: e.unless }), shareCode(e.id));
     if (!res.changes) continue; // already published (re-poll, restart, or overlapping detectors)
     const hateWatch = isHateWatch(e);
@@ -464,16 +483,17 @@ export function publish(events: Detected[], league: League) {
     const deliver: Delivery[] = [];
     for (const f of fols) {
       // A Successful Hate Watch counts for everyone tracking the team (or a player on it), whatever their alert settings.
-      if (hateWatch && recordHateWatch(f.device_id, e)) {
+      // A favorite (f.fav) roots against the team, so its loss is not a hate watch for them.
+      if (!f.fav && hateWatch && recordHateWatch(f.device_id, e)) {
         const tally = JSON.stringify({ kind: 'hateWatches', tally: hateWatchTally(f.device_id) });
         for (const ws of sockets.get(f.device_id) ?? []) ws.send(tally);
       }
-      const prefs = getPrefs(f.device_id);
+      const prefs = f.fav ? favoritePrefs(getPrefs(f.device_id), e.targetKey, f.fav) : getPrefs(f.device_id);
       if (!shouldDeliver(prefs, e, league)) continue;
       // A line on the device's alert about it today, when it has one (a championship drop on that day's race alert).
       const on = e.lateOn ? latestAbout(f.device_id, e.lateOn) : null;
       if (on) { late.push({ deviceId: f.device_id, eventId: on, line: e.lateOn!.line }); continue; }
-      if (e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
+      if (!f.fav && e.firstFollowed && e.moment && firstFollowed.get(e.moment)?.get(f.device_id)?.key !== e.targetKey) continue; // another of theirs, followed earlier
       const d: Delivery = { f, prefs, folded: [], alts: new Set(e.alt ? [e.alt] : []) };
       if (e.moment) {
         const mine = got.get(e.moment) ?? got.set(e.moment, new Map()).get(e.moment)!;
@@ -520,18 +540,19 @@ export function publish(events: Detected[], league: League) {
     planned.push({ e, gameId, deliver, followers: fols.length });
   }
   const perMoment = new Map<string, number>();
-  for (const { e, deliver } of planned) if (e.moment && isLossAlert(e)) perMoment.set(e.moment, (perMoment.get(e.moment) ?? 0) + deliver.length);
+  const hateWatchers = (deliver: Delivery[]) => deliver.filter((d) => !d.f.fav).length; // a favorite's copy isn't counted (RECIPIENTS)
+  for (const { e, deliver } of planned) if (e.moment && isLossAlert(e)) perMoment.set(e.moment, (perMoment.get(e.moment) ?? 0) + hateWatchers(deliver));
   for (const { e, gameId, deliver, followers } of planned) {
-    const recipients = e.moment && isLossAlert(e) ? perMoment.get(e.moment)! : deliver.length;
+    const recipients = e.moment && isLossAlert(e) ? perMoment.get(e.moment)! : hateWatchers(deliver);
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: JSON.stringify(e.meta ?? null), game_id: gameId, recipients });
     const frame = JSON.stringify({ kind: 'event', item });
     const moment = e.moment ? events.filter((x) => x.moment === e.moment) : [];
     for (const { f, prefs, folded } of deliver) {
-      const streak = streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line
+      const streak = f.fav ? [] : streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line; a favorite has no hate watch streak
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
       const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
-      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null);
+      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null, f.fav ? 1 : 0);
       const body = withLines(e.body, lines);
       for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length ? JSON.stringify({ kind: 'event', item: { ...item, body } }) : frame);
       if (willPush) pushes.push({
@@ -608,7 +629,7 @@ export function publishTo(deviceId: string, e: Detected, league: League): boolea
   const prefs = getPrefs(deviceId);
   const token = (db.prepare('SELECT push_token FROM devices WHERE id = ?').get(deviceId) as { push_token: string | null } | undefined)?.push_token;
   const willPush = !!token && prefs.pushEnabled && !inQuietHours(prefs) && pushTypeFor(prefs, e.targetKey, e.type);
-  insFeed().run(deviceId, e.id, e.at, willPush ? 1 : 0, null);
+  insFeed().run(deviceId, e.id, e.at, willPush ? 1 : 0, null, 0);
   const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: Date.now(), meta: JSON.stringify(e.meta ?? null) });
   for (const ws of sockets.get(deviceId) ?? []) ws.send(JSON.stringify({ kind: 'event', item }));
   if (willPush) pushSender([{ to: token!, title: `${item.emoji} ${e.title}`, body: e.body, sound: prefs.sound ? 'default' : null, priority: 'high', channelId: 'hate-events', interruptionLevel: 'active', threadId: 'recap', data: { eventId: e.id, targetKey: e.targetKey, type: e.type } }]);

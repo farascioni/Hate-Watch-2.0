@@ -6,6 +6,8 @@ import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
 import { Plus } from '../../components/Plus';
+import { Favorites } from '../../components/Favorites';
+import { setDevPlus, useDevPlus } from '../../lib/plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
   const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   // Each alert group folds up (all start folded, so the page isn't 69 rows long). The tab stays mounted, so this survives switching tabs.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const devPlus = useDevPlus();
   if (!prefs) return null;
   const toggleGroup = (title: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -72,6 +75,7 @@ export default function SettingsScreen() {
 
       <SectionHeader>Support Hate Watch</SectionHeader>
       <Plus />
+      <Favorites />
 
       <SectionHeader>Delivery</SectionHeader>
       <View style={styles.card}>
@@ -154,6 +158,12 @@ export default function SettingsScreen() {
         {__DEV__ ? (
           <Pressable style={styles.action} onPress={() => api.simulate().catch((e) => Alert.alert('Simulate failed', String(e)))}>
             <Text style={styles.actionText}>🧪 Send a test event (dev)</Text>
+          </Pressable>
+        ) : null}
+        {__DEV__ ? (
+          <Pressable style={styles.action} onPress={() => setDevPlus(!devPlus)} accessibilityRole="switch" accessibilityState={{ checked: devPlus }}>
+            <Text style={styles.actionText}>🧪 Hate Watch Plus (dev): {devPlus ? 'on' : 'off'}</Text>
+            <Text style={styles.actionSub}>Reads as a subscriber on this test build, to try Plus's perks.</Text>
           </Pressable>
         ) : null}
       </View>

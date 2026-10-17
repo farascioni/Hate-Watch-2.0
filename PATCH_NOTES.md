@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 HATE WATCH PLUS
+- Favorite teams: tap the heart on a team in Search or on its page to root for it (Plus only; without Plus there is no heart). While your favorite plays, its opponent's alerts land in your Feed and push to your phone, and stop when the game ends. If you already track the team it plays, your settings for that team win. Without Plus, Settings shows the card locked. They are not hate watches. Settings, under Support Hate Watch, lists your favorites: a push switch for each, a gear to choose which alerts, and an X to remove.
 - The league you pick in the filter (NBA, MLB, F1 and the rest, and the full league list) lights up gold for subscribers instead of that league's color. (Update)
 - On the Scores tab, a game's card gets a gold border while a team on your most hated list is playing, or the team of a player on it (or, in F1, a driver or constructor on it). (Update)
 

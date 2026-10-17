@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
+import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 // Without it, a release build (a TestFlight build, or an over-the-air update published without it) uses production's,
@@ -76,6 +76,14 @@ export const api = {
   follows: () => request<{ follows: { key: string; followedAt: number; trackers?: number; target: Target | null }[] }>('GET', '/me/follows'),
   follow: (key: string) => request<{ ok: boolean; trackers?: number }>('PUT', `/me/follows/${enc(key)}`),
   unfollow: (key: string) => request<{ ok: boolean; trackers?: number }>('DELETE', `/me/follows/${enc(key)}`),
+
+  /** Hate Watch Plus favorites: a team you root for. Its current opponent's alerts reach you for that game only. */
+  favorites: () => request<{ favorites: Favorite[] }>('GET', '/me/favorites'),
+  addFavorite: (key: string) => request<{ favorite: Favorite }>('PUT', `/me/favorites/${enc(key)}`),
+  /** null removes a choice (back to the global setting). */
+  updateFavorite: (key: string, patch: FavoritePatch) => request<{ favorite: Favorite }>('PUT', `/me/favorites/${enc(key)}/settings`, patch),
+  removeFavorite: (key: string) => request('DELETE', `/me/favorites/${enc(key)}`),
+  clearFavorites: () => request('DELETE', '/me/favorites'),
 
   prefs: () => request<Prefs>('GET', '/me/prefs'),
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),

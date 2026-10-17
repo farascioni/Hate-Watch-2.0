@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
+import { FavoriteButton } from '../../components/FavoriteButton';
 import { FeedCard } from '../../components/FeedCard';
 import { StatsView } from '../../components/StatsView';
 import { ChipRows, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
@@ -74,6 +75,7 @@ export default function TargetScreen() {
         <HaterCount target={target} size={14} />
         <View style={styles.actions}>
           <FollowButton target={target} />
+          <FavoriteButton target={target} />
         </View>
       </View>
       <View style={styles.tabs} accessibilityRole="tablist">

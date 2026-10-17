@@ -14,6 +14,7 @@ import {
   awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, impossibleTouchdown, goalNamesScorer, goalOffBoard, goalWords, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
+import { favoriteTeamKeys, registerGame } from './favorites.ts';
 import { BASKETBALL_REVISE_MS, PlayLedger, againLine } from './revisions.ts';
 import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
 import { flagOn } from './flags.ts';
@@ -314,6 +315,7 @@ export class GameTracker {
 
   constructor(league: League, gameId: string, homeId: string, awayId: string, info: GameInfo = {}) {
     this.ctx = { league, gameId, homeId, awayId, goalies: new Map() };
+    registerGame(league, gameId, teamKey(league, homeId), teamKey(league, awayId)); // who a favorite's opponent is (favorites.ts)
     this.info = info;
     this.sawPre = !!info.sawPre;
     this.pre = kvGet<Pregame>(this.preKey) ?? {};
@@ -1499,7 +1501,7 @@ class LiveEngine {
       const near = (sb.events ?? []).some((ev: any) => ev.status?.type?.state === 'in' || (ev.status?.type?.state === 'pre' && Date.parse(ev.date) - Date.now() < 20 * 60_000));
       this.quietUntil[lg] = near ? 0 : Date.now() + TEAMS_ONLY_QUIET_MS;
     }
-    const watched = watchedTeamKeys();
+    const watched = new Set([...watchedTeamKeys(), ...favoriteTeamKeys()]); // a favorite's game is tracked for its opponent's alerts
     // Every game on the board gets a Scores-tab card (they're pushed only to devices that track a side).
     const seen = new Set<string>();
     for (const ev of sb.events ?? []) {

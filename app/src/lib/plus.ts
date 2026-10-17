@@ -1,7 +1,9 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { DevSettings, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo';
 import { gold, setGold } from '../theme';
+import { api } from './api';
 import { clearMostHated } from './mostHated';
 
 /**
@@ -55,9 +57,28 @@ export const goldIconSupported = () => !!iconModule()?.supportsAlternateIcons;
 export const goldIconOn = () => iconModule()?.getAppIconName() === GOLD_ICON;
 export const setGoldIcon = async (on: boolean) => { await iconModule()?.setAlternateAppIcon(on ? GOLD_ICON : null); };
 
+/**
+ * Development only (Settings, next to "Send a test event"): reads as a subscriber whatever the store says, so Plus's
+ * perks can be tried on a test server. Saved on this device; never exists in a release build.
+ */
+const DEV_KEY = 'hw.devPlus';
+let devOn = false;
+const devListeners = new Set<() => void>();
+const devLoaded = __DEV__ ? AsyncStorage.getItem(DEV_KEY).then((v) => { devOn = v === '1'; devListeners.forEach((l) => l()); }).catch(() => {}) : Promise.resolve();
+export const setDevPlus = (on: boolean) => {
+  devOn = on;
+  devListeners.forEach((l) => l());
+  AsyncStorage.setItem(DEV_KEY, on ? '1' : '0').catch(() => {});
+};
+const devSubscribe = (l: () => void) => { devListeners.add(l); return () => { devListeners.delete(l); }; };
+export const useDevPlus = () => useSyncExternalStore(devSubscribe, () => __DEV__ && devOn);
+
 /** A definite "not subscribed": gold goes back to red, the colours and the icon. Whatever was undone can only be redone by subscribing. */
 export async function lapsePlus() {
+  await devLoaded;
+  if (__DEV__ && devOn) return;
   clearMostHated();
+  api.clearFavorites().catch(() => {}); // the server stops sending their opponents' alerts
   // Colours first: changing the icon can close the app on Android before a later step runs.
   if (gold) await setGold(false).catch(() => {});
   if (goldIconOn()) await setGoldIcon(false).catch(() => {});
@@ -79,4 +100,8 @@ export type Plus = {
 /** Development only: EXPO_PUBLIC_PLUS_DEV=1 makes a build with no store (web, Expo Go) read as a subscriber, to try Plus's perks. */
 const devPlus = __DEV__ && process.env.EXPO_PUBLIC_PLUS_DEV === '1';
 export const PlusContext = createContext<Plus>({ active: devPlus, price: null, ready: false, busy: false, subscribe: () => {}, restore: () => {} });
-export const usePlus = () => useContext(PlusContext);
+export const usePlus = (): Plus => {
+  const plus = useContext(PlusContext);
+  const dev = useDevPlus();
+  return useMemo(() => (dev && !plus.active ? { ...plus, active: true } : plus), [plus, dev]);
+};
