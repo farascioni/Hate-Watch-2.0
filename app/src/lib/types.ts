@@ -17,6 +17,8 @@ export interface Team {
   /** With the division, where ESPN's standings have them: "93-68" (NHL "6-2-0") and the streak ("W2", "L4"). */
   record?: string;
   streak?: string;
+  /** College football: "3-0 in conference, T-1st". */
+  standing?: string;
   /** How many people track them, where the server includes it (Search, team lists, rosters, their page). */
   haters?: number;
 }

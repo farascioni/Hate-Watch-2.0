@@ -14,7 +14,7 @@ const { GameTracker, liveDeps } = await import('../src/live.ts');
 const { urls, LEAGUE_IDS, TEAMS_ONLY } = await import('../src/leagues.ts');
 const D = await import('../src/detectors.ts');
 const { gameCard } = await import('../src/scores.ts');
-const { divisionsOf } = await import('../src/divisions.ts');
+const { divisionsOf, divisionsDeps } = await import('../src/divisions.ts');
 const P = await import('../src/cfb-poll.ts');
 
 for (const [id, name, short, abbr] of [['61', 'Georgia Bulldogs', 'Georgia', 'UGA'], ['238', 'Vanderbilt Commodores', 'Vanderbilt', 'VAN'], ['2005', 'Air Force Falcons', 'Air Force', 'AFA'],
@@ -69,8 +69,9 @@ test("the catalog: the FBS's teams from its conferences, each school's short nam
     assert.ok(!reads.some((u) => /roster|\.png/.test(u)), 'no rosters, no logo checks');
   } finally { globalThis.fetch = realFetch; }
   kvSet('cfb:conferences', { '61': 'SEC', '238': 'SEC', '2005': 'Mountain West', '2426': 'American' });
+  divisionsDeps.getJson = async () => { throw new Error('ESPN is down'); }; // the conferences are the catalog's; ESPN only adds the record
   const div = await divisionsOf('cfb');
-  assert.deepEqual([div.get('61'), div.get('2005'), div.get('2426')], [{ name: 'SEC', order: 2 }, { name: 'Mountain West', order: 1 }, { name: 'American', order: 0 }], 'Search\'s "by division": conferences A to Z, no read of ESPN');
+  assert.deepEqual([div.get('61'), div.get('2005'), div.get('2426')], [{ name: 'SEC', order: 2 }, { name: 'Mountain West', order: 1 }, { name: 'American', order: 0 }], 'Search\'s "by division": conferences A to Z, still there when ESPN\'s standings fail');
 });
 
 // ESPN's drive plays (a summary's drives): the team with the ball under `start`, no players.

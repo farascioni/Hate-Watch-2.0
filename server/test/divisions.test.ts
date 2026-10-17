@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net';
 process.env.HW_DB = ':memory:';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { parseDivisions, divisionsDeps } = await import('../src/divisions.ts');
+const { parseDivisions, postseasonStreaks, divisionsDeps } = await import('../src/divisions.ts');
 const { urls } = await import('../src/leagues.ts');
 const { startApi } = await import('../src/api.ts');
 
@@ -39,6 +39,14 @@ test('record and streak come with the division, only where ESPN has them', () =>
   assert.equal('record' in got('nba', [])!, false);
 });
 
+test('a postseason streak replaces the regular season\'s, only for teams that played one this season', () => {
+  const table = (season: number, rows: [string, number, number, string][]) => ({ children: [{ standings: { season, entries: rows.map(([id, w, l, streak]) => ({ team: { id }, stats: [{ name: 'wins', value: w }, { name: 'losses', value: l }, { name: 'streak', displayValue: streak }] })) } }] });
+  const regular = table(2026, [['19', 100, 62, 'W3'], ['10', 93, 68, 'W1']]);
+  assert.deepEqual([...postseasonStreaks(regular, table(2026, [['19', 3, 5, 'L4'], ['10', 0, 0, 'W1']]))], [['19', 'L4']], 'the Dodgers lost four in a row; the Yankees played none');
+  assert.equal(postseasonStreaks(regular, table(2025, [['19', 3, 5, 'L4']])).size, 0, "last season's postseason is not this season's");
+  assert.equal(postseasonStreaks(regular, null).size, 0, 'no answer, no change');
+});
+
 test('GET /teams?by=division: by league (the app\'s order), then division, then name; F1\'s constructors together', async () => {
   divisionsDeps.getJson = async (url: string) => (url === `${urls.standings('mlb')}?level=3` ? MLB : url === `${urls.standings('nfl')}?level=3` ? NFL : {});
   const server = startApi(0);
@@ -49,4 +57,15 @@ test('GET /teams?by=division: by league (the app\'s order), then division, then 
   assert.deepEqual(await list('?league=mlb&by=division'), ['NYY (AL East)', 'TB (AL East)', 'CLE (AL Central)']);
   assert.deepEqual(await list('?league=mlb'), ['CLE', 'NYY', 'TB'], 'A-Z, as before');
   server.close();
+});
+
+test("college football: record, streak and a conference standing from the conference record, ties shared", () => {
+  const e = (id: string, overall: string, conf: string, streak = 'W1') => ({ team: { id }, stats: [{ name: 'overall', displayValue: overall }, { name: 'vs. Conf.', displayValue: conf }, { name: 'streak', displayValue: streak }] });
+  const got = parseDivisions('cfb', { children: [{ name: 'Big Ten Conference', standings: { entries: [e('1', '6-0', '3-0'), e('2', '5-1', '3-0'), e('3', '4-2', '2-1'), e('4', '3-3', '0-3'), e('5', '6-0', '0-0')] } }] });
+  assert.equal(got.get('1')?.record, '6-0');
+  assert.equal(got.get('1')?.standing, '3-0 in conference, T-1st');
+  assert.equal(got.get('3')?.standing, '2-1 in conference, 3rd');
+  assert.equal(got.get('4')?.standing, '0-3 in conference, 4th');
+  assert.equal(got.get('5')?.standing, undefined, 'no conference game yet (or an independent): no standing');
+  assert.equal(parseDivisions('mlb', MLB).get('10')?.standing, undefined, 'only college football');
 });

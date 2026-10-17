@@ -10,7 +10,7 @@ import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
 
 /** What the Tracking tab knows about a card beyond the target: its division, its team's record and streak, its game. */
-export interface CardInfo { division?: string; record?: string; streak?: string; game?: GameInfo | null }
+export interface CardInfo { division?: string; record?: string; streak?: string; standing?: string; game?: GameInfo | null }
 
 const GREEN = colors.live, RED = '#F87171';
 const labelColor = (g: GameInfo) => (g.label === 'LIVE' ? colors.hate : g.label === 'NEXT' ? colors.textDim : colors.textFaint);
@@ -25,7 +25,7 @@ function Pill({ text, tone }: { text: string; tone?: boolean }) {
 function Form({ info }: { info: CardInfo }) {
   const s = streakOf(info.streak);
   if (!info.record && !s) return null;
-  return <>{info.record ? <Pill text={info.record} /> : null}{s ? <Pill text={s.text} tone={s.win} /> : null}</>;
+  return <>{info.record ? <Pill text={info.record} /> : null}{s ? <Pill text={s.text} tone={s.win} /> : null}{info.standing ? <Pill text={info.standing} /> : null}</>;
 }
 
 const open = (t: Target) => router.push(`/target/${encodeURIComponent(t.key)}`);
@@ -121,7 +121,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
         {cell(g ? g.label : 'GAME', g ? `${g.matchup}${g.score ? ` ${g.score}` : ''}` : '–', g ? labelColor(g) : undefined)}
       </View>
       <View style={styles.footer}>
-        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={1}>{g ? g.status : 'No game soon'}</Text>
+        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={1}>{g ? g.status : info.standing ?? 'No game soon'}</Text>
         {actions(true)}
       </View>
     </Pressable>

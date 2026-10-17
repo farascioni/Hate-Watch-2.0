@@ -85,7 +85,7 @@ route('GET', '/teams', false, async (_r, url) => {
   const div = new Map(await Promise.all(leagues.map(async (l) => [l, await divisionsOf(l)] as const)));
   const rows = teams.map((t) => {
     const d = div.get(t.league)?.get(t.espnId);
-    return { ...teamDto(t), division: d?.name ?? (t.league === 'f1' ? 'Constructors' : LEAGUES[t.league].name), divisionOrder: d?.order ?? 99, record: d?.record, streak: d?.streak };
+    return { ...teamDto(t), division: d?.name ?? (t.league === 'f1' ? 'Constructors' : LEAGUES[t.league].name), divisionOrder: d?.order ?? 99, record: d?.record, streak: d?.streak, standing: d?.standing };
   });
   rows.sort((a, b) => LEAGUE_IDS.indexOf(a.league) - LEAGUE_IDS.indexOf(b.league) || a.divisionOrder - b.divisionOrder || a.name.localeCompare(b.name));
   return { teams: withHaters(rows) };

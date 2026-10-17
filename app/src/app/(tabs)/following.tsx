@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useStore } from '../../lib/store';
@@ -53,6 +53,18 @@ export default function FollowingScreen() {
   const { leagueInfo, games, upNext } = useStore();
   const layout = useTrackingLayout();
   const [menu, setMenu] = useState(false);
+  // The layout picker lives in the top right of the page (the header), beside nothing else: the leaderboard is on the left.
+  const navigation = useNavigation();
+  const hasFollows = follows.size > 0;
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: hasFollows ? () => (
+        <Pressable onPress={() => setMenu(true)} hitSlop={8} style={styles.layoutBtn} accessibilityRole="button" accessibilityLabel="Choose how the cards look">
+          <Ionicons name="grid-outline" size={14} color={colors.textDim} /><Text style={styles.layoutText}>Layout</Text>
+        </Pressable>
+      ) : undefined,
+    });
+  }, [navigation, hasFollows]);
   // Not for leagues without divisions (F1), nor where ESPN's only "division" is the league's own name (the EPL's table).
   const divisionOf = (t: Target) => {
     const d = t.kind === 'team' && leagueUi(t.league).divisions ? teams.get(t.key)?.division : undefined;
@@ -100,7 +112,7 @@ export default function FollowingScreen() {
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<View><Pressable onPress={() => setMenu(true)} hitSlop={8} style={styles.layoutBtn} accessibilityRole="button" accessibilityLabel="Choose how the cards look"><Ionicons name="grid-outline" size={14} color={colors.textDim} /><Text style={styles.layoutText}>Layout</Text></Pressable><Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow (✕ on the smaller cards) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text></View>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow (✕ on the smaller cards) stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
       renderItem={({ item: row }) => (
         <View style={per > 1 ? styles.tiles : undefined}>
         {row.map((item) => (
@@ -108,7 +120,7 @@ export default function FollowingScreen() {
           key={item.key}
           target={item}
           layout={layout}
-          info={{ division: divisionOf(item), record: teams.get(teamKeyOf(item))?.record, streak: teams.get(teamKeyOf(item))?.streak, game: gameInfo(item, games, upNext) }}
+          info={{ division: divisionOf(item), record: teams.get(teamKeyOf(item))?.record, streak: teams.get(teamKeyOf(item))?.streak, standing: teams.get(teamKeyOf(item))?.standing, game: gameInfo(item, games, upNext) }}
           actions={(compact) => (
             <View style={styles.actions}>
               <MostHatedStar target={item} allowed={starAllowed} compact={compact} />
@@ -154,7 +166,7 @@ const styles = StyleSheet.create({
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(2) },
   tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },
-  layoutBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 4, marginRight: space(4), marginTop: space(3), paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  layoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: space(4), paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   layoutText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
   iconSm: { padding: space(1.5) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
