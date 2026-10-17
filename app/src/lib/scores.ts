@@ -20,6 +20,12 @@ export const trackedPlayers = (g: GameCard, side: Side, follows: Map<string, Tar
 export const trackedDrivers = (g: GameCard, follows: Map<string, Target>) =>
   (g.order ?? []).filter((d) => follows.has(d.key) || (!!d.teamKey && follows.has(d.teamKey)));
 
+/** Target keys a game card involves: its teams and the players you track on them, or (F1) your drivers and their constructors. */
+export const gameTargetKeys = (g: GameCard, follows: Map<string, Target>): string[] =>
+  g.league === 'f1'
+    ? trackedDrivers(g, follows).flatMap((d) => [d.key, ...(d.teamKey ? [d.teamKey] : [])])
+    : SIDES.flatMap((k) => (g[k] ? [g[k]!.team.key, ...trackedPlayers(g, k, follows).map((p) => p.key)] : []));
+
 /** F1: a car's places since the start, "▲10 from P19", "▼3 from P4", "Started P1", read out in words. None out of it, or without a grid slot. */
 export function fromGrid(d: RaceDriver): { text: string; label: string; lost: boolean } | null {
   if (!d.grid || !d.position || d.out) return null;

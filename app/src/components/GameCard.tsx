@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import { Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
-import { fromGrid, hateTag, loseChance, statusLine, stopsText, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
-import { colors, radius, space } from '../theme';
+import { useAnyMostHated } from '../lib/mostHated';
+import { fromGrid, gameTargetKeys, hateTag, loseChance, statusLine, stopsText, trackedDrivers, trackedPlayers, trackedSides, type Side, type Tone } from '../lib/scores';
+import { GOLD, colors, radius, space } from '../theme';
 import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 
@@ -20,6 +21,8 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
 export const GameCardView = memo(function GameCardView({ game, latest, now, big }: { game: GameCard; latest?: FeedItem; now: number; big?: boolean }) {
   const { follows } = useStore();
   const sides = trackedSides(game, follows);
+  // Hate Watch Plus: a gold border while a team (or a player or driver) on your most hated list is in this game. Not on the game screen's header.
+  const mostHated = useAnyMostHated(gameTargetKeys(game, follows)) && !big;
   const side: Side | undefined = sides.length === 1 ? sides[0] : undefined; // hating both sides: no "down 7"
   const tag = hateTag(game, side);
   const lose = loseChance(game, side);
@@ -58,7 +61,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   );
   if (big) return <View style={[styles.card, styles.bigCard]}>{content}</View>;
   return (
-    <Pressable onPress={open} style={({ pressed }) => [styles.card, game.state === 'post' && { opacity: 0.8 }, pressed && { backgroundColor: colors.surfaceHi }]}
+    <Pressable onPress={open} style={({ pressed }) => [styles.card, mostHated && styles.mostHated, game.state === 'post' && { opacity: 0.8 }, pressed && { backgroundColor: colors.surfaceHi }]}
       accessibilityRole="button" accessibilityHint="Opens the play-by-play and your alerts from this game"
       accessibilityActions={teams.map((k) => ({ name: k, label: `Open the ${game[k]!.team.shortName} page` }))}
       onAccessibilityAction={(e) => { const k = teams.find((t) => t === e.nativeEvent.actionName); if (k) openTeam(game[k]!.team.key); }}>
@@ -241,6 +244,7 @@ export function Bases({ bases, count }: { bases: NonNullable<GameCard['bases']>;
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: space(3), marginBottom: space(2), padding: space(3), gap: space(2), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  mostHated: { borderColor: GOLD, borderWidth: 2 },
   bigCard: { marginTop: space(3), padding: space(4) },
   team: { flexDirection: 'row', alignItems: 'center', gap: space(2.5) },
   // Around a team's name: only as wide as the name, so the space after it still opens the game.

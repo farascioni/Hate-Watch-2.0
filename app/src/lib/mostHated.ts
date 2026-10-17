@@ -34,5 +34,7 @@ export const toggleMostHated = (key: string) => {
 export const clearMostHated = () => { if (keys.size) publish(new Set()); };
 
 export const useIsMostHated = (key: string) => useSyncExternalStore(subscribe, () => keys.has(key));
+/** Whether any of these target keys is marked: a scoreboard's teams, their tracked players, an F1 session's drivers. */
+export const useAnyMostHated = (targets: string[]) => useSyncExternalStore(subscribe, () => targets.some((k) => keys.has(k)));
 /** How many are marked: Following keeps the star working for someone whose subscription can't be confirmed (offline). */
 export const useMostHatedCount = () => useSyncExternalStore(subscribe, () => keys.size);

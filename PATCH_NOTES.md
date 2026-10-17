@@ -9,6 +9,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 HATE WATCH PLUS
 - The league you pick in the filter (NBA, MLB, F1 and the rest, and the full league list) lights up gold for subscribers instead of that league's color. (Update)
+- On the Scores tab, a game's card gets a gold border while a team on your most hated list is playing, or the team of a player on it (or, in F1, a driver or constructor on it). (Update)
 
 STARTUP GUIDE
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
