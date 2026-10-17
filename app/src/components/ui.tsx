@@ -128,7 +128,7 @@ export function HaterCount({ target, size = 12 }: { target: Target; size?: numbe
 /** A player or team in a list, with how many people hate them. `extra` replaces that line. */
 export function TargetRow({ target, right, extra, wrapName }: { target: Target; right?: ReactNode; extra?: ReactNode; wrapName?: boolean }) {
   return (
-    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, wrapName && styles.rowCard, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Avatar target={target} size={48} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.rowTitle} numberOfLines={wrapName ? undefined : 1}>{target.name}</Text>
@@ -230,6 +230,7 @@ const styles = StyleSheet.create({
   followOn: { backgroundColor: 'transparent', borderColor: colors.hate },
   followText: { color: colors.onHate, fontWeight: '800', fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
+  rowCard: { marginHorizontal: space(3), marginVertical: space(1), borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
   // Opaque, like the Feed's day headers: iOS pins SectionList headers while scrolling, and rows must not show through.
