@@ -16,7 +16,7 @@ loadCatalog();
 
 const { upsertGame, forgetDeviceTeams } = await import('../src/scores.ts');
 const { addFavorite } = await import('../src/favorites.ts');
-const { buildBoard, putLiveActivity, getLiveActivity, flush } = await import('../src/live-activity.ts');
+const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine } = await import('../src/live-activity.ts');
 const { setApnsSender, apnsJwt, apnsConfigured, tokenGone } = await import('../src/apns.ts');
 const { setFlag } = await import('../src/flags.ts');
 
@@ -145,4 +145,12 @@ test('nothing is sent without the secrets or with the flag off, and the app is t
   await flush();
   assert.equal(sent.length, before);
   assert.ok(getLiveActivity('dev'));
+});
+
+test('a live row says what ESPN gives for the situation: baseball outs and count, football down and distance', () => {
+  const card = (o: object) => ({ detail: 'Bot 8th', ...o }) as any;
+  assert.equal(statusLine(card({})), 'Bot 8th');
+  assert.equal(statusLine(card({ bases: { first: true, second: false, third: true, outs: 1 }, count: { balls: 3, strikes: 2 } })), 'Bot 8th · 1 out · 3-2');
+  assert.equal(statusLine(card({ bases: { first: false, second: false, third: false, outs: 0 } })), 'Bot 8th · 0 out', 'between batters there is no count');
+  assert.equal(statusLine(card({ detail: 'Q4 - 2:14', downDistance: '3rd & 6 at LAR 38' })), 'Q4 - 2:14 · 3rd & 6');
 });

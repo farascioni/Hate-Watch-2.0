@@ -19,7 +19,7 @@ The README's "Lock screen scoreboard" has the summary; this is the full detail. 
 
 - **Games:** a game is on a device's board while it is live, and for 10 minutes after it ends (shown as "Final"). Games not started are not shown. F1 and the UFC are not on it (`GAME_LEAGUES` leaves them out).
 - **Order** (`buildBoard` in `server/src/live-activity.ts`): the games of a favorite team first (heart), then a most hated team's, or the team of a most hated player's (star), then the games of teams the device only tracks. Inside each, live before final, then the earlier start. Only a favorite's game appears without the team being tracked; a most hated team that is not tracked is left off.
-- **A row:** `♥/★ AWAY 3  HOME 2` and the status on the right (the inning, quarter or clock, in red while live; "Final" in grey). Four rows at most (the lock screen has room for about that many); the rest are counted in "+N more". In the Dynamic Island, the first game's teams and score.
+- **A row:** `♥/★ AWAY 3  HOME 2` and the status on the right (`statusLine` in `live-activity.ts`: ESPN's inning, quarter or clock, then baseball's outs and count, or football's down and distance, in red while live; "Final" in grey; hockey and basketball give the clock only, since the card has no power play or run). Four rows at most (the lock screen has room for about that many); the rest are counted in "+N more". In the Dynamic Island, the first game's teams and score.
 - **Dynamic Island and CarPlay/watch:** compact and minimal show the first game; expanded shows the first game across the middle and the rest below; the small banner (CarPlay, watch) shows the top two. All regions are defined in the first build because adding one later needs a build.
 - **Tapping** it opens the app.
 

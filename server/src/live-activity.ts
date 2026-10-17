@@ -36,6 +36,16 @@ type Row = { activity_token: string | null; sandbox: number; most_hated: string 
 const rowOf = (deviceId: string) => db.prepare('SELECT activity_token, sandbox, most_hated FROM live_activities WHERE device_id = ?').get(deviceId) as Row | undefined;
 const mostHatedOf = (r?: Row): string[] => { try { return JSON.parse(r?.most_hated ?? '[]'); } catch { return []; } };
 
+/** The right-hand text of a live row: ESPN's status plus what ESPN gives for the situation (baseball outs and count, football down and distance). */
+export function statusLine(g: GameCard): string {
+  const parts = [g.detail];
+  if (g.bases) parts.push(`${g.bases.outs} out`);
+  if (g.count) parts.push(`${g.count.balls}-${g.count.strikes}`);
+  const dd = g.downDistance?.split(' at ')[0];
+  if (dd) parts.push(dd);
+  return parts.join(' · ');
+}
+
 /** The device's board now, or null when no game of its teams is live (or just ended). */
 export function buildBoard(deviceId: string, now = Date.now()): BoardProps | null {
   const favs = new Set(favoritesOf(deviceId).map((f) => f.team_key));
@@ -54,7 +64,7 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     const score = (n: number | null) => (n === null ? '-' : String(n));
     rows.push({
       k: g.key, a, as: g.away.score, h, hs: g.home.score, st, live, t,
-      l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: st, lc: t === 2 ? WHITE : GOLD, rc: live ? RED : GREY,
+      l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: t === 2 ? WHITE : GOLD, rc: live ? RED : GREY,
       startsAt: g.startsAt,
     });
   }
