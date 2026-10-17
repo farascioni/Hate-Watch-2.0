@@ -10,7 +10,7 @@ import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
-  good: { bg: colors.hateDim, fg: '#FF8A8F' },  // they're losing: good news
+  good: { bg: colors.hateDim, fg: colors.hateText },  // they're losing: good news
   warn: { bg: '#3D2A06', fg: colors.warn },      // they could score
   neutral: { bg: colors.surfaceHi, fg: colors.textDim },
   done: { bg: '#0F2E1A', fg: colors.live },      // a Successful Hate Watch
@@ -42,7 +42,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
         <View style={{ gap: 4 }}>
           <View style={styles.meta}>
             <Text style={styles.metaText}>Chance the {game[side]!.team.shortName} lose</Text>
-            <Text style={[styles.metaText, { color: '#FF8A8F', fontWeight: '800' }]}>{Math.round(lose * 100)}%</Text>
+            <Text style={[styles.metaText, { color: colors.hateText, fontWeight: '800' }]}>{Math.round(lose * 100)}%</Text>
           </View>
           <View style={styles.bar}><View style={[styles.barFill, { width: `${Math.round(lose * 100)}%` }]} /></View>
         </View>
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   barFill: { height: '100%', backgroundColor: colors.hate },
   lapFill: { backgroundColor: colors.textDim },
   // F1: a driver's places lost, or out of it: their bad afternoon, in the colour of good news here.
-  down: { color: '#FF8A8F', fontWeight: '700' },
+  down: { color: colors.hateText, fontWeight: '700' },
   alert: { color: colors.textDim, fontSize: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: space(2) },
   diamond: { width: 30, height: 22, position: 'relative' },
   base: { position: 'absolute', width: 9, height: 9, borderWidth: 1, borderColor: colors.textDim, transform: [{ rotate: '45deg' }] },

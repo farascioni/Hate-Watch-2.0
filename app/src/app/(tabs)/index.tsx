@@ -51,7 +51,7 @@ export default function FeedScreen() {
     <SectionList
       sections={sections}
       keyExtractor={(i) => i.id}
-      renderItem={({ item }) => <FeedCard item={item} now={now} fresh={item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000} />}
+      renderItem={({ item }) => <FeedCard item={item} now={now} highlight fresh={item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000} />}
       renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
       stickySectionHeadersEnabled
       contentContainerStyle={{ paddingBottom: space(6), flexGrow: 1 }}

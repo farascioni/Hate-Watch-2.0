@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   splits: { color: colors.textDim, fontSize: 13, marginTop: space(1) },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), paddingHorizontal: space(3) },
   tile: { width: '31.5%', flexGrow: 1, padding: space(2.5), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, gap: 1 },
-  tileBad: { borderColor: colors.hateDim, backgroundColor: '#1F1012' },
+  tileBad: { borderColor: colors.hateDim, backgroundColor: colors.hateTint },
   value: { color: colors.text, fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
   label: { color: colors.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   full: { color: colors.textFaint, fontSize: 11, lineHeight: 14 },

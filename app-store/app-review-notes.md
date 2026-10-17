@@ -9,7 +9,7 @@ There are no accounts and no login. On first launch the app creates an anonymous
 - Feed: every alert for the players and teams you track, newest first. The share icon shares an alert.
 - Tracking: the bell turns off push notifications for one player or team (their alerts still appear in the feed). The gear chooses which alert types you get for just that player or team, overriding Settings. Unfollow stops tracking.
 - Settings: push on/off, alert sound, quiet hours, and an on/off switch for every alert type in each league. Also Give feedback (opens Mail), Privacy policy, Support, and "Delete all my data", which permanently deletes the device's tracked players and teams, settings and feed from our server.
-- Optional tips: under "Support Hate Watch" in Settings, Donate offers three consumable In-App Purchase tips. Tips unlock nothing. Every feature is free, with no ads or subscriptions.
+- Optional supporter subscription: under "Support Hate Watch" in Settings, Hate Watch Plus is a $5/month auto-renewing subscription (Restore Purchases, Privacy, Terms and Manage Subscription are on the same card). Its perks are a "Gold accents" switch that changes the app's red accent colour to gold, a gold app icon, and a star on the Tracking tab that marks a player or team as a "most hated" (their alerts get a gold border in the Feed). Every feature of the app is free, with no ads.
 Alerts come from live games, so a player or team only produces alerts while they are playing. To see alerts quickly, track a team (or its players) with a game in progress or scheduled today. Search includes every team in all five leagues. Game-result alerts such as "Loses a game" arrive when the game ends.
 
 4. EXTERNAL SERVICES
@@ -17,7 +17,7 @@ Alerts come from live games, so a player or team only produces alerts while they
 - ESPN's image CDN (a.espncdn.com): the player headshots and team logos shown in the app.
 - Our own server (hate-watch-api.fly.dev, hosted on Fly.io): detects alerts and stores each anonymous device's tracked players and teams, alert settings and feed.
 - Expo Push Notification Service, which delivers notifications through Apple Push Notification service.
-- Apple In-App Purchase (StoreKit), for the optional tips.
+- Apple In-App Purchase (StoreKit), for the optional Hate Watch Plus subscription.
 The app uses no analytics, advertising, tracking, sign-in or AI services.
 
 5. REGIONAL DIFFERENCES

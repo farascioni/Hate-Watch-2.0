@@ -61,7 +61,20 @@
         }
       ],
       "expo-iap",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-alternate-app-icons",
+        [
+          {
+            "name": "Gold",
+            "ios": "./assets/icon-gold.png",
+            "android": {
+              "foregroundImage": "./assets/android-icon-gold-foreground.png",
+              "backgroundColor": "#0B0B0D"
+            }
+          }
+        ]
+      ]
     ],
     "extra": {
       "eas": {

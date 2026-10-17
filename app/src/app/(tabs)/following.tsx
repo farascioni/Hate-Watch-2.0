@@ -1,17 +1,46 @@
 import { useCallback, useMemo } from 'react';
-import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Haptics from 'expo-haptics';
 import { useStore } from '../../lib/store';
+import { toggleMostHated, useIsMostHated, useMostHatedCount } from '../../lib/mostHated';
+import { usePlus } from '../../lib/plus';
 import { Empty, PrimaryButton, SectionHeader, TargetRow } from '../../components/ui';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
-import { colors, radius, space } from '../../theme';
+import { GOLD, colors, radius, space } from '../../theme';
 import type { Target } from '../../lib/types';
+
+/** Hate Watch Plus: marks one of your trackers as a most hated (a gold border on their alerts in the Feed). */
+function MostHatedStar({ target, allowed }: { target: Target; allowed: boolean }) {
+  const on = useIsMostHated(target.key);
+  const press = () => {
+    if (!allowed && !on) {
+      Alert.alert('Most hated is a Plus perk', 'Hate Watch Plus subscribers can star their most hated players and teams, and their alerts get a gold border in the Feed.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'See Plus', onPress: () => router.navigate('/settings') },
+      ]);
+      return;
+    }
+    Haptics.selectionAsync().catch(() => {});
+    toggleMostHated(target.key);
+  };
+  return (
+    <Pressable onPress={press} hitSlop={8} style={[styles.icon, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
+      accessibilityLabel={on ? `Remove ${target.name} from your most hated` : `Add ${target.name} to your most hated`}>
+      <Ionicons name={on ? 'star' : 'star-outline'} size={20} color={on ? GOLD : colors.text} />
+    </Pressable>
+  );
+}
 
 export default function FollowingScreen() {
   const { follows, toggleFollow, prefs, updatePrefs, refreshTrackers } = useStore();
   // Other people follow and unfollow too: fresh counts each time the tab opens.
   useFocusEffect(useCallback(() => { refreshTrackers().catch(() => {}); }, [refreshTrackers]));
+  // A saved most-hated list keeps its stars working when the store can't confirm the subscription (offline).
+  const { active: plus } = usePlus();
+  const starred = useMostHatedCount();
+  const starAllowed = plus || starred > 0;
   const muted = new Set(prefs?.muted ?? []);
   const customized = new Set([...Object.keys(prefs?.targetTypes ?? {}), ...Object.keys(prefs?.targetPushTypes ?? {})]);
   const { filter, setFilter, active, reset } = useFilter();
@@ -42,12 +71,13 @@ export default function FollowingScreen() {
       keyExtractor={(t) => t.key}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
       renderItem={({ item }) => (
         <TargetRow
           target={item}
           right={
             <View style={styles.actions}>
+              <MostHatedStar target={item} allowed={starAllowed} />
               <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
                 <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
               </Pressable>
@@ -80,6 +110,7 @@ const styles = StyleSheet.create({
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2) },
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
+  iconStar: { borderWidth: 1, borderColor: GOLD },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },
   unfollow: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },

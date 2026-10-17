@@ -11,7 +11,7 @@ import { leagueColor } from '../lib/leagueUi';
 export function Chip({ label, active, onPress, color, style, accessibilityLabel }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   return (
     <Pressable onPress={onPress} style={[styles.chip, style, active && { backgroundColor: color ?? colors.hate, borderColor: color ?? colors.hate }]} accessibilityRole="button" accessibilityState={{ selected: !!active }} accessibilityLabel={accessibilityLabel}>
-      <Text style={[styles.chipText, active && { color: '#fff' }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.chipText, active && { color: color ? '#fff' : colors.onHate }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   follow: { paddingHorizontal: space(4), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1.5, minWidth: 92, alignItems: 'center' },
   followOff: { backgroundColor: colors.hate, borderColor: colors.hate },
   followOn: { backgroundColor: 'transparent', borderColor: colors.hate },
-  followText: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  followText: { color: colors.onHate, fontWeight: '800', fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
@@ -236,5 +236,5 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   emptyBody: { color: colors.textDim, fontSize: 15, textAlign: 'center', lineHeight: 21 },
   primary: { marginTop: space(3), backgroundColor: colors.hate, paddingHorizontal: space(6), paddingVertical: space(3), borderRadius: radius.pill, alignItems: 'center' },
-  primaryText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  primaryText: { color: colors.onHate, fontWeight: '800', fontSize: 15 },
 });

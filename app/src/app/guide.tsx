@@ -73,7 +73,7 @@ const PAGES: Page[] = [
         <Text style={styles.demoFaint}>Passing: <Text style={styles.demoStrong}>M. Penix Jr.</Text>, 18/27, 211 YDS</Text>
         <View style={[styles.row, { marginTop: space(2), justifyContent: 'space-between' }]}>
           <Text style={styles.demoSub}>Chance the Falcons lose</Text>
-          <Text style={[styles.demoSub, { color: '#FF8A8F', fontWeight: '800' }]}>78%</Text>
+          <Text style={[styles.demoSub, { color: colors.hateText, fontWeight: '800' }]}>78%</Text>
         </View>
         <View style={styles.bar}><View style={[styles.barFill, { width: '78%' }]} /></View>
       </View>
@@ -311,13 +311,13 @@ const styles = StyleSheet.create({
   chipCount: { color: colors.hate, fontSize: 13, fontWeight: '900' },
   chipMore: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   downPill: { backgroundColor: colors.hateDim, borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },
-  downText: { color: '#FF8A8F', fontSize: 12, fontWeight: '800' },
+  downText: { color: colors.hateText, fontSize: 12, fontWeight: '800' },
   trackPill: { backgroundColor: colors.hate, borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2) },
-  trackText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  trackText: { color: colors.onHate, fontWeight: '800', fontSize: 14 },
   round: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: space(2), marginTop: space(2), marginBottom: space(4) },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.border },
   dotOn: { width: 22, backgroundColor: colors.hate },
   primary: { marginHorizontal: space(5), backgroundColor: colors.hate, borderRadius: radius.pill, paddingVertical: space(4), alignItems: 'center' },
-  primaryText: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  primaryText: { color: colors.onHate, fontSize: 17, fontWeight: '900' },
 });

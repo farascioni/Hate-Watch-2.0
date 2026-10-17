@@ -7,19 +7,22 @@ import { AlsoGot, LeagueTag, ago } from './ui';
 import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { isNotice, openAlert, targetHref } from '../lib/alerts';
 import { useShare } from './ShareStyleSheet';
-import { colors, radius, space } from '../theme';
+import { useIsMostHated } from '../lib/mostHated';
+import { GOLD, colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 
-export const FeedCard = memo(function FeedCard({ item, now, fresh }: { item: FeedItem; now: number; fresh?: boolean }) {
+export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: { item: FeedItem; now: number; fresh?: boolean; highlight?: boolean }) {
   const [pressed, setPressed] = useState(false);
   const { share, copied, sheet } = useShare(item);
+  // Only the Feed tab passes `highlight`: the same card on a game, a target page or a shared alert stays plain.
+  const mostHated = useIsMostHated(item.target.key) && !!highlight;
 
   // The alert opens on its own screen, all of its text (here, three lines); its photo opens its player's or team's
   // page. Its clip sits below, outside that tap area, so playing the video (or its controls) never opens anything.
   // A developer notice is from Hate Watch itself: the app's icon, no page to open, no league, nothing to share.
   const notice = isNotice(item);
   return (
-    <View style={[styles.card, notice && (item.urgent ? styles.urgent : styles.notice), fresh && styles.fresh, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <View style={[styles.card, notice && (item.urgent ? styles.urgent : styles.notice), fresh && styles.fresh, mostHated && styles.mostHated, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Pressable
         onPress={() => openAlert(item)}
         onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)}
@@ -91,6 +94,8 @@ const styles = StyleSheet.create({
   urgent: { borderColor: colors.warn },
   noticeLabel: { color: colors.textDim, fontWeight: '800' },
   fresh: { borderColor: colors.hate, shadowColor: colors.hate, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
+  // A subscriber's most hated (the star on the Tracking tab): a gold edge, over the fresh glow's red.
+  mostHated: { borderColor: GOLD, borderWidth: 2 },
   emoji: { position: 'absolute', right: -6, bottom: -6, fontSize: 20 },
   title: { color: colors.text, fontSize: 16, fontWeight: '800', lineHeight: 21 },
   body: { color: colors.textDim, fontSize: 14, lineHeight: 19 },

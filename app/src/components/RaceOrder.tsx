@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   outName: { color: colors.textFaint },
   detail: { color: colors.textFaint, fontSize: 12, lineHeight: 16 },
   // Your driver's places lost, or out of it: their bad afternoon, in the colour of good news here.
-  bad: { color: '#FF8A8F', fontWeight: '700' },
+  bad: { color: colors.hateText, fontWeight: '700' },
   gaps: { alignItems: 'flex-end', flexShrink: 0 },
   gap: { color: colors.text, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   interval: { color: colors.textFaint, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },

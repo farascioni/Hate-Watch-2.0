@@ -36,7 +36,7 @@ export default function TabLayout() {
           headerTitle: 'Hate Watch',
           tabBarIcon: ({ color, size }) => <Ionicons name="flame" color={color} size={size} />,
           tabBarBadge: unseen > 0 ? (unseen > 99 ? '99+' : unseen) : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.hate },
+          tabBarBadgeStyle: { backgroundColor: colors.hate, color: colors.onHate },
         }}
       />
       <Tabs.Screen

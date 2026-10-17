@@ -6,6 +6,7 @@ import { registerForPush, type PushStatus } from './push';
 import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
+import { clearMostHated } from './mostHated';
 import type { EventType, F1Weekend, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -272,6 +273,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // we then start over as a brand-new anonymous device.
       await api.deleteMe();
       await forgetToken();
+      clearMostHated();
       setFollows(new Map());
       setTrackers(new Map());
       setFeed([]);

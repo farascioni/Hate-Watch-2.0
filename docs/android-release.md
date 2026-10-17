@@ -13,7 +13,7 @@
 - **Step 4: Test it without a phone (Android emulator)**: Android Studio's emulator with a Google Play system image, and what to check.
 - **Step 5: Create the app and store listing in Play Console**: the listing's text and images, and the App content questionnaires with answers that fit Hate Watch.
 - **Step 6: Let EAS upload to Play Console for you (service account)**: a Google Cloud service account with Play Console permissions, and its key uploaded to EAS.
-- **Step 7: Internal testing (just you)**: submitting a build, installing it from the Play Store on the emulator, the pre-launch report, and the three tip products.
+- **Step 7: Internal testing (just you)**: submitting a build, installing it from the Play Store on the emulator, the pre-launch report, and the Hate Watch Plus subscription.
 - **Step 8: Closed testing: 12 testers for 14 days**: the track, the testers, the opt-in link, and why testers have to actually use the app.
 - **Step 9: Verify you have access to an Android phone (borrowed)**: the five-minute device check in the Play Console app.
 - **Step 10: Apply for production and launch**: the production application, the first release and its review.
@@ -44,7 +44,7 @@ What is already in place (checked against the files on October 11, 2026):
 - **The notification channel:** alerts go to the channel `hate-events` (`defaultChannel` in the `expo-notifications` plugin).
 - **Predictive back is off** (`predictiveBackGestureEnabled: false`).
 - **The build profiles** (`app/eas.json`): `preview` builds an installable `.apk` (`android.buildType: "apk"`, added in b249331) against the production API, and `production` builds the `.aab` Google Play takes. `autoIncrement` gives each production build a new version code, and EAS keeps the count (`appVersionSource: "remote"`). Both profiles have an update channel (`preview`, `production`) for over-the-air updates.
-- **The tips:** `app/src/lib/tips.ts` lists the three product ids (`com.hatewatch.app.tip.coffee`, `.pizza`, `.trophy`). `expo-iap` is in the plugins, and the app treats tips as consumable. The comment in `tips.ts` says to create the same ids in Play Console as one-time products.
+- **Hate Watch Plus:** `app/src/lib/plus.ts` holds the subscription's product id (`com.hatewatch.app.plus.monthly`). `expo-iap` is in the plugins. The comment in `plus.ts` says to create the same id in Play Console as a subscription with one monthly base plan.
 - **The privacy policy and the data deletion** that Play Console asks about are on the server: `https://hate-watch-api.fly.dev/privacy`, and Settings → "Delete all my data" (`DELETE /me`).
 
 What is not there yet:
@@ -109,7 +109,7 @@ The emulator can't do Google's device verification (step 9), but it's enough for
 
 ## Step 5: Create the app and store listing in Play Console
 
-1. In Play Console, click **Create app**. Name: **Hate Watch**. Default language: English (United States). App or game: **App**. Free or paid: **Free** (tips are in-app purchases, which free apps can have). Accept the declarations.
+1. In Play Console, click **Create app**. Name: **Hate Watch**. Default language: English (United States). App or game: **App**. Free or paid: **Free** (the Hate Watch Plus subscription is an in-app purchase, which free apps can have). Accept the declarations.
 2. **Store listing** (Grow → Store presence → Main store listing). You need:
    - **Short description** (up to 80 characters), for example: *Real-time alerts when the teams and players you hate mess up.*
    - **Full description** (up to 4,000 characters). The App Store description can be reused.
@@ -152,18 +152,13 @@ Internal testing is Google's TestFlight: up to 100 testers, available within min
    (Or build and submit in one go with `eas build --platform android --profile production --auto-submit`.)
    What the flags mean (`eas submit --help`): `--profile` names the submit profile in `eas.json` (it defaults to `production` when there is one). That profile has no `android` settings until step 6 adds them. `--latest` submits the newest Android build on EAS, `--id <buildId>` a particular one, and `--path` a local `.aab` file.
 2. In Play Console, open **Testing** → **Internal testing** → **Testers**. Create an email list with your Google account and add a short release note.
-3. Use the **opt-in link** on that page. Open it in the emulator's browser while signed in to the same Google account, and install Hate Watch from the Play Store. This is the version that can test the tips, because in-app purchases only work for an app installed from Google Play.
+3. Use the **opt-in link** on that page. Open it in the emulator's browser while signed in to the same Google account, and install Hate Watch from the Play Store. This is the version that can test Hate Watch Plus, because in-app purchases only work for an app installed from Google Play.
 4. Check the **pre-launch report** a few hours later (under Testing, or in Quality). Google installs every testing-track build on real phones in its test lab, then shows crashes, screenshots and accessibility warnings. It's the closest thing to owning a few Android phones.
 
-### The tips (in-app purchases)
+### Hate Watch Plus (the subscription)
 
 1. In Play Console, set up a **payments profile** (Settings → Payments profile). Google asks for this before you can create products.
-2. Go to **Monetize** → **Products** → **In-app products** (one-time products), and create the same three products the app already uses, with these exact IDs:
-   - `com.hatewatch.app.tip.coffee`
-   - `com.hatewatch.app.tip.pizza`
-   - `com.hatewatch.app.tip.trophy`
-
-   Give them names and prices (the iOS ones are $1.99, $4.99 and $9.99), then activate them. The app already treats them as consumable, so people can tip more than once.
+2. Go to **Monetize** → **Products** → **Subscriptions**, and create one subscription with the exact ID `com.hatewatch.app.plus.monthly`. Give it a name, then add one **base plan**: auto-renewing, billing period 1 month, price $5.00 (set per country), and activate it. The app buys through the base plan's offer token, so it needs exactly one active base plan with no required offers.
 3. Under **Settings** → **License testing**, add your Google account, so your test purchases aren't charged.
 
 ## Step 8: Closed testing: 12 testers for 14 days

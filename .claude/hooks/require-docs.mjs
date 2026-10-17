@@ -123,7 +123,7 @@ const AREAS = [
   [/alert\/\[id\]|FeedCard|alerts\.ts/i, 'README "An alert on its own screen"'],
   [/flags|flag-cli/i, 'CLAUDE.md "Server switches"; vault "Feature switches"'],
   [/news\.ts/i, 'README "Notifications" → "Off-field trouble / Fined or suspended"'],
-  [/tips|Donate|TipJar/i, 'README "Donations (in-app tips)"'],
+  [/Plus\.tsx|PlusStore|lib\/plus|theme\.ts/, 'docs/deploy.md "Hate Watch Plus (the $5/month subscription)"'],
 ];
 const hits = AREAS.filter(([re]) => re.test(file)).map(([, d]) => `  - ${d}`);
 const app = /\/app\//.test(file) ? ['  - app/AGENTS.md: Expo changes every SDK, so read the versioned docs for any Expo or React Native API you touch'] : [];

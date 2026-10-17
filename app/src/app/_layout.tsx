@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect, type ComponentType, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import { Stack, router, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import { StoreProvider } from '../lib/store';
 import { EasterEggOverlay } from '../components/EasterEggOverlay';
 import { needsGuide, settleGuide } from '../lib/guide';
+import { iapAvailable } from '../lib/plus';
 import { colors } from '../theme';
 
 /** A screen opened straight from a link (a shared alert) still has the tabs underneath to go back to. */
@@ -30,8 +31,12 @@ function FirstLaunchGuide() {
   return null;
 }
 
+// Required lazily: evaluating expo-iap without its native module (Expo Go, web) throws.
+const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require('../components/PlusStore').PlusStore : Fragment;
+
 export default function RootLayout() {
   return (
+    <PlusStore>
     <StoreProvider>
       <StatusBar style="light" />
       {Platform.OS !== 'web' && <NotificationRouter />}
@@ -57,5 +62,6 @@ export default function RootLayout() {
       </Stack>
       <EasterEggOverlay />
     </StoreProvider>
+    </PlusStore>
   );
 }

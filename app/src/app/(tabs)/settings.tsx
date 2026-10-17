@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { api, API_URL } from '../../lib/api';
 import { SectionHeader } from '../../components/ui';
-import { TipJar } from '../../components/TipJar';
+import { Plus } from '../../components/Plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
@@ -71,7 +71,7 @@ export default function SettingsScreen() {
       <HateWatchCounter />
 
       <SectionHeader>Support Hate Watch</SectionHeader>
-      <TipJar />
+      <Plus />
 
       <SectionHeader>Delivery</SectionHeader>
       <View style={styles.card}>
