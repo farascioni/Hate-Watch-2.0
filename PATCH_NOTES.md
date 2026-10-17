@@ -7,6 +7,8 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+## Build 16 (October 17, 2026)
+
 LOCK SCREEN SCOREBOARD
 - New in Settings, Delivery: Lock screen scoreboard (off until you switch it on; needs this build). A live scoreboard on the lock screen lists the live games of your teams: favorite teams first, then most hated, then the rest, with "+N more" past four games. Finals stay for 10 minutes.
 - To sort by most hated, the app sends your most hated list to Hate Watch while the scoreboard is on. Switching it off, a lapsed Plus and "Delete all my data" remove it. F1 and the UFC are not on the board yet.
