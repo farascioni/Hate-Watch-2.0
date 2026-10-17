@@ -8,7 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 TRACKING TAB
-- Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name.
+- Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
 
 ## Build 15 (October 17, 2026)
 
