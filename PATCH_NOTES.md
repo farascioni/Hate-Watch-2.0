@@ -13,6 +13,7 @@ HATE WATCH PLUS
 - On the Scores tab, a game's card gets a gold border while a team on your most hated list is playing, or the team of a player on it (or, in F1, a driver or constructor on it). (Update)
 
 STARTUP GUIDE
+- A new last page of the guide explains Hate Watch Plus and its four extras: gold accents, gold app icon, most hated and favorite teams. (Update)
 - The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
 
 TRACKING TAB

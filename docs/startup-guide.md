@@ -4,16 +4,16 @@
 
 ## Index
 
-**Summary:** On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, and "You're all set". It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
+**Summary:** On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, "You're all set", and Hate Watch Plus. It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
 
 **Sections:**
-- **Startup guide**: On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, and "You're all set".
+- **Startup guide**: On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, "You're all set", and Hate Watch Plus.
 
 The README's "Startup guide" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Startup guide
 
-**In short:** On a device's first launch the app opens a nine-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, and "You're all set". It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
+**In short:** On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, "You're all set", and Hate Watch Plus. It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
 
 **The pages,** in order (`PAGES`). Each has an icon (the first a large devil face), where in the app it is, a title, a sentence or two, and on most a drawing of the real control:
 
@@ -25,7 +25,8 @@ The README's "Startup guide" has the summary; this is the full detail. Read this
 6. Settings tab, "Choose your alerts": each kind of alert on or off for every league, and the bell that decides between a notification and the feed only.
 7. Settings tab, "Keep score": the Successful Hate Watch counter at the top of Settings, every time a team you track loses or the team of a player you track; "+3 more" shows every team.
 8. Tracking tab, "Fine-tune one player or team": a drawing of Daniel Jones' card (a banner in the team's colour with the league and "214 haters", the avatar over its edge, the name, then the star, bell, gear and Unfollow buttons along the bottom), then what each is: the hater count ("How many people hate them, you included."), the star (with Hate Watch Plus, marks your most hated; their alerts get a gold border in the Feed), the bell (no notifications about just them; their alerts still reach the feed), the gear (pick exactly which alerts you get about them, which beats the global settings) and Unfollow (stop tracking them entirely).
-9. "You're all set": you can watch the guide again any time from Settings. On the first run it adds "Next, your phone will ask to send you notifications. Allow them so alerts reach you even when the app is closed."
+9. "You're all set": you can watch the guide again any time from Settings.
+10. Settings tab, "Hate Watch Plus" (the last page; a gold-bordered drawing, `GOLD` from `app/src/theme.ts`): a monthly subscription that keeps the servers running and the app ad free, with the four extras under Support Hate Watch in Settings: gold accents, gold app icon, most hated (the star on the Tracking tab; gold border in the Feed and on Scores game cards) and favorite teams (the heart on Search; while it plays, its opponent's alerts for that game reach you). On the first run it adds "Next, your phone will ask to send you notifications. Allow them so alerts reach you even when the app is closed." It names no price: the store shows it.
 
 **Moving through it:** swipe sideways (pages snap), or tap Next at the bottom. From the second page a Back link at the top left goes to the previous one. Skip at the top right closes it from any page but the last. Dots under the pages show where you are. The last page's button is "Find someone to hate" on the first run (it closes the guide and opens Search) and "Done" when rewatched (back to Settings). The pictures are drawings of the real controls, not live ones, so nothing in the guide changes settings.
 

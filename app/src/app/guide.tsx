@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AlsoGot, LeagueTag } from '../components/ui';
 import { markGuideSeen, settleGuide } from '../lib/guide';
-import { colors, radius, space } from '../theme';
+import { GOLD, colors, radius, space } from '../theme';
 
 /**
  * The startup guide. Opens over the app on a device's first launch (`?first=1`, see _layout.tsx) and
@@ -172,6 +172,18 @@ const PAGES: Page[] = [
     key: 'done', icon: 'checkmark-circle', title: "You're all set",
     body: 'You can watch this guide again any time from Settings.',
   },
+  {
+    key: 'plus', icon: 'star', where: 'Settings tab', title: 'Hate Watch Plus',
+    body: "A monthly subscription that keeps the servers running and the app ad free. It unlocks four extras, under Support Hate Watch in Settings:",
+    demo: () => (
+      <View style={[styles.demoCard, { borderColor: GOLD, gap: space(4) }]}>
+        <Explain icon="color-palette" color={GOLD} text="Gold accents: swaps the red for gold throughout the app." />
+        <Explain icon="apps" color={GOLD} text="Gold app icon: a gold icon on your Home Screen." />
+        <Explain icon="star" color={GOLD} text="Most hated: star players and teams on the Tracking tab. Their alerts in the Feed, and their games on the Scores tab, get a gold border." />
+        <Explain icon="heart" color={GOLD} text="Favorite teams: tap the heart on a team in Search to root for it. While it plays, you get its opponent's alerts for that game." />
+      </View>
+    ),
+  },
 ];
 
 export default function GuideScreen() {
@@ -228,10 +240,10 @@ export default function GuideScreen() {
             {item.where ? <Text style={styles.where}>{item.where}</Text> : null}
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.body}>{item.body}</Text>
-            {item.key === 'done' && isFirstRun ? (
+            {item.demo ? <View style={styles.demo}>{item.demo()}</View> : null}
+            {item.key === PAGES[PAGES.length - 1].key && isFirstRun ? (
               <Text style={styles.body}>Next, your phone will ask to send you notifications. Allow them so alerts reach you even when the app is closed.</Text>
             ) : null}
-            {item.demo ? <View style={styles.demo}>{item.demo()}</View> : null}
           </ScrollView>
         )}
       />
@@ -277,10 +289,10 @@ function ToggleRow({ label, on, push, note }: { label: string; on: boolean; push
     </View>
   );
 }
-function Explain({ icon, text }: { icon: Icon; text: string }) {
+function Explain({ icon, text, color = colors.hate }: { icon: Icon; text: string; color?: string }) {
   return (
     <View style={[styles.row, { alignItems: 'flex-start' }]}>
-      <Ionicons name={icon} size={18} color={colors.hate} style={{ marginTop: 2 }} />
+      <Ionicons name={icon} size={18} color={color} style={{ marginTop: 2 }} />
       <Text style={[styles.body, { flex: 1, textAlign: 'left', marginTop: 0 }]}>{text}</Text>
     </View>
   );
