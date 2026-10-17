@@ -69,3 +69,11 @@ test("college football: record, streak and a conference standing from the confer
   assert.equal(got.get('5')?.standing, undefined, 'no conference game yet (or an independent): no standing');
   assert.equal(parseDivisions('mlb', MLB).get('10')?.standing, undefined, 'only college football');
 });
+
+test("a preseason table (the NBA in October) gives no streak: exhibitions aren't form", () => {
+  const e = { team: { id: '2' }, stats: [{ name: 'streak', displayValue: 'W4' }] };
+  const at = (lg: any, seasonType: number) => parseDivisions(lg, { children: [{ name: 'Atlantic', abbreviation: 'AT', standings: { seasonType, entries: [e] } }] }).get('2');
+  assert.equal(at('nba', 1)?.streak, undefined);
+  assert.equal(at('nba', 2)?.streak, 'W4');
+  assert.equal(at('epl', 1)?.streak, 'W4', "soccer's type 1 is its season");
+});

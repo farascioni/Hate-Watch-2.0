@@ -18,14 +18,14 @@ const gameLine = (g: GameInfo) => `${g.matchup}${g.score ? ` ${g.score}` : ''} Â
 
 function Pill({ text, tone }: { text: string; tone?: boolean }) {
   const c = tone === undefined ? colors.textDim : tone ? GREEN : RED;
-  return <View style={[styles.pill, { borderColor: c + '66' }]}><Text style={[styles.pillText, { color: c }]}>{text}</Text></View>;
+  return <View style={[styles.pill, { borderColor: c + '66' }]}><Text style={[styles.pillText, { color: c }]} numberOfLines={1}>{text}</Text></View>;
 }
 
 /** Record and streak as pills; nothing for a league ESPN has neither for. */
-function Form({ info }: { info: CardInfo }) {
+function Form({ info, short }: { info: CardInfo; short?: boolean }) {
   const s = streakOf(info.streak);
-  if (!info.record && !s) return null;
-  return <>{info.record ? <Pill text={info.record} /> : null}{s ? <Pill text={s.text} tone={s.win} /> : null}{info.standing ? <Pill text={info.standing} /> : null}</>;
+  if (!info.record && !s && !info.standing) return null;
+  return <>{info.record ? <Pill text={info.record} /> : null}{s ? <Pill text={s.text} tone={s.win} /> : null}{info.standing ? <Pill text={short ? info.standing.replace(' in conference', ' conf') : info.standing} /> : null}</>;
 }
 
 const open = (t: Target) => router.push(`/target/${encodeURIComponent(t.key)}`);
@@ -59,7 +59,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
             </View>
           ) : null}
         </View>
-        <View style={styles.footer}><Form info={info} /><View style={styles.push}>{actions(true)}</View></View>
+        <View style={styles.footer}><View style={styles.form}><Form info={info} /></View>{actions(true)}</View>
       </Pressable>
     );
   }
@@ -78,7 +78,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
             <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text>
           </View>
         </View>
-        <View style={[styles.footer, { paddingTop: 0 }]}><Form info={info} /><View style={styles.push}>{actions(true)}</View></View>
+        <View style={[styles.footer, { paddingTop: 0 }]}><View style={styles.form}><Form info={info} /></View>{actions(true)}</View>
       </Pressable>
     );
   }
@@ -93,7 +93,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
             <View style={styles.row}><LeagueTag league={target.league} /><HaterCount target={target} size={11} /></View>
           </View>
         </View>
-        <View style={styles.row}><Form info={info} />{!info.record && !info.streak ? <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text> : null}</View>
+        <View style={styles.row}><Form info={info} short />{!info.record && !info.streak ? <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text> : null}</View>
         <Text style={[styles.sub, g?.label === 'LIVE' && { color: colors.hate, fontWeight: '700' }]} numberOfLines={1}>{g ? `${g.label} ${gameLine(g)}` : 'No game soon'}</Text>
         <View style={styles.tileActions}>{actions(true)}</View>
       </Pressable>
@@ -121,7 +121,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
         {cell(g ? g.label : 'GAME', g ? `${g.matchup}${g.score ? ` ${g.score}` : ''}` : 'â€“', g ? labelColor(g) : undefined)}
       </View>
       <View style={styles.footer}>
-        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={1}>{g ? g.status : info.standing ?? 'No game soon'}</Text>
+        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={2}>{[g?.status, info.standing].filter(Boolean).join('\n') || 'No game soon'}</Text>
         {actions(true)}
       </View>
     </Pressable>
@@ -133,10 +133,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), flexWrap: 'wrap' },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
   sub: { color: colors.textDim, fontSize: 12 },
-  pill: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space(2), paddingVertical: 2 },
+  pill: { maxWidth: '100%', borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space(2), paddingVertical: 2 },
   pillText: { fontSize: 12, fontWeight: '700' },
   footer: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingHorizontal: space(3), paddingBottom: space(2), paddingTop: space(1) },
-  push: { marginLeft: 'auto' },
+  form: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(1.5) },
   compact: { paddingLeft: 4 },
   bar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   compactMain: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(3), paddingTop: space(2.5), paddingBottom: space(1) },

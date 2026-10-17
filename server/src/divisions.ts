@@ -1,7 +1,7 @@
 // Each team's division (MLB "AL East", NFL "AFC South", NBA "East · Atlantic", NHL "West · Pacific"; the
 // WNBA has conferences, the EPL one table), for the Search tab's "By division". From ESPN's standings at
 // division level, in ESPN's order (AL East, AL Central, AL West, NL East...), kept for 15 minutes. The same
-// response gives each team's record and streak, for the Tracking tab's cards (a postseason streak from the ?seasontype=3 read).
+// response gives each team's record and streak, for the Tracking tab's cards (a postseason streak from the ?seasontype=3 read; none from a preseason table).
 import { getJson as espnGetJson } from './espn.ts';
 import { LEAGUES, urls, type League } from './leagues.ts';
 import { kvGet } from './db.ts';
@@ -27,6 +27,8 @@ function label(lg: League, group: any, parent: any): string {
 export function parseDivisions(lg: League, res: any): Map<string, Division> {
   const out = new Map<string, Division>();
   let order = 0;
+  // Preseason (ESPN's season type 1 in the American leagues: October's NBA) has no record, and a streak of exhibitions isn't form.
+  const preseason = (n: any) => n.standings.seasonType === 1 && ['nba', 'wnba', 'nfl', 'nhl', 'mlb'].includes(lg);
   const walk = (n: any, parent?: any) => {
     if (n?.standings?.entries?.length) {
       const name = label(lg, n, parent), at = order++;
@@ -36,7 +38,7 @@ export function parseDivisions(lg: League, res: any): Map<string, Division> {
       const pct = (e: any) => { const [w, l] = conf(e); return w + l > 0 ? w / (w + l) : -1; };
       for (const e of n.standings.entries) {
         if (e.team?.id == null) continue;
-        const record = stat(e, 'overall')?.split(',')[0].trim(), streak = stat(e, 'streak');
+        const record = stat(e, 'overall')?.split(',')[0].trim(), streak = preseason(n) ? undefined : stat(e, 'streak');
         let standing: string | undefined;
         if (lg === 'cfb' && pct(e) >= 0) {
           const peers = n.standings.entries, rank = 1 + peers.filter((o: any) => pct(o) > pct(e)).length;
