@@ -6,7 +6,7 @@ import { createLiveActivity } from 'expo-widgets';
  * The lock screen scoreboard (lib/liveScoreboard.ts, docs/live-activity.md): one line per game, favorites first, then most
  * hated, then tracked. The server builds the props (server/src/live-activity.ts BoardProps) and pushes them to Apple, so
  * this only draws them. Runs in the widget extension's own runtime: no hooks, no imports of ours, nothing declared outside
- * the function. This code is baked into each build (it can't be updated over the air), so it draws what the server wrote
+ * the function. The babel plugin turns this function into a string in the JS bundle, so an EAS Update changes it (the app stores it in the App Group at launch, the extension evaluates it; only components and modifiers already in the installed build's ExpoWidgets.bundle exist). It draws what the server wrote
  * (`l`, `r`, `lc`, `rc`, `mt`: text and colors, changed by a server deploy) and falls back to its own wording when a field is
  * missing. Every region is defined here for the same reason. Props only ever gain fields (`v`).
  *
