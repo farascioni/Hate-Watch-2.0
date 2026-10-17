@@ -13,6 +13,7 @@
   - **App Store Connect answers**: these are the answers given in App Store Connect's privacy and app information forms.
   - **Hate Watch Plus (the $5/month subscription)**: Settings → **Support Hate Watch** has a $5/month auto-renewing subscription through [`expo-iap`](https://openiap.dev/docs/setup/expo) (`app/src/lib/plus.ts`, `app/src/components/PlusStore.tsx`, `Plus.tsx`); a subscriber can switch the red accents and the app icon to gold and star their most hated players and teams.
   - **Icons and splash**: The artwork is an angry eye: a red iris with a black pupil and a white glint in a white eye, under a tapered red brow that bears down toward it, on a near-black background with a dark red glow.
+  - **App Store page images**: the custom Header (21:9) and Search Results (3:2) images and every screenshot set are made from the app's real screens by `app-store/capture-screens.mjs` then `app-store/build-store-images.mjs`; the screenshots are in `app-store/screenshots*/`, one folder per size.
 
 The README's "Deploy" has the summary; this is the full detail. Read this index first, then only the part you need.
 
@@ -240,3 +241,11 @@ Apple and Google keep 15% under their small-business programs. Privacy label: pu
 | `splash-icon.png` | 1024×1024 | the mark at 1.2 scale on transparent | the `expo-splash-screen` plugin: `imageWidth` 220, `resizeMode` contain, on `#0B0B0D` |
 | `favicon.png` | 48×48 | full colour on the gradient | `web.favicon` |
 | `notification-icon.png` | 96×96 | the one-colour mark at 1.35 scale: white on transparent for Android's status bar | the `expo-notifications` plugin's `icon`, tinted `#E5232B`, channel `hate-events` |
+
+### App Store page images
+
+**In short:** App Store Connect's Product Page Information has a "Header and Search Results" tab (a custom Header and a custom Search Results image) and an "App Previews and Screenshots" tab. Both are uploaded by hand; nothing here ships with a build.
+
+- **Retake the screens** when the app's look changes (the images are the app's own screens, so they go stale): start the web app (`hate-watch-web` in `.claude/launch.json`) and the dev server, then `HW_TOKEN=<token> HW_PLAYER=player:nba:4065648 node app-store/capture-screens.mjs`. It opens the web app at iPhone size and 3x with Playwright's Chromium and writes `app-store/raw/{feed,search,scores,tracking,player-alerts,settings}.jpg` (1290×2796). `HW_TOKEN` is the `hatewatch.token` in localStorage of a dev web session that tracks teams and athletes in several leagues (the screens show that device's follows and feed); `HW_PLAYER` is one of its tracked athletes. Check the raw images for stale or empty data before building.
+- **Build the images**: `node app-store/build-store-images.mjs` (needs `app/node_modules`; `sips` scales). It writes the Header and Search Results to `app-store/header-search/` (`header-3840x1646.png` 21:9, `search-results-3840x2560.png` 3:2, drawn with the icon's eye mark and palette; the search image bleeds the Feed screen off the bottom) and six captioned, framed screenshots (feed, search, scores, tracking, player alerts, settings) into `app-store/screenshots/` (1320×2868, 6.9-inch), `screenshots-6.5in/` (1284×2778) and `screenshots-6.3in/` (1206×2622), clearing those folders first. The captions are the `SHOTS` list in the script. Apple's rules (Creative assets specifications): opaque, no prices or URLs, 4+ suitable; the Header and the search card crop differently per device, so keep everything central and check both in App Store Connect's preview. No video versions are made. Uploaded by hand; the Scores screen shows DraftKings odds lines, so swap it if App Review objects.
+- iPhone only (`supportsTablet: false`), so no iPad sizes. All shots are the red look; there are no gold or Plus screenshots.

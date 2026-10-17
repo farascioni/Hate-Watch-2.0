@@ -140,22 +140,31 @@ const PAGES: Page[] = [
   },
   {
     key: 'one', icon: 'eye', where: 'Tracking tab', title: 'Fine-tune one player or team',
-    body: 'Next to everyone you track:',
+    body: 'Everyone you track gets a card with these controls:',
     demo: () => (
       <View style={{ gap: space(4) }}>
-        <DemoCard>
-          <Badge text="DJ" color="#002C5F" />
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={styles.demoTitle} numberOfLines={1}>Daniel Jones</Text>
-            <View style={styles.inline}><LeagueTag league="nfl" /><Text style={styles.demoSub} numberOfLines={1}>QB</Text></View>
-            <View style={[styles.inline, { gap: 4 }]}><Ionicons name="eye" size={12} color={colors.textFaint} /><Text style={styles.demoFaint}>214 haters</Text></View>
+        <View style={[styles.demoCard, { padding: 0, overflow: 'hidden' }]}>
+          <View style={styles.banner}>
+            <Text style={styles.bannerLeague}>NFL</Text>
+            <View style={[styles.inline, { gap: 4 }]}><Ionicons name="eye" size={12} color="#fff" /><Text style={styles.bannerLeague}>214 haters</Text></View>
           </View>
-          <RoundIcon name="notifications" />
-          <RoundIcon name="settings-sharp" highlight />
-        </DemoCard>
+          <View style={{ padding: space(3), paddingTop: 0 }}>
+            <View style={styles.bannerAvatar}><Badge text="DJ" color="#002C5F" /></View>
+            <Text style={[styles.demoTitle, { fontSize: 17 }]}>Daniel Jones</Text>
+            <Text style={styles.demoSub}>QB</Text>
+            <View style={[styles.row, { marginTop: space(3) }]}>
+              <RoundIcon name="star-outline" />
+              <RoundIcon name="notifications" />
+              <RoundIcon name="settings-sharp" highlight />
+              <View style={[styles.unfollowPill, { marginLeft: 'auto' }]}><Text style={styles.unfollowText}>Unfollow</Text></View>
+            </View>
+          </View>
+        </View>
         <Explain icon="eye" text="How many people hate them, you included." />
+        <Explain icon="star" text="Star: with Hate Watch Plus, marks your most hated. Their alerts get a gold border in the Feed." />
         <Explain icon="notifications" text="Bell: no notifications about just them. Their alerts still reach your feed." />
         <Explain icon="settings-sharp" text="Gear: pick exactly which alerts you get about them. It beats your global settings." />
+        <Explain icon="close-circle" text="Unfollow: stop tracking them entirely." />
       </View>
     ),
   },
@@ -314,6 +323,11 @@ const styles = StyleSheet.create({
   downText: { color: colors.hateText, fontSize: 12, fontWeight: '800' },
   trackPill: { backgroundColor: colors.hate, borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2) },
   trackText: { color: colors.onHate, fontWeight: '800', fontSize: 14 },
+  banner: { height: 34, backgroundColor: '#002C5F', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: space(3), paddingLeft: space(3) + 46 + space(3) },
+  bannerLeague: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  bannerAvatar: { alignSelf: 'flex-start', marginTop: -20, marginBottom: space(1), padding: 3, borderRadius: radius.pill, backgroundColor: colors.surface },
+  unfollowPill: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   round: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHi, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: space(2), marginTop: space(2), marginBottom: space(4) },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.border },

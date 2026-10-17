@@ -7,6 +7,9 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+STARTUP GUIDE
+- The Tracking page of the guide now shows the new team and athlete card and explains the star (Hate Watch Plus), bell, gear and Unfollow.
+
 TRACKING TAB
 - Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
 - Each team and athlete has a thin border around it, so the rows are easier to tell apart. (Update)
