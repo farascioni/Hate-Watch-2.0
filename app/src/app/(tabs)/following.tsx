@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useStore } from '../../lib/store';
 import { toggleMostHated, useIsMostHated, useMostHatedCount } from '../../lib/mostHated';
 import { usePlus } from '../../lib/plus';
-import { Empty, PrimaryButton, SectionHeader, TargetRow } from '../../components/ui';
+import { Empty, PrimaryButton, SectionHeader, TargetCard } from '../../components/ui';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
 import { GOLD, colors, radius, space } from '../../theme';
 import type { Target } from '../../lib/types';
@@ -73,10 +73,9 @@ export default function FollowingScreen() {
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
       ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. Unfollow stops tracking them entirely. With Hate Watch Plus, ⭐ marks your most hated: their alerts get a gold border in the Feed.</Text>}
       renderItem={({ item }) => (
-        <TargetRow
+        <TargetCard
           target={item}
-          wrapName // a long name wraps instead of cutting off, and the buttons sit under it
-          right={
+          actions={
             <View style={styles.actions}>
               <MostHatedStar target={item} allowed={starAllowed} />
               <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={styles.icon} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
@@ -113,6 +112,6 @@ const styles = StyleSheet.create({
   icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
   iconStar: { borderWidth: 1, borderColor: GOLD },
   iconCustom: { borderWidth: 1, borderColor: colors.hate },
-  unfollow: { paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  unfollow: { marginLeft: 'auto', paddingHorizontal: space(3), paddingVertical: space(2), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
 });

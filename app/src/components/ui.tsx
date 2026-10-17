@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Avatar } from './Avatar';
+import { Avatar, readableOn } from './Avatar';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
@@ -111,7 +111,7 @@ export function subtitle(t: Target) {
  * "👁 12 haters": how many people track this player or team. The freshest count the app has (from a
  * list the server just sent, or your own follow or unfollow), else the one on the target.
  */
-export function HaterCount({ target, size = 12 }: { target: Target; size?: number }) {
+export function HaterCount({ target, size = 12, tint }: { target: Target; size?: number; tint?: string }) {
   const { trackers, follows } = useStore();
   const n = trackers.get(target.key) ?? target.haters;
   if (n == null) return null;
@@ -119,28 +119,50 @@ export function HaterCount({ target, size = 12 }: { target: Target; size?: numbe
   const label = n === 0 ? 'No haters yet' : n === 1 && mine ? 'Just you' : `${n.toLocaleString()} hater${n === 1 ? '' : 's'}`;
   return (
     <View style={styles.haters} accessible accessibilityLabel={n === 0 ? 'Nobody tracks them yet' : `${n} ${n === 1 ? 'person tracks' : 'people track'} them${mine ? ', you included' : ''}`}>
-      <Ionicons name="eye" size={size} color={colors.textFaint} />
-      <Text style={[styles.hatersText, { fontSize: size }]}>{label}</Text>
+      <Ionicons name="eye" size={size} color={tint ?? colors.textFaint} />
+      <Text style={[styles.hatersText, { fontSize: size }, tint ? { color: tint } : null]}>{label}</Text>
     </View>
   );
 }
 
 /** A player or team in a list, with how many people hate them. `extra` replaces that line. */
-export function TargetRow({ target, right, extra, wrapName }: { target: Target; right?: ReactNode; extra?: ReactNode; wrapName?: boolean }) {
+export function TargetRow({ target, right, extra }: { target: Target; right?: ReactNode; extra?: ReactNode }) {
   return (
-    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, wrapName && styles.rowCard, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
       <Avatar target={target} size={48} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={styles.rowTitle} numberOfLines={wrapName ? undefined : 1}>{target.name}</Text>
+        <Text style={styles.rowTitle} numberOfLines={1}>{target.name}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
           <LeagueTag league={target.league} />
           <Text style={styles.rowSub} numberOfLines={1}>{subtitle(target)}</Text>
         </View>
         {extra ?? <HaterCount target={target} />}
-        {/* wrapName: the name wraps, and wide controls drop under it so the name keeps the row's width */}
-        {wrapName && right ? <View style={{ marginTop: space(2), alignSelf: 'flex-start' }}>{right}</View> : null}
       </View>
-      {wrapName && right ? null : right ?? <FollowButton target={target} />}
+      {right ?? <FollowButton target={target} />}
+    </Pressable>
+  );
+}
+
+/**
+ * The Tracking tab's card: a banner in the team's colour (league on the left, hater count on the right), the avatar
+ * overlapping it, the name wrapping freely, and `actions` along the bottom.
+ */
+export function TargetCard({ target, actions }: { target: Target; actions: ReactNode }) {
+  const { leagueInfo } = useStore();
+  const tint = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.border;
+  const ink = readableOn(tint);
+  return (
+    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHi }]}>
+      <View style={[styles.banner, { backgroundColor: tint }]}>
+        <Text style={[styles.bannerLeague, { color: ink }]}>{leagueInfo(target.league)?.name ?? target.league.toUpperCase()}</Text>
+        <HaterCount target={target} tint={ink} />
+      </View>
+      <View style={styles.cardBody}>
+        <View style={styles.cardAvatar}><Avatar target={target} size={56} /></View>
+        <Text style={styles.cardTitle}>{target.name}</Text>
+        <Text style={styles.rowSub}>{subtitle(target)}</Text>
+        <View style={{ marginTop: space(3) }}>{actions}</View>
+      </View>
     </Pressable>
   );
 }
@@ -230,7 +252,12 @@ const styles = StyleSheet.create({
   followOn: { backgroundColor: 'transparent', borderColor: colors.hate },
   followText: { color: colors.onHate, fontWeight: '800', fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space(3), paddingHorizontal: space(4), paddingVertical: space(3) },
-  rowCard: { marginHorizontal: space(3), marginVertical: space(1), borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
+  card: { marginHorizontal: space(3), marginVertical: space(1), borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface, overflow: 'hidden' },
+  banner: { height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: space(4), paddingLeft: space(4) + 62 + space(3) }, // the left gap clears the avatar (56 + 2 × 3 padding) that overlaps the banner
+  bannerLeague: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  cardBody: { paddingHorizontal: space(4), paddingBottom: space(3), gap: 2 },
+  cardAvatar: { alignSelf: 'flex-start', marginTop: -28, marginBottom: space(1), padding: 3, borderRadius: radius.pill, backgroundColor: colors.surface },
+  cardTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rowSub: { color: colors.textDim, fontSize: 13, flexShrink: 1 },
   // Opaque, like the Feed's day headers: iOS pins SectionList headers while scrolling, and rows must not show through.

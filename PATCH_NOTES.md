@@ -10,6 +10,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 TRACKING TAB
 - Long team and athlete names wrap onto a second line instead of being cut off; the star, bell, gear and Unfollow buttons sit under the name. (Update)
 - Each team and athlete has a thin border around it, so the rows are easier to tell apart. (Update)
+- Teams and athletes are now cards with a banner in their team's color: the league on the left, how many people hate them on the right, and the logo or photo sitting over the banner's edge. The name is larger, and the buttons run along the bottom with Unfollow on the right.
 
 ## Build 15 (October 17, 2026)
 

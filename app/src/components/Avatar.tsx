@@ -62,7 +62,7 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
 }
 
 /** Black or white text, whichever reads better on a hex background (Alpine yellow, Williams white…). */
-function readableOn(hex: string) {
+export function readableOn(hex: string) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!m) return '#fff';
   const n = parseInt(m[1], 16);
