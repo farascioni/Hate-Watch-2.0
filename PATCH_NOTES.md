@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
+- When a newer build is out (TestFlight, or the App Store once the app is public), opening the app shows "Update available" with Update (opens TestFlight or the App Store) and Later, once per build. (Update)
 - The app now checks for an update by itself when you open it (and when you come back to it after a minute away), downloads it and restarts into it right away, so you no longer have to force-quit and reopen it to get the latest version. (Update)
 - The red X on the Tracking tab is now shown only to Hate Watch Plus subscribers; without Plus it is gone (it used to offer Plus when tapped), along with the line about it at the top of the tab. (Update)
 - Tap LIVE (the badge at the top of the Feed and Scores tabs) to check for an app update: if there is one it downloads and the app restarts into it, otherwise it says you are up to date. Before, a new update only arrived after you force-quit and reopened the app, sometimes twice. (Update)

@@ -15,6 +15,7 @@ import { appSiteAssociation, shareCard, sharedAlert, shareLink, type Reply } fro
 import { allGames, deviceTeams, forgetDeviceTeams, gameDetail, gamesFor, getGame, nextF1Weekend } from './scores.ts';
 import { forDevice } from './highlights.ts';
 import { flagOn } from './flags.ts';
+import { getLatestBuild } from './app-build.ts';
 import { deleteLiveActivity, getLiveActivity, putLiveActivity } from './live-activity.ts';
 import { withoutImages } from './images.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
@@ -69,6 +70,7 @@ route('GET', '/health/deep', false, async () => {
 // Each league's sport too: the app shows any soccer league's matches the soccer way.
 // `ui`: how the app shows each league (its color, filter, words: leagues.ts LeagueUi). `teamsOnly`: a league with no players (college football).
 route('GET', '/catalog/event-types', false, () => ({ leagues: LEAGUE_IDS.map((id) => ({ id, name: LEAGUES[id].name, sport: LEAGUES[id].sport, ui: LEAGUES[id].ui, ...(TEAMS_ONLY.has(id) ? { teamsOnly: true } : {}) })), types: EVENT_TYPES }));
+route('GET', '/app/latest-build', false, () => getLatestBuild()); // the newest build and where to get it, for the app's "update available" alert (app-build.ts)
 route('GET', '/catalog/report', false, () => kvGet('ingest:report'));
 route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {

@@ -66,6 +66,8 @@ export const api = {
   target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
   /** A player's or team's stats page (every league: F1's from f1-stats.ts, the UFC's from ufc.ts). */
   stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
+  /** The newest iOS build (null until the server has one recorded) and the TestFlight or App Store link that gets it, for the "update available" alert (lib/updates.ts). */
+  latestBuild: () => request<{ ios: number | null; url: string }>('GET', '/app/latest-build', undefined, false),
   /** The alert behind a share link (/a/<code>), for the screen that link opens in the app. */
   /** The most hated players and teams. No kind = both; no league = every sport. */
   leaderboard: (f: { kind?: 'team' | 'player'; league?: League }) =>
