@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Platform, useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions, type ViewStyle } from 'react-native';
 
 /**
  * How the web version uses a wide window, picked with the buttons at the bottom of its sidebar. Kept in this browser only.
@@ -20,6 +20,8 @@ export const SIDEBAR = 208;
 export const RAIL = 64;
 export const LIST_PANE = 400;   // panes: the tab's width
 export const DETAIL_MAX = 760;  // a game, player or alert reads best at this width, centred in what's left
+/** Search and Settings stay one centred column in a wide window. Inside the screen, not on its scene: the tabs keep inactive scenes painted underneath, so a narrow scene lets the Feed show beside it. */
+export const COLUMN: ViewStyle | undefined = Platform.OS === 'web' ? { width: '100%', maxWidth: 640, marginHorizontal: 'auto' as unknown as number } : undefined;
 const GRID_MAX = 1600;
 const CARD_MIN = 340;
 

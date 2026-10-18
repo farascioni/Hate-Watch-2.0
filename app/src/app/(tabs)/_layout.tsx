@@ -21,8 +21,7 @@ export default function TabLayout() {
   const { wide, panes } = useWebLayout();
   // Panes draw the tab beside the router's stack (WebShell's ListPane), so the router's own tab screens would be a second copy.
   if (panes) return <DetailPlaceholder />;
-  // A sidebar (WebShell) replaces the tab bar and the leaderboard button; Search and Settings stay a column.
-  const narrow = { backgroundColor: colors.bg, ...(wide && { width: '100%' as const, maxWidth: 640, marginHorizontal: 'auto' as unknown as number }) };
+  // A sidebar (WebShell) replaces the tab bar and the leaderboard button.
   return (
     <Tabs
       screenOptions={{
@@ -52,7 +51,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="search"
-        options={{ title: 'Search', sceneStyle: narrow, tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} /> }}
+        options={{ title: 'Search', tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="following"
@@ -64,7 +63,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="settings"
-        options={{ title: 'Settings', sceneStyle: narrow, tabBarIcon: ({ color, size }) => <Ionicons name="options" color={color} size={size} /> }}
+        options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Ionicons name="options" color={color} size={size} /> }}
       />
     </Tabs>
   );

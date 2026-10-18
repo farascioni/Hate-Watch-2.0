@@ -10,6 +10,7 @@ import { Favorites } from '../../components/Favorites';
 import { setDevPlus, useDevPlus } from '../../lib/plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
+import { COLUMN } from '../../lib/webLayout';
 import { liveBoardSupported, LIVE_LAYOUTS, setLiveBoard, setLiveLayout, useLiveBoard, useLiveLayout, type LiveLayout } from '../../lib/liveScoreboard';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, radius, space } from '../../theme';
@@ -73,7 +74,7 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <ScrollView contentContainerStyle={{ paddingBottom: space(16) }}>
+    <ScrollView contentContainerStyle={[{ paddingBottom: space(16) }, COLUMN]}>
       <HateWatchCounter />
 
       <SectionHeader>Support Hate Watch</SectionHeader>

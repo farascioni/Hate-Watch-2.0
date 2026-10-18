@@ -9,6 +9,7 @@ import { FilterBar, byWeightClass, groupByWeightClass, kindOf, playersWord, useF
 import { colors, radius, space } from '../../theme';
 import type { Player, Target, Team, WeightClass } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
+import { COLUMN } from '../../lib/webLayout';
 
 export default function SearchScreen() {
   const { noteTrackers } = useStore();
@@ -104,7 +105,7 @@ export default function SearchScreen() {
   }, [browsing, showTeams, byDivision, teams, results, league, leagueInfo, classes, weightClasses, allDrivers, drivers]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={[{ flex: 1, backgroundColor: colors.bg }, COLUMN]}>
       <View style={[styles.searchBox, focused && { borderColor: colors.hate }]}>
         <Ionicons name="search" size={18} color={colors.textFaint} />
         <TextInput

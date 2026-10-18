@@ -189,7 +189,9 @@ const PAGES: Page[] = [
 export default function GuideScreen() {
   const { first } = useLocalSearchParams<{ first?: string }>();
   const isFirstRun = first === '1';
-  const { width } = useWindowDimensions();
+  const windowWidth = useWindowDimensions().width;
+  const [listWidth, setListWidth] = useState(0);
+  const width = listWidth || windowWidth; // the web version puts the guide in a column narrower than the window
   const insets = useSafeAreaInsets();
   const list = useRef<FlatList<Page>>(null);
   const [index, setIndex] = useState(0);
@@ -226,6 +228,7 @@ export default function GuideScreen() {
         keyExtractor={(p) => p.key}
         horizontal
         pagingEnabled
+        onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}
         showsHorizontalScrollIndicator={false}
         bounces={false}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
