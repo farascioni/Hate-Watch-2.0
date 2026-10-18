@@ -5,6 +5,8 @@ import { useStore } from '../../lib/store';
 import { FeedCard } from '../../components/FeedCard';
 import { Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
 import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
+import { GridRow } from '../../components/GridRow';
+import { chunkSections, useWebLayout } from '../../lib/webLayout';
 import { colors, space } from '../../theme';
 import type { FeedItem } from '../../lib/types';
 
@@ -23,6 +25,7 @@ export default function FeedScreen() {
   const now = useNow(10_000);
   const nav = useNavigation();
   const { filter, setFilter, active, reset } = useFilter();
+  const { cols } = useWebLayout();
 
   useEffect(() => { nav.setOptions({ headerRight: () => <LiveBadge /> }); }, [nav]);
   useFocusEffect(useCallback(() => { markSeen(); setOpenedAt(Date.now()); }, [feed.length]));
@@ -43,15 +46,17 @@ export default function FeedScreen() {
     return out;
   }, [visible]);
 
+  const rows = useMemo(() => chunkSections(sections, () => cols), [sections, cols]);
+
   if (!ready) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
     {feed.length ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
     <SectionList
-      sections={sections}
-      keyExtractor={(i) => i.id}
-      renderItem={({ item }) => <FeedCard item={item} now={now} highlight fresh={item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000} />}
+      sections={rows}
+      keyExtractor={(row) => row.map((i) => i.id).join('|')}
+      renderItem={({ item: row }) => <GridRow row={row} cols={cols} render={(item) => <FeedCard item={item} now={now} highlight fresh={item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000} />} />}
       renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
       stickySectionHeadersEnabled
       contentContainerStyle={{ paddingBottom: space(6), flexGrow: 1 }}

@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -12,6 +12,8 @@ import { Chip, Empty, PrimaryButton, SectionHeader } from '../../components/ui';
 import { TrackingCard } from '../../components/TrackingCard';
 import { LayoutSheet } from '../../components/LayoutSheet';
 import { useTrackingLayout } from '../../lib/trackingLayout';
+import { useWebLayout } from '../../lib/webLayout';
+import { GridRow } from '../../components/GridRow';
 import { gameInfo, teamKeyOf } from '../../lib/trackingInfo';
 import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFilter, playersTitle, useFilter } from '../../components/FilterBar';
 import { HATE_RED, colors, radius, space } from '../../theme';
@@ -90,7 +92,8 @@ export default function FollowingScreen() {
   const reset = () => { resetFilter(); setHatedOnly(false); };
 
   // Rows of cards: one each, two in the tiles layout (the section's count is of the cards, not the rows).
-  const per = layout === 'tiles' ? 2 : 1;
+  const { cols } = useWebLayout(); // the web's card grid: as many across as fit, never fewer than the layout's own
+  const per = Math.max(layout === 'tiles' ? 2 : 1, cols);
   const sections = useMemo((): { title: string; count: number; data: Target[][] }[] => {
     const all = [...follows.values()].filter((t) => matchesFilter(filter, t) && (!showHated || hated.has(t.key))).sort((a, b) => a.name.localeCompare(b.name));
     const groups = byWeightClass(filter) ? groupByWeightClass(all) : [
@@ -126,11 +129,9 @@ export default function FollowingScreen() {
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
       ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The − (it asks first) stops tracking them entirely.{starAllowed ? ' ❌ marks your most hated: their alerts get a red border in the Feed.' : ''}</Text>}
-      renderItem={({ item: row }) => (
-        <View style={per > 1 ? styles.tiles : undefined}>
-        {row.map((item) => (
+      renderItem={({ item: row }) => {
+        const card = (item: Target) => (
         <TrackingCard
-          key={item.key}
           target={item}
           layout={layout}
           info={{ division: divisionOf(item), record: formOf(item)?.record, streak: formOf(item)?.streak, standing: formOf(item)?.standing, game: gameInfo(item, games, upNext) }}
@@ -162,10 +163,16 @@ export default function FollowingScreen() {
             </View>
           )}
         />
-        ))}
-        {per > 1 && row.length < per ? <View style={{ flex: 1 }} /> : null}
-        </View>
-      )}
+        );
+        // The web's card grid puts the other layouts' cards in cells too; the tiles lay themselves out.
+        if (per > 1 && layout !== 'tiles') return <GridRow row={row} cols={per} render={card} />;
+        return (
+          <View style={per > 1 ? styles.tiles : undefined}>
+            {row.map((item) => <Fragment key={item.key}>{card(item)}</Fragment>)}
+            {Array.from({ length: per > 1 ? per - row.length : 0 }, (_, i) => <View key={`pad${i}`} style={{ flex: 1 }} />)}
+          </View>
+        );
+      }}
       ListEmptyComponent={active ? <Empty emoji="🔎" title={showHated ? `None of your ${filtered ? describeFilter(filter) : 'trackers'} are starred as most hated` : `You're not tracking any ${describeFilter(filter)}`} body={showHated ? 'Tap the ❌ on a player or team to star them.' : 'Change the filter, or find some on the Search tab.'} action={<PrimaryButton label="Show everything" onPress={reset} />} /> : null}
       contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />

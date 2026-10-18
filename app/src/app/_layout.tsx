@@ -1,5 +1,5 @@
 import { Fragment, useEffect, type ComponentType, type ReactNode } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, type ViewStyle } from 'react-native';
 import { Stack, router, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -8,6 +8,8 @@ import { EasterEggOverlay } from '../components/EasterEggOverlay';
 import { needsGuide, settleGuide } from '../lib/guide';
 import { iapAvailable } from '../lib/plus';
 import { useAutoUpdate } from '../lib/updates';
+import { DETAIL_MAX, useWebLayout } from '../lib/webLayout';
+import { WebShell } from '../components/WebShell';
 import { colors } from '../theme';
 
 /** A screen opened straight from a link (a shared alert) still has the tabs underneath to go back to. */
@@ -35,30 +37,30 @@ function FirstLaunchGuide() {
 // Required lazily: evaluating expo-iap without its native module (Expo Go, web) throws.
 const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require('../components/PlusStore').PlusStore : Fragment;
 
-// On the web the app is a phone layout: keep it a centred column instead of stretching across a desktop window.
-const Frame: ComponentType<{ children: ReactNode }> =
-  Platform.OS === 'web'
-    ? ({ children }) => <View style={{ flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center' }}>{children}</View>
-    : Fragment;
+// On the web the app is a phone layout in a centred column; in a wide window, a sidebar and the picked layout (WebShell).
+const Shell: ComponentType<{ children: ReactNode }> = Platform.OS === 'web' ? WebShell : Fragment;
 
 export default function RootLayout() {
   useAutoUpdate();
+  const { wide } = useWebLayout();
+  // A game, player or alert reads best narrow: centred in the room the sidebar leaves (the tabs fill it).
+  const detail: ViewStyle | undefined = wide ? { width: '100%', maxWidth: DETAIL_MAX, marginHorizontal: 'auto' as unknown as number } : undefined;
   return (
     <PlusStore>
     <StoreProvider>
       <StatusBar style="light" />
       {Platform.OS !== 'web' && <NotificationRouter />}
       <FirstLaunchGuide />
-      <Frame>
+      <Shell>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           headerTitleStyle: { fontWeight: '800' },
-          contentStyle: { backgroundColor: colors.bg },
+          contentStyle: { backgroundColor: colors.bg, ...detail },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
         <Stack.Screen name="target/[key]" options={{ title: '', headerBackTitle: 'Back' }} />
         <Stack.Screen name="stats/[key]" options={{ title: 'Stats', headerBackTitle: 'Back' }} />
         <Stack.Screen name="alerts/[key]" options={{ title: 'Alerts', headerBackTitle: 'Back' }} />
@@ -69,7 +71,7 @@ export default function RootLayout() {
         <Stack.Screen name="a/[code]" options={{ title: 'Shared alert', headerBackTitle: 'Back' }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
-      </Frame>
+      </Shell>
       <EasterEggOverlay />
     </StoreProvider>
     </PlusStore>

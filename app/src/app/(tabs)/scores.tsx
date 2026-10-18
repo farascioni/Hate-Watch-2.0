@@ -9,6 +9,8 @@ import { F1Grid } from '../../components/F1Preview';
 import { UfcBoutRow, cardDate, fightTime } from '../../components/UfcCard';
 import { Empty, LiveBadge, PrimaryButton, SectionHeader, useNow } from '../../components/ui';
 import { FilterBar, useFilter } from '../../components/FilterBar';
+import { GridRow } from '../../components/GridRow';
+import { chunkSections, useWebLayout } from '../../lib/webLayout';
 import { SECTION, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard } from '../../lib/types';
@@ -134,6 +136,10 @@ export default function ScoresScreen() {
   const listed: { title: string; data: (GameCard | NextGame | SessionAhead)[]; upNext?: boolean; kind?: string }[] = f1Only ? f1Sections
     : mode === 'all' ? allSections
     : next.length ? [...sections, { title: 'Up next', data: next, upNext: true }] : sections;
+  // Card grid (web): a race's grid sits under its card, so F1 stays one to a row.
+  const { cols } = useWebLayout();
+  const rowCols = f1Only ? 1 : cols;
+  const rows = chunkSections(listed, () => rowCols);
 
   // The newest alert from each game (the feed is newest first).
   const latest = useMemo(() => {
@@ -179,9 +185,9 @@ export default function ScoresScreen() {
         </View>}
         <FilterBar filter={filter} onChange={setFilter} kinds={false} />
       </View>
-      {ufcOnly ? <UfcScores cards={ufc} failed={ufcFailed} mode={mode} onAll={() => setMode('all')} refreshing={refreshing} onRefresh={onRefresh} /> : <SectionList<GameCard | NextGame | SessionAhead, { title: string; upNext?: boolean; kind?: string }>
-        sections={listed}
-        keyExtractor={(g, i) => `${'state' in g ? 'game' : 'kind' in g && g.kind === 'session' ? 'session' : 'next'}:${g.key}:${i}`}
+      {ufcOnly ? <UfcScores cards={ufc} failed={ufcFailed} mode={mode} onAll={() => setMode('all')} refreshing={refreshing} onRefresh={onRefresh} /> : <SectionList<(GameCard | NextGame | SessionAhead)[], { title: string; upNext?: boolean; kind?: string }>
+        sections={rows}
+        keyExtractor={(row, i) => `${row.map((g) => g.key).join('|')}:${i}`}
         // A day with no games for this filter: say so above what's next (unless what's next is today: a
         // game tonight can be in "Up next" before ESPN's scoreboard turns over to today).
         ListHeaderComponent={f1Only ? (f1Mode === 'upcoming' && weekend ? (
@@ -191,11 +197,11 @@ export default function ScoresScreen() {
         ) : null) : mode === 'mine' && !sections.length && next.length && upNextWhen(next[0].startsAt, true, now).day !== 'Today' ? (
           <Text style={styles.none}>{filter.league ? `No ${leagueName(filter.league)} ${word} today.` : `No ${word} today.`}</Text>
         ) : null}
-        renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.length}{section.kind ? ` ${section.kind}` : ''}</SectionHeader>}
-        renderItem={({ item, section }) => (section.upNext
+        renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${section.kind}` : ''}</SectionHeader>}
+        renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} render={(item) => (section.upNext
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
-          : <>{<GameCardView game={item as GameCard} latest={latest.get((item as GameCard).id)} now={now} />}{f1Only && f1Mode === 'upcoming' ? gridUnder(item.key) : null}</>)}
+          : <>{<GameCardView game={item as GameCard} latest={latest.get((item as GameCard).id)} now={now} />}{f1Only && f1Mode === 'upcoming' ? gridUnder(item.key) : null}</>)} />}
         stickySectionHeadersEnabled={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.hate} />}
         contentContainerStyle={{ paddingBottom: space(10), flexGrow: 1 }}

@@ -19,7 +19,7 @@ FEED AND SCORES
 - Hate Watch Plus: a favorite team's alerts now include the other side's errors. When the team you favorite is playing, you get "Commits an error" for the opposing team (Defense, MLB), pushed like the player version. Teams you track get their own team's error alert too.
 - On the Scores tab, a favorite team's game card is edged gold in My games and All games alike, and a most hated team's is red in both. (Update)
 - The Scores tab's Up next now lists the next game of each favorite team too, and its rows are edged gold for a favorite and red for a most hated team, like the Feed and the game cards. (Update)
-- Hate Watch now has a web version: the same app in a browser, without push or Plus.
+- Hate Watch now has a web version: the same app in a browser, without push or Plus. Wide windows get a sidebar and layouts.
 
 LOCK SCREEN SCOREBOARD
 - An eye on each game card (Scores tab) adds the game to the lock screen scoreboard, or takes it off. (Update)
