@@ -4,13 +4,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { DetailPlaceholder } from '../../components/WebShell';
 import { useWebLayout } from '../../lib/webLayout';
+import { useT } from '../../lib/i18n';
 import { colors, space } from '../../theme';
 
 /** Top left of every tab: the leaderboard (the most hated athletes and teams), instead of a sixth tab. */
 function LeaderboardButton() {
+  const t = useT();
   return (
     <Pressable onPress={() => router.push('/leaderboard')} hitSlop={10} style={({ pressed }) => [{ marginLeft: space(4), marginRight: space(2), padding: 2 }, pressed && { opacity: 0.6 }]}
-      accessibilityRole="button" accessibilityLabel="Leaderboard: the most hated athletes and teams">
+      accessibilityRole="button" accessibilityLabel={t('tab.leaderboardLabel')}>
       <Ionicons name="podium" size={22} color={colors.text} />
     </Pressable>
   );
@@ -18,6 +20,7 @@ function LeaderboardButton() {
 
 export default function TabLayout() {
   const { unseen, follows } = useStore();
+  const t = useT();
   const { wide, panes } = useWebLayout();
   // Panes draw the tab beside the router's stack (WebShell's ListPane), so the router's own tab screens would be a second copy.
   if (panes) return <DetailPlaceholder />;
@@ -38,8 +41,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
-          headerTitle: 'Hate Watch',
+          title: t('tab.feed'),
+          headerTitle: t('tab.title'),
           tabBarIcon: ({ color, size }) => <Ionicons name="flame" color={color} size={size} />,
           tabBarBadge: unseen > 0 ? (unseen > 99 ? '99+' : unseen) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.hate, color: colors.onHate },
@@ -47,23 +50,23 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="scores"
-        options={{ title: 'Scores', tabBarIcon: ({ color, size }) => <Ionicons name="trophy" color={color} size={size} /> }}
+        options={{ title: t('tab.scores'), tabBarIcon: ({ color, size }) => <Ionicons name="trophy" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="search"
-        options={{ title: 'Search', tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} /> }}
+        options={{ title: t('tab.search'), tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="following"
         options={{
-          title: 'Tracking',
-          headerTitle: `Tracking (${follows.size})`,
+          title: t('tab.tracking'),
+          headerTitle: t('tab.trackingCount', { n: follows.size }),
           tabBarIcon: ({ color, size }) => <Ionicons name="eye" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="settings"
-        options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <Ionicons name="options" color={color} size={size} /> }}
+        options={{ title: t('tab.settings'), tabBarIcon: ({ color, size }) => <Ionicons name="options" color={color} size={size} /> }}
       />
     </Tabs>
   );

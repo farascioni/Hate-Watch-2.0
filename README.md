@@ -49,6 +49,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Recent misery** ([docs/recent-misery.md](docs/recent-misery.md)): the second tab on every player and team page lists the priority things that happened to them in the last 30 days: every loss (with how it happened as lines on it) and the worst of the rest (an ejection, a serious injury, a pulled quarterback or goalie, a red card, a DNF, a UFC loss).
 - **Successful Hate Watch counter** ([docs/hate-watch-counter.md](docs/hate-watch-counter.md)): The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most.
 - **Leaderboard** ([docs/leaderboard.md](docs/leaderboard.md)): The podium button at the top left of every tab opens the most hated athletes and teams, ranked by how many people (devices) track them, filtered like the Feed: Everything, Teams or Players, in every sport or one league.
+- **Languages (in-app text)** ([docs/i18n.md](docs/i18n.md)): the app's own words come from `app/src/lib/strings/<language>.ts` through `useT()` / `tr()` in `app/src/lib/i18n.ts`; English is the source and the fallback.
 - **Startup guide** ([docs/startup-guide.md](docs/startup-guide.md)): On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, Hate Watch Plus, and "You're all set".
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
@@ -126,6 +127,12 @@ The full detail: [docs/hate-watch-counter.md](docs/hate-watch-counter.md).
 **In short:** The podium button at the top left of every tab opens the most hated athletes and teams, ranked by how many people (devices) track them, filtered like the Feed: Everything, Teams or Players, in every sport or one league. Each filter is the top 100 ranked on the server within that filter, with 🥇🥈🥉 for the top three, ties shown as "T-2" with no gaps after them, and a note when the list is cut. It comes from `GET /leaderboard` (`server/src/leaderboard.ts`), public because it's only counts, never who.
 
 The full detail: [docs/leaderboard.md](docs/leaderboard.md).
+
+## Languages (in-app text)
+
+**In short:** the app's own words come from `app/src/lib/strings/<language>.ts` through `useT()` / `tr()` in `app/src/lib/i18n.ts`; English is the source and the fallback. Today the tabs and Settings are in English and Spanish (Latin America), picked by the device's language (read with `Intl`, no native module, so it ships as an update) or by Settings → Language. Alert text, league names and chips come from the server and stay English for now. French (Canada), Portuguese (Brazil), German and Japanese follow, after a native speaker reviews each.
+
+The full detail: [docs/i18n.md](docs/i18n.md).
 
 ## Startup guide
 

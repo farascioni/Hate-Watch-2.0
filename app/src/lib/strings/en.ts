@@ -1,0 +1,85 @@
+/** English: the source of every key. The other languages are typed against it (docs/i18n.md). `x_one` is used instead of `x` when n is 1. */
+export const en = {
+  // Tabs
+  'tab.feed': 'Feed',
+  'tab.title': 'Hate Watch',
+  'tab.scores': 'Scores',
+  'tab.search': 'Search',
+  'tab.tracking': 'Tracking',
+  'tab.trackingCount': 'Tracking ({n})',
+  'tab.settings': 'Settings',
+  'tab.leaderboardLabel': 'Leaderboard: the most hated athletes and teams',
+
+  // Settings: sections
+  'settings.support': 'Support Hate Watch',
+  'settings.delivery': 'Delivery',
+  'settings.data': 'Data',
+  'settings.about': 'About',
+  'settings.language': 'Language',
+  'settings.languageDevice': 'Device',
+  'settings.languageDesc': 'Alerts come from our server and stay in English for now.',
+
+  // Settings: delivery
+  'settings.push': 'Push notifications',
+  'settings.pushGranted': 'Alerts arrive even when the app is closed.',
+  'settings.pushDenied': 'Blocked in system settings — the feed still updates live.',
+  'settings.pushChecking': 'Checking…',
+  'settings.sound': 'Sound',
+  'settings.soundDesc': 'Play a sound with each alert.',
+  'settings.lockScreen': 'Lock screen scoreboard',
+  'settings.lockScreenDesc': 'The scores of your teams on the lock screen from an hour before the game: favorites first, then most hated, then the rest. It starts when you open the app. Add or remove any game with the eye on its score card. Your most hated list and the games you pick are sent to Hate Watch so it can build the board.',
+  'settings.layout': 'Scoreboard layout',
+  'settings.layoutNewest': ' Needs the newest version of the app.',
+  'layout.compact': 'Compact',
+  'layout.detailed': 'Detailed',
+  'layout.grid': 'Grid',
+  'layout.hero': 'Hero',
+  'layout.compactDesc': 'One line a game.',
+  'layout.detailedDesc': 'Two lines a game: the count, outs and pitcher, or the down and distance, with the bases and each team\'s win chance. Shows fewer games.',
+  'layout.gridDesc': 'Games in cells two across, each with its score and a short status.',
+  'layout.heroDesc': 'The top game big, with its clock and the bases, count or down; the rest as lines.',
+  'settings.quiet': 'Quiet hours',
+  'settings.quietDesc': 'Silence pushes overnight. Everything still lands in your feed.',
+  'settings.from': 'From',
+  'settings.until': 'Until',
+  'settings.earlier': '{label} earlier',
+  'settings.later': '{label} later',
+
+  // Settings: alert groups
+  'settings.hint': 'These are your defaults for everyone. Tap a group to see its alerts. The switch turns an alert on or off; its 🔔 decides whether it also sends a notification or just lands in your feed. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.',
+  'settings.leagueAlerts': '{name} alerts',
+  'settings.allPlayerAlerts': 'All player alerts',
+  'settings.teamAlerts': 'Team alerts',
+  'settings.leagueOff': 'League off · All on turns it back on',
+  'settings.countOn': '{on} of {total} on',
+  'settings.allOn': 'All on',
+  'settings.allOff': 'All off',
+  'settings.hides': 'Hides these alerts',
+  'settings.shows': 'Shows these alerts',
+  'settings.showGroup': 'Show {total} {title}, {summary}',
+
+  // Settings: data
+  'settings.reset': 'Reset alerts to defaults',
+  'settings.clearFeed': 'Clear feed',
+  'settings.clearFeedTitle': 'Clear feed?',
+  'settings.clearFeedBody': 'This removes every item from your feed.',
+  'settings.clear': 'Clear',
+  'settings.cancel': 'Cancel',
+  'settings.deleteAll': 'Delete all my data',
+  'settings.deleteAllTitle': 'Delete all my data?',
+  'settings.deleteAllBody': 'This permanently deletes everyone you track, your settings and your feed from our server, and gives this device a fresh anonymous identity.',
+  'settings.deleteEverything': 'Delete everything',
+  'settings.deleteFailed': 'Could not delete',
+
+  // Settings: about
+  'settings.guide': 'Show the guide',
+  'settings.guideDesc': 'How tracking and alerts work',
+  'settings.feedback': 'Give feedback',
+  'settings.feedbackDesc': 'Bugs, ideas, alerts you want: {email}',
+  'settings.feedbackHint': 'Opens an email to {email}',
+  'settings.privacy': 'Privacy policy',
+  'settings.help': 'Help & support',
+  'settings.footer': 'Data: ESPN public APIs. Live plays polled every ~2s; injury report every 30s; standings every 60s.',
+} as const;
+
+export type Key = keyof typeof en;

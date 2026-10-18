@@ -11,29 +11,28 @@ import { setDevPlus, useDevPlus } from '../../lib/plus';
 import { HateWatchCounter } from '../../components/HateWatchCounter';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { COLUMN } from '../../lib/webLayout';
-import { liveBoardSupported, LIVE_LAYOUTS, setLiveBoard, setLiveLayout, useLiveBoard, useLiveLayout, type LiveLayout } from '../../lib/liveScoreboard';
+import { liveBoardSupported, LIVE_LAYOUTS, setLiveBoard, setLiveLayout, useLiveBoard, useLiveLayout } from '../../lib/liveScoreboard';
 import { FEEDBACK_EMAIL, sendFeedback } from '../../lib/feedback';
 import { colors, radius, space } from '../../theme';
 import { bySection, type EventType, type League } from '../../lib/types';
 import { leagueColor } from '../../lib/leagueUi';
+import { LANGS, currentLocale, setLangPref, useLangPref, useT } from '../../lib/i18n';
 
 /** A folded alert group shows this many of its emoji (the last place becomes "+N" when there are more). Cutting the line short would split an emoji. */
 const FOLDED_EMOJI = 6;
 const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
-const fmtHour = (hm: string) => {
-  const h = Number(hm.slice(0, 2));
-  return `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
-};
+const fmtHour = (hm: string) => new Date(2000, 0, 1, Number(hm.slice(0, 2))).toLocaleTimeString(currentLocale(), { hour: 'numeric' });
 
 function HourStepper({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const t = useT();
   const i = Math.max(0, HOURS.indexOf(value));
   return (
     <View style={styles.stepper}>
       <Text style={styles.desc}>{label}</Text>
       <View style={styles.stepRow}>
-        <Pressable style={styles.stepBtn} onPress={() => onChange(HOURS[(i + 23) % 24])} accessibilityLabel={`${label} earlier`}><Text style={styles.stepTxt}>−</Text></Pressable>
+        <Pressable style={styles.stepBtn} onPress={() => onChange(HOURS[(i + 23) % 24])} accessibilityLabel={t('settings.earlier', { label })}><Text style={styles.stepTxt}>−</Text></Pressable>
         <Text style={styles.stepVal}>{fmtHour(value)}</Text>
-        <Pressable style={styles.stepBtn} onPress={() => onChange(HOURS[(i + 1) % 24])} accessibilityLabel={`${label} later`}><Text style={styles.stepTxt}>+</Text></Pressable>
+        <Pressable style={styles.stepBtn} onPress={() => onChange(HOURS[(i + 1) % 24])} accessibilityLabel={t('settings.later', { label })}><Text style={styles.stepTxt}>+</Text></Pressable>
       </View>
     </View>
   );
@@ -42,6 +41,8 @@ function HourStepper({ label, value, onChange }: { label: string; value: string;
 export default function SettingsScreen() {
   const liveBoard = useLiveBoard();
   const liveLayout = useLiveLayout();
+  const t = useT();
+  const langPref = useLangPref();
   const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   // Each alert group folds up (all start folded, so the page isn't 69 rows long). The tab stays mounted, so this survives switching tabs.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -66,66 +67,66 @@ export default function SettingsScreen() {
     // League-only alerts live under their league, in the server's order: offense, defense, pitching, then
     // team ones like MLB "strands runners", each under its section heading.
     ...leagues.map((l) => ({
-      title: `${l.name} alerts`, color: leagueColor(l.id), league: l.id,
+      title: t('settings.leagueAlerts', { name: l.name }), color: leagueColor(l.id), league: l.id,
       types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id),
     })),
-    { title: 'All player alerts', types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
-    { title: 'Team alerts', types: eventTypes.filter((t) => t.scope === 'team' && t.leagues.length > 1) },
+    { title: t('settings.allPlayerAlerts'), types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
+    { title: t('settings.teamAlerts'), types: eventTypes.filter((t) => t.scope === 'team' && t.leagues.length > 1) },
   ];
 
   return (
     <ScrollView contentContainerStyle={[{ paddingBottom: space(16) }, COLUMN]}>
       <HateWatchCounter />
 
-      <SectionHeader>Support Hate Watch</SectionHeader>
+      <SectionHeader>{t('settings.support')}</SectionHeader>
       <Plus />
       <Favorites />
 
-      <SectionHeader>Delivery</SectionHeader>
+      <SectionHeader>{t('settings.delivery')}</SectionHeader>
       <View style={styles.card}>
-        <SettingRow title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
-        <SettingRow title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
-        {liveBoardSupported ? <SettingRow title="Lock screen scoreboard" desc="The scores of your teams on the lock screen from an hour before the game: favorites first, then most hated, then the rest. It starts when you open the app. Add or remove any game with the eye on its score card. Your most hated list and the games you pick are sent to Hate Watch so it can build the board." value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
+        <SettingRow title={t('settings.push')} desc={push.status === 'granted' ? t('settings.pushGranted') : push.status === 'denied' ? t('settings.pushDenied') : push.reason ?? t('settings.pushChecking')} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
+        <SettingRow title={t('settings.sound')} desc={t('settings.soundDesc')} value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
+        {liveBoardSupported ? <SettingRow title={t('settings.lockScreen')} desc={t('settings.lockScreenDesc')} value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
         {liveBoardSupported && liveBoard ? (
           <View style={styles.layoutRow}>
-            <Text style={styles.layoutTitle}>Scoreboard layout</Text>
-            <Text style={styles.desc}>{LAYOUT_DESC[liveLayout]}{liveLayout === 'compact' ? '' : ' Needs the newest version of the app.'}</Text>
+            <Text style={styles.layoutTitle}>{t('settings.layout')}</Text>
+            <Text style={styles.desc}>{t(`layout.${liveLayout}Desc`)}{liveLayout === 'compact' ? '' : t('settings.layoutNewest')}</Text>
             <View style={styles.layoutChips}>
               {LIVE_LAYOUTS.map((l) => (
                 <Pressable key={l} onPress={() => { setLiveLayout(l); }} accessibilityRole="radio" aria-checked={l === liveLayout} style={[styles.layoutChip, l === liveLayout && styles.layoutChipOn]}>
-                  <Text style={[styles.layoutChipText, l === liveLayout && { color: colors.text }]}>{l[0].toUpperCase() + l.slice(1)}</Text>
+                  <Text style={[styles.layoutChipText, l === liveLayout && { color: colors.text }]}>{t(`layout.${l}`)}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
         ) : null}
-        <SettingRow title="Quiet hours" desc="Silence pushes overnight. Everything still lands in your feed." value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
+        <SettingRow title={t('settings.quiet')} desc={t('settings.quietDesc')} value={prefs.quietHours.enabled} onChange={(v) => updatePrefs({ quietHours: { ...prefs.quietHours, enabled: v, tz: Intl.DateTimeFormat().resolvedOptions().timeZone } })} />
         {prefs.quietHours.enabled ? (
           <View style={styles.quiet}>
-            <HourStepper label="From" value={prefs.quietHours.start} onChange={(start) => updatePrefs({ quietHours: { ...prefs.quietHours, start } })} />
-            <HourStepper label="Until" value={prefs.quietHours.end} onChange={(end) => updatePrefs({ quietHours: { ...prefs.quietHours, end } })} />
+            <HourStepper label={t('settings.from')} value={prefs.quietHours.start} onChange={(start) => updatePrefs({ quietHours: { ...prefs.quietHours, start } })} />
+            <HourStepper label={t('settings.until')} value={prefs.quietHours.end} onChange={(end) => updatePrefs({ quietHours: { ...prefs.quietHours, end } })} />
           </View>
         ) : null}
       </View>
 
       <Text style={styles.hint}>
-        These are your defaults for everyone. Tap a group to see its alerts. The switch turns an alert on or off; its 🔔 decides whether it also sends a notification or just lands in your feed. To change alerts for one player or team, tap ⚙️ next to them on the Tracking tab; those choices win over everything here.
+        {t('settings.hint')}
       </Text>
 
       {groups.filter((g) => g.types.length).map((g) => {
         const off = g.league ? !leagueOn(g.league) : false;
         const allOn = !off && g.types.every(on);
         const isOpen = !!openGroups[g.title];
-        const summary = off ? 'League off · All on turns it back on' : `${g.types.filter(on).length} of ${g.types.length} on`;
+        const summary = off ? t('settings.leagueOff') : t('settings.countOn', { on: g.types.filter(on).length, total: g.types.length });
         return (
           <View key={g.title}>
             <View style={styles.groupHead}>
               <Pressable onPress={() => toggleGroup(g.title)} hitSlop={8} style={({ pressed }) => [styles.groupToggle, pressed && { opacity: 0.6 }]}
-                accessibilityRole="button" aria-expanded={isOpen} accessibilityLabel={`${g.title}, ${summary}`} accessibilityHint={isOpen ? 'Hides these alerts' : 'Shows these alerts'}>
+                accessibilityRole="button" aria-expanded={isOpen} accessibilityLabel={`${g.title}, ${summary}`} accessibilityHint={isOpen ? t('settings.hides') : t('settings.shows')}>
                 <Text style={styles.groupTitle}>{g.title}</Text>
                 <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textFaint} />
               </Pressable>
-              <Pressable onPress={() => setAll(g.types, !allOn, g.league)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? 'All off' : 'All on'}</Text></Pressable>
+              <Pressable onPress={() => setAll(g.types, !allOn, g.league)} hitSlop={8}><Text style={styles.toggleAll}>{allOn ? t('settings.allOff') : t('settings.allOn')}</Text></Pressable>
             </View>
             <View style={[styles.card, g.color ? { borderLeftColor: g.color, borderLeftWidth: 3 } : null]}>
               {isOpen ? bySection(g.types).map((s) => (
@@ -139,7 +140,7 @@ export default function SettingsScreen() {
               )) : (
                 // Folded: the group's alerts at a glance, and how many are on. Tapping opens it.
                 <Pressable onPress={() => toggleGroup(g.title)} style={({ pressed }) => [styles.folded, off && { opacity: 0.45 }, pressed && { opacity: 0.6 }]}
-                  accessibilityRole="button" aria-expanded={false} accessibilityLabel={`Show ${g.types.length} ${g.title}, ${summary}`}>
+                  accessibilityRole="button" aria-expanded={false} accessibilityLabel={t('settings.showGroup', { total: g.types.length, title: g.title, summary })}>
                   <Text style={styles.foldedEmoji} numberOfLines={1}>
                     {(g.types.length > FOLDED_EMOJI ? g.types.slice(0, FOLDED_EMOJI - 1) : g.types).map((t) => t.emoji).join(' ')}
                     {g.types.length > FOLDED_EMOJI ? <Text style={styles.foldedMore}>  +{g.types.length - FOLDED_EMOJI + 1}</Text> : null}
@@ -153,25 +154,39 @@ export default function SettingsScreen() {
         );
       })}
 
-      <SectionHeader>Data</SectionHeader>
+      <SectionHeader>{t('settings.language')}</SectionHeader>
+      <View style={styles.card}>
+        <View style={styles.layoutRow}>
+          <Text style={styles.desc}>{t('settings.languageDesc')}</Text>
+          <View style={styles.layoutChips}>
+            {([['auto', t('settings.languageDevice')], ...LANGS.map((l) => [l.id, l.name] as const)] as const).map(([id, name]) => (
+              <Pressable key={id} onPress={() => setLangPref(id)} accessibilityRole="radio" aria-checked={id === langPref} style={[styles.layoutChip, id === langPref && styles.layoutChipOn]}>
+                <Text style={[styles.layoutChipText, id === langPref && { color: colors.text }]}>{name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <SectionHeader>{t('settings.data')}</SectionHeader>
       <View style={styles.card}>
         <Pressable style={styles.action} onPress={() => updatePrefs({ types: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultOn])), pushTypes: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultPush ?? true])), leagues: Object.fromEntries(leagues.map((l) => [l.id, true])) })}>
-          <Text style={styles.actionText}>Reset alerts to defaults</Text>
+          <Text style={styles.actionText}>{t('settings.reset')}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => {
           const go = () => clearFeed();
           if (Platform.OS === 'web') go();
-          else Alert.alert('Clear feed?', 'This removes every item from your feed.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: go }]);
+          else Alert.alert(t('settings.clearFeedTitle'), t('settings.clearFeedBody'), [{ text: t('settings.cancel'), style: 'cancel' }, { text: t('settings.clear'), style: 'destructive', onPress: go }]);
         }}>
-          <Text style={[styles.actionText, { color: colors.hate }]}>Clear feed</Text>
+          <Text style={[styles.actionText, { color: colors.hate }]}>{t('settings.clearFeed')}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => {
-          const go = () => deleteAllData().catch((e) => Alert.alert('Could not delete', String(e)));
-          const msg = 'This permanently deletes everyone you track, your settings and your feed from our server, and gives this device a fresh anonymous identity.';
+          const go = () => deleteAllData().catch((e) => Alert.alert(t('settings.deleteFailed'), String(e)));
+          const msg = t('settings.deleteAllBody');
           if (Platform.OS === 'web') { if (window.confirm(msg)) go(); }
-          else Alert.alert('Delete all my data?', msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete everything', style: 'destructive', onPress: go }]);
+          else Alert.alert(t('settings.deleteAllTitle'), msg, [{ text: t('settings.cancel'), style: 'cancel' }, { text: t('settings.deleteEverything'), style: 'destructive', onPress: go }]);
         }}>
-          <Text style={[styles.actionText, { color: colors.hate }]}>Delete all my data</Text>
+          <Text style={[styles.actionText, { color: colors.hate }]}>{t('settings.deleteAll')}</Text>
         </Pressable>
         {__DEV__ ? (
           <Pressable style={styles.action} onPress={() => api.simulate().catch((e) => Alert.alert('Simulate failed', String(e)))}>
@@ -185,34 +200,27 @@ export default function SettingsScreen() {
           </Pressable>
         ) : null}
       </View>
-      <SectionHeader>About</SectionHeader>
+      <SectionHeader>{t('settings.about')}</SectionHeader>
       <View style={styles.card}>
         <Pressable style={styles.action} onPress={() => router.push('/guide')} accessibilityRole="button">
-          <Text style={styles.actionText}>Show the guide</Text>
-          <Text style={styles.actionSub}>How tracking and alerts work</Text>
+          <Text style={styles.actionText}>{t('settings.guide')}</Text>
+          <Text style={styles.actionSub}>{t('settings.guideDesc')}</Text>
         </Pressable>
-        <Pressable style={styles.action} onPress={sendFeedback} accessibilityRole="button" accessibilityHint={`Opens an email to ${FEEDBACK_EMAIL}`}>
-          <Text style={styles.actionText}>Give feedback</Text>
-          <Text style={styles.actionSub}>Bugs, ideas, alerts you want: {FEEDBACK_EMAIL}</Text>
+        <Pressable style={styles.action} onPress={sendFeedback} accessibilityRole="button" accessibilityHint={t('settings.feedbackHint', { email: FEEDBACK_EMAIL })}>
+          <Text style={styles.actionText}>{t('settings.feedback')}</Text>
+          <Text style={styles.actionSub}>{t('settings.feedbackDesc', { email: FEEDBACK_EMAIL })}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => Linking.openURL(`${API_URL}/privacy`)} accessibilityRole="link">
-          <Text style={styles.actionText}>Privacy policy</Text>
+          <Text style={styles.actionText}>{t('settings.privacy')}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => Linking.openURL(`${API_URL}/support`)} accessibilityRole="link">
-          <Text style={styles.actionText}>Help & support</Text>
+          <Text style={styles.actionText}>{t('settings.help')}</Text>
         </Pressable>
       </View>
-      <Text style={styles.footer}>Data: ESPN public APIs. Live plays polled every ~2s; injury report every 30s; standings every 60s.</Text>
+      <Text style={styles.footer}>{t('settings.footer')}</Text>
     </ScrollView>
   );
 }
-
-const LAYOUT_DESC: Record<LiveLayout, string> = {
-  compact: 'One line a game.',
-  detailed: 'Two lines a game: the count, outs and pitcher, or the down and distance, with the bases and each team\'s win chance. Shows fewer games.',
-  grid: 'Games in cells two across, each with its score and a short status.',
-  hero: 'The top game big, with its clock and the bases, count or down; the rest as lines.',
-};
 
 const styles = StyleSheet.create({
   layoutRow: { paddingHorizontal: space(4), paddingVertical: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
