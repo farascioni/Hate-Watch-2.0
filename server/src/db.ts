@@ -117,6 +117,10 @@ if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c
 if (!(db.prepare('PRAGMA table_info(live_activities)').all() as { name: string }[]).some((c) => c.name === 'layout')) {
   db.exec('ALTER TABLE live_activities ADD COLUMN layout INTEGER NOT NULL DEFAULT 0');
 }
+// Games the device added to or removed from its board by hand (live-activity.ts), as JSON {"on": [game keys], "off": [game keys]}.
+if (!(db.prepare('PRAGMA table_info(live_activities)').all() as { name: string }[]).some((c) => c.name === 'picks')) {
+  db.exec(`ALTER TABLE live_activities ADD COLUMN picks TEXT NOT NULL DEFAULT '{}'`);
+}
 {
   const missing = db.prepare('SELECT id FROM events WHERE share_code IS NULL').all() as { id: string }[];
   const set = db.prepare('UPDATE events SET share_code = ? WHERE id = ?');

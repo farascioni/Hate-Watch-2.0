@@ -39,7 +39,7 @@ game('BOS', 'NYY', 'in');                                  // tracked only
 game('DET', 'CLE', 'in');                                  // most hated
 const rays = game('MIA', 'TB', 'in', { as: 1, hs: 2 });    // favorite, not tracked
 game('LAD', 'SF', 'in');                                   // nobody's
-game('SEA', 'LAD', 'pre');                                 // not started
+game('SEA', 'LAD', 'pre', { startsAt: Date.now() + 5 * HOUR }); // not started, hours away
 game('HOU', 'LAD', 'post', { startsAt: Date.now() - 3 * HOUR - 5 * 60_000 }); // ended 5 minutes ago
 game('ATL', 'LAD', 'post', { startsAt: Date.now() - 4 * HOUR });               // ended an hour ago
 putLiveActivity('dev', { mostHated: [T.CLE] });
@@ -220,4 +220,34 @@ test('the sub line by sport, and three detailed rows stay far under Apple\'s lim
   const game3 = { k: 'mlb:123456', a: 'BOS', as: 10, h: 'NYY', hs: 12, st: 'Bot 12th', live: true, t: 0, l: '♥ BOS 10  NYY 12', r: 'Bot 12th', lc: '#F5C451', rc: '#E5232B', sub: 'x'.repeat(40), sc: '#9A9AA2', bs: '111', wp: 100, wl: 'NYY 100%' };
   const props = { v: 1, lay: 1, games: [game3, game3, game3], more: 99, mt: '+99 more' };
   assert.ok(JSON.stringify({ aps: { 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify(props) } } }).length < 1500);
+});
+
+test('a game about to start is on the board with no score; hand-picked games are added and removed', () => {
+  db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev5', 's', 'ios', '{}');
+  follow.run('dev5', T.NYM);
+  const soon = game('SF', 'NYM', 'pre', { startsAt: Date.now() + 20 * 60_000 });
+  const late = game('NYM', 'SF', 'pre', { startsAt: Date.now() + 2 * HOUR });
+  const stale = game('NYM', 'LAD', 'pre', { startsAt: Date.now() - 4 * HOUR }); // ESPN never moved it on
+  const b = buildBoard('dev5')!;
+  assert.deepEqual(b.games.filter((g) => !g.live).map((g) => g.k), [soon], 'only the one within the hour');
+  const row = b.games.find((g) => g.k === soon)!;
+  assert.deepEqual([row.st, row.as, row.hs, row.live], ['Starts soon', null, null, false]);
+  assert.ok(![late, stale].some((k) => b.games.some((g) => g.k === k)));
+
+  const picked = putLiveActivity('dev5', { pins: [late, stale] })!; // a pick brings a game in early, but not one ESPN never moved on
+  assert.deepEqual([picked.games.find((g) => g.k === late)?.st, picked.games.some((g) => g.k === stale)], ['Upcoming', false]);
+
+  const lad = game('LAD', 'SF', 'in'); // nobody's
+  for (const lay of ['compact', 'detailed', 'grid', 'hero']) {
+    const p = putLiveActivity('dev5', { layout: lay, pins: [lad] })!; // a pin of a game with none of its teams tracked must not throw in any layout
+    assert.ok(p.games.some((g) => g.k === lad), lay);
+  }
+  putLiveActivity('dev5', { layout: 'compact', pins: [], hides: [soon, 7, 'x'.repeat(65)] as any });
+  assert.ok(!buildBoard('dev5')!.games.some((g) => g.k === soon || g.k === lad), 'taken off by hand, and the pin is gone');
+  assert.equal(JSON.parse((db.prepare('SELECT picks FROM live_activities WHERE device_id = ?').get('dev5') as any).picks).off.length, 1, 'invalid keys dropped');
+
+  assert.ok(buildBoard('dev')!.games.some((g) => g.k === 'mlb:1'), 'another device is unaffected');
+  putLiveActivity('dev', { hides: ['mlb:1'] });
+  assert.ok(!buildBoard('dev')?.games.some((g) => g.k === 'mlb:1'), 'a tracked live game can be taken off');
+  putLiveActivity('dev', { hides: [] });
 });

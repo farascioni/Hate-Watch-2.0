@@ -84,7 +84,7 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <SettingRow title="Push notifications" desc={push.status === 'granted' ? 'Alerts arrive even when the app is closed.' : push.status === 'denied' ? 'Blocked in system settings — the feed still updates live.' : push.reason ?? 'Checking…'} value={prefs.pushEnabled && push.status === 'granted'} onChange={async (v) => { if (v && push.status !== 'granted') await enablePush(); updatePrefs({ pushEnabled: v }); }} disabled={push.status === 'unavailable'} />
         <SettingRow title="Sound" desc="Play a sound with each alert." value={prefs.sound} onChange={(v) => updatePrefs({ sound: v })} />
-        {liveBoardSupported ? <SettingRow title="Lock screen scoreboard" desc="The live scores of your teams on the lock screen: favorites first, then most hated, then the rest. Your most hated list is sent to Hate Watch so it can sort the board." value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
+        {liveBoardSupported ? <SettingRow title="Lock screen scoreboard" desc="The scores of your teams on the lock screen from an hour before the game: favorites first, then most hated, then the rest. It starts when you open the app. Add or remove any game with the lock on its score card. Your most hated list and the games you pick are sent to Hate Watch so it can build the board." value={liveBoard} onChange={(v) => { setLiveBoard(v); }} /> : null}
         {liveBoardSupported && liveBoard ? (
           <View style={styles.layoutRow}>
             <Text style={styles.layoutTitle}>Scoreboard layout</Text>

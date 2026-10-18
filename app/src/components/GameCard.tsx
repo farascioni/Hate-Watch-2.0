@@ -1,6 +1,7 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
@@ -9,6 +10,7 @@ import { fromGrid, gameTargetKeys, hateTag, isFavoriteGame, loseChance, statusLi
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
+import { liveBoardSupported, toggleBoardGame, useOnBoard } from '../lib/liveScoreboard';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
   good: { bg: colors.hateDim, fg: colors.hateText },  // they're losing: good news
@@ -40,6 +42,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
         <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>
         {game.bases ? <Bases bases={game.bases} count={game.count} /> : null}
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
+        {!big && game.state !== 'post' ? <BoardButton game={game} /> : null}
       </View>
       {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
       {game.state === 'pre' ? <PreviewDetails game={game} big={big} /> : <LiveDetails game={game} big={big} />}
@@ -71,6 +74,18 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
     </Pressable>
   );
 });
+
+/** The lock: puts the game on the lock screen scoreboard (docs/live-activity.md), or takes it off. iOS builds with the widget only. */
+function BoardButton({ game }: { game: GameCard }) {
+  const onBoard = useOnBoard(game.key);
+  if (!liveBoardSupported) return null;
+  return (
+    <Pressable onPress={() => { toggleBoardGame(game.key).catch(() => {}); }} hitSlop={10} accessibilityRole="button" accessibilityState={{ selected: onBoard }}
+      accessibilityLabel={onBoard ? 'Remove this game from your lock screen scoreboard' : 'Add this game to your lock screen scoreboard'}>
+      <Ionicons name={onBoard ? 'lock-closed' : 'lock-closed-outline'} size={16} color={onBoard ? colors.live : colors.textDim} />
+    </Pressable>
+  );
+}
 
 /** A team's page, as Search opens it: their stats, recent misery and roster. */
 const openTeam = (key: string) => router.push(`/target/${encodeURIComponent(key)}`);

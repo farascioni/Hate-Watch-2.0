@@ -87,7 +87,7 @@ export const api = {
   removeFavorite: (key: string) => request('DELETE', `/me/favorites/${enc(key)}`),
   clearFavorites: () => request('DELETE', '/me/favorites'),
   /** The lock screen scoreboard: send what the server can't know (most hated, the activity's push token); it answers with the board now. */
-  putLiveActivity: (body: { mostHated?: string[]; layout?: 'compact' | 'detailed' | 'grid' | 'hero'; activityToken?: string; sandbox?: boolean }) =>
+  putLiveActivity: (body: { mostHated?: string[]; layout?: 'compact' | 'detailed' | 'grid' | 'hero'; activityToken?: string; sandbox?: boolean; pins?: string[]; hides?: string[] }) =>
     request<{ board: LiveBoard | null }>('PUT', '/me/live-activity', body),
   deleteLiveActivity: () => request('DELETE', '/me/live-activity'),
 

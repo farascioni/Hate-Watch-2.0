@@ -3,6 +3,8 @@
 // for the first board) and registers its push token here; from then on this module builds each device's board whenever a
 // game changes and pushes it to Apple directly (apns.ts). Nothing is sent until APNS_* is set and the `liveActivity` flag is on.
 //
+// The board lists a device's live games, the ones about to start (SOON_MS) and finals for 10 minutes; the device can also add a
+// game of any team to it, or take one off, by hand (`picks`, from the card's lock screen button).
 // Most hated lives only on the device otherwise; the app uploads its keys (`PUT /me/live-activity`) so the board can sort by
 // them. Plus is checked on the device only, so a lapse clears them here too (`DELETE /me/live-activity`).
 // Imports scores.ts for the games (which notifies `onGameChange`) and favorites.ts for the teams; neither imports this.
@@ -39,6 +41,10 @@ const LAYOUTS: BoardLayout[] = ['compact', 'detailed', 'grid', 'hero'];
 const MAX_GAMES = [4, 3, 4, 3];
 /** A final stays on the board this long after it ends. */
 const FINAL_KEEP_MS = 10 * 60_000;
+/** A game not yet started is on the board from this long before its start (and for DELAYED_MS after it, while ESPN still has it as not started). */
+const SOON_MS = 60 * 60_000;
+const DELAYED_MS = 3 * 3600_000;
+const MAX_PICKS = 100;
 const MARKS = ['♥ ', '❌ ', ''];
 const GOLD = '#F5C451', WHITE = '#FFFFFF', RED = '#E5232B', GREY = '#9A9AA2';
 /** By tier: a favorite gold, a most hated red, the rest white. */
@@ -48,9 +54,12 @@ const SWEEP_MS = 30_000;
 /** A clock or inning change alone is sent at most this often per device: ESPN's status carries the clock, so it changes every few seconds. */
 const QUIET_GAP_MS = 30_000;
 
-type Row = { activity_token: string | null; sandbox: number; most_hated: string; layout: number };
-const rowOf = (deviceId: string) => db.prepare('SELECT activity_token, sandbox, most_hated, layout FROM live_activities WHERE device_id = ?').get(deviceId) as Row | undefined;
+type Row = { activity_token: string | null; sandbox: number; most_hated: string; layout: number; picks: string };
+const rowOf = (deviceId: string) => db.prepare('SELECT activity_token, sandbox, most_hated, layout, picks FROM live_activities WHERE device_id = ?').get(deviceId) as Row | undefined;
 const mostHatedOf = (r?: Row): string[] => { try { return JSON.parse(r?.most_hated ?? '[]'); } catch { return []; } };
+/** The games the device added (`on`) and removed (`off`) by hand. */
+const picksOf = (r?: Row): { on: string[]; off: string[] } => { try { const p = JSON.parse(r?.picks ?? '{}'); return { on: p.on ?? [], off: p.off ?? [] }; } catch { return { on: [], off: [] }; } };
+const keyList = (v: unknown, max: number) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string' && k.length <= 64).slice(0, max) : undefined);
 
 const outs = (n: number) => `${n} out${n === 1 ? '' : 's'}`;
 const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
@@ -84,32 +93,37 @@ export function heroLine(g: GameCard): string {
   return g.shots ? `Shots ${g.shots.away}-${g.shots.home}` : '';
 }
 
-/** The device's board now, or null when no game of its teams is live (or just ended). */
+/** The device's board now, or null when no game of its teams is live, about to start or just ended (and none was added by hand). */
 export function buildBoard(deviceId: string, now = Date.now()): BoardProps | null {
   const favs = new Set(favoritesOf(deviceId).map((f) => f.team_key));
   const tracked = deviceTeams(deviceId).teams;
   // A starred player stands for his team.
-  const hated = new Set(mostHatedOf(rowOf(deviceId)).flatMap((k) => (k.startsWith('team:') ? [k] : [catalog.player(k)?.teamKey ?? ''])));
-  const lay = (rowOf(deviceId)?.layout ?? 0) as BoardProps['lay'];
+  const row = rowOf(deviceId);
+  const hated = new Set(mostHatedOf(row).flatMap((k) => (k.startsWith('team:') ? [k] : [catalog.player(k)?.teamKey ?? ''])));
+  const lay = (row?.layout ?? 0) as BoardProps['lay'];
+  const picks = { on: new Set(picksOf(row).on), off: new Set(picksOf(row).off) };
   const gridCell = lay === 2, heroRow = (i: number) => lay === 3 && i === 0;
   const rows: (BoardGame & { startsAt: number; card: GameCard })[] = [];
   for (const g of cardList()) {
     if (!g.home || !g.away || !(GAME_LEAGUES as League[]).includes(g.league)) continue;
     const live = g.state === 'in';
-    if (!live && !(g.state === 'post' && g.endedAt && now - g.endedAt < FINAL_KEEP_MS)) continue;
+    const soon = g.state === 'pre' && now - g.startsAt < DELAYED_MS && (g.startsAt - now < SOON_MS || picks.on.has(g.key)); // a game picked by hand comes early
+    if (!live && !soon && !(g.state === 'post' && g.endedAt && now - g.endedAt < FINAL_KEEP_MS)) continue;
+    if (picks.off.has(g.key)) continue; // taken off by hand, even a favorite's
     const keys = [g.home.team.key, g.away.team.key];
     const t = keys.some((k) => favs.has(k)) ? 0 : keys.some((k) => hated.has(k)) ? 1 : 2;
-    if (t && !keys.some((k) => tracked.has(k))) continue; // only a favorite's game comes without tracking
+    if (t && !keys.some((k) => tracked.has(k)) && !picks.on.has(g.key)) continue; // only a favorite's game, or one added by hand, comes without tracking
     const tier = (team: string) => (hated.has(team) ? 1 : favs.has(team) ? 0 : 2); // a team both favorite and most hated is red, as everywhere in the app
     const ta = tier(g.away.team.key), th = tier(g.home.team.key);
-    const a = g.away.team.abbrev, h = g.home.team.abbrev, st = live ? g.detail : 'Final';
+    const a = g.away.team.abbrev, h = g.home.team.abbrev, st = live ? g.detail : soon ? (g.startsAt - now < SOON_MS ? 'Starts soon' : 'Upcoming') : 'Final';
     const score = (n: number | null) => (n === null ? '-' : String(n));
+    const as = soon ? null : g.away.score, hs = soon ? null : g.home.score; // no score yet
     // The detailed layout's bar is the chance the team that put the game on the board wins.
-    const own = [g.away, g.home].find((x) => (t === 0 ? favs : t === 1 ? hated : tracked).has(x!.team.key))!;
+    const own = [g.away, g.home].find((x) => (t === 0 ? favs : t === 1 ? hated : tracked).has(x!.team.key)) ?? g.away; // a game added by hand may have none
     const chance = live && g.winProb ? Math.round(100 * (own === g.home ? g.winProb.home : g.winProb.away)) : null;
     rows.push({
-      k: g.key, a, as: g.away.score, h, hs: g.home.score, st, live, t,
-      l: `${MARKS[t]}${a} ${score(g.away.score)}  ${h} ${score(g.home.score)}`, r: live ? statusLine(g) : st, lc: TIER_COLORS[t], rc: live ? RED : GREY,
+      k: g.key, a, as, h, hs, st, live, t,
+      l: `${MARKS[t]}${a} ${score(as)}  ${h} ${score(hs)}`, r: live ? statusLine(g) : st, lc: TIER_COLORS[t], rc: live ? RED : GREY,
       ac: TIER_COLORS[ta], hc: TIER_COLORS[th], am: MARKS[ta], hm: MARKS[th],
       ...(lay === 1 && {
         r: st, sub: live ? subLine(g) : '', sc: GREY, bs: g.bases ? [g.bases.first, g.bases.second, g.bases.third].map(Number).join('') : '',
@@ -120,7 +134,8 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     });
   }
   if (!rows.length) return null;
-  rows.sort((x, y) => x.t - y.t || +y.live - +x.live || x.startsAt - y.startsAt);
+  const rank = (g: GameCard) => (g.state === 'in' ? 0 : g.state === 'pre' ? 1 : 2); // live, then about to start, then final
+  rows.sort((x, y) => x.t - y.t || rank(x.card) - rank(y.card) || x.startsAt - y.startsAt);
   const max = MAX_GAMES[lay];
   const more = Math.max(0, rows.length - max);
   const games = rows.slice(0, max).map(({ startsAt, card, ...r }, i) =>
@@ -129,8 +144,8 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
   return { v: 1, lay, games, more, mt: more ? `+${more} more` : '' };
 }
 
-/** What the app sends: any of the four fields, the rest of the row stays as it was. Returns the board for the first draw. */
-export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; activityToken?: unknown; sandbox?: unknown; layout?: unknown }): BoardProps | null {
+/** What the app sends: any of the fields (`pins`: game keys added to the board, `hides`: removed), the rest of the row stays as it was. Returns the board for the first draw. */
+export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; activityToken?: unknown; sandbox?: unknown; layout?: unknown; pins?: unknown; hides?: unknown }): BoardProps | null {
   const old = rowOf(deviceId);
   const hated = Array.isArray(body.mostHated)
     ? JSON.stringify(body.mostHated.filter((k): k is string => typeof k === 'string' && k.length <= 64).slice(0, 200))
@@ -139,9 +154,11 @@ export function putLiveActivity(deviceId: string, body: { mostHated?: unknown; a
   const sandbox = typeof body.sandbox === 'boolean' ? +body.sandbox : old?.sandbox ?? 0;
   const named = LAYOUTS.indexOf(body.layout as BoardLayout);
   const layout = named >= 0 ? named : old?.layout ?? 0; // anything else leaves it as it was
-  db.prepare(`INSERT INTO live_activities (device_id, activity_token, sandbox, most_hated, layout, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(device_id) DO UPDATE SET activity_token = excluded.activity_token, sandbox = excluded.sandbox, most_hated = excluded.most_hated, layout = excluded.layout, updated_at = excluded.updated_at`)
-    .run(deviceId, token, sandbox, hated, layout, Date.now());
+  const was = picksOf(old), on = keyList(body.pins, MAX_PICKS), off = keyList(body.hides, MAX_PICKS);
+  const picks = JSON.stringify({ on: on ?? was.on, off: off ?? was.off });
+  db.prepare(`INSERT INTO live_activities (device_id, activity_token, sandbox, most_hated, layout, picks, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(device_id) DO UPDATE SET activity_token = excluded.activity_token, sandbox = excluded.sandbox, most_hated = excluded.most_hated, layout = excluded.layout, picks = excluded.picks, updated_at = excluded.updated_at`)
+    .run(deviceId, token, sandbox, hated, layout, picks, Date.now());
   last.delete(deviceId); // whatever is on the lock screen may be stale: send the next board whole
   schedule();
   return flagOn('liveActivity') ? buildBoard(deviceId) : null;

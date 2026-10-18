@@ -128,7 +128,7 @@ const ScoreboardActivity = (props: Props) => {
       ),
       compactLeading: <Text>{lead ? lead.a : ''}</Text>,
       compactTrailing: <Text>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>,
-      minimal: <Text>{lead ? score(lead.as) : ''}</Text>,
+      minimal: <Text modifiers={[font({ size: 12, weight: 'bold' })]}>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>, // both scores: the round pill shared with another app's activity showed only the away team's
       // Long-pressed Dynamic Island: the top game's scores either side, its clock and bases in the middle, its sub line and
       // win chance under them, then the other games as one-line rows.
       expandedLeading: <Text modifiers={[font({ size: 17, weight: 'semibold' })]}>{lead ? `${lead.a} ${score(lead.as)}` : ''}</Text>,
@@ -171,7 +171,7 @@ const ScoreboardActivity = (props: Props) => {
     ),
     compactLeading: <Text>{lead ? lead.a : ''}</Text>,
     compactTrailing: <Text>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>,
-    minimal: <Text>{lead ? score(lead.as) : ''}</Text>,
+    minimal: <Text modifiers={[font({ size: 12, weight: 'bold' })]}>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>, // both scores: the round pill shared with another app's activity showed only the away team's
     // Long-pressed Dynamic Island: the top game across the middle, the rest below.
     expandedCenter: lead ? row(lead) : <Text>{''}</Text>,
     expandedBottom: (
