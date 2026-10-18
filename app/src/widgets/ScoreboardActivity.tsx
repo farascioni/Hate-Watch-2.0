@@ -29,12 +29,17 @@ const ScoreboardActivity = (props: Props) => {
   'widget';
   const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '❌ ' : '');
   const score = (n: number | null) => (n === null ? '-' : String(n));
-  // The island's pills shrink when another app's activity shares it ("17-10" was cut to "17-..."): away over home, codes left and scores right.
-  const mini = (g?: Game, codes = false) => (g ? <VStack spacing={0}><Text modifiers={[font({ size: 11, weight: 'bold' })]}>{codes ? g.a : score(g.as)}</Text><Text modifiers={[font({ size: 11, weight: 'bold' })]}>{codes ? g.h : score(g.hs)}</Text></VStack> : <Text>{''}</Text>);
   const base = (g: Game) => g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451');
   const awayColor = (g: Game) => g.ac ?? base(g);
   const homeColor = (g: Game) => g.hc ?? base(g);
   const awayMark = (g: Game) => g.am ?? mark(g.t);
+  // The island's pills shrink when another app's activity shares it ("17-10" was cut to "17-..."): away over home, codes left and scores right, each in its team's color, small enough for three digits.
+  const mini = (g?: Game, codes = false) => (g ? (
+    <VStack spacing={0}>
+      <Text modifiers={[font({ size: 9, weight: 'bold' }), foregroundStyle(awayColor(g))]}>{codes ? g.a : score(g.as)}</Text>
+      <Text modifiers={[font({ size: 9, weight: 'bold' }), foregroundStyle(homeColor(g))]}>{codes ? g.h : score(g.hs)}</Text>
+    </VStack>
+  ) : <Text>{''}</Text>);
   // The game's two teams on one line: each in its own color when the server sent them, else the whole line in one.
   const teams = (g: Game) =>
     g.ac !== undefined ? (
