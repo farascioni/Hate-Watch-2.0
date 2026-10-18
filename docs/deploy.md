@@ -14,7 +14,7 @@
   - **App Store Connect answers**: these are the answers given in App Store Connect's privacy and app information forms.
   - **Hate Watch Plus (the $5/month subscription)**: Settings → **Support Hate Watch** has a $5/month auto-renewing subscription through [`expo-iap`](https://openiap.dev/docs/setup/expo) (`app/src/lib/plus.ts`, `app/src/components/PlusStore.tsx`, `Plus.tsx`); a subscriber can switch the red accents and the app icon to gold, star their most hated players and teams, and favorite teams (`docs/favorites.md`).
   - **Icons and splash**: The artwork is an angry eye: a red iris with a black pupil and a white glint in a white eye, under a tapered red brow that bears down toward it, on a near-black background with a dark red glow.
-  - **App Store page images**: the custom Header (21:9) and Search Results (3:2) images and every screenshot set are made from the app's real screens by `app-store/capture-screens.mjs` then `app-store/build-store-images.mjs`; the screenshots are in `app-store/screenshots*/`, one folder per size.
+  - **App Store page images**: the custom Header (21:9) and Search Results (3:2) images and every screenshot set are made from the app's real screens by `app-store/capture-screens.mjs` then `app-store/build-store-images.mjs`; the screenshots are in `app-store/screenshots*/`, one folder per size. Google Play's set (icon, feature graphic, 1080x1920 screenshots) comes from the same raw screens: `app-store/build-play-images.mjs` into `app-store/play/`, with the listing text in `app-store/play-listing.md` (`docs/android-release.md` step 5).
 
 The README's "Deploy" has the summary; this is the full detail. Read this index first, then only the part you need.
 
