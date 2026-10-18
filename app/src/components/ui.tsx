@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   banner: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: space(3), paddingLeft: space(3) + 50 + space(3) }, // the left gap clears the avatar (44 + 2 × 3 padding) that overlaps the banner
   bannerLeague: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   cardBody: { paddingHorizontal: space(3), paddingBottom: space(2) },
-  cardActions: { width: 136, paddingTop: space(1) }, // room for the four small icons in one row
+  cardActions: { width: 148, paddingTop: space(1) }, // room for the four small icons in one row (4 icons + borders + gaps ≈ 139)
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space(3) },
   cardText: { flex: 1, minWidth: 0, gap: 1, paddingTop: space(1) },
   cardAvatar: { marginTop: -16, padding: 3, borderRadius: radius.pill, backgroundColor: colors.surface },

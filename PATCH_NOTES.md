@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
+- The Tracking tab's classic cards keep all four icons (X, bell, gear, minus) on one line; the minus used to drop to a second line. (Update)
 - A favorite team's game now shows under My games on the Scores tab, not only in Up next, and its live score updates there. Before, only the teams you track did.
 - Hate Watch Plus: you can favorite an F1 constructor (the heart on its page). Its drivers are drawn in gold, with a heart, in the race results, the starting grid and the drivers' and constructors' tables. A most hated constructor's drivers are red with a red X; if it is both, red wins, as everywhere else (the lock screen too, with a server deploy). The colors are published as an update (Update); saving the heart for a constructor needs the next server update.
 - The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star; off, it is the same X dimmed, so it isn't mistaken for the unfollow button, now a − (minus) in the compact layouts. (Update)
