@@ -99,7 +99,7 @@ To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, cata
 EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:8787 npx expo start
 ```
 
-**For Claude Code's preview,** `.claude/launch.json` defines two configurations. `hate-watch-web` runs `npx --prefix app expo start --web --port 8081`, the app on the web at port 8081. `hate-watch-server` runs `npm --prefix server start`, the server on port 8787.
+**For Claude Code's preview,** `.claude/launch.json` defines three configurations. `hate-watch-web` runs `npx --prefix app expo start --web --port 8081`, the app on the web at port 8081. `hate-watch-web-export` runs `wrangler dev` on `app/dist` (run `npx expo export --platform web` in `app/` first), the site as Cloudflare serves it (`docs/deploy.md`, "Web → Cloudflare"). `hate-watch-server` runs `npm --prefix server start`, the server on port 8787.
 
 **Push notifications** need a development build on a physical device. The app asks for a push token only on a real phone. On the web it reports "Push is not supported on web", and on a simulator "Push needs a physical device" (`registerForPush` in `app/src/lib/push.ts`). The token is requested with the EAS project id, which this repository already has in `app/app.json` (`extra.eas.projectId`). A fork with its own EAS project sets it with `eas init`. Remote push doesn't work in Expo Go on Android.
 

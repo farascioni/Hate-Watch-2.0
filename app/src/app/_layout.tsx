@@ -1,5 +1,5 @@
 import { Fragment, useEffect, type ComponentType, type ReactNode } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Stack, router, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -35,6 +35,12 @@ function FirstLaunchGuide() {
 // Required lazily: evaluating expo-iap without its native module (Expo Go, web) throws.
 const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require('../components/PlusStore').PlusStore : Fragment;
 
+// On the web the app is a phone layout: keep it a centred column instead of stretching across a desktop window.
+const Frame: ComponentType<{ children: ReactNode }> =
+  Platform.OS === 'web'
+    ? ({ children }) => <View style={{ flex: 1, width: '100%', maxWidth: 600, alignSelf: 'center' }}>{children}</View>
+    : Fragment;
+
 export default function RootLayout() {
   useAutoUpdate();
   return (
@@ -43,6 +49,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       {Platform.OS !== 'web' && <NotificationRouter />}
       <FirstLaunchGuide />
+      <Frame>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
@@ -62,6 +69,7 @@ export default function RootLayout() {
         <Stack.Screen name="a/[code]" options={{ title: 'Shared alert', headerBackTitle: 'Back' }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
+      </Frame>
       <EasterEggOverlay />
     </StoreProvider>
     </PlusStore>

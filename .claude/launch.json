@@ -9,6 +9,12 @@
       "port": 8081
     },
     {
+      "name": "hate-watch-web-export",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "app", "wrangler", "dev", "--cwd", "app", "--port", "8790"],
+      "port": 8790
+    },
+    {
       "name": "hate-watch-server",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "server", "start"],

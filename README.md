@@ -6,7 +6,7 @@ The rest of this README is the map of how everything works: each section is a sh
 
 Track the athletes and teams you can't stand. Get a push the moment something bad happens to them.
 
-- **`app/`**: the iOS and Android app, built with Expo SDK 57 (`expo` ~57.0.26), React Native 0.86 and Expo Router. It also runs on the web, for development. It talks to the server over REST and a WebSocket. The server's address is `EXPO_PUBLIC_API_URL`, or `http://localhost:8787` in a development build and `https://hate-watch-api.fly.dev` in a release build (`app/src/lib/api.ts`, `API_URL`). The WebSocket is the same address with `ws` in place of `http`, at `/ws` (`WS_URL`).
+- **`app/`**: the iOS and Android app, built with Expo SDK 57 (`expo` ~57.0.26), React Native 0.86 and Expo Router. It also runs on the web, and the web export is the site on Cloudflare (`app/wrangler.jsonc`, `docs/deploy.md`, "Web → Cloudflare"). It talks to the server over REST and a WebSocket. The server's address is `EXPO_PUBLIC_API_URL`, or `http://localhost:8787` in a development build and `https://hate-watch-api.fly.dev` in a release build (`app/src/lib/api.ts`, `API_URL`). The WebSocket is the same address with `ws` in place of `http`, at `/ws` (`WS_URL`).
 - **`server/`**: the Node backend. Node runs its TypeScript sources directly (`"engines": { "node": ">=22.18" }`, and Node 24 in the Docker image), with SQLite from `node:sqlite`. It has three jobs:
   - It builds a catalog of every team and player from ESPN (`server/src/catalog.ts`, see Data below).
   - It watches live games and detects bad plays (`live.ts`, `detectors.ts`).
@@ -39,7 +39,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 
 **Sections:**
 - **Run it** ([docs/run-it.md](docs/run-it.md)): Start the server with `cd server && npm ci && npm start`.
-- **Deploy** ([docs/deploy.md](docs/deploy.md)): Hate Watch reaches people in three ways.
+- **Deploy** ([docs/deploy.md](docs/deploy.md)): Hate Watch reaches people in four ways.
 - **Data: rosters, duplicates, and images** ([docs/data.md](docs/data.md)): Every team and player comes from ESPN's public API.
 - **Real-time: how fast is it?** ([docs/real-time.md](docs/real-time.md)): An alert reaches an open app within milliseconds of the server seeing the play, and a closed phone typically 1-3 seconds later through Expo's push service.
 - **Notifications (every alert type, all user-controllable)** ([docs/notifications.md](docs/notifications.md)): every alert type a user can switch is one entry in `EVENT_TYPES` (`server/src/event-types.ts`): 152 types today, 99 of them pushed by default, 37 feed only (on, in the feed, no notification) and 16 off.
@@ -69,7 +69,7 @@ The full detail: [docs/run-it.md](docs/run-it.md).
 
 ## Deploy
 
-**In short:** Hate Watch reaches people in three ways. Each has its own command, and none of them needs the other machine. **The server** (`server/`) runs on Fly.io as the app `hate-watch-api`: one machine, with SQLite on a volume. A server deploy reaches every installed build within seconds. **The app** (`app/`) is built in the cloud by EAS (Expo Application Services) and sent to TestFlight and the App Store, and later Google Play. **Over-the-air updates** (EAS Update) send JavaScript and asset changes to builds after build 12 without a new build. The day-to-day release rules (ask first, the exact commands, backups, server switches, developer notices, patch notes) are in `CLAUDE.md` under "Release flow". This section covers first-time setup and how each piece is configured.
+**In short:** Hate Watch reaches people in four ways. Each has its own command, and none of them needs the other machine. **The server** (`server/`) runs on Fly.io as the app `hate-watch-api`: one machine, with SQLite on a volume. A server deploy reaches every installed build within seconds. **The app** (`app/`) is built in the cloud by EAS (Expo Application Services) and sent to TestFlight and the App Store, and later Google Play. **Over-the-air updates** (EAS Update) send JavaScript and asset changes to builds after build 12 without a new build. **The web version** is the app's web export, served by Cloudflare Workers from `app/dist` and rebuilt on every push to `main`. The day-to-day release rules (ask first, the exact commands, backups, server switches, developer notices, patch notes) are in `CLAUDE.md` under "Release flow". This section covers first-time setup and how each piece is configured.
 
 The full detail: [docs/deploy.md](docs/deploy.md).
 

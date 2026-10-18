@@ -11,14 +11,15 @@ FEED AND SCORES
 - When a newer build is out (TestFlight, or the App Store once the app is public), opening the app shows "Update available" with Update (opens TestFlight or the App Store) and Later, once per build. (Update)
 - The app now checks for an update by itself when you open it (and when you come back to it after a minute away), downloads it and restarts into it right away, so you no longer have to force-quit and reopen it to get the latest version. (Update)
 - The red X on the Tracking tab is now shown only to Hate Watch Plus subscribers; without Plus it is gone (it used to offer Plus when tapped), along with the line about it at the top of the tab. (Update)
-- Tap LIVE (the badge at the top of the Feed and Scores tabs) to check for an app update: if there is one it downloads and the app restarts into it, otherwise it says you are up to date. Before, a new update only arrived after you force-quit and reopened the app, sometimes twice. (Update)
+- Tap LIVE (the badge at the top of the Feed and Scores tabs) to check for an app update: if there is one it downloads and the app restarts into it, otherwise it says you are up to date. (Update)
 - The Tracking tab's classic cards keep all four icons (X, bell, gear, minus) on one line; the minus used to drop to a second line. (Update)
-- A favorite team's game now shows under My games on the Scores tab, not only in Up next, and its live score updates there. Before, only the teams you track did.
+- A favorite team's game now shows under My games on the Scores tab, not only in Up next, and its live score updates there.
 - Hate Watch Plus: you can favorite an F1 constructor (the heart on its page). Its drivers are drawn in gold, with a heart, in the race results, the starting grid and the drivers' and constructors' tables. A most hated constructor's drivers are red with a red X; if it is both, red wins, as everywhere else (the lock screen too, with a server deploy). The colors are published as an update (Update); saving the heart for a constructor needs the next server update.
 - The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star; off, it is the same X dimmed, so it isn't mistaken for the unfollow button, now a − (minus) in the compact layouts. (Update)
 - Hate Watch Plus: a favorite team's alerts now include the other side's errors. When the team you favorite is playing, you get "Commits an error" for the opposing team (Defense, MLB), pushed like the player version. Teams you track get their own team's error alert too.
 - On the Scores tab, a favorite team's game card is edged gold in My games and All games alike, and a most hated team's is red in both. (Update)
 - The Scores tab's Up next now lists the next game of each favorite team too, and its rows are edged gold for a favorite and red for a most hated team, like the Feed and the game cards. (Update)
+- Hate Watch now has a web version: the same app in a browser, without push or Plus.
 
 LOCK SCREEN SCOREBOARD
 - An eye on each game card (Scores tab) adds the game to the lock screen scoreboard, or takes it off. (Update)

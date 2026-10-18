@@ -1,0 +1,11 @@
+{
+  // The web version of the app: `npx expo export --platform web` writes ./dist,
+  // Cloudflare serves it. Unknown paths get index.html so Expo Router's client
+  // routes (/game/..., /stats/...) work on reload.
+  "name": "hate-watch-2-0",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
