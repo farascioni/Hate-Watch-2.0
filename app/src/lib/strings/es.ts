@@ -147,6 +147,7 @@ export const es: Record<Key, string> = {
   'scores.section.in': 'En vivo',
   'scores.section.pre': 'Más tarde hoy',
   'scores.section.post': 'Final',
+  'scores.section.upNext': 'Próximos',
   'common.findSomeone': 'Busca a alguien a quien odiar',
   'scores.comingUp': 'Próximos',
   'scores.gridAfterSprint': 'La parrilla se define tras el Sprint Shootout.',

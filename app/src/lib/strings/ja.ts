@@ -142,6 +142,7 @@ export const ja: Record<Key, string> = {
   'scores.section.in': 'ライブ中',
   'scores.section.pre': '今日これから',
   'scores.section.post': '終了',
+  'scores.section.upNext': '次の試合',
   'common.findSomeone': '嫌いな相手を探す',
   'scores.comingUp': '次の予定',
   'scores.gridAfterSprint': 'グリッドはスプリント予選のあとに決まります。',

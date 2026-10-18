@@ -142,6 +142,7 @@ export const pt: Record<Key, string> = {
   'scores.section.in': 'Ao vivo agora',
   'scores.section.pre': 'Mais tarde hoje',
   'scores.section.post': 'Final',
+  'scores.section.upNext': 'Em seguida',
   'common.findSomeone': 'Encontre alguém para odiar',
   'scores.comingUp': 'A seguir',
   'scores.gridAfterSprint': 'Grid definido após o Sprint Shootout.',

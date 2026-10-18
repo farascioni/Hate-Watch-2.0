@@ -142,6 +142,7 @@ export const de: Record<Key, string> = {
   'scores.section.in': 'Jetzt live',
   'scores.section.pre': 'Später heute',
   'scores.section.post': 'Beendet',
+  'scores.section.upNext': 'Als Nächstes',
   'common.findSomeone': 'Finde jemanden zum Hassen',
   'scores.comingUp': 'Demnächst',
   'scores.gridAfterSprint': 'Startaufstellung nach dem Sprint Shootout.',

@@ -3,7 +3,7 @@
 // where each language's files go (English: app-store/ itself; others: app-store/localized/<lang>/). Texts: locales.mjs.
 // Run a build for some languages only: node app-store/build-store-images.mjs es ja   (no argument: all).
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { LOCALES } from './locales.mjs';
 
@@ -53,7 +53,11 @@ export const text = (x, y, size, weight, fill, s, anchor = 'middle', maxW = Infi
   return `<text x="${x}" y="${y}" font-family="${FONTS[LOCALES[lang].font ?? 'latin'].family}" font-weight="${weight}" font-size="${fit(plain, size, weight, maxW)}" fill="${fill}" text-anchor="${anchor}">${svg}</text>`;
 };
 
-export const rawB64 = (name) => readFileSync(here(`raw/${name}.jpg`)).toString('base64');
+// The app's own screens in the language when capture-screens.mjs took them (raw/<lang>/), else the English ones.
+export const rawB64 = (name) => {
+  const own = here(`raw/${lang}/${name}.jpg`);
+  return readFileSync(lang !== 'en' && existsSync(own) ? own : here(`raw/${name}.jpg`)).toString('base64');
+};
 export const png = (svg) => {
   const f = FONTS[LOCALES[lang].font ?? 'latin'];
   return new Resvg(svg, { background: BG, font: { fontFiles: f.files, loadSystemFonts: false, defaultFontFamily: f.family } }).render();

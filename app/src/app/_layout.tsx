@@ -11,7 +11,7 @@ import { useAutoUpdate } from '../lib/updates';
 import { DETAIL_MAX, WIDE_HOST, useWebLayout } from '../lib/webLayout';
 import { WebShell } from '../components/WebShell';
 import { colors } from '../theme';
-import { useT } from '../lib/i18n';
+import { currentLang, useT } from '../lib/i18n';
 
 /** A screen opened straight from a link (a shared alert) still has the tabs underneath to go back to. */
 export const unstable_settings = { anchor: '(tabs)' };
@@ -47,6 +47,8 @@ const appTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: colo
 export default function RootLayout() {
   useAutoUpdate();
   const t = useT();
+  // The web page's language (screen readers, translation prompts); `t` changes with the picked language.
+  useEffect(() => { if (Platform.OS === 'web') document.documentElement.lang = currentLang(); }, [t]);
   const { wide } = useWebLayout();
   // A game, player or alert reads best narrow: centred in the room the sidebar leaves (the tabs fill it).
   const detail: ViewStyle | undefined = wide ? { width: '100%', maxWidth: DETAIL_MAX, marginHorizontal: 'auto' as unknown as number } : undefined;

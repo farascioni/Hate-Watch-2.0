@@ -137,7 +137,7 @@ export default function ScoresScreen() {
 
   const listed: { title: string; data: (GameCard | NextGame | SessionAhead)[]; upNext?: boolean; kind?: string }[] = f1Only ? f1Sections
     : mode === 'all' ? allSections
-    : next.length ? [...sections, { title: 'Up next', data: next, upNext: true }] : sections;
+    : next.length ? [...sections, { title: t('scores.section.upNext'), data: next, upNext: true }] : sections;
   // Card grid (web): a race's grid sits under its card, so F1 stays one to a row.
   const { cols } = useWebLayout();
   const rowCols = f1Only ? 1 : cols;

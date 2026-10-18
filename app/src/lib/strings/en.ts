@@ -151,6 +151,7 @@ export const en = {
   'scores.section.in': 'Live now',
   'scores.section.pre': 'Later today',
   'scores.section.post': 'Final',
+  'scores.section.upNext': 'Up next',
   'common.findSomeone': 'Find someone to hate',
   'scores.comingUp': 'Coming up',
   'scores.gridAfterSprint': 'Grid set after the Sprint Shootout.',

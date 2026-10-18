@@ -130,7 +130,7 @@ The full detail: [docs/leaderboard.md](docs/leaderboard.md).
 
 ## Languages (in-app text)
 
-**In short:** the app's own words come from `app/src/lib/strings/<language>.ts` through `useT()` / `tr()` in `app/src/lib/i18n.ts`; English is the source and the fallback. Today every screen is in English, Spanish (Latin America), French (Canada), Portuguese (Brazil), German and Japanese, picked by the device's language (read with `Intl`, no native module, so it ships as an update) or by Settings → Language. Alert text, league names and chips come from the server and stay English for now. A native speaker reviews each language before it ships.
+**In short:** the app's own words come from `app/src/lib/strings/<language>.ts` through `useT()` / `tr()` in `app/src/lib/i18n.ts`; English is the source and the fallback. Today every screen is in English, Spanish (Latin America), French (Canada), Portuguese (Brazil), German and Japanese, picked by the device's language (read with `Intl`, no native module, so it ships as an update) or by Settings → Language. Alert text, league names and chips come from the server, and the lock screen scoreboard is composed by it, so those stay English for now. A native speaker reviews each language before it ships.
 
 The full detail: [docs/i18n.md](docs/i18n.md).
 
