@@ -34,7 +34,8 @@ function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: 
   return (
     <Pressable onPress={press} hitSlop={8} style={[styles.icon, compact && styles.iconSm, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
       accessibilityLabel={on ? `Remove ${target.name} from your most hated` : `Add ${target.name} to your most hated`}>
-      {on ? <Text style={{ fontSize: compact ? 15 : 18, lineHeight: compact ? 17 : 20 }}>❌</Text> : <Ionicons name="close-outline" size={compact ? 17 : 20} color={colors.text} />}
+      {/* Off is the same X dimmed, so it never reads as the plain − that unfollows. */}
+      <Text style={{ fontSize: compact ? 13 : 17, lineHeight: compact ? 17 : 20, opacity: on ? 1 : 0.4 }}>❌</Text>
     </Pressable>
   );
 }
@@ -123,7 +124,7 @@ export default function FollowingScreen() {
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The ✕ (it asks first) stops tracking them entirely. With Hate Watch Plus, ❌ marks your most hated: their alerts get a red border in the Feed.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The − (it asks first) stops tracking them entirely. With Hate Watch Plus, ❌ marks your most hated: their alerts get a red border in the Feed.</Text>}
       renderItem={({ item: row }) => (
         <View style={per > 1 ? styles.tiles : undefined}>
         {row.map((item) => (
@@ -150,7 +151,7 @@ export default function FollowingScreen() {
               </Pressable>
               {compact ? (
                 <Pressable onPress={() => confirmUnfollow(item)} hitSlop={8} style={[styles.icon, styles.iconSm]} accessibilityLabel={`Unfollow ${item.name}`}>
-                  <Ionicons name="close" size={17} color={colors.textDim} />
+                  <Ionicons name="remove" size={22} color={colors.text} />
                 </Pressable>
               ) : (
                 <Pressable onPress={() => toggleFollow(item)} hitSlop={8} style={styles.unfollow} accessibilityLabel={`Unfollow ${item.name}`}>
@@ -179,10 +180,10 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },
   layoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: space(4), paddingHorizontal: space(3), paddingVertical: space(1.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   layoutText: { color: colors.textDim, fontSize: 12, fontWeight: '700' },
-  iconSm: { padding: space(1.5) },
-  icon: { padding: space(2), borderRadius: radius.pill, backgroundColor: colors.surface },
-  iconStar: { borderWidth: 1, borderColor: HATE_RED },
-  iconCustom: { borderWidth: 1, borderColor: colors.hate },
+  iconSm: { padding: space(1.5) - 1 },
+  icon: { padding: space(2) - 1, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: 'transparent' },
+  iconStar: { borderColor: HATE_RED },
+  iconCustom: { borderColor: colors.hate },
   unfollow: { marginLeft: 'auto', paddingHorizontal: space(3), paddingVertical: space(1), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   unfollowText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
 });

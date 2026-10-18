@@ -15,7 +15,7 @@ loadCatalog();
 
 const { DEFAULT_PREFS, publish, setPushSender, setPrefs, feedItem } = await import('../src/fanout.ts');
 const { addFavorite, updateFavorite, registerGame, favoriteTeamKeys, removeFavorite } = await import('../src/favorites.ts');
-const { gameLostEvent } = await import('../src/detectors.ts');
+const { gameLostEvent, gameStartEvents } = await import('../src/detectors.ts');
 const { hateWatchTally, RECIPIENTS } = await import('../src/hate-watches.ts');
 
 const pushes: string[] = [];
@@ -106,4 +106,19 @@ test('a tracked team’s own alert choices beat the favorite’s: a type off for
 test('removing a favorite stops the scan', () => {
   for (const d of ['fan', 'quiet-fan', 'both']) removeFavorite(d, 'team:mlb:30');
   assert.ok(!favoriteTeamKeys().has('team:mlb:30'));
+});
+
+test('a favorite gets "Hate Watch Starting" when its team’s game begins: once, pushed, and favoriting both sides is still one alert', () => {
+  for (const id of ['start-fan', 'start-fan-both']) device.run(id, 's', 'test', `tok-${id}`, JSON.stringify(DEFAULT_PREFS));
+  addFavorite('start-fan', 'team:mlb:30');
+  addFavorite('start-fan-both', 'team:mlb:30');
+  addFavorite('start-fan-both', 'team:mlb:5');
+  registerGame('mlb', 'G9', 'team:mlb:30', 'team:mlb:5'); // Rays vs Guardians
+  const ctx = { league: 'mlb' as const, gameId: 'G9', homeId: '30', awayId: '5' };
+  publish(gameStartEvents(ctx, { venue: 'Tropicana Field', tv: 'FS1' }, 3000), 'mlb');
+  publish(gameStartEvents(ctx, { venue: 'Tropicana Field', tv: 'FS1' }, 3000), 'mlb'); // a re-poll: nothing new
+  assert.deepEqual(feed('start-fan').map((r) => [r.event_id, r.pushed, r.fav]), [['G9:team.game_start:5', 1, 1]]);
+  assert.equal(feed('start-fan-both').length, 1);
+  assert.equal(pushes.filter((p) => p.startsWith('tok-start-fan|')).length, 1);
+  assert.equal((db.prepare('SELECT title FROM events WHERE id = ?').get('G9:team.game_start:5') as any).title, 'Hate Watch Starting: Guardians vs Rays');
 });

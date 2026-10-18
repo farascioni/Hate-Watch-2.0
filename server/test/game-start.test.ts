@@ -8,11 +8,14 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { urls } = await import('../src/leagues.ts');
-const { GameTracker, liveDeps } = await import('../src/live.ts');
+const { GameTracker, liveDeps, engine } = await import('../src/live.ts');
+const { addFavorite } = await import('../src/favorites.ts');
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, color, logo, logo_w, logo_h, updated_at) VALUES (?, 'nfl', ?, ?, ?, ?, '#000', 'x', 1, 1, 0)`);
 team.run('team:nfl:21', '21', 'Philadelphia Eagles', 'Eagles', 'PHI');
 team.run('team:nfl:3', '3', 'Chicago Bears', 'Bears', 'CHI');
+team.run('team:nfl:8', '8', 'Detroit Lions', 'Lions', 'DET');
+team.run('team:nfl:9', '9', 'Green Bay Packers', 'Packers', 'GB');
 loadCatalog();
 
 // One fan of each team, plus one who turned "Game starts" off.
@@ -88,4 +91,31 @@ test('a game first seen already under way never gets a late "starting" alert', a
   await game.poll();
   await game.poll();
   assert.equal(feed('eagles-fan').length, 1, 'only the G1 alert from the previous test');
+});
+
+test('a game only a favorite team is in: the scan saw it before it began, so its kickoff reaches the favorite once', async () => {
+  device.run('lions-favorite', 's', 'test', JSON.stringify(DEFAULT_PREFS));
+  addFavorite('lions-favorite', 'team:nfl:8'); // nobody follows the Lions or the Packers
+  let status = 'pre';
+  const lionsGame = () => ({
+    id: 'F1', date: new Date(Date.now() + 10 * 60_000).toISOString(), season: { year: 2026, type: 2 }, shortName: 'GB @ DET',
+    status: { type: { state: status, completed: false, shortDetail: status } },
+    competitions: [{ venue: { fullName: 'Ford Field' }, broadcasts: [{ market: 'national', names: ['CBS'] }], competitors: [{ id: '8', homeAway: 'home', score: '0', team: {} }, { id: '9', homeAway: 'away', score: '0', team: {} }] }],
+  });
+  state.F1 = 'pre';
+  const getJson = liveDeps.getJson;
+  liveDeps.getJson = async (url: string) => (url === urls.scoreboard('nfl') ? { events: [lionsGame()] } : getJson(url));
+  try {
+    const scan = () => (engine as any).scanScoreboard('nfl');
+    await scan(); // 10 minutes out: no tracker yet, but the scan notes the favorite's game as "pre"
+    assert.equal((engine as any).trackers.get('nfl:F1'), undefined);
+    status = state.F1 = 'in';
+    await scan(); // live: the tracker attaches having seen the game before it began
+    const tracker = (engine as any).trackers.get('nfl:F1');
+    assert.ok(tracker, 'a favorite’s game is tracked');
+    await tracker.poll();
+    await tracker.poll();
+    assert.deepEqual(feed('lions-favorite'), ['Hate Watch Starting: Packers vs Lions | Kickoff at Ford Field · CBS']);
+    tracker.stop();
+  } finally { liveDeps.getJson = getJson; }
 });

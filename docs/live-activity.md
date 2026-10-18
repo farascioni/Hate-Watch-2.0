@@ -1,6 +1,5 @@
 # Lock screen scoreboard
 
-<!-- README section: the README has its summary and links here; the vault puts this text back in its place -->
 
 ## Index
 

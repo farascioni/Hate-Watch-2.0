@@ -164,7 +164,7 @@ const PAGES: Page[] = [
         <Explain mark="❌" text="Red X: with Hate Watch Plus, marks your most hated. Their alerts get a red border in the Feed." />
         <Explain icon="notifications" text="Bell: no notifications about just them. Their alerts still reach your feed." />
         <Explain icon="settings-sharp" text="Gear: pick exactly which alerts you get about them. It beats your global settings." />
-        <Explain icon="close-circle" text="Unfollow: stop tracking them entirely." />
+        <Explain icon="remove-circle" text="Unfollow: stop tracking them entirely." />
       </View>
     ),
   },

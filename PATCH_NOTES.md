@@ -8,11 +8,11 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
-- The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star. (Update)
+- The Feed tab edges a most hated team's alerts in red (and the Scores tab its games, which were gold) and a favorite team's alerts in gold (the lock screen scoreboard's colors). Before, most hated was gold and favorites had no edge. Most hated is now a red X (the Tracking tab button, the guide and the lock screen scoreboard) in place of the star; off, it is the same X dimmed, so it isn't mistaken for the unfollow button, now a − (minus) in the compact layouts. (Update)
 - The Scores tab's Up next now lists the next game of each favorite team too, and its rows are edged gold for a favorite and red for a most hated team, like the Feed and the game cards. (Update)
 
 LOCK SCREEN SCOREBOARD
-- Each team now has its own color on the lock screen scoreboard: a favorite team is gold with a heart before its code, a most hated team is red with a star, and every other team is white. If you favorite one team and hate the other in the same game, each shows its own color. This applies to all four layouts (Compact, Detailed, Grid and Hero). (Update)
+- Each team now has its own color on the lock screen scoreboard: a favorite team is gold with a heart before its code, a most hated team is red with a red X, and every other team is white. If you favorite one team and hate the other in the same game, each shows its own color. This applies to all four layouts (Compact, Detailed, Grid and Hero). (Update)
 
 ## Build 19 (October 17, 2026)
 
