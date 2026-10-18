@@ -103,7 +103,7 @@ Cost is roughly a few US dollars a month for one shared-cpu-1x machine with 512 
 | `preview` | internal / TestFlight-style testing | `https://hate-watch-api.fly.dev` | Internal distribution; Android builds an installable `.apk`; update channel `preview` |
 | `production` | App Store / Play Store; build number auto-increments | `https://hate-watch-api.fly.dev` | `autoIncrement: true`; update channel `production` |
 
-The `cli` block asks for eas-cli 24.0.0 or newer and sets `"appVersionSource": "remote"`. EAS keeps the build number, so it doesn't depend on which machine starts the build. The `submit.production.ios.ascAppId` (`6819054268`) tells `eas submit`, and `--auto-submit`, which App Store Connect app to upload to.
+The `cli` block asks for eas-cli 24.0.0 or newer and sets `"appVersionSource": "remote"`. EAS keeps the build number, so it doesn't depend on which machine starts the build. The `submit.production.ios.ascAppId` (`6819054268`) tells `eas submit`, and `--auto-submit`, which App Store Connect app to upload to. `eas.json` has no Android submit block on purpose: `eas submit` defaults the Android track to `internal` (eas-cli `AndroidSubmitCommand`), the Play service-account key is stored in EAS (`eas credentials`, not in the repo), and any edit to `eas.json` changes the over-the-air fingerprint (checked October 18, 2026 with `eas fingerprint:generate`: both platforms' hashes changed), which would strand updates for installed builds.
 
 **If you rename the Fly app:** update the URL in both `preview` and `production`. The URL is compiled into the app at build time. The same host is also in `app/package.json`'s `update` script, in `app/src/lib/api.ts` (a release build's fallback when `EXPO_PUBLIC_API_URL` isn't set), and in `app/app.json`'s `associatedDomains` (`applinks:hate-watch-api.fly.dev`, for share links). On the server, share links and the share card are built from `HW_PUBLIC_URL` (`PUBLIC_URL` in `server/src/fanout.ts`, default `https://hate-watch-api.fly.dev`): set it, or change that default. `server/fly.toml`'s header lists the same places.
 
@@ -121,15 +121,16 @@ npx eas-cli@latest submit --platform ios --latest               # uploads to App
 3. The first iOS build asks for an Apple ID login. EAS creates the distribution certificate, the provisioning profile and the push key, and keeps them.
 4. `submit --latest` uploads the latest iOS build to App Store Connect, for TestFlight.
 
-**Every TestFlight build after that** is one command that needs no Apple login (`CLAUDE.md`, "Release flow", which says when to send one and what to check first):
+**Every build after that, for both stores,** is one command that needs no Apple or Google login (`CLAUDE.md`, "Release flow", which says when to send one and what to check first):
 
 ```bash
-cd app && npx eas-cli@latest build --platform ios --profile production --auto-submit --non-interactive --no-wait
+cd app && npx eas-cli@latest build --platform all --profile production --auto-submit --non-interactive --no-wait
 ```
 
 - `--auto-submit` submits the finished build with the submit profile of the same name, `--non-interactive` runs without prompts, and `--no-wait` returns without waiting for the build (from `eas build --help`, eas-cli 24.12.1).
 - Before it: a clean git tree (EAS uploads uncommitted changes too), `npx tsc --noEmit`, and the npm 10 lockfile check (`CLAUDE.md`, "Don't run `npx expo lint` in app/"). The lockfile check exists because `npx expo lint` once rewrote the lockfile and iOS build 3 failed on it.
 - Progress: `npx eas-cli@latest build:view <id> --json` and `npx eas-cli@latest status --json`. On the free tier a submission can queue for about 2 hours. If Apple answers "Creating Build Upload" with a 500, the build is resubmitted with `npx eas-cli@latest submit --platform ios --id <buildId>`, not rebuilt.
+- Android builds are submitted to the Play Console internal testing track; promote the release to production there (Google reviews it).
 - After a build goes out, `PATCH_NOTES.md`'s "Next build" heading becomes that build's number and date (`CLAUDE.md`, "Patch notes").
 
 **What the app config sets for builds** (`app/app.json`): bundle id and Android package `com.hatewatch.app`, version `1.0.0`, iPhone only (`supportsTablet: false`, so no iPad screenshots or iPad review), dark interface, and the scheme `hatewatch`. For iOS it also sets time-sensitive notifications, the `remote-notification` background mode, associated domains for share links, and `ITSAppUsesNonExemptEncryption: false` (it declares no non-exempt encryption). Android uses an adaptive icon with a monochrome layer and the notification channel `hate-events`. The plugins include `expo-notifications`, `expo-iap` (Hate Watch Plus), `expo-alternate-app-icons` (its gold icon) and `expo-video` (clips). Adding a native plugin or an entitlement changes the native code, so it needs a new build, and over-the-air updates published after it reach only that build and later ones.

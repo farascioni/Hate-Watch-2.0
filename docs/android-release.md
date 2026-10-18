@@ -51,7 +51,6 @@ What is already in place (checked against the files on October 11, 2026):
 What is not there yet:
 
 - **The FCM key is only in EAS if you uploaded it** (step 2, item 5). Without it, Android builds get no push notifications.
-- **No Android submit settings** in `eas.json`. `submit.production` has only `ios.ascAppId`, so `--auto-submit` can't send an Android build to Play Console until step 6 adds them.
 - **No Android App Links:** the server serves `/.well-known/apple-app-site-association` for iOS share links, but no `assetlinks.json` (see "After launch").
 
 ---
@@ -140,7 +139,7 @@ EAS Submit uploads builds to Play Console using a Google Cloud service account.
 5. In Play Console, go to **Users and permissions** → **Invite new users**. Paste the service account's email. Under **App permissions**, add Hate Watch and grant: *View app information*, *Edit and delete draft apps*, *Release to production, exclude devices, and use Play App Signing*, *Release apps to testing tracks*, *Manage testing tracks and edit tester lists*, and *Manage store presence*. Click **Invite user**.
 6. Upload the key to EAS: run `npx eas-cli@latest credentials --platform android` → **production** → **Google Service Account** → upload it as the key for **EAS Submit**. You can then delete your local copy.
 
-**Claude can do this:** add the Android submit settings to `eas.json` (`"submit": { "production": { "android": { "track": "internal" } } }`) so builds can go to Play Console with `--auto-submit`, the same way iOS goes to TestFlight.
+Done October 18, 2026: the key is in EAS (`eas-submit@hate-watch-7a930.iam.gserviceaccount.com`). `eas.json` needs no Android submit block: `eas submit` defaults the track to `internal` (eas-cli), so `--auto-submit` sends Android builds to the internal testing track, the same way iOS goes to TestFlight. Do not add a block: any edit to `eas.json` changes the over-the-air fingerprint on both platforms (checked with `eas fingerprint:generate`) and strands updates for installed builds. To release to production, promote the release in Play Console.
 
 ## Step 7: Internal testing (just you)
 
@@ -151,7 +150,7 @@ Internal testing is Google's TestFlight: up to 100 testers, available within min
    npx eas-cli@latest submit --platform android --profile production
    ```
    (Or build and submit in one go with `eas build --platform android --profile production --auto-submit`.)
-   What the flags mean (`eas submit --help`): `--profile` names the submit profile in `eas.json` (it defaults to `production` when there is one). That profile has no `android` settings until step 6 adds them. `--latest` submits the newest Android build on EAS, `--id <buildId>` a particular one, and `--path` a local `.aab` file.
+   What the flags mean (`eas submit --help`): `--profile` names the submit profile in `eas.json` (it defaults to `production` when there is one). The track defaults to `internal`. `--latest` submits the newest Android build on EAS, `--id <buildId>` a particular one, and `--path` a local `.aab` file.
 2. In Play Console, open **Testing** → **Internal testing** → **Testers**. Create an email list with your Google account and add a short release note.
 3. Use the **opt-in link** on that page. Open it in the emulator's browser while signed in to the same Google account, and install Hate Watch from the Play Store. This is the version that can test Hate Watch Plus, because in-app purchases only work for an app installed from Google Play.
 4. Check the **pre-launch report** a few hours later (under Testing, or in Quality). Google installs every testing-track build on real phones in its test lab, then shows crashes, screenshots and accessibility warnings. It's the closest thing to owning a few Android phones.
@@ -189,9 +188,9 @@ Do this with a borrowed phone any time before you apply for production. It takes
 
 ## After launch
 
-- **Updates:** one command builds and uploads (switch `track` to `production` in `eas.json` once you're live):
+- **Updates:** one command builds and uploads both platforms (Android lands on the `internal` track; promote it to production in Play Console; the track is not set in `eas.json`, see step 6):
   ```bash
-  npx eas-cli@latest build --platform android --profile production --auto-submit
+  npx eas-cli@latest build --platform all --profile production --auto-submit
   ```
 - **Claude can do this: share links on Android.** Today only an iPhone, iPad or iPod is sent to the App Store (`server/src/share.ts` checks the browser's user agent); on an Android phone a shared alert opens the server's card page (the alert's picture and a download button that points to the App Store). Once the Play listing is live, I can send Android visitors to the Play Store instead, and set up Android App Links (an `assetlinks.json` on the server, plus intent filters in `app.json`) so share links open the app directly when it's installed, like iOS universal links. That needs the app-signing SHA-256 fingerprint from Play Console → Setup → App signing.
 - **Claude can do this: the README.** Once you've been through this once, I can fold the parts that turned out to matter into the README's Deploy section.
