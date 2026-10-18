@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { fromGrid, stopsText } from '../lib/scores';
-import { useF1Tone, toneRow, toneName, toneMark, toneStyles, type F1Tone } from '../lib/f1Tone';
+import { useF1Tone, toneRow, toneName, toneMark, toneStyles, trackedRow, type F1Tone } from '../lib/f1Tone';
 import { colors, radius, space } from '../theme';
 import type { GameCard, RaceDriver } from '../lib/types';
 
@@ -28,7 +28,7 @@ function Row({ d, mine, tone, leader }: { d: RaceDriver; mine: boolean; tone?: F
   const label = [`${d.position ? `P${d.position}` : 'No position'}, ${d.name}`, d.out ?? grid?.label, stops,
     leader ? 'leading' : d.gap ? `${d.gap} to the leader` : null, d.interval ? `${d.interval} to the car ahead` : null].filter(Boolean).join(', ');
   return (
-    <View style={[styles.line, mine && styles.mine, toneRow(tone)]} accessible accessibilityLabel={label}>
+    <View style={[styles.line, mine && trackedRow, toneRow(tone)]} accessible accessibilityLabel={label}>
       <Text style={styles.pos}>{d.position ? `P${d.position}` : '–'}</Text>
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
         <Text style={[styles.name, d.out && styles.outName, mine && styles.nameMine, toneName(tone)]}>{d.name}{tone ? <Text style={toneStyles.mark}>{` ${toneMark[tone]}`}</Text> : null}</Text>

@@ -1,11 +1,11 @@
 import { StyleSheet } from 'react-native';
 import { useStore } from './store';
 import { useMostHatedSet } from './mostHated';
-import { GOLD, HATE_RED } from '../theme';
+import { GOLD, HATE_RED, colors, gold } from '../theme';
 
 /**
  * Hate Watch Plus, F1: a favorite constructor's drivers are gold in the race order, the grid and the championship tables, and a most hated
- * constructor's red; both is red, as on every other surface. Fixed colours (the Plus gold accent only recolours the app's own red). A tracked driver keeps the usual tint.
+ * constructor's red; both is red, as on every other surface. Fixed colours (the Plus gold accent only recolours the app's own red). A tracked driver keeps the usual tint (`trackedRow`), neutral grey with the gold accent so it is never mistaken for a favorite's gold.
  */
 export type F1Tone = 'fav' | 'hate';
 
@@ -25,5 +25,7 @@ export const toneStyles = StyleSheet.create({
   hateName: { color: '#FF8A8F', fontWeight: '800' },
   mark: { fontSize: 12 },
 });
+/** Tracked drivers and constructors in the F1 tables: the accent tint, but neutral when the accent is gold (gold means a favorite constructor here). */
+export const trackedRow = { backgroundColor: gold ? '#33333B' : colors.hateDim };
 export const toneRow = (t?: F1Tone) => (t ? toneStyles[t] : undefined);
 export const toneName = (t?: F1Tone) => (t === 'fav' ? toneStyles.favName : t === 'hate' ? toneStyles.hateName : undefined);

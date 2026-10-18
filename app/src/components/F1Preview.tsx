@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SectionHeader } from './ui';
 import { useStore } from '../lib/store';
-import { useF1Tone, toneRow, toneName, toneMark, toneStyles, type F1Tone } from '../lib/f1Tone';
+import { useF1Tone, toneRow, toneName, toneMark, toneStyles, trackedRow, type F1Tone } from '../lib/f1Tone';
 import { colors, radius, space } from '../theme';
 import type { F1Preview } from '../lib/types';
 
@@ -62,7 +62,7 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {grid.cars.map((c) => (
               <Pressable key={c.key} disabled={!opens(c.name)} onPress={() => open(c.key)} accessibilityRole={opens(c.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, mine(c.key, c.teamKey) && styles.mine, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, mine(c.key, c.teamKey) && trackedRow, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
                 <Text style={styles.when}>P{c.grid}</Text>
                 <Name style={[styles.text, mine(c.key, c.teamKey) && styles.strong]} tone={tone(c.teamKey)}>{c.name}</Name>
               </Pressable>
@@ -77,7 +77,7 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {table.map((d) => (
               <Pressable key={d.key} disabled={!opens(d.name)} onPress={() => open(d.key)} accessibilityRole={opens(d.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, mine(d.key, d.teamKey) && styles.mine, toneRow(tone(d.teamKey)), pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, mine(d.key, d.teamKey) && trackedRow, toneRow(tone(d.teamKey)), pressed && pressedBg]}>
                 <Text style={styles.rank}>{d.rank}</Text>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Name style={[styles.text, mine(d.key, d.teamKey) && styles.strong]} tone={tone(d.teamKey)} numberOfLines={1}>{d.name}</Name>
@@ -96,7 +96,7 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {teams.map((t) => (
               <Pressable key={t.key} disabled={!opens(t.name)} onPress={() => open(t.key)} accessibilityRole={opens(t.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, follows.has(t.key) && styles.mine, toneRow(tone(t.key)), pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, follows.has(t.key) && trackedRow, toneRow(tone(t.key)), pressed && pressedBg]}>
                 <Text style={styles.rank}>{t.rank}</Text>
                 <Name style={[styles.text, follows.has(t.key) && styles.strong]} tone={tone(t.key)} numberOfLines={1}>{t.name}</Name>
                 <Text style={styles.side}>{t.points} pts</Text>
@@ -125,7 +125,7 @@ export function F1Grid({ grid }: { grid: NonNullable<F1Preview['grid']> }) {
         <View key={i} style={styles.gridRow}>
           {pair.map((c) => (
             <Pressable key={c.key} disabled={!opens(c.name)} onPress={() => open(c.key)} accessibilityRole={opens(c.name) ? 'link' : undefined}
-              accessibilityLabel={`P${c.grid} ${c.name}`} style={({ pressed }) => [styles.gridCell, mine(c) && styles.mine, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
+              accessibilityLabel={`P${c.grid} ${c.name}`} style={({ pressed }) => [styles.gridCell, mine(c) && trackedRow, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
               <Text style={styles.gridPos}>P{c.grid}</Text>
               <Name style={[styles.gridName, mine(c) && styles.strong]} tone={tone(c.teamKey)} numberOfLines={1}>{c.name}</Name>
             </Pressable>
