@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
+- Tap LIVE (the badge at the top of the Feed and Scores tabs) to check for an app update: if there is one it downloads and the app restarts into it, otherwise it says you are up to date. Before, a new update only arrived after you force-quit and reopened the app, sometimes twice. (Update)
 - The Tracking tab's classic cards keep all four icons (X, bell, gear, minus) on one line; the minus used to drop to a second line. (Update)
 - A favorite team's game now shows under My games on the Scores tab, not only in Up next, and its live score updates there. Before, only the teams you track did.
 - Hate Watch Plus: you can favorite an F1 constructor (the heart on its page). Its drivers are drawn in gold, with a heart, in the race results, the starting grid and the drivers' and constructors' tables. A most hated constructor's drivers are red with a red X; if it is both, red wins, as everywhere else (the lock screen too, with a server deploy). The colors are published as an update (Update); saving the heart for a constructor needs the next server update.

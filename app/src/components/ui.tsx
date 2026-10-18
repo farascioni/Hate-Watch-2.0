@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar, readableOn } from './Avatar';
@@ -223,15 +223,35 @@ export function ago(ts: number, now: number) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** The realtime connection state, for a tab's header (Feed, Scores). */
+/** Checks for an over-the-air update, downloads it and restarts into it; says so when there is none or the build can't take one. */
+async function syncUpdate() {
+  try {
+    const Updates = require('expo-updates');
+    if (!Updates.isEnabled) return Alert.alert('No updates here', 'This build (development or web) does not take over-the-air updates.');
+    if (!(await Updates.checkForUpdateAsync()).isAvailable) return Alert.alert('Up to date', 'You have the latest version.');
+    await Updates.fetchUpdateAsync();
+    await Updates.reloadAsync();
+  } catch {
+    Alert.alert("Couldn't check for updates", 'Try again in a moment.');
+  }
+}
+
+/** The realtime connection state, for a tab's header (Feed, Scores). Tapping it syncs the latest over-the-air update. */
 export function LiveBadge() {
   const { live } = useStore();
+  const [busy, setBusy] = useState(false);
   const color = live === 'live' ? colors.live : live === 'connecting' ? colors.warn : colors.textFaint;
+  const press = async () => {
+    if (busy) return;
+    setBusy(true);
+    await syncUpdate();
+    setBusy(false);
+  };
   return (
-    <View style={styles.liveWrap} accessibilityLabel={`Realtime ${live}`}>
+    <Pressable onPress={press} hitSlop={8} style={styles.liveWrap} accessibilityRole="button" accessibilityLabel={`Realtime ${live}. Tap to check for an app update`}>
       <View style={[styles.liveDot, { backgroundColor: color }]} />
-      <Text style={[styles.liveText, { color }]}>{live === 'live' ? 'LIVE' : live === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</Text>
-    </View>
+      <Text style={[styles.liveText, { color }]}>{busy ? 'CHECKING' : live === 'live' ? 'LIVE' : live === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</Text>
+    </Pressable>
   );
 }
 
