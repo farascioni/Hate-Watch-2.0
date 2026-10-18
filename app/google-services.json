@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "577197763205",
+    "project_id": "hate-watch-7a930",
+    "storage_bucket": "hate-watch-7a930.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:577197763205:android:15d29e50c1c24481f2d7ec",
+        "android_client_info": {
+          "package_name": "com.hatewatch.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEqGkZeIzeZh3aOo6uryhdN-uCNU4K5Og"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
