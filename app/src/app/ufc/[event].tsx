@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { UfcBoutRow, UfcFightView, cardDate, fightTime } from '../../components/UfcCard';
 import { Empty, LeagueTag, SectionHeader, useNow } from '../../components/ui';
+import { useT } from '../../lib/i18n';
 import { colors, space } from '../../theme';
 import type { UfcCard } from '../../lib/types';
 
@@ -19,6 +20,7 @@ const EARLY_MS = 5 * 60_000;
  * fight tapped in the list goes on top. Under way, it re-reads every 30 seconds: rounds, results, the next fight starting.
  */
 export default function UfcCardScreen() {
+  const t = useT();
   const { event, fight } = useLocalSearchParams<{ event: string; fight?: string }>();
   const { follows } = useStore();
   const [card, setCard] = useState<UfcCard | null>(null);
@@ -32,13 +34,13 @@ export default function UfcCardScreen() {
   const underway = !!card && now >= card.event.startsAt - EARLY_MS && card.segments.some((s) => s.bouts.some((b) => b.state !== 'post' && !b.canceled));
   useEffect(() => {
     if (!underway) return;
-    const t = setInterval(() => { load(); }, LIVE_MS);
-    return () => clearInterval(t);
+    const id = setInterval(() => { load(); }, LIVE_MS);
+    return () => clearInterval(id);
   }, [underway, load]);
 
   if (!card) {
     return failed
-      ? <Empty emoji="🥊" title="No preview for this card" body="ESPN doesn't have it right now. Try again in a bit." />
+      ? <Empty emoji="🥊" title={t('ufc.noPreview')} body={t('ufc.noPreviewBody')} />
       : <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   }
   const all = card.segments.flatMap((s) => s.bouts.map((b) => ({ b, s })));

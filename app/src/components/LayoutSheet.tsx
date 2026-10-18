@@ -3,27 +3,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LAYOUTS, setTrackingLayout, useTrackingLayout } from '../lib/trackingLayout';
 import { colors, radius, space } from '../theme';
+import { useT } from '../lib/i18n';
 
 /** The Tracking tab's layout menu: how its cards look. Picking one applies it and closes. */
 export function LayoutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const picked = useTrackingLayout();
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close the card layout menu" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('layoutSheet.close')} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + space(4) }]} accessibilityViewIsModal>
           <View style={styles.grab} />
           <View style={styles.head}>
-            <Text style={styles.title} accessibilityRole="header">Card layout</Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>Done</Text></Pressable>
+            <Text style={styles.title} accessibilityRole="header">{t('layoutSheet.title')}</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>{t('guide.done')}</Text></Pressable>
           </View>
           {LAYOUTS.map((l) => (
             <Pressable key={l.id} onPress={() => { setTrackingLayout(l.id); onClose(); }} style={[styles.option, picked === l.id && styles.optionOn]}
-              accessibilityRole="radio" accessibilityState={{ selected: picked === l.id }} accessibilityLabel={`${l.name}: ${l.blurb}`}>
+              accessibilityRole="radio" accessibilityState={{ selected: picked === l.id }} accessibilityLabel={`${t(`tl.${l.id}` as never)}: ${t(`tl.${l.id}.blurb` as never)}`}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{l.name}</Text>
-                <Text style={styles.blurb}>{l.blurb}</Text>
+                <Text style={styles.name}>{t(`tl.${l.id}` as never)}</Text>
+                <Text style={styles.blurb}>{t(`tl.${l.id}.blurb` as never)}</Text>
               </View>
               {picked === l.id ? <Ionicons name="checkmark-circle" size={22} color={colors.hate} /> : null}
             </Pressable>

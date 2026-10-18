@@ -4,8 +4,7 @@ import { API_URL } from '../lib/api';
 import { EULA_URL, MANAGE_URL, applyGold, goldIconOn, goldIconSupported, iapAvailable, setGoldIcon, usePlus } from '../lib/plus';
 import { SettingRow } from './SettingRow';
 import { colors, gold, radius, space } from '../theme';
-
-const BLURB = "Servers cost money and I'd like to keep the app ad free! Subscribing unlocks gold accents, a gold app icon, the ability to add teams and athletes to your most hated list, and favorite teams: root for a team and get its opponent's alerts for that game.";
+import { tr, useT } from '../lib/i18n';
 
 const open = (url: string) => Linking.openURL(url).catch(() => {});
 
@@ -14,6 +13,7 @@ const open = (url: string) => Linking.openURL(url).catch(() => {});
  * Without a store (Expo Go, web) it only explains where Plus works. The store itself lives in PlusStore.
  */
 export function Plus() {
+  const t = useT();
   const { active, price, busy, subscribe, restore } = usePlus();
   // A saved gold choice keeps its switch even if the store can't be reached to confirm the subscription right now.
   const [iconOn, setIconOn] = useState(goldIconOn);
@@ -21,23 +21,23 @@ export function Plus() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Hate Watch Plus</Text>
-      <Text style={styles.blurb}>{BLURB}</Text>
+      <Text style={styles.title}>{t('plus.title')}</Text>
+      <Text style={styles.blurb}>{t('plus.blurb')}</Text>
 
       {canToggle ? (
         <View style={styles.switchWrap}>
           <SettingRow
-            title="Gold accents"
-            desc="Swaps the red for gold throughout the app. Switching restarts the app."
+            title={t('plus.gold')}
+            desc={t('plus.goldDesc')}
             value={gold}
-            onChange={(on) => { applyGold(on).catch(() => Alert.alert("Couldn't switch", 'Please try again.')); }}
+            onChange={(on) => { applyGold(on).catch(() => Alert.alert(t('plus.switchFailed'), t('plus.tryAgain'))); }}
           />
           {goldIconSupported() ? (
             <SettingRow
-              title="Gold app icon"
-              desc="Changes the Home Screen icon to gold."
+              title={t('plus.icon')}
+              desc={t('plus.iconDesc')}
               value={iconOn}
-              onChange={(on) => { setGoldIcon(on).then(() => setIconOn(on)).catch(() => Alert.alert("Couldn't switch", 'Please try again.')); }}
+              onChange={(on) => { setGoldIcon(on).then(() => setIconOn(on)).catch(() => Alert.alert(t('plus.switchFailed'), t('plus.tryAgain'))); }}
             />
           ) : null}
         </View>
@@ -48,24 +48,24 @@ export function Plus() {
             disabled={busy}
             style={({ pressed }) => [styles.subscribe, (pressed || busy) && { opacity: 0.85 }]}
             accessibilityRole="button"
-            accessibilityLabel={`Subscribe to Hate Watch Plus${price ? ` for ${price} a month` : ''}`}
+            accessibilityLabel={price ? t('plus.subscribeA11yPrice', { price }) : t('plus.subscribeA11y')}
           >
-            {busy ? <ActivityIndicator color={colors.onHate} /> : <Text style={styles.subscribeText}>Subscribe{price ? `  ${price} / month` : ''}</Text>}
+            {busy ? <ActivityIndicator color={colors.onHate} /> : <Text style={styles.subscribeText}>{price ? t('plus.subscribePrice', { price }) : t('plus.subscribe')}</Text>}
           </Pressable>
           <Text style={styles.fine}>
-            {`Hate Watch Plus is a monthly subscription${price ? ` at ${price}` : ''}. Payment is charged to your ${Platform.OS === 'ios' ? 'Apple ID' : 'Google Play account'} and renews every month until you cancel, at least 24 hours before the period ends, in your ${Platform.OS === 'ios' ? 'App Store' : 'Google Play'} subscription settings.`}
+            {t(Platform.OS === 'ios' ? (price ? 'plus.fineIos' : 'plus.fineIosNoPrice') : (price ? 'plus.fineAndroid' : 'plus.fineAndroidNoPrice'), { price: price ?? '' })}
           </Text>
         </>
       ) : (
-        <Text style={styles.fine}>Plus works in the App Store and Google Play versions of Hate Watch.</Text>
+        <Text style={styles.fine}>{t('plus.worksIn')}</Text>
       )}
 
       {iapAvailable ? (
         <View style={styles.links}>
-          <Pressable onPress={restore} disabled={busy} hitSlop={6} accessibilityRole="button"><Text style={styles.link}>Restore Purchases</Text></Pressable>
-          {active ? <Pressable onPress={() => open(MANAGE_URL)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>Manage Subscription</Text></Pressable> : null}
-          <Pressable onPress={() => open(`${API_URL}/privacy`)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>Privacy</Text></Pressable>
-          <Pressable onPress={() => open(EULA_URL)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>Terms</Text></Pressable>
+          <Pressable onPress={restore} disabled={busy} hitSlop={6} accessibilityRole="button"><Text style={styles.link}>{t('plus.restore')}</Text></Pressable>
+          {active ? <Pressable onPress={() => open(MANAGE_URL)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>{t('plus.manage')}</Text></Pressable> : null}
+          <Pressable onPress={() => open(`${API_URL}/privacy`)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>{t('plus.privacy')}</Text></Pressable>
+          <Pressable onPress={() => open(EULA_URL)} hitSlop={6} accessibilityRole="link"><Text style={styles.link}>{t('plus.terms')}</Text></Pressable>
         </View>
       ) : null}
     </View>

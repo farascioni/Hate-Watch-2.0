@@ -3,6 +3,7 @@ import { ago } from './ui';
 import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { colors, radius, space } from '../theme';
 import type { Clip, KeyPlay } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 /**
  * A game's highlights: ESPN's video clips (newest first; one plays at a time, right in the list), then the
@@ -10,22 +11,23 @@ import type { Clip, KeyPlay } from '../lib/types';
  * the plays that sent you alerts, shaded.
  */
 export function HighlightsView({ clips, plays, now }: { clips: Clip[]; plays: KeyPlay[]; now: number }) {
+  const t = useT();
   return (
     <View style={{ gap: space(3) }}>
       {clips.length ? (
         <View style={styles.card}>
-          <Text style={styles.heading}>Clips · {clips.length}</Text>
+          <Text style={styles.heading}>{t('hl.clips', { n: clips.length })}</Text>
           {clips.map((c) => <ClipRow key={c.id} clip={c} now={now} />)}
         </View>
       ) : null}
       {plays.length ? (
         <View style={styles.card}>
-          <Text style={styles.heading}>Key plays</Text>
+          <Text style={styles.heading}>{t('hl.keyPlays')}</Text>
           {plays.map((p) => (
             <View key={p.id} style={[styles.line, p.alerted && styles.alerted]}>
               <Text style={styles.when}>{p.when}</Text>
               <View style={{ flex: 1, gap: 2 }}>
-                {p.tag || p.alerted ? <Text style={[styles.tag, p.alerted && { color: colors.text }]}>{[p.tag, p.alerted && 'Your alert'].filter(Boolean).join(' · ')}</Text> : null}
+                {p.tag || p.alerted ? <Text style={[styles.tag, p.alerted && { color: colors.text }]}>{[p.tag, p.alerted && t('hl.yourAlert')].filter(Boolean).join(' · ')}</Text> : null}
                 <Text style={[styles.text, p.scoring && styles.scoring]}>{p.text}</Text>
                 {p.score ? <Text style={styles.meta}>{p.score}</Text> : null}
               </View>
@@ -38,11 +40,12 @@ export function HighlightsView({ clips, plays, now }: { clips: Clip[]; plays: Ke
 }
 
 function ClipRow({ clip, now }: { clip: Clip; now: number }) {
+  const t = useT();
   const [open, toggle] = useNowPlaying(`highlights:${clip.id}`);
   return (
     <View style={styles.clip}>
       {open ? <ClipPlayer clip={clip} /> : null}
-      <Pressable style={styles.clipRow} onPress={toggle} accessibilityRole="button" accessibilityLabel={`${open ? 'Close' : 'Play'} ${clip.title}, ${duration(clip.seconds)}`}>
+      <Pressable style={styles.clipRow} onPress={toggle} accessibilityRole="button" accessibilityLabel={`${open ? t('feedCard.close') : t('hl.play')} ${clip.title}, ${duration(clip.seconds)}`}>
         <ClipThumb clip={clip} open={open} width={128} />
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.clipTitle} numberOfLines={3}>{clip.title}</Text>

@@ -4,6 +4,7 @@ import { Alert, AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { isUserCancelledError, useIAP } from 'expo-iap';
 import { LEGACY_TIP_SKUS, PLUS_SKU, PlusContext, lapsePlus, type Plus } from '../lib/plus';
+import { tr } from '../lib/i18n';
 
 /**
  * The one owner of the store connection: Settings reads the subscription from here (usePlus).
@@ -26,12 +27,12 @@ export function PlusStore({ children }: { children: ReactNode }) {
       setActive(true);
       setBusy(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert('Welcome to Hate Watch Plus 🙏', 'Thank you for keeping Hate Watch running and ad free. Switch on Gold accents in Settings.');
+      Alert.alert(tr('plus.welcome'), tr('plus.welcomeBody'));
     },
     onPurchaseError: (error) => {
       setBusy(false);
       if (isUserCancelledError(error)) return;
-      Alert.alert("Subscription didn't go through", error.message || 'Please try again.');
+      Alert.alert(tr('plus.failed'), error.message || tr('plus.tryAgain'));
     },
   });
 
@@ -72,7 +73,7 @@ export function PlusStore({ children }: { children: ReactNode }) {
 
   const subscribe = useCallback(async () => {
     if (!product) {
-      Alert.alert('Hate Watch Plus', connected ? "Subscriptions aren't available right now. Please try again later." : "Can't reach the store right now. Please try again in a moment.");
+      Alert.alert(tr('plus.title'), tr(connected ? 'plus.unavailable' : 'plus.noStore'));
       return;
     }
     setBusy(true);
@@ -88,7 +89,7 @@ export function PlusStore({ children }: { children: ReactNode }) {
       });
     } catch (e) {
       setBusy(false);
-      if (!isUserCancelledError(e)) Alert.alert("Subscription didn't go through", String((e as Error)?.message ?? e));
+      if (!isUserCancelledError(e)) Alert.alert(tr('plus.failed'), String((e as Error)?.message ?? e));
     }
   }, [product, connected, requestPurchase]);
 
@@ -97,10 +98,10 @@ export function PlusStore({ children }: { children: ReactNode }) {
     try {
       await restorePurchases();
       const yes = await refresh();
-      if (yes === false) Alert.alert('Restore purchases', 'No active Hate Watch Plus subscription was found on this account.');
-      else if (yes) Alert.alert('Restore purchases', 'Hate Watch Plus is back on.');
+      if (yes === false) Alert.alert(tr('plus.restoreTitle'), tr('plus.restoreNone'));
+      else if (yes) Alert.alert(tr('plus.restoreTitle'), tr('plus.restoreOn'));
     } catch (e) {
-      Alert.alert("Couldn't restore", String((e as Error)?.message ?? e));
+      Alert.alert(tr('plus.restoreFailed'), String((e as Error)?.message ?? e));
     } finally {
       setBusy(false);
     }

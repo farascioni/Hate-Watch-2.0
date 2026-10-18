@@ -3,6 +3,7 @@ import { Alert, AppState, Linking, Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from './api';
+import { tr } from './i18n';
 
 /** Checks for an over-the-air update, downloads it and restarts into it. 'off' in development builds and on web, which take none. */
 export async function syncUpdate(): Promise<'reloading' | 'current' | 'off'> {
@@ -32,9 +33,9 @@ async function offerNewBuild() {
   const { ios, url } = await api.latestBuild();
   if (ios == null || ios <= mine || !/^itms-(beta|apps):\/\//.test(url) || Number(await AsyncStorage.getItem(BUILD_ASKED_KEY)) >= ios) return;
   const asked = () => AsyncStorage.setItem(BUILD_ASKED_KEY, String(ios)); // on a tap, so an update restart that wipes the alert asks again
-  Alert.alert('Update available', `Build ${ios} of Hate Watch is ready to install.`, [
-    { text: 'Later', style: 'cancel', onPress: asked },
-    { text: 'Update', onPress: () => { asked(); Linking.openURL(url).catch(() => {}); } },
+  Alert.alert(tr('update.title'), tr('update.body', { build: ios }), [
+    { text: tr('update.later'), style: 'cancel', onPress: asked },
+    { text: tr('update.update'), onPress: () => { asked(); Linking.openURL(url).catch(() => {}); } },
   ]);
 }
 

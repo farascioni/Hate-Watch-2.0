@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { shareAlert } from '../lib/share';
 import { colors, radius, space } from '../theme';
 import type { FeedItem } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 type ShareStyle = NonNullable<FeedItem['shareStyles']>[number];
 
@@ -32,19 +33,20 @@ export function useShare(item: FeedItem | undefined) {
 /** "Share as": each look as the picture a link preview will show (the server's card, small), two to a row. */
 function ShareStyleSheet({ styles: options, onPick, onClose }: { styles: ShareStyle[]; onPick: (s: ShareStyle) => void; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={s.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('feedCard.close')} />
         <View style={[s.sheet, { paddingBottom: insets.bottom + space(4) }]} accessibilityViewIsModal>
           <View style={s.grab} />
           <View style={s.head}>
-            <Text style={s.title} accessibilityRole="header">Share as</Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={s.done}>Cancel</Text></Pressable>
+            <Text style={s.title} accessibilityRole="header">{t('share.as')}</Text>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={s.done}>{t('settings.cancel')}</Text></Pressable>
           </View>
           <ScrollView contentContainerStyle={s.grid} style={{ flexShrink: 1 }}>
             {options.map((o) => (
-              <Pressable key={o.id} onPress={() => onPick(o)} style={({ pressed }) => [s.option, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={`Share as ${o.label}`}>
+              <Pressable key={o.id} onPress={() => onPick(o)} style={({ pressed }) => [s.option, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={`${t('share.as')} ${o.label}`}>
                 <Image source={{ uri: o.image }} style={s.thumb} contentFit="cover" transition={150} />
                 <Text style={s.label}>{o.label}</Text>
               </Pressable>

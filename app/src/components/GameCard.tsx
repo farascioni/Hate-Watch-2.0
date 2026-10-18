@@ -11,6 +11,8 @@ import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 import { liveBoardSupported, toggleBoardGame, useOnBoard } from '../lib/liveScoreboard';
+import { useT } from '../lib/i18n';
+import type { Key } from '../lib/strings/en';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
   good: { bg: colors.hateDim, fg: colors.hateText },  // they're losing: good news
@@ -21,6 +23,7 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
 
 /** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). */
 export const GameCardView = memo(function GameCardView({ game, latest, now, big }: { game: GameCard; latest?: FeedItem; now: number; big?: boolean }) {
+  const tx = useT();
   const { follows, favorites } = useStore();
   const sides = trackedSides(game, follows);
   // Hate Watch Plus: a red border while a team (or a player or driver) on your most hated list is in this game, a gold one while a favorite is (red wins).
@@ -36,7 +39,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
 
   const body = game.league === 'f1' ? <F1Body game={game} big={big} /> : (
     <>
-      {game.state === 'pre' && game.preview?.chance ? <Text style={styles.chanceHead} importantForAccessibility="no">Win %</Text> : null}
+      {game.state === 'pre' && game.preview?.chance ? <Text style={styles.chanceHead} importantForAccessibility="no">{tx('gc.winPct')}</Text> : null}
       {(['away', 'home'] as const).map((k) => <TeamRow key={k} game={game} side={k} tracked={sides.includes(k)} big={big} />)}
       <View style={styles.meta}>
         <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>
@@ -49,7 +52,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
       {lose != null && side ? (
         <View style={{ gap: 4 }}>
           <View style={styles.meta}>
-            <Text style={styles.metaText}>Chance the {game[side]!.team.shortName} lose</Text>
+            <Text style={styles.metaText}>{tx('gc.chanceLose', { team: game[side]!.team.shortName })}</Text>
             <Text style={[styles.metaText, { color: colors.hateText, fontWeight: '800' }]}>{Math.round(lose * 100)}%</Text>
           </View>
           <View style={styles.bar}><View style={[styles.barFill, { width: `${Math.round(lose * 100)}%` }]} /></View>
@@ -67,8 +70,8 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   if (big) return <View style={[styles.card, styles.bigCard]}>{content}</View>;
   return (
     <Pressable onPress={open} style={({ pressed }) => [styles.card, mostHated && styles.mostHated, favorite && styles.favorite, game.state === 'post' && { opacity: 0.8 }, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityHint="Opens the play-by-play and your alerts from this game"
-      accessibilityActions={teams.map((k) => ({ name: k, label: `Open the ${game[k]!.team.shortName} page` }))}
+      accessibilityRole="button" accessibilityHint={tx('gc.openHint')}
+      accessibilityActions={teams.map((k) => ({ name: k, label: tx('gc.openTeam', { name: game[k]!.team.shortName }) }))}
       onAccessibilityAction={(e) => { const k = teams.find((t) => t === e.nativeEvent.actionName); if (k) openTeam(game[k]!.team.key); }}>
       {content}
     </Pressable>
@@ -77,11 +80,12 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
 
 /** The lock: puts the game on the lock screen scoreboard (docs/live-activity.md), or takes it off. iOS builds with the widget only. */
 function BoardButton({ game }: { game: GameCard }) {
+  const tx = useT();
   const onBoard = useOnBoard(game.key);
   if (!liveBoardSupported) return null;
   return (
     <Pressable onPress={() => { toggleBoardGame(game.key).catch(() => {}); }} hitSlop={10} accessibilityRole="button" accessibilityState={{ selected: onBoard }}
-      accessibilityLabel={onBoard ? 'Remove this game from your lock screen scoreboard' : 'Add this game to your lock screen scoreboard'}>
+      accessibilityLabel={tx(onBoard ? 'gc.boardOff' : 'gc.boardOn')}>
       <Ionicons name={onBoard ? 'eye' : 'eye-outline'} size={16} color={onBoard ? colors.live : colors.textDim} />
     </Pressable>
   );
@@ -91,6 +95,7 @@ function BoardButton({ game }: { game: GameCard }) {
 const openTeam = (key: string) => router.push(`/target/${encodeURIComponent(key)}`);
 
 function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tracked: boolean; big?: boolean }) {
+  const tx = useT();
   const { follows } = useStore();
   const s = game[side]!;
   const players = trackedPlayers(game, side, follows);
@@ -109,16 +114,16 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={styles.nameRow}>
           <Pressable onPress={open} hitSlop={{ top: 4, bottom: 4 }} style={({ pressed }) => [styles.nameTap, pressed && { opacity: 0.6 }]}
-            accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint="Opens their page">
+            accessibilityRole="link" accessibilityLabel={s.team.name} accessibilityHint={tx('gc.theirPage')}>
             <Text style={[styles.teamName, big && { fontSize: 18 }, !tracked && { color: colors.textDim }]}>{s.team.shortName}</Text>
           </Pressable>
-          {tracked ? <Text style={styles.tracking}>Tracking</Text> : null}
+          {tracked ? <Text style={styles.tracking}>{tx('lb.tracking')}</Text> : null}
         </View>
         {players.length && !follows.has(s.team.key) ? <Text style={styles.players} numberOfLines={1}>{players.map((p) => p.name).join(', ')}</Text> : null}
-        {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${side === 'home' ? 'at home' : 'away'}` : ''}</Text> : null}
+        {record ? <Text style={styles.record} numberOfLines={1}>{record}{split ? ` · ${split} ${tx(side === 'home' ? 'gc.atHome' : 'gc.away')}` : ''}</Text> : null}
       </View>
       {chance != null
-        ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={`${chance}% chance to win`}>{chance}%</Text>
+        ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={tx('gc.chanceWin', { n: chance })}>{chance}%</Text>
         : <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>}
     </View>
   );
@@ -129,6 +134,7 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
  * and your drivers: where they are, their places since the start, gap to the leader and stops, or when they went out.
  */
 function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
+  const tx = useT();
   const { follows } = useStore();
   const mine = trackedDrivers(game, follows);
   // The server's status line names the flag too, for builds without the pill.
@@ -147,7 +153,7 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
         {game.flag && game.state === 'in' ? <View style={[styles.pill, { backgroundColor: flagTone.bg }]}><Text style={[styles.pillText, { color: flagTone.fg }]}>{game.flag}</Text></View> : null}
       </View>
       {game.state === 'in' && game.lap && game.laps ? (
-        <View style={styles.bar} accessibilityLabel={`Lap ${game.lap} of ${game.laps}`}>
+        <View style={styles.bar} accessibilityLabel={tx('gc.lap', { lap: game.lap, laps: game.laps })}>
           <View style={[styles.barFill, styles.lapFill, { width: `${Math.min(100, Math.round((game.lap / game.laps) * 100))}%` }]} />
         </View>
       ) : null}
@@ -181,6 +187,7 @@ function F1Body({ game, big }: { game: GameCard; big?: boolean }) {
  * (soccer: the latest goal or card). Tracked players in red.
  */
 function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
+  const tx = useT();
   const { follows, leagueInfo } = useStore();
   const name = (x: { key: string; name: string }) => <Text style={follows.has(x.key) ? styles.mine : styles.who}>{x.name}</Text>;
   const abbr = (side: Side) => game[side]?.team.abbrev ?? '';
@@ -193,26 +200,26 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
   if (game.league === 'mlb') {
     const p = game.pitcher, b = game.batter;
     // ESPN's batter line is hits-at bats today ("0-2"), sometimes with extras ("1-3, HR").
-    const today = (l?: string) => l?.replace(/^(\d+)-(\d+)/, '$1 for $2');
-    if (p) line('p', <>Pitching: {name(p)}{p.pitches != null ? `, ${p.pitches} pitches` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}</>);
-    if (b) line('b', <>At bat: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</>);
+    const today = (l?: string) => l?.replace(/^(\d+)-(\d+)/, tx('gc.hitsFor'));
+    if (p) line('p', <>{tx('gc.pitching')}: {name(p)}{p.pitches != null ? `, ${tx('gc.pitches', { n: p.pitches })}` : ''}{(big || p.pitches == null) && p.line ? ` · ${p.line}` : ''}</>);
+    if (b) line('b', <>{tx('gc.atBat')}: {name(b)}{b.line ? `, ${today(b.line)}` : ''}</>);
   }
-  if ((game.league === 'nba' || game.league === 'wnba') && game.leaders) line('lead', <>Top scorers: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
+  if ((game.league === 'nba' || game.league === 'wnba') && game.leaders) line('lead', <>{tx('gc.topScorers')}: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>);
   if (isFootball(game.league)) {
-    if (game.timeouts && game.state === 'in') line('to', `Timeouts left: ${abbr('away')} ${game.timeouts.away} · ${abbr('home')} ${game.timeouts.home}`);
+    if (game.timeouts && game.state === 'in') line('to', `${tx('gc.timeouts')}: ${abbr('away')} ${game.timeouts.away} · ${abbr('home')} ${game.timeouts.home}`);
     const withBall: Side | undefined = game.possession === game.home?.team.key ? 'home' : game.possession === game.away?.team.key ? 'away' : undefined;
-    if (big && game.leaders) line('pass', <>Passing: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>, 2);
-    else if (withBall && game.leaders?.[withBall]) { const p = game.leaders[withBall]!; line('pass', <>Passing: {name(p)}, {p.line}</>); }
+    if (big && game.leaders) line('pass', <>{tx('guide.scores.passing').replace(/:$/, '')}: {both(game.leaders, (p) => <>{name(p)} {p.line}</>)}</>, 2);
+    else if (withBall && game.leaders?.[withBall]) { const p = game.leaders[withBall]!; line('pass', <>{tx('guide.scores.passing').replace(/:$/, '')}: {name(p)}, {p.line}</>); }
   }
   if (game.league === 'nhl') {
-    if (game.shots) line('sog', `Shots on goal: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
-    if (game.goalies) line('g', <>In net: {both(game.goalies, (p) => <>{name(p)}{p.line ? ` (${p.line})` : ''}</>)}</>);
+    if (game.shots) line('sog', `${tx('gc.shotsGoal')}: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
+    if (game.goalies) line('g', <>{tx('gc.inNet')}: {both(game.goalies, (p) => <>{name(p)}{p.line ? ` (${p.line})` : ''}</>)}</>);
   }
   if (leagueInfo(game.league)?.sport === 'soccer') {
-    if (game.shots) line('sot', `Shots on target: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
-    if (game.redCards) line('red', `Red cards 🟥 ${abbr('away')} ${game.redCards.away} · ${abbr('home')} ${game.redCards.home}`);
+    if (game.shots) line('sot', `${tx('gc.shotsTarget')}: ${abbr('away')} ${game.shots.away} · ${abbr('home')} ${game.shots.home}`);
+    if (game.redCards) line('red', `${tx('gc.redCards')} 🟥 ${abbr('away')} ${game.redCards.away} · ${abbr('home')} ${game.redCards.home}`);
   }
-  if (game.lastPlay && game.state === 'in') line('last', <>Last play: <Text style={styles.who}>{game.lastPlay}</Text></>);
+  if (game.lastPlay && game.state === 'in') line('last', <>{tx('gc.lastPlay')}: <Text style={styles.who}>{game.lastPlay}</Text></>);
   return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;
 }
 
@@ -222,6 +229,7 @@ function LiveDetails({ game, big }: { game: GameCard; big?: boolean }) {
  * Away first, like the team rows; tracked players in red.
  */
 function PreviewDetails({ game, big }: { game: GameCard; big?: boolean }) {
+  const tx = useT();
   const { follows } = useStore();
   const pv = game.preview;
   if (!pv) return null;
@@ -231,30 +239,31 @@ function PreviewDetails({ game, big }: { game: GameCard; big?: boolean }) {
   const line = (key: string, node: ReactNode, rows = 1) => lines.push(<Text key={key} style={styles.atBat} numberOfLines={big ? rows + 1 : rows}>{node}</Text>);
   const st = pv.starters;
   if (st && (st.home || st.away)) {
-    const who = (s: Side) => (st[s] ? <>{name(st[s]!)}{st[s]!.line ? ` (${st[s]!.line})` : ''}</> : <Text style={styles.who}>TBD</Text>);
+    const who = (s: Side) => (st[s] ? <>{name(st[s]!)}{st[s]!.line ? ` (${st[s]!.line})` : ''}</> : <Text style={styles.who}>{tx('gc.tbd')}</Text>);
     line('sp', <>{st.label}: {who('away')} · {who('home')}</>, 2);
   }
   if (pv.line || pv.total != null || pv.chance?.draw != null) {
-    const parts = [pv.line, pv.total != null ? `O/U ${pv.total}` : null, pv.chance?.draw != null ? `Draw ${pv.chance.draw}%` : null].filter(Boolean);
-    line('odds', `${pv.source ? `Odds (${pv.source})` : 'Odds'}: ${parts.join(' · ')}`);
+    const parts = [pv.line, pv.total != null ? `O/U ${pv.total}` : null, pv.chance?.draw != null ? `${tx('gc.draw')} ${pv.chance.draw}%` : null].filter(Boolean);
+    line('odds', `${pv.source ? tx('gc.oddsSource', { source: pv.source }) : tx('gc.odds')}: ${parts.join(' · ')}`);
   }
-  if (pv.form && (pv.form.home || pv.form.away)) line('form', `Form: ${abbr('away')} ${pv.form.away ?? '–'} · ${abbr('home')} ${pv.form.home ?? '–'}`);
+  if (pv.form && (pv.form.home || pv.form.away)) line('form', `${tx('gc.form')}: ${abbr('away')} ${pv.form.away ?? '–'} · ${abbr('home')} ${pv.form.home ?? '–'}`);
   if (pv.series) line('series', pv.series);
   return lines.length ? <View style={{ gap: 2 }}>{lines}</View> : null;
 }
 
 /** MLB: who's on base (filled), how many out, and the count. */
 export function Bases({ bases, count }: { bases: NonNullable<GameCard['bases']>; count?: GameCard['count'] }) {
+  const tx = useT();
   const base = (on: boolean, pos: object) => <View style={[styles.base, pos, on && styles.baseOn]} />;
   return (
-    <View style={styles.inline} accessibilityLabel={`${['first', 'second', 'third'].filter((b) => bases[b as 'first']).join(' and ') || 'Bases empty'}, ${bases.outs} out`}>
+    <View style={styles.inline} accessibilityLabel={`${['first', 'second', 'third'].filter((b) => bases[b as 'first']).map((b) => tx(`gc.base.${b}` as Key)).join(tx('gc.and')) || tx('gc.basesEmpty')}, ${tx('gc.outs', { n: bases.outs })}`}>
       <View style={styles.diamond}>
         {base(bases.second, { left: 10, top: 0 })}
         {base(bases.third, { left: 0, top: 10 })}
         {base(bases.first, { left: 20, top: 10 })}
       </View>
       <View style={{ flexDirection: 'row', gap: 3 }}>{[0, 1].map((i) => <View key={i} style={[styles.out, i < bases.outs && styles.outOn]} />)}</View>
-      {count ? <Text style={styles.count} accessibilityLabel={`${count.balls} balls, ${count.strikes} strikes`}>{count.balls}-{count.strikes}</Text> : null}
+      {count ? <Text style={styles.count} accessibilityLabel={tx('gc.count', { balls: count.balls, strikes: count.strikes })}>{count.balls}-{count.strikes}</Text> : null}
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { fromGrid, stopsText } from '../lib/scores';
 import { useF1Tone, toneRow, toneName, toneMark, toneStyles, trackedRow, type F1Tone } from '../lib/f1Tone';
 import { colors, radius, space } from '../theme';
 import type { GameCard, RaceDriver } from '../lib/types';
+import { useT, tr } from '../lib/i18n';
 
 /**
  * An F1 session's running order (the results once it's over), yours in red. A race or sprint on a newer server
@@ -10,23 +11,25 @@ import type { GameCard, RaceDriver } from '../lib/types';
  * its pit stops; a car out of it says when. The name and that line wrap, so large text sizes fit.
  */
 export function RaceOrder({ game, mine }: { game: GameCard; mine: Set<string> }) {
+  const t = useT();
   const order = game.order ?? [];
   const live = game.state === 'in';
   const timed = order.some((d) => d.gap || d.interval);
   const tone = useF1Tone();
   return (
     <View style={styles.list}>
-      {live && timed ? <Text style={styles.legend}>Gap to the leader, and to the car ahead</Text> : null}
+      {live && timed ? <Text style={styles.legend}>{t('race.legend')}</Text> : null}
       {order.map((d) => <Row key={d.key} d={d} mine={mine.has(d.key)} tone={tone(d.teamKey)} leader={live && timed && d.position === 1 && !d.out} />)}
     </View>
   );
 }
 
 function Row({ d, mine, tone, leader }: { d: RaceDriver; mine: boolean; tone?: F1Tone; leader: boolean }) {
+  const t = useT();
   const grid = fromGrid(d), stops = stopsText(d.pits);
   const detail = d.out ? [d.out] : [grid?.text, stops].filter(Boolean);
-  const label = [`${d.position ? `P${d.position}` : 'No position'}, ${d.name}`, d.out ?? grid?.label, stops,
-    leader ? 'leading' : d.gap ? `${d.gap} to the leader` : null, d.interval ? `${d.interval} to the car ahead` : null].filter(Boolean).join(', ');
+  const label = [`${d.position ? `P${d.position}` : t('race.noPosition')}, ${d.name}`, d.out ?? grid?.label, stops,
+    leader ? t('race.leading') : d.gap ? t('race.toLeader', { gap: d.gap }) : null, d.interval ? t('race.toCar', { gap: d.interval }) : null].filter(Boolean).join(', ');
   return (
     <View style={[styles.line, mine && trackedRow, toneRow(tone)]} accessible accessibilityLabel={label}>
       <Text style={styles.pos}>{d.position ? `P${d.position}` : '–'}</Text>
@@ -41,7 +44,7 @@ function Row({ d, mine, tone, leader }: { d: RaceDriver; mine: boolean; tone?: F
       </View>
       {leader || d.gap ? (
         <View style={styles.gaps}>
-          <Text style={styles.gap}>{leader ? 'Leader' : d.gap}</Text>
+          <Text style={styles.gap}>{leader ? t('race.leader') : d.gap}</Text>
           {d.interval ? <Text style={styles.interval}>{d.interval}</Text> : null}
         </View>
       ) : null}

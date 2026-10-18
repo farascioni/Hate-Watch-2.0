@@ -8,6 +8,7 @@ import { AlertClip } from '../../components/FeedCard';
 import { AlsoGot, LeagueTag, ago, subtitle, useNow } from '../../components/ui';
 import { useShare } from '../../components/ShareStyleSheet';
 import { colors, radius, space } from '../../theme';
+import { currentLocale, useT } from '../../lib/i18n';
 
 const DAY = 24 * 3600_000;
 
@@ -16,6 +17,7 @@ const decoded = (id: string) => { try { return decodeURIComponent(id); } catch {
 
 /** An alert on its own, opened from a list (lib/alerts.ts openAlert): all of its text, its clip, when, and who it's about. */
 export default function AlertScreen() {
+  const tx = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const alertId = decoded(id);
   const { feed, ready } = useStore();
@@ -23,7 +25,7 @@ export default function AlertScreen() {
   // The feed's copy when it has one (a fact that comes later is added to it live), else the one tapped.
   const item = feed.find((f) => f.id === alertId) ?? openedAlert(alertId);
   const { share, copied, sheet } = useShare(item);
-  const header = <Stack.Screen options={{ title: 'Alert', headerBackTitle: 'Back' }} />;
+  const header = <Stack.Screen options={{ title: tx('alert.title'), headerBackTitle: tx('guide.back') }} />;
 
   if (!item) {
     return (
@@ -31,8 +33,8 @@ export default function AlertScreen() {
         {header}
         {ready ? (
           <>
-            <Text style={styles.gone}>This alert isn't in your feed anymore.</Text>
-            <Pressable onPress={() => router.replace('/')} hitSlop={8}><Text style={styles.link}>Go to your feed</Text></Pressable>
+            <Text style={styles.gone}>{tx('alert.gone')}</Text>
+            <Pressable onPress={() => router.replace('/')} hitSlop={8}><Text style={styles.link}>{tx('alert.goFeed')}</Text></Pressable>
           </>
         ) : <ActivityIndicator color={colors.hate} />}
       </View>
@@ -42,7 +44,7 @@ export default function AlertScreen() {
   // Hate Watch itself: no page to open, no league, nothing to share.
   const notice = isNotice(item);
   const target = !notice && 'name' in item.target ? item.target : null;
-  const when = new Date(item.occurredAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const when = new Date(item.occurredAt).toLocaleString(currentLocale(), { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -53,12 +55,12 @@ export default function AlertScreen() {
           <AppAvatar size={48} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.name}>Hate Watch</Text>
-            <Text style={styles.sub}>From the developer</Text>
+            <Text style={styles.sub}>{tx('alert.fromDev')}</Text>
           </View>
         </View>
       ) : target ? (
         <Pressable onPress={() => router.push(targetHref(target))} style={({ pressed }) => [styles.who, pressed && { backgroundColor: colors.surfaceHi }]}
-          accessibilityRole="button" accessibilityLabel={`${target.name}'s page`}>
+          accessibilityRole="button" accessibilityLabel={tx('alert.page', { name: target.name })}>
           <Avatar target={target} size={48} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.name} numberOfLines={1}>{target.name}</Text>
@@ -79,9 +81,9 @@ export default function AlertScreen() {
       {item.clip ? <AlertClip clip={item.clip} style={styles.clip} /> : null}
       {notice ? null : (
         <Pressable onPress={share} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button"
-          accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
+          accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
           <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={copied ? colors.live : colors.text} />
-          <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? 'Copied' : 'Share this alert'}</Text>
+          <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? tx('alert.copied') : tx('alert.share')}</Text>
         </Pressable>
       )}
     </ScrollView>

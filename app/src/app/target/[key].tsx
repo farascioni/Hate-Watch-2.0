@@ -11,14 +11,16 @@ import { ChipRows, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow
 import { colors, space } from '../../theme';
 import type { FeedItem, Player, StatsPage, Target } from '../../lib/types';
 import { ROSTER_GROUPS } from '../../lib/positions';
+import { tr, useT } from '../../lib/i18n';
 
 const DAY = 24 * 3600_000;
 const MISERY_DAYS = 30; // "Recent misery": the last 30 days (server MISERY_DAYS)
 
 /** A loss is a "Successful Hate Watch!" only for someone who tracks the team or player; the server's list has no such wording. */
-const withHateWatch = (item: FeedItem, tracked: boolean): FeedItem => (item.loss && tracked ? { ...item, title: `Successful Hate Watch! ${item.title}` } : item);
+const withHateWatch = (item: FeedItem, tracked: boolean): FeedItem => (item.loss && tracked ? { ...item, title: `${tr('feed.successful')} ${item.title}` } : item);
 
 export default function TargetScreen() {
+  const tx = useT();
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
   const { noteTrackers, leagueInfo, isFollowing } = useStore();
@@ -79,7 +81,7 @@ export default function TargetScreen() {
         </View>
       </View>
       <View style={styles.tabs} accessibilityRole="tablist">
-        {([['stats', 'Stats'], ['misery', 'Recent misery']] as const).map(([id, label]) => (
+        {([['stats', tx('target.stats')], ['misery', tx('target.misery')]] as const).map(([id, label]) => (
           <Pressable key={id} onPress={() => { setTab(id); if (id === 'misery') loadMisery(); }} style={[styles.tab, view === id && styles.tabOn]}
             accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
             <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{label}</Text>
@@ -90,8 +92,8 @@ export default function TargetScreen() {
         stats ? <StatsView page={stats} target={target} now={now} />
         : statsFailed ? (
           <View style={styles.note}>
-            <Text style={styles.noteText}>Couldn't load the stats. ESPN didn't answer.</Text>
-            <Pressable onPress={loadStats} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>Try again</Text></Pressable>
+            <Text style={styles.noteText}>{tx('target.statsFailed')}</Text>
+            <Pressable onPress={loadStats} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>{tx('plus.tryAgain')}</Text></Pressable>
           </View>
         ) : <ActivityIndicator color={colors.hate} style={styles.note} />
       ) : (
@@ -100,18 +102,18 @@ export default function TargetScreen() {
           {misery?.length ? misery.map((h) => <FeedCard key={h.id} item={withHateWatch(h, isFollowing(h.target.key) || isFollowing(targetKey))} now={now} />)
             : miseryFailed ? (
               <View style={styles.note}>
-                <Text style={styles.noteText}>Couldn't load the misery.</Text>
-                <Pressable onPress={loadMisery} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>Try again</Text></Pressable>
+                <Text style={styles.noteText}>{tx('target.miseryFailed')}</Text>
+                <Pressable onPress={loadMisery} hitSlop={8} accessibilityRole="button"><Text style={styles.retry}>{tx('plus.tryAgain')}</Text></Pressable>
               </View>
-            ) : misery ? <Text style={[styles.noteText, styles.note]}>{`No misery in the last ${MISERY_DAYS} days. Give it time.`}</Text>
+            ) : misery ? <Text style={[styles.noteText, styles.note]}>{tx('target.miseryNone', { n: MISERY_DAYS })}</Text>
             : <ActivityIndicator color={colors.hate} style={styles.note} />}
-          {misery?.length ? <Text style={[styles.noteText, styles.footer]}>The same for everyone: losses and the worst of what happens to them, whoever tracks them.</Text> : null}
+          {misery?.length ? <Text style={[styles.noteText, styles.footer]}>{tx('target.miseryFooter')}</Text> : null}
         </>
       )}
-      {target.roster?.length ? <SectionHeader>Roster · {target.roster.length}</SectionHeader> : null}
+      {target.roster?.length ? <SectionHeader>{tx('target.roster', { n: target.roster.length })}</SectionHeader> : null}
       {groups.length > 1 ? (
-        <ChipRows style={styles.positions} gap={space(1.5)} chipStyle={styles.positionChip} accessibilityLabel="Filter the roster by position" items={[
-          { key: 'all', label: `All ${target.roster!.length}`, active: !position, onPress: () => setPosition(null) },
+        <ChipRows style={styles.positions} gap={space(1.5)} chipStyle={styles.positionChip} accessibilityLabel={tx('target.filterRoster')} items={[
+          { key: 'all', label: tx('target.allN', { n: target.roster!.length }), active: !position, onPress: () => setPosition(null) },
           ...groups.map((g) => ({ key: g.label, label: `${g.label} ${g.players.length}`, active: position === g.label, onPress: () => setPosition(position === g.label ? null : g.label) })),
         ]} />
       ) : null}

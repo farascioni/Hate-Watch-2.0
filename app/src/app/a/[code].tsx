@@ -6,6 +6,7 @@ import { FeedCard } from '../../components/FeedCard';
 import { FollowButton, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
 import type { FeedItem } from '../../lib/types';
+import { useT } from '../../lib/i18n';
 
 /**
  * Where a shared alert's link (https://…/a/<code>) lands when Hate Watch is installed: iOS opens the
@@ -13,6 +14,7 @@ import type { FeedItem } from '../../lib/types';
  */
 export default function SharedAlertScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
+  const t = useT();
   const [item, setItem] = useState<FeedItem | null>();  // undefined while loading, null if it's gone
   const now = useNow();
 
@@ -22,8 +24,8 @@ export default function SharedAlertScreen() {
   if (item === null) {
     return (
       <View style={styles.center}>
-        <Text style={styles.gone}>This alert isn't available anymore.</Text>
-        <Pressable onPress={() => router.replace('/')} hitSlop={8}><Text style={styles.link}>Go to your feed</Text></Pressable>
+        <Text style={styles.gone}>{t('shared.gone')}</Text>
+        <Pressable onPress={() => router.replace('/')} hitSlop={8}><Text style={styles.link}>{t('shared.goFeed')}</Text></Pressable>
       </View>
     );
   }

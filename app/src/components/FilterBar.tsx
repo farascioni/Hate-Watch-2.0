@@ -6,13 +6,10 @@ import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import { leagueColor, leagueUi } from '../lib/leagueUi';
 import type { League, Target } from '../lib/types';
+import { tr, useT, wordT } from '../lib/i18n';
 
 export type Kind = 'all' | 'player' | 'team';
-const KINDS: { id: Kind; label: string }[] = [
-  { id: 'all', label: 'Everything' },
-  { id: 'team', label: 'Teams' },
-  { id: 'player', label: 'Players' },
-];
+const KINDS: Kind[] = ['all', 'team', 'player'];
 
 export interface Filter { kind: Kind; league?: League }
 
@@ -56,15 +53,15 @@ export function groupByWeightClass(targets: Target[]): { title: string; data: Ta
  * What a league's players are called: F1's are drivers, the UFC's fighters ("Search UFC fighters"); every
  * league's at once (All), athletes.
  */
-export const playersWord = (league?: string) => (!league ? 'athletes' : leagueUi(league).players);
+export const playersWord = (league?: string) => wordT(tr, !league ? 'athletes' : leagueUi(league).players);
 /** The same as a heading or label: "Athletes", "Players", "Drivers", "Fighters". */
 export const playersTitle = (league?: string) => { const w = playersWord(league); return w[0].toUpperCase() + w.slice(1); };
 
 /** Human description of the active filter, e.g. "NBA players", "F1 drivers", "athletes and teams", for empty states. */
 export function describeFilter(f: Filter) {
   const players = playersWord(f.league), kind = kindOf(f);
-  const what = kind === 'team' ? 'teams' : kind === 'player' ? players : `${players} and teams`;
-  return f.league ? `${f.league.toUpperCase()} ${what}` : what;
+  const what = kind === 'team' ? tr('word.teams') : kind === 'player' ? players : tr('filter.andTeams', { players });
+  return f.league ? tr('filter.leagueWhat', { league: f.league.toUpperCase(), what }) : what;
 }
 
 /** With nothing tracked yet, the leagues on the filter's row: the first few in the server's order (NBA, MLB, NFL, NHL). */
@@ -81,6 +78,7 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
   /** false: league chips only (Scores tab) */ kinds?: boolean;
   /** false: Teams / Players only, no Everything (Search, where the two are separate lists) */ everything?: boolean;
 }) {
+  const t = useT();
   const { leagues, follows } = useStore();
   const [sheet, setSheet] = useState(false);
   const yours = useMemo(() => {
@@ -93,23 +91,23 @@ export function FilterBar({ filter, onChange, kinds = true, everything = true }:
   const name = (id: League) => leagues.find((l) => l.id === id)?.name ?? id.toUpperCase();
   const pick = (league: League | undefined) => onChange({ ...filter, league });
   const only = onlyKind(filter);
-  const options = only ? KINDS.filter((k) => k.id === only) : KINDS.filter((k) => everything || k.id !== 'all');
+  const options = only ? KINDS.filter((k) => k === only) : KINDS.filter((k) => everything || k !== 'all');
   return (
     <View>
       {kinds ? <View style={styles.segment} accessibilityRole="tablist">
-        {options.map(({ id, label }) => {
+        {options.map((id) => {
           const on = kindOf(filter) === id;
           return (
             <Pressable key={id} onPress={only ? undefined : () => onChange({ ...filter, kind: id })} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-              <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' ? playersTitle(filter.league) : label}</Text>
+              <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'player' ? playersTitle(filter.league) : t(id === 'all' ? 'filter.everything' : 'filter.teams')}</Text>
             </Pressable>
           );
         })}
       </View> : null}
       <ChipRows style={styles.leagues} gap={space(1)} chipStyle={styles.leagueChip} items={[
-        { key: 'all', label: 'All', active: !filter.league, onPress: () => pick(undefined) },
+        { key: 'all', label: t('filter.all'), active: !filter.league, onPress: () => pick(undefined) },
         ...row.map((id) => ({ key: id, label: name(id), active: filter.league === id, color: leagueColor(id), onPress: () => pick(filter.league === id ? undefined : id) })),
-        ...(more ? [{ key: 'more', label: 'More', onPress: () => setSheet(true), accessibilityLabel: 'More leagues' }] : []),
+        ...(more ? [{ key: 'more', label: t('filter.more'), onPress: () => setSheet(true), accessibilityLabel: t('filter.moreLeagues') }] : []),
       ]} />
       <LeagueSheet open={sheet} onClose={() => setSheet(false)} leagues={leagues} yours={yours} picked={filter.league} onPick={pick} />
     </View>

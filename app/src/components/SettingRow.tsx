@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, space } from '../theme';
+import { useT } from '../lib/i18n';
 
 /** One labelled switch row, shared by the global Settings tab and the per-player/team alert screen. */
 export function SettingRow({ title, desc, value, onChange, emoji, disabled, footer, push }: {
@@ -14,6 +15,7 @@ export function SettingRow({ title, desc, value, onChange, emoji, disabled, foot
    */
   push?: { on: boolean; onChange: (on: boolean) => void };
 }) {
+  const t = useT();
   const bellUsable = !!push && value && !disabled;
   return (
     <View style={[styles.row, disabled && { opacity: 0.45 }]}>
@@ -21,7 +23,7 @@ export function SettingRow({ title, desc, value, onChange, emoji, disabled, foot
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>{title}</Text>
         {desc ? <Text style={styles.desc}>{desc}</Text> : null}
-        {push && value && !push.on ? <Text style={styles.feedOnly}>Feed only: no notification</Text> : null}
+        {push && value && !push.on ? <Text style={styles.feedOnly}>{t('guide.global.row2note')}</Text> : null}
         {footer}
       </View>
       {push ? (
@@ -34,8 +36,8 @@ export function SettingRow({ title, desc, value, onChange, emoji, disabled, foot
           // aria-* rather than accessibilityState: react-native-web only passes these on to screen readers.
           aria-checked={push.on}
           aria-disabled={!bellUsable}
-          accessibilityLabel={`Notifications for ${title}`}
-          accessibilityHint={push.on ? 'Turn off to keep this alert in your feed without a notification' : 'Turn on to also get a notification'}
+          accessibilityLabel={t('settingRow.bell', { title })}
+          accessibilityHint={t(push.on ? 'settingRow.turnOff' : 'settingRow.turnOn')}
         >
           <Ionicons name={push.on ? 'notifications' : 'notifications-off'} size={18} color={push.on && value ? colors.text : colors.textFaint} />
         </Pressable>

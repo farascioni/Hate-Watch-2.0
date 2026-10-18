@@ -6,6 +6,7 @@ import { Chip } from './ui';
 import { leagueColor, leagueUi, sportOf } from '../lib/leagueUi';
 import { colors, radius, space } from '../theme';
 import type { League, LeagueInfo } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 /**
  * Every league, from the filter's More chip (FilterBar): yours first, then the rest under their sport ("Basketball",
@@ -15,6 +16,7 @@ import type { League, LeagueInfo } from '../lib/types';
 export function LeagueSheet({ open, onClose, leagues, yours, picked, onPick }: {
   open: boolean; onClose: () => void; leagues: LeagueInfo[]; yours: League[]; picked?: League; onPick: (league: League | undefined) => void;
 }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const groups = useMemo(() => {
@@ -25,24 +27,24 @@ export function LeagueSheet({ open, onClose, leagues, yours, picked, onPick }: {
     const sports = new Map<string, LeagueInfo[]>(leagues.map((l) => [sportOf(l), []]));
     for (const l of leagues) if (!mine.has(l.id) && match(l)) sports.get(sportOf(l))!.push(l);
     const ofYours = leagues.filter((l) => mine.has(l.id) && match(l));
-    return [...(ofYours.length ? [{ title: 'Yours', leagues: ofYours }] : []), ...[...sports].filter(([, list]) => list.length).map(([title, list]) => ({ title, leagues: list }))];
-  }, [leagues, yours, q]);
+    return [...(ofYours.length ? [{ title: t('leagueSheet.yours'), leagues: ofYours }] : []), ...[...sports].filter(([, list]) => list.length).map(([title, list]) => ({ title, leagues: list }))];
+  }, [leagues, yours, q, t]);
   const close = () => { setQ(''); onClose(); };
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
       <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel="Close the list of leagues" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={t('leagueSheet.closeA11y')} />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + space(4) }]} accessibilityViewIsModal>
           <View style={styles.grab} />
           <View style={styles.head}>
-            <Text style={styles.title} accessibilityRole="header">All leagues</Text>
-            <Pressable onPress={close} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>Done</Text></Pressable>
+            <Text style={styles.title} accessibilityRole="header">{t('leagueSheet.title')}</Text>
+            <Pressable onPress={close} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>{t('guide.done')}</Text></Pressable>
           </View>
           <View style={styles.searchBox}>
             <Ionicons name="search" size={16} color={colors.textFaint} />
-            <TextInput value={q} onChangeText={setQ} placeholder="Find a league" placeholderTextColor={colors.textFaint} style={styles.input}
-              autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing" accessibilityLabel="Find a league" />
+            <TextInput value={q} onChangeText={setQ} placeholder={t('leagueSheet.find')} placeholderTextColor={colors.textFaint} style={styles.input}
+              autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing" accessibilityLabel={t('leagueSheet.find')} />
           </View>
           {/* A tap on a league while the keyboard is up picks it (not just closing the keyboard). */}
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.groups} style={{ flexShrink: 1 }}>

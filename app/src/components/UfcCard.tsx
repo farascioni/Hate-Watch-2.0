@@ -6,18 +6,19 @@ import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import type { StatsPage, UfcBout, UfcCorner } from '../lib/types';
+import { useT, tr, currentLocale } from '../lib/i18n';
 
-export const fightTime = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-export const cardDate = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+export const fightTime = (t: number) => new Date(t).toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' });
+export const cardDate = (t: number) => new Date(t).toLocaleDateString(currentLocale(), { weekday: 'short', month: 'short', day: 'numeric' });
 const openPage = (c: UfcCorner) => router.push(`/target/${encodeURIComponent(c.key)}`);
 /** "Middleweight · 5 rounds · Main event". */
-const boutMeta = (b: UfcBout) => [b.weight, `${b.rounds} rounds`, b.billing].filter(Boolean).join(' · ');
-const beltWord = (c: UfcCorner) => (c.belt === 'champion' ? 'Champion' : c.belt === 'interim' ? 'Interim champion' : null);
+const boutMeta = (b: UfcBout) => [b.weight, tr('ufc.rounds', { n: b.rounds }), b.billing].filter(Boolean).join(' · ');
+const beltWord = (c: UfcCorner) => (c.belt === 'champion' ? tr('ufc.champion') : c.belt === 'interim' ? tr('ufc.interim') : null);
 /** Where a fight is: live (its round), over, called off; nothing before it starts (its segment's time is above it). */
 function stateWord(b: UfcBout): { text: string; color: string } | null {
-  if (b.canceled) return { text: 'Cancelled', color: colors.textFaint };
-  if (b.state === 'in') return { text: b.round ? `Live · R${b.round}` : 'Live', color: colors.live };
-  if (b.state === 'post') return { text: 'Final', color: colors.textDim };
+  if (b.canceled) return { text: tr('ufc.cancelled'), color: colors.textFaint };
+  if (b.state === 'in') return { text: b.round ? tr('ufc.liveRound', { n: b.round }) : tr('f1.live'), color: colors.live };
+  if (b.state === 'post') return { text: tr('f1.final'), color: colors.textDim };
   return null;
 }
 
@@ -27,13 +28,14 @@ function stateWord(b: UfcBout): { text: string; color: string } | null {
  * the Scores tab opens the card on it; the card's screen shows it on top.
  */
 export function UfcBoutRow({ bout, onPress, selected }: { bout: UfcBout; onPress: () => void; selected?: boolean }) {
+  useT();
   const { follows } = useStore();
   const state = stateWord(bout);
   const over = bout.state === 'post' && !bout.canceled;
   const fav = bout.corners.find((c) => (c.chance ?? 0) > 50);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.bout, selected && { borderColor: colors.hate }, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityLabel={`${bout.corners.map((c) => c.name).join(' versus ')}. ${boutMeta(bout)}${bout.title ? `, ${bout.title}` : ''}${state ? `. ${state.text}` : ''}${bout.result ? `. ${bout.result.line}` : ''}`}>
+      accessibilityRole="button" accessibilityLabel={`${bout.corners.map((c) => c.name).join(` ${tr('ufc.versus')} `)}. ${boutMeta(bout)}${bout.title ? `, ${bout.title}` : ''}${state ? `. ${state.text}` : ''}${bout.result ? `. ${bout.result.line}` : ''}`}>
       <View style={styles.boutHead}>
         <Text style={styles.meta} numberOfLines={1}>{boutMeta(bout)}</Text>
         {state ? <Text style={[styles.state, { color: state.color }]}>{state.text}</Text> : null}
@@ -47,7 +49,7 @@ export function UfcBoutRow({ bout, onPress, selected }: { bout: UfcBout; onPress
               {c.name}{beltWord(c) ? <Text style={styles.tag}>  {beltWord(c)}</Text> : null}
             </Text>
             {c.record ? <Text style={styles.record}>{c.record}</Text> : null}
-            <Text style={[styles.side, over && c.winner && { color: colors.text }]}>{over ? (c.winner ? 'W' : c.winner === false ? 'L' : '') : c.odds?.win ?? ''}</Text>
+            <Text style={[styles.side, over && c.winner && { color: colors.text }]}>{over ? (c.winner ? tr('ufc.w') : c.winner === false ? tr('ufc.l') : '') : c.odds?.win ?? ''}</Text>
           </View>
         );
       })}
@@ -61,7 +63,7 @@ function byHow(page: StatsPage | undefined, ko: string, sub: string, none: strin
   const tiles = page?.groups.flatMap((g) => g.tiles) ?? [];
   const n = (label: string) => tiles.find((t) => t.label === label)?.value;
   if (n(ko) == null && n(sub) == null) return null;
-  return Number(n(ko) ?? 0) + Number(n(sub) ?? 0) === 0 ? none : `${n(ko) ?? 0} KO · ${n(sub) ?? 0} sub`;
+  return Number(n(ko) ?? 0) + Number(n(sub) ?? 0) === 0 ? none : tr('ufc.byHow', { ko: n(ko) ?? 0, sub: n(sub) ?? 0 });
 }
 
 /**
@@ -71,6 +73,7 @@ function byHow(page: StatsPage | undefined, ko: string, sub: string, none: strin
  * opponent is ahead on a number, it's red. Anything ESPN lacks is left out.
  */
 export function UfcFightView({ bout, startsAt, segment }: { bout: UfcBout; startsAt: number; segment: string }) {
+  const t = useT();
   const { follows } = useStore();
   const [pages, setPages] = useState<Record<string, StatsPage>>({});
   useEffect(() => {
@@ -86,18 +89,18 @@ export function UfcFightView({ bout, startsAt, segment }: { bout: UfcBout; start
   const over = bout.state === 'post' && !bout.canceled;
   const winner = bout.corners.find((c) => c.winner === true);
   const [a, b] = bout.corners;
-  const ways = (c: UfcCorner) => [c.odds?.ko && `KO/TKO ${c.odds.ko}`, c.odds?.decision && `decision ${c.odds.decision}`, c.odds?.sub && `submission ${c.odds.sub}`].filter(Boolean).join(' · ');
+  const ways = (c: UfcCorner) => [c.odds?.ko && t('ufc.koOdds', { v: c.odds.ko }), c.odds?.decision && t('ufc.decisionOdds', { v: c.odds.decision }), c.odds?.sub && t('ufc.subOdds', { v: c.odds.sub })].filter(Boolean).join(' · ');
   const tape = [
     ...bout.tape,
-    ...[['Wins by', 'KO W', 'SUB W', 'None'], ['Finished', 'KO L', 'SUB L', 'Never']].map(([label, ko, sub, none]) => ({ label, values: [byHow(pages[a.key], ko, sub, none), byHow(pages[b.key], ko, sub, none)] as [string | null, string | null] }))
+    ...[[t('ufc.winsBy'), 'KO W', 'SUB W', t('ufc.none')], [t('ufc.finished'), 'KO L', 'SUB L', t('ufc.never')]].map(([label, ko, sub, none]) => ({ label, values: [byHow(pages[a.key], ko, sub, none), byHow(pages[b.key], ko, sub, none)] as [string | null, string | null] }))
       .filter((r) => r.values.some((v) => v != null)),
   ];
 
   return (
     <View>
-      <SectionHeader>{[me ? 'Your fighter' : both ? 'Your fighters' : null, bout.billing ?? segment].filter(Boolean).join(' · ')}</SectionHeader>
+      <SectionHeader>{[me ? t('ufc.yourFighter') : both ? t('ufc.yourFighters') : null, bout.billing ?? segment].filter(Boolean).join(' · ')}</SectionHeader>
       <View style={styles.box}>
-        <Text style={[styles.meta, { padding: space(3), paddingBottom: space(1) }]}>{[bout.weight, `${bout.rounds} rounds`, bout.state === 'pre' && !bout.canceled ? fightTime(startsAt) : null].filter(Boolean).join(' · ')}</Text>
+        <Text style={[styles.meta, { padding: space(3), paddingBottom: space(1) }]}>{[bout.weight, t('ufc.rounds', { n: bout.rounds }), bout.state === 'pre' && !bout.canceled ? fightTime(startsAt) : null].filter(Boolean).join(' · ')}</Text>
         {bout.title ? <Text style={[styles.belt, { paddingHorizontal: space(3) }]}>{bout.title}</Text> : null}
         {bout.corners.map((c) => (
           <Pressable key={c.key} disabled={!c.linked} onPress={() => openPage(c)} accessibilityRole={c.linked ? 'link' : undefined}
@@ -105,36 +108,36 @@ export function UfcFightView({ bout, startsAt, segment }: { bout: UfcBout; start
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={styles.nameRow}>
                 <Text style={[styles.fighter, over && c.winner === false && { color: colors.textDim }]}>{c.name}</Text>
-                {follows.has(c.key) ? <Text style={styles.tracking}>Tracking</Text> : null}
+                {follows.has(c.key) ? <Text style={styles.tracking}>{t('ufc.tracking')}</Text> : null}
               </View>
               {[c.record, beltWord(c)].some(Boolean) ? <Text style={styles.record}>{[c.record, beltWord(c)].filter(Boolean).join(' · ')}</Text> : null}
             </View>
-            <Text style={styles.side}>{over ? (c.winner ? 'W' : c.winner === false ? 'L' : '') : c.odds?.win ?? ''}</Text>
+            <Text style={styles.side}>{over ? (c.winner ? tr('ufc.w') : c.winner === false ? tr('ufc.l') : '') : c.odds?.win ?? ''}</Text>
           </Pressable>
         ))}
-        {bout.canceled ? <Text style={styles.foot}>This fight is off the card.</Text> : null}
+        {bout.canceled ? <Text style={styles.foot}>{t('ufc.offCard')}</Text> : null}
         {over && bout.result ? (
           <Text style={[styles.foot, styles.strong, me && winner && winner !== me && { color: colors.hate }]}>
-            {[winner ? `${winner.last} won` : null, bout.result.line, bout.result.detail].filter(Boolean).join(' · ')}
+            {[winner ? t('ufc.won', { name: winner.last }) : null, bout.result.line, bout.result.detail].filter(Boolean).join(' · ')}
           </Text>
         ) : null}
         {!over && !bout.canceled && a.chance != null && b.chance != null ? (
           <View style={styles.chance}>
             <View style={styles.chanceHead}>
-              <Text style={styles.chanceLabel}>{me ? `Chance ${me.last} loses` : `${a.last} ${a.chance}% · ${b.last} ${b.chance}%`}</Text>
+              <Text style={styles.chanceLabel}>{me ? t('ufc.chanceLoses', { name: me.last }) : `${a.last} ${a.chance}% · ${b.last} ${b.chance}%`}</Text>
               {me ? <Text style={[styles.chanceLabel, { color: colors.hate, fontWeight: '800' }]}>{them!.chance}%</Text> : null}
             </View>
             <View style={styles.bar}><View style={[styles.fill, { width: `${me ? them!.chance! : a.chance}%` }, !me && { backgroundColor: colors.textDim }]} /></View>
-            {me && ways(them!) ? <Text style={styles.ways}>How {me.last} could lose: {them!.last} by {ways(them!)}</Text>
-              : !me ? [a, b].filter((c) => ways(c)).map((c) => <Text key={c.key} style={styles.ways}>{c.last} by {ways(c)}</Text>) : null}
-            {bout.oddsBy ? <Text style={styles.by}>Odds: {bout.oddsBy}</Text> : null}
+            {me && ways(them!) ? <Text style={styles.ways}>{t('ufc.howLose', { me: me.last, them: them!.last, ways: ways(them!) })}</Text>
+              : !me ? [a, b].filter((c) => ways(c)).map((c) => <Text key={c.key} style={styles.ways}>{t('ufc.by', { name: c.last, ways: ways(c) })}</Text>) : null}
+            {bout.oddsBy ? <Text style={styles.by}>{t('ufc.oddsBy', { by: bout.oddsBy })}</Text> : null}
           </View>
         ) : null}
       </View>
 
       {tape.length ? (
         <>
-          <SectionHeader>Tale of the tape</SectionHeader>
+          <SectionHeader>{t('ufc.tape')}</SectionHeader>
           <View style={styles.box}>
             <View style={styles.tapeRow}>
               <Text style={[styles.tapeL, styles.strong]} numberOfLines={1}>{a.last}</Text>
@@ -158,7 +161,7 @@ export function UfcFightView({ bout, startsAt, segment }: { bout: UfcBout; start
 
       {bout.corners.map((c) => (pages[c.key]?.recent.length ? (
         <View key={c.key}>
-          <SectionHeader>{c.last}'s last {Math.min(5, pages[c.key].recent.length)}</SectionHeader>
+          <SectionHeader>{t('ufc.lastN', { name: c.last, n: Math.min(5, pages[c.key].recent.length) })}</SectionHeader>
           <View style={styles.box}>
             {pages[c.key].recent.slice(0, 5).map((g) => (
               <View key={g.id} style={styles.row}>

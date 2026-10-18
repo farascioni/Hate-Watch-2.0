@@ -5,9 +5,10 @@ import { useStore } from '../lib/store';
 import { useF1Tone, toneRow, toneName, toneMark, toneStyles, trackedRow, type F1Tone } from '../lib/f1Tone';
 import { colors, radius, space } from '../theme';
 import type { F1Preview } from '../lib/types';
+import { useT, currentLocale } from '../lib/i18n';
 
-const day = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const day = (t: number) => new Date(t).toLocaleDateString(currentLocale(), { weekday: 'short', month: 'short', day: 'numeric' });
+const time = (t: number) => new Date(t).toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' });
 /** A driver's or constructor's page; one ESPN listed that the catalog lacks ('?') has none. */
 const opens = (name: string) => name !== '?';
 const open = (key: string) => router.push(`/target/${encodeURIComponent(key)}`);
@@ -25,6 +26,7 @@ const Name = ({ children, tone, style, ...rest }: { children: string; tone?: F1T
  * ESPN has no F1 odds, so there are no win chances here.
  */
 export function F1PreviewView({ preview, current }: { preview: F1Preview; current?: string }) {
+  const t = useT();
   const { follows, games } = useStore();
   const tone = useF1Tone();
   const mine = (key: string, teamKey?: string | null) => follows.has(key) || (!!teamKey && follows.has(teamKey));
@@ -34,11 +36,11 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
   const teams = constructors.filter((t, i) => i < 5 || follows.has(t.key) || tone(t.key));
   return (
     <View>
-      <SectionHeader>Where and when</SectionHeader>
+      <SectionHeader>{t('f1.whereWhen')}</SectionHeader>
       <View style={styles.list}>
         {event.circuit ? (
           <View style={styles.row}>
-            <Text style={styles.when}>Circuit</Text>
+            <Text style={styles.when}>{t('f1.circuit')}</Text>
             <Text style={styles.text}>{[event.circuit, event.place].filter(Boolean).join(' · ')}</Text>
           </View>
         ) : null}
@@ -47,10 +49,10 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           return (
             <Pressable key={s.key} disabled={!open} onPress={() => router.push(`/game/${encodeURIComponent(s.key)}`)}
               style={({ pressed }) => [styles.row, s.key === current && styles.mine, pressed && { backgroundColor: colors.surfaceHi }]}
-              accessibilityRole={open ? 'button' : undefined} accessibilityLabel={`${s.name}, ${day(s.at)}, ${s.state === 'post' ? 'final' : s.state === 'in' ? 'live now' : time(s.at)}`}>
+              accessibilityRole={open ? 'button' : undefined} accessibilityLabel={`${s.name}, ${day(s.at)}, ${s.state === 'post' ? t('f1.finalLc') : s.state === 'in' ? t('f1.liveNow') : time(s.at)}`}>
               <Text style={styles.when}>{day(s.at)}</Text>
               <Text style={[styles.text, (s.key === current || open) && styles.strong]}>{s.name}</Text>
-              <Text style={[styles.side, s.state === 'in' && { color: colors.live }]}>{s.state === 'post' ? 'Final' : s.state === 'in' ? 'Live' : time(s.at)}</Text>
+              <Text style={[styles.side, s.state === 'in' && { color: colors.live }]}>{s.state === 'post' ? t('f1.final') : s.state === 'in' ? t('f1.live') : time(s.at)}</Text>
             </Pressable>
           );
         })}
@@ -58,7 +60,7 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
 
       {grid ? (
         <>
-          <SectionHeader>Starting grid · {grid.session}</SectionHeader>
+          <SectionHeader>{t('f1.startingGridSession', { session: grid.session })}</SectionHeader>
           <View style={styles.list}>
             {grid.cars.map((c) => (
               <Pressable key={c.key} disabled={!opens(c.name)} onPress={() => open(c.key)} accessibilityRole={opens(c.name) ? 'link' : undefined}
@@ -69,11 +71,11 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
             ))}
           </View>
         </>
-      ) : gridAfter ? <Text style={styles.note}>The grid is set after {gridAfter}.</Text> : null}
+      ) : gridAfter ? <Text style={styles.note}>{t('f1.gridAfter', { session: gridAfter })}</Text> : null}
 
       {table.length ? (
         <>
-          <SectionHeader>Drivers' Championship</SectionHeader>
+          <SectionHeader>{t('f1.driversChamp')}</SectionHeader>
           <View style={styles.list}>
             {table.map((d) => (
               <Pressable key={d.key} disabled={!opens(d.name)} onPress={() => open(d.key)} accessibilityRole={opens(d.name) ? 'link' : undefined}
@@ -81,9 +83,9 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
                 <Text style={styles.rank}>{d.rank}</Text>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Name style={[styles.text, mine(d.key, d.teamKey) && styles.strong]} tone={tone(d.teamKey)} numberOfLines={1}>{d.name}</Name>
-                  {d.form.length ? <Text style={styles.form} accessibilityLabel={`Last races: ${d.form.join(', ')}`}>Last races: {d.form.join(' · ')}</Text> : null}
+                  {d.form.length ? <Text style={styles.form} accessibilityLabel={t('f1.lastRaces', { form: d.form.join(', ') })}>{t('f1.lastRaces', { form: d.form.join(' · ') })}</Text> : null}
                 </View>
-                <Text style={styles.side}>{d.points} pts</Text>
+                <Text style={styles.side}>{t('f1.pts', { n: d.points })}</Text>
               </Pressable>
             ))}
           </View>
@@ -92,14 +94,14 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
 
       {teams.length ? (
         <>
-          <SectionHeader>Constructors' Championship</SectionHeader>
+          <SectionHeader>{t('f1.constructorsChamp')}</SectionHeader>
           <View style={styles.list}>
-            {teams.map((t) => (
-              <Pressable key={t.key} disabled={!opens(t.name)} onPress={() => open(t.key)} accessibilityRole={opens(t.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, follows.has(t.key) && trackedRow, toneRow(tone(t.key)), pressed && pressedBg]}>
-                <Text style={styles.rank}>{t.rank}</Text>
-                <Name style={[styles.text, follows.has(t.key) && styles.strong]} tone={tone(t.key)} numberOfLines={1}>{t.name}</Name>
-                <Text style={styles.side}>{t.points} pts</Text>
+            {teams.map((tm) => (
+              <Pressable key={tm.key} disabled={!opens(tm.name)} onPress={() => open(tm.key)} accessibilityRole={opens(tm.name) ? 'link' : undefined}
+                style={({ pressed }) => [styles.row, follows.has(tm.key) && trackedRow, toneRow(tone(tm.key)), pressed && pressedBg]}>
+                <Text style={styles.rank}>{tm.rank}</Text>
+                <Name style={[styles.text, follows.has(tm.key) && styles.strong]} tone={tone(tm.key)} numberOfLines={1}>{tm.name}</Name>
+                <Text style={styles.side}>{t('f1.pts', { n: tm.points })}</Text>
               </Pressable>
             ))}
           </View>
@@ -114,13 +116,14 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
  * Scores' Upcoming races. Tracked drivers (and a tracked constructor's) highlighted; each opens its page.
  */
 export function F1Grid({ grid }: { grid: NonNullable<F1Preview['grid']> }) {
+  const t = useT();
   const { follows } = useStore();
   const tone = useF1Tone();
   const mine = (c: { key: string; teamKey: string | null }) => follows.has(c.key) || (!!c.teamKey && follows.has(c.teamKey));
   const rows = Array.from({ length: Math.ceil(grid.cars.length / 2) }, (_, i) => grid.cars.slice(i * 2, i * 2 + 2));
   return (
-    <View style={styles.gridBox} accessibilityLabel={`Starting grid for the ${grid.session}: ${grid.cars.map((c) => `P${c.grid} ${c.name}`).join(', ')}`}>
-      <Text style={styles.gridTitle}>Starting grid</Text>
+    <View style={styles.gridBox} accessibilityLabel={`${t('f1.gridFor', { session: grid.session })}: ${grid.cars.map((c) => `P${c.grid} ${c.name}`).join(', ')}`}>
+      <Text style={styles.gridTitle}>{t('f1.startingGrid')}</Text>
       {rows.map((pair, i) => (
         <View key={i} style={styles.gridRow}>
           {pair.map((c) => (

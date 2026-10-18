@@ -2,21 +2,29 @@ import { useCallback, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { en, type Key } from './strings/en';
 import { es } from './strings/es';
+import { fr } from './strings/fr';
+import { pt } from './strings/pt';
+import { de } from './strings/de';
+import { ja } from './strings/ja';
 
 /**
  * The app's own words (docs/i18n.md). English is the source and the fallback: a language file may miss a key and that key shows in English.
  * The language is the device's (read with Intl, no native module, so updates reach old builds) unless Settings → Language picks one.
  * Alert titles and bodies are written by the server in English and are not translated here.
  */
-export type Lang = 'en' | 'es';
-const DICTS: Record<Lang, Partial<Record<Key, string>>> = { en, es };
+export type Lang = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja';
+const DICTS: Record<Lang, Partial<Record<Key, string>>> = { en, es, fr, pt, de, ja };
 /** What the picker offers, each in its own language. Add a language here when its file lands in strings/. */
 export const LANGS: { id: Lang; name: string }[] = [
   { id: 'en', name: 'English' },
   { id: 'es', name: 'Español' },
+  { id: 'fr', name: 'Français (Canada)' },
+  { id: 'pt', name: 'Português (Brasil)' },
+  { id: 'de', name: 'Deutsch' },
+  { id: 'ja', name: '日本語' },
 ];
-/** The Intl locale per language (Latin American Spanish for `es`, as the store pages). */
-const TAGS: Record<Lang, string> = { en: 'en-US', es: 'es-419' };
+/** The Intl locale per language (Latin American Spanish, Canadian French and Brazilian Portuguese, as the store pages). */
+const TAGS: Record<Lang, string> = { en: 'en-US', es: 'es-419', fr: 'fr-CA', pt: 'pt-BR', de: 'de-DE', ja: 'ja-JP' };
 
 export type LangPref = 'auto' | Lang;
 const KEY = 'hw.language';
@@ -49,15 +57,25 @@ export const currentLang = (): Lang => (pref === 'auto' ? deviceLang() : pref);
 /** The Intl locale for dates and numbers: the picked language's, else undefined (the device's own formatting, as before the picker). */
 export const currentLocale = (): string | undefined => (pref === 'auto' ? undefined : TAGS[pref]);
 
+const fmt = (v: string | number, lang: Lang) => (typeof v === 'number' ? v.toLocaleString(TAGS[lang]) : v);
 /** `{name}` placeholders are filled from vars; when vars.n is 1 and `key_one` exists, it is used instead of `key`. */
 function translate(lang: Lang, key: Key, vars?: Record<string, string | number>): string {
   const dict = DICTS[lang];
   const oneKey = `${key}_one` as Key;
-  const raw = (vars?.n === 1 && (dict[oneKey] ?? en[oneKey])) || dict[key] || en[key];
-  return vars ? raw.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : raw;
+  const raw = (vars?.n === 1 && (dict[oneKey] ?? en[oneKey])) || dict[key] || en[key] || key;
+  return vars ? raw.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? fmt(vars[k], lang) : m)) : raw;
 }
 
+/** Whether the English source has this key (the server's words for a league, like `games`, map to `word.games` when one exists). */
+export const hasKey = (k: string): k is Key => k in en;
+
 export type T = (key: Key, vars?: Record<string, string | number>) => string;
+/** A phrase that depends on a server word: `<base>.<word>` when written, else `<base>.other` with {word}. */
+export const phrase = (t: T, base: string, word: string, vars: Record<string, string | number> = {}) =>
+  hasKey(`${base}.${word}`) ? t(`${base}.${word}` as Key, vars) : t(`${base}.other` as Key, { word, ...vars });
+/** A server word (games, races, fights, events, players, drivers, fighters) in the reader's language; any other word as it is. */
+export const wordT = (t: T, w: string) => (hasKey(`word.${w}`) ? t(`word.${w}` as Key) : w);
+
 /** For code outside React (Alert.alert, share text): the language as it is now. */
 export const tr: T = (key, vars) => translate(currentLang(), key, vars);
 /** For components: re-renders when the language changes. */

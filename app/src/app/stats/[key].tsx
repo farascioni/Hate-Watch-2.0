@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 import { Avatar } from '../../components/Avatar';
 import { StatsView } from '../../components/StatsView';
 import { Empty, LeagueTag, PrimaryButton, subtitle, useNow } from '../../components/ui';
+import { useT } from '../../lib/i18n';
 import { colors, space } from '../../theme';
 import type { StatsPage, Target } from '../../lib/types';
 
@@ -13,6 +14,7 @@ import type { StatsPage, Target } from '../../lib/types';
  * same stats in its Stats tab; this screen stays for links that still open it.
  */
 export default function StatsScreen() {
+  const t = useT();
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
   const now = useNow();
@@ -26,9 +28,9 @@ export default function StatsScreen() {
   };
   useEffect(load, [targetKey]);
 
-  const title = target ? (target.kind === 'team' ? target.abbrev : target.shortName ?? target.name) : 'Stats';
+  const title = target ? (target.kind === 'team' ? target.abbrev : target.shortName ?? target.name) : t('target.stats');
   if (failed) return (<><Stack.Screen options={{ title }} />
-    <Empty emoji="📉" title="Couldn't load the stats" body="ESPN didn't answer. Check your connection and try again." action={<PrimaryButton label="Try again" onPress={load} />} /></>);
+    <Empty emoji="📉" title={t('stats.loadFailed')} body={t('stats.loadFailedBody')} action={<PrimaryButton label={t('common.tryAgain')} onPress={load} />} /></>);
   if (!page || !target) return <View style={styles.center}><Stack.Screen options={{ title }} /><ActivityIndicator color={colors.hate} /></View>;
 
   return (

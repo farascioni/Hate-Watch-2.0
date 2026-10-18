@@ -6,6 +6,7 @@ import { colors, radius, space } from '../theme';
 import type { GameLine, StatGroup, StatsPage, Target } from '../lib/types';
 import { leagueUi } from '../lib/leagueUi';
 import { useLiveGame } from '../lib/liveGame';
+import { useT, phrase, currentLocale } from '../lib/i18n';
 
 /**
  * A player's or team's stats, from ESPN through the server. Players: the season line ESPN picks for their
@@ -16,6 +17,7 @@ import { useLiveGame } from '../lib/liveGame';
  * A plain View, so it fits in the stats screen's ScrollView and in a player page's FlatList header.
  */
 export function StatsView({ page, target, now }: { page: StatsPage; target: Target; now: number }) {
+  const t = useT();
   const game = leagueUi(target.league).game; // "game", F1's "race", the UFC's "fight" (the server's)
   const f1 = target.league === 'f1';
   const live = useLiveGame(target); // their game in progress, with the score
@@ -33,7 +35,7 @@ export function StatsView({ page, target, now }: { page: StatsPage; target: Targ
 
       {page.recent.length ? (
         <>
-          <SectionHeader>Last {page.recent.length} {game}{page.recent.length === 1 ? '' : 's'}</SectionHeader>
+          <SectionHeader>{phrase(t, 'stats.last', game, { n: page.recent.length })}</SectionHeader>
           {target.kind === 'team' && !f1 ? <Form games={page.recent} /> : null}
           <View style={styles.list}>{page.recent.map((g, i) => <GameRow key={g.id} game={g} last={i === page.recent.length - 1} f1={f1} />)}</View>
         </>
@@ -41,21 +43,21 @@ export function StatsView({ page, target, now }: { page: StatsPage; target: Targ
 
       {live ? (
         <>
-          <SectionHeader>Live now</SectionHeader>
+          <SectionHeader>{t('stats.liveNow')}</SectionHeader>
           <GameCardView game={live} now={now} />
         </>
       ) : null}
 
       {page.next ? (
         <>
-          <SectionHeader>Next {game}</SectionHeader>
+          <SectionHeader>{phrase(t, 'stats.next', game)}</SectionHeader>
           <View style={styles.list}><UpNextRow game={page.next} now={now} /></View>
         </>
       ) : null}
 
       {!page.groups.length && !page.recent.length && !page.record ? (
-        <Empty emoji="📊" title="No stats yet" body="ESPN doesn't have numbers for them this season." />
-      ) : <Text style={styles.footer}>Stats from ESPN, updated every 10 minutes. In red: the numbers worth gloating about.</Text>}
+        <Empty emoji="📊" title={t('stats.none')} body={t('stats.noneBody')} />
+      ) : <Text style={styles.footer}>{t('stats.footer')}</Text>}
     </View>
   );
 }
@@ -80,8 +82,9 @@ function Group({ group }: { group: StatGroup }) {
 
 /** Their last results at a glance, oldest to newest: an L is a Successful Hate Watch, so it's the green one. */
 function Form({ games }: { games: GameLine[] }) {
+  const t = useT();
   return (
-    <View style={styles.form} accessible accessibilityLabel={`Form: ${[...games].reverse().map((g) => g.result || '?').join(', ')}`}>
+    <View style={styles.form} accessible accessibilityLabel={`${t('stats.form')}: ${[...games].reverse().map((g) => g.result || '?').join(', ')}`}>
       {[...games].reverse().map((g) => (
         <View key={g.id} style={[styles.chip, g.result === 'L' ? styles.chipL : g.result === 'W' ? styles.chipW : styles.chipD]}>
           <Text style={[styles.chipText, g.result === 'L' && { color: colors.live }]}>{g.result || '–'}</Text>
@@ -93,12 +96,13 @@ function Form({ games }: { games: GameLine[] }) {
 
 /** "Oct 6 · @ TB · L 2-5", and a player's line in that game. F1: "Oct 4 · Monaco GP · DNF", a DNF or no points shown like a loss. */
 function GameRow({ game, last, f1 }: { game: GameLine; last: boolean; f1: boolean }) {
-  const day = new Date(game.date).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const t = useT();
+  const day = new Date(game.date).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
   return (
     <View style={[styles.gameRow, !last && styles.rowLine]}>
       <View style={styles.inline}>
         <Text style={styles.gameDay}>{day}</Text>
-        {f1 ? null : <Text style={styles.gameVs}>{game.home ? 'vs' : '@'}</Text>}
+        {f1 ? null : <Text style={styles.gameVs}>{game.home ? t('stats.vs') : '@'}</Text>}
         {game.opponentLogo ? <Image source={{ uri: game.opponentLogo }} style={styles.logo} /> : null}
         <Text style={styles.gameOpp} numberOfLines={1}>{game.opponent}</Text>
         <Text style={[styles.result, game.result === 'L' && { color: colors.live }, game.result === 'W' && { color: colors.textDim }]}>{f1 ? game.score : `${game.result} ${game.score}`}</Text>

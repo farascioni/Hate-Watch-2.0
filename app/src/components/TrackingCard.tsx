@@ -8,12 +8,14 @@ import { streakOf, type GameInfo } from '../lib/trackingInfo';
 import type { TrackingLayout } from '../lib/trackingLayout';
 import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
+import { tr, useT } from '../lib/i18n';
 
 /** What the Tracking tab knows about a card beyond the target: its division, its team's record and streak, its game. */
 export interface CardInfo { division?: string; record?: string; streak?: string; standing?: string; game?: GameInfo | null }
 
 const GREEN = colors.live, RED = '#F87171';
 const labelColor = (g: GameInfo) => (g.label === 'LIVE' ? colors.hate : g.label === 'NEXT' ? colors.textDim : colors.textFaint);
+const labelText = (g: GameInfo) => tr(`tracking.label.${g.label}` as never);
 const gameLine = (g: GameInfo) => `${g.matchup}${g.score ? ` ${g.score}` : ''} · ${g.status}`;
 
 function Pill({ text, tone }: { text: string; tone?: boolean }) {
@@ -37,6 +39,7 @@ const sub = (t: Target, info: CardInfo) => [subtitle(t), info.division].filter(B
  * buttons: the icons alone (on the right of the name on the classic card).
  */
 export function TrackingCard({ target, layout, info, actions }: { target: Target; layout: TrackingLayout; info: CardInfo; actions: (compact: boolean) => ReactNode }) {
+  const t = useT();
   const { leagueInfo } = useStore();
   if (layout === 'classic') return <TargetCard target={target} division={info.division} actions={actions(true)} />;
   const tint = tintOf(target), ink = readableOn(tint), g = info.game;
@@ -54,7 +57,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
           </View>
           {g ? (
             <View style={styles.right}>
-              <Text style={[styles.gameTop, { color: labelColor(g) }]} numberOfLines={1}>{g.label} {g.matchup}{g.score ? ` ${g.score}` : ''}</Text>
+              <Text style={[styles.gameTop, { color: labelColor(g) }]} numberOfLines={1}>{labelText(g)} {g.matchup}{g.score ? ` ${g.score}` : ''}</Text>
               <Text style={styles.sub} numberOfLines={1}>{g.status}</Text>
             </View>
           ) : null}
@@ -68,7 +71,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
     return (
       <Pressable onPress={() => open(target)} style={(s) => [styles.card, press(s)]}>
         <View style={[styles.banner, { backgroundColor: tint }]}>
-          <Text style={[styles.bannerText, { color: ink }]} numberOfLines={1}>{g ? `${g.label} · ${gameLine(g)}` : leagueInfo(target.league)?.name ?? target.league.toUpperCase()}</Text>
+          <Text style={[styles.bannerText, { color: ink }]} numberOfLines={1}>{g ? `${labelText(g)} · ${gameLine(g)}` : leagueInfo(target.league)?.name ?? target.league.toUpperCase()}</Text>
           <HaterCount target={target} tint={ink} size={11} />
         </View>
         <View style={styles.bannerBody}>
@@ -94,7 +97,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
           </View>
         </View>
         <View style={styles.row}><Form info={info} short />{!info.record && !info.streak ? <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text> : null}</View>
-        <Text style={[styles.sub, g?.label === 'LIVE' && { color: colors.hate, fontWeight: '700' }]} numberOfLines={1}>{g ? `${g.label} ${gameLine(g)}` : 'No game soon'}</Text>
+        <Text style={[styles.sub, g?.label === 'LIVE' && { color: colors.hate, fontWeight: '700' }]} numberOfLines={1}>{g ? `${labelText(g)} ${gameLine(g)}` : t('tracking.noGame')}</Text>
         <View style={styles.tileActions}>{actions(true)}</View>
       </Pressable>
     );
@@ -116,12 +119,12 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
         <View style={{ alignItems: 'flex-end', gap: 3 }}><LeagueTag league={target.league} /><HaterCount target={target} size={11} /></View>
       </View>
       <View style={styles.strip}>
-        {cell('RECORD', info.record ?? '–')}
-        {cell('FORM', s?.text ?? '–', s?.win === undefined ? undefined : s.win ? GREEN : RED)}
-        {cell(g ? g.label : 'GAME', g ? `${g.matchup}${g.score ? ` ${g.score}` : ''}` : '–', g ? labelColor(g) : undefined)}
+        {cell(t('tracking.cellRecord'), info.record ?? '–')}
+        {cell(t('tracking.cellForm'), s?.text ?? '–', s?.win === undefined ? undefined : s.win ? GREEN : RED)}
+        {cell(g ? labelText(g) : t('tracking.cellGame'), g ? `${g.matchup}${g.score ? ` ${g.score}` : ''}` : '–', g ? labelColor(g) : undefined)}
       </View>
       <View style={styles.footer}>
-        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={2}>{[g?.status, info.standing].filter(Boolean).join('\n') || 'No game soon'}</Text>
+        <Text style={[styles.sub, { flex: 1 }]} numberOfLines={2}>{[g?.status, info.standing].filter(Boolean).join('\n') || t('tracking.noGame')}</Text>
         {actions(true)}
       </View>
     </Pressable>

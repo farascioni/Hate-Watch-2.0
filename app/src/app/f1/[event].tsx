@@ -5,11 +5,13 @@ import { api } from '../../lib/api';
 import { weekendDates } from '../../lib/scores';
 import { F1PreviewView } from '../../components/F1Preview';
 import { Empty, LeagueTag } from '../../components/ui';
+import { useT } from '../../lib/i18n';
 import { colors, space } from '../../theme';
 import type { F1Preview } from '../../lib/types';
 
 /** An F1 race weekend ahead (from the Scores tab's next weekend): where, when, the grid once it's set, the championship. */
 export default function F1WeekendScreen() {
+  const t = useT();
   const { event } = useLocalSearchParams<{ event: string }>();
   const [preview, setPreview] = useState<F1Preview | null>(null);
   const [failed, setFailed] = useState(false);
@@ -19,7 +21,7 @@ export default function F1WeekendScreen() {
 
   if (!preview) {
     return failed
-      ? <Empty emoji="🏁" title="No preview for this weekend" body="ESPN doesn't have it yet. Try again closer to the weekend." />
+      ? <Empty emoji="🏁" title={t('f1.noPreview')} body={t('f1.noPreviewBody')} />
       : <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   }
   const { event: ev } = preview;

@@ -22,7 +22,7 @@ FEED AND SCORES
 - Hate Watch Plus: a favorite team's alerts now include the other side's errors ("Commits an error" for the opposing team, MLB), pushed like the player version. Teams you track get their own team's error alert too.
 - Hate Watch now has a web version: the same app in a browser, without push or Plus. Wide windows get a sidebar and layouts.
 - Hate Watch now runs natively on iPad: any orientation, and a wide window gets the sidebar and the Card grid, One column and Panes layouts (buttons at the bottom of the sidebar). Split View and Slide Over keep the phone layout. Needs this build; it does not arrive as an update.
-- The app now speaks Spanish (Latin America): the tabs and Settings follow your phone's language, or pick English or Español in Settings under Language. Alert text still arrives in English for now.
+- The app now speaks Spanish (Latin America), French (Canada), Portuguese (Brazil), German and Japanese on every screen: it follows your phone's language, or pick one in Settings under Language. Alert text still arrives in English for now.
 
 LOCK SCREEN SCOREBOARD
 - An eye on each game card (Scores) adds the game to the lock screen scoreboard or takes it off. (Update)

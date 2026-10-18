@@ -10,8 +10,10 @@ import { colors, radius, space } from '../../theme';
 import type { Player, Target, Team, WeightClass } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
 import { COLUMN } from '../../lib/webLayout';
+import { useT } from '../../lib/i18n';
 
 export default function SearchScreen() {
+  const t = useT();
   const { noteTrackers } = useStore();
   const [q, setQ] = useState('');
   // Teams or players, Teams first: no Everything here (FilterBar `everything`).
@@ -80,8 +82,8 @@ export default function SearchScreen() {
   // The search box says what it searches: "Search teams", "Search NBA players", "Search F1 drivers", "Search UFC fighters".
   const players = playersWord(league);
   // What this search finds: "players", "teams", "athletes or teams" (the box's placeholder, and the hint under it).
-  const what = searchKind === 'player' ? players : searchKind === 'team' ? 'teams' : `${players} or teams`;
-  const placeholder = `Search ${league ? `${name(league)} ` : ''}${what}`;
+  const what = searchKind === 'player' ? players : searchKind === 'team' ? t('word.teams') : t('search.orTeams', { players });
+  const placeholder = league ? t('search.placeholderLeague', { league: name(league), what }) : t('search.placeholder', { what });
   // One section of results, or of teams A-Z; by division, a section each ("AL East"; "MLB · AL East" across every league).
   // The UFC's weight classes: a section each, for results too.
   const sections = useMemo(() => {
@@ -94,15 +96,15 @@ export default function SearchScreen() {
     }
     if (!showTeams || !teams.length) return [];
     // A league without players (college football) has no roster to see: its page.
-    const tap = league && !leagueUi(league).kinds.includes('player') ? 'tap one for its page' : 'tap one to see its roster';
-    if (!byDivision || !teams.some((t) => t.division)) return [{ title: `${league ? `All ${name(league)} teams` : 'All teams'} — ${tap}`, data: teams as Target[] }];
+    const tap = t(league && !leagueUi(league).kinds.includes('player') ? 'search.tapPage' : 'search.tapRoster');
+    if (!byDivision || !teams.some((t) => t.division)) return [{ title: `${league ? t('search.allLeagueTeams', { league: name(league) }) : t('search.allTeams')} — ${tap}`, data: teams as Target[] }];
     const groups = new Map<string, Target[]>();
-    for (const t of teams) {
-      const title = league ? (t.division ?? name(t.league)) : `${name(t.league)} · ${t.division ?? name(t.league)}`;
-      groups.set(title, [...(groups.get(title) ?? []), t]);
+    for (const tm of teams) {
+      const title = league ? (tm.division ?? name(tm.league)) : `${name(tm.league)} · ${tm.division ?? name(tm.league)}`;
+      groups.set(title, [...(groups.get(title) ?? []), tm]);
     }
     return [...groups].map(([title, data]) => ({ title, data }));
-  }, [browsing, showTeams, byDivision, teams, results, league, leagueInfo, classes, weightClasses, allDrivers, drivers]);
+  }, [browsing, showTeams, byDivision, teams, results, league, leagueInfo, classes, weightClasses, allDrivers, drivers, t]);
 
   return (
     <View style={[{ flex: 1, backgroundColor: colors.bg }, COLUMN]}>
@@ -125,11 +127,11 @@ export default function SearchScreen() {
       </View>
       <FilterBar filter={filter} onChange={setFilter} everything={false} />
       {showTeams && league !== 'f1' ? (
-        <View style={styles.sortRow} accessibilityRole="tablist" accessibilityLabel="Sort teams">
-          <Text style={styles.sortLabel}>Sort teams</Text>
-          {([[false, 'A–Z'], [true, 'By division']] as const).map(([on, label]) => (
+        <View style={styles.sortRow} accessibilityRole="tablist" accessibilityLabel={t('search.sort')}>
+          <Text style={styles.sortLabel}>{t('search.sort')}</Text>
+          {([[false, t('search.az')], [true, t('search.byDivision')]] as const).map(([on, label]) => (
             <Pressable key={label} onPress={() => setByDivision(on)} hitSlop={6} style={[styles.sortBtn, sortByDivision === on && styles.sortOn]}
-              accessibilityRole="tab" accessibilityState={{ selected: sortByDivision === on }} accessibilityLabel={on ? 'Sort teams by league and division' : 'Sort teams A to Z'}>
+              accessibilityRole="tab" accessibilityState={{ selected: sortByDivision === on }} accessibilityLabel={t(on ? 'search.sortDivisionA11y' : 'search.sortAzA11y')}>
               <Text style={[styles.sortText, sortByDivision === on && styles.sortTextOn]}>{label}</Text>
             </Pressable>
           ))}
@@ -140,16 +142,16 @@ export default function SearchScreen() {
         keyExtractor={(t) => t.key}
         renderItem={({ item }) => <TargetRow target={item} right={<View style={styles.rowActions}><FavoriteButton target={item} /><FollowButton target={item} /></View>} />}
         renderSectionHeader={({ section }) => (section.title ? <SectionHeader>{section.title}{byDivision && showTeams ? ` · ${section.data.length}` : ''}</SectionHeader> : null)}
-        ListHeaderComponent={classes && browsing && sections.length ? <Text style={styles.hint}>Each class's champion, then whoever has headlined and won the most lately. Type a name to find anyone else.</Text> : null}
+        ListHeaderComponent={classes && browsing && sections.length ? <Text style={styles.hint}>{t('search.classesHint')}</Text> : null}
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         initialNumToRender={14}
         ListEmptyComponent={
           loading ? null
-            : failed && !browsing ? <Text style={styles.none}>Couldn't search. Check your connection and try again.</Text>
-            : browsing ? <Text style={styles.none}>Type a name to find {league ? `${name(league)} ` : ''}{what}.</Text>
-            : <Text style={styles.none}>No {searchKind === 'all' ? `${players} or teams` : searchKind === 'player' ? players : 'teams'} match “{q}”.</Text>
+            : failed && !browsing ? <Text style={styles.none}>{t('search.failed')}</Text>
+            : browsing ? <Text style={styles.none}>{league ? t('search.typeLeague', { league: name(league), what }) : t('search.type', { what })}</Text>
+            : <Text style={styles.none}>{t('search.noMatch', { what: searchKind === 'all' ? t('search.orTeams', { players }) : searchKind === 'player' ? players : t('word.teams'), q })}</Text>
         }
       />
     </View>

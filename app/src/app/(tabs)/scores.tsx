@@ -11,10 +11,11 @@ import { Empty, LiveBadge, PrimaryButton, SectionHeader, useNow } from '../../co
 import { FilterBar, useFilter } from '../../components/FilterBar';
 import { GridRow } from '../../components/GridRow';
 import { chunkSections, useWebLayout } from '../../lib/webLayout';
-import { SECTION, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
+import { sectionTitle, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
+import { currentLocale, phrase, useT, wordT } from '../../lib/i18n';
 
 /** How often "All games" re-reads the server while it's on screen (it reads ESPN's scoreboards every 10s). */
 const ALL_GAMES_MS = 15_000;
@@ -27,7 +28,7 @@ const MODES: Mode[] = ['mine', 'all'];
 const eventsWord = (league?: string) => (!league ? 'events' : leagueUi(league).events); // the server's word for a league (leagueUi)
 /** F1 (its chip on): every session is everyone's, so the switch is when, not whose. */
 type F1Mode = 'live' | 'upcoming';
-const F1_MODES: { id: F1Mode; label: string }[] = [{ id: 'live', label: 'Live races' }, { id: 'upcoming', label: 'Upcoming races' }];
+const F1_MODES: F1Mode[] = ['live', 'upcoming'];
 /** A session of the weekend ahead not on the Scores tab yet (Sunday's race on Friday): a row that opens the weekend's preview. */
 interface SessionAhead { kind: 'session'; key: string; name: string; at: number; eventId: string }
 
@@ -43,6 +44,7 @@ interface SessionAhead { kind: 'session'; key: string; name: string; at: number;
  * The UFC's chip on: the next card and the one after (UfcScores).
  */
 export default function ScoresScreen() {
+  const t = useT();
   const { games, nextF1, upNext, refreshScores, follows, feed, leagues } = useStore();
   const { filter, setFilter } = useFilter();
   const [mode, setMode] = useState<Mode>('mine');
@@ -72,7 +74,7 @@ export default function ScoresScreen() {
   const sections = useMemo(() => {
     const list = [...games.values()].filter((g) => inWindow(g, now) && (!filter.league || g.league === filter.league)).sort(byState);
     return (['in', 'pre', 'post'] as const)
-      .map((state) => ({ title: SECTION[state], data: list.filter((g) => g.state === state) }))
+      .map((state) => ({ title: sectionTitle(state), data: list.filter((g) => g.state === state) }))
       .filter((s) => s.data.length);
   }, [games, filter.league, now]);
   // Up next: not one already on the tab as a card, and only games still to come.
@@ -116,21 +118,21 @@ export default function ScoresScreen() {
   useEffect(() => { if (f1Only && nextF1?.eventId) api.f1Preview(nextF1.eventId).then(setWeekend, () => setWeekend(null)); }, [f1Only, nextF1?.eventId]);
   const f1Sections = useMemo((): { title: string; data: (GameCard | SessionAhead)[] }[] => {
     if (f1Mode === 'live') {
-      return [{ title: 'Live now', data: liveF1 }, { title: 'Final', data: f1Games.filter((g) => g.state === 'post') }].filter((x) => x.data.length);
+      return [{ title: t('scores.section.in'), data: liveF1 }, { title: t('scores.section.post'), data: f1Games.filter((g) => g.state === 'post') }].filter((x) => x.data.length);
     }
     // The weekend's sessions still to come, but practice: a card once the tab has it, else a row.
     const ahead = weekend?.sessions.filter((x) => x.state === 'pre' && !/^practice/i.test(x.name))
       .map((x): GameCard | SessionAhead => f1Games.find((g) => g.key === x.key) ?? { kind: 'session', key: x.key, name: x.name, at: x.at, eventId: weekend.event.id })
       ?? f1Games.filter((g) => g.state === 'pre');
-    return ahead.length ? [{ title: weekend?.event.shortName ?? 'Coming up', data: ahead }] : [];
-  }, [f1Mode, liveF1, f1Games, weekend]);
+    return ahead.length ? [{ title: weekend?.event.shortName ?? t('scores.comingUp'), data: ahead }] : [];
+  }, [f1Mode, liveF1, f1Games, weekend, t]);
 
   // Under a sprint or race in Upcoming races: its full grid once ESPN has set it, else what sets it.
   const gridUnder = (key: string) => {
     const s = weekend?.sessions.find((x) => x.key === key), g = weekend?.grid;
     if (g && (g.key ? g.key === key : g.session === s?.name)) return <F1Grid grid={g} />;
     if (!s || !['Sprint', 'Race'].includes(s.name)) return null;
-    return <Text style={styles.gridNote}>Grid set after {s.name === 'Sprint' ? 'the Sprint Shootout' : 'Qualifying'}.</Text>;
+    return <Text style={styles.gridNote}>{t(s.name === 'Sprint' ? 'scores.gridAfterSprint' : 'scores.gridAfterQuali')}</Text>;
   };
 
   const listed: { title: string; data: (GameCard | NextGame | SessionAhead)[]; upNext?: boolean; kind?: string }[] = f1Only ? f1Sections
@@ -149,6 +151,7 @@ export default function ScoresScreen() {
   }, [feed]);
 
   const word = eventsWord(filter.league);
+  const leagueWhat = filter.league ? t('scores.leagueWord', { league: leagueName(filter.league), word: wordT(t, word) }) : wordT(t, word);
   const tracked = [...follows.values()];
   const f1 = filter.league === 'f1' || (!filter.league && tracked.length > 0 && tracked.every((t) => t.league === 'f1'));
   const ufcOnly = filter.league === 'ufc';
@@ -160,8 +163,9 @@ export default function ScoresScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.filters}>
         {f1Only ? (
-          <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel="Which races">
-            {F1_MODES.map(({ id, label }) => {
+          <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={t('scores.whichRaces')}>
+            {F1_MODES.map((id) => {
+              const label = t(id === 'live' ? 'scores.f1.live' : 'scores.f1.upcoming');
               const on = f1Mode === id;
               return (
                 <Pressable key={id} onPress={() => setF1Pick(id)} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
@@ -170,14 +174,14 @@ export default function ScoresScreen() {
               );
             })}
           </View>
-        ) : <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel="Which games">
+        ) : <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={t('scores.whichGames')}>
           {MODES.map((id) => {
             const on = mode === id;
-            const label = `${id === 'all' ? 'All' : 'My'} ${word}`;
-            const text = id === 'all' && liveCount ? `${label} · ${liveCount} live` : label;
+            const label = phrase(t, id === 'all' ? 'scores.all' : 'scores.mine', word);
+            const text = id === 'all' && liveCount ? t('scores.liveCount', { label, n: liveCount }) : label;
             return (
               <Pressable key={id} onPress={() => setMode(id)} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}
-                accessibilityLabel={id === 'all' ? `All ${word}, live and coming up${liveCount ? `, ${liveCount} live now` : ''}` : `${word[0].toUpperCase()}${word.slice(1)} for the players and teams you track`}>
+                accessibilityLabel={id === 'all' ? `${phrase(t, 'scores.all', word)}${t('scores.allA11y')}${liveCount ? t('scores.allA11yLive', { n: liveCount }) : ''}` : t('scores.mineA11y', { Word: wordT(t, word)[0].toUpperCase() + wordT(t, word).slice(1) })}>
                 <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{text}</Text>
               </Pressable>
             );
@@ -192,12 +196,12 @@ export default function ScoresScreen() {
         // game tonight can be in "Up next" before ESPN's scoreboard turns over to today).
         ListHeaderComponent={f1Only ? (f1Mode === 'upcoming' && weekend ? (
           <Pressable onPress={() => router.push(`/f1/${weekend.event.id}`)} style={({ pressed }) => [styles.preview, pressed && { opacity: 0.7 }]} accessibilityRole="button">
-            <Text style={styles.previewText}>Preview the weekend: the grid, the championship, every session</Text>
+            <Text style={styles.previewText}>{t('scores.previewWeekend')}</Text>
           </Pressable>
-        ) : null) : mode === 'mine' && !sections.length && next.length && upNextWhen(next[0].startsAt, true, now).day !== 'Today' ? (
-          <Text style={styles.none}>{filter.league ? `No ${leagueName(filter.league)} ${word} today.` : `No ${word} today.`}</Text>
+        ) : null) : mode === 'mine' && !sections.length && next.length && !upNextWhen(next[0].startsAt, true, now).isToday ? (
+          <Text style={styles.none}>{t('scores.noneDot', { what: leagueWhat })}</Text>
         ) : null}
-        renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${section.kind}` : ''}</SectionHeader>}
+        renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${t(`scores.kind.${section.kind}` as never)}` : ''}</SectionHeader>}
         renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} render={(item) => (section.upNext
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
@@ -206,22 +210,22 @@ export default function ScoresScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.hate} />}
         contentContainerStyle={{ paddingBottom: space(10), flexGrow: 1 }}
         ListEmptyComponent={f1Only && f1Mode === 'live' ? (
-          <Empty emoji="🏁" title="No race live right now" body={(() => {
+          <Empty emoji="🏁" title={t('scores.noRace')} body={(() => {
             const soon = weekend?.sessions.find((x) => x.state === 'pre' && !/^practice/i.test(x.name));
-            return soon ? `Next: ${soon.name}, ${new Date(soon.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}.` : '';
+            return soon ? t('scores.nextSession', { name: soon.name, when: new Date(soon.at).toLocaleString(currentLocale(), { weekday: 'short', hour: 'numeric', minute: '2-digit' }) }) : '';
           })()} />
         ) : f1Only ? (
           <F1Empty next={nextF1} tracking={tracked.some((t) => t.league === 'f1')} now={now} />
         ) : mode === 'all' ? (
-          <Empty emoji="📺" title={filter.league ? `No ${leagueName(filter.league)} ${word} today` : `No ${word} today`}
-            body={`Every ${word.slice(0, -1)} that's live or starts in the next 24 hours shows up here, whether you track anyone in it or not.`} />
+          <Empty emoji="📺" title={t('scores.none', { what: leagueWhat })}
+            body={t('scores.every', { one: wordT(t, word.slice(0, -1)) })} />
         ) : follows.size === 0 ? (
-          <Empty emoji="😈" title="Nobody to hate yet" body="Track some players and teams, and their games show up here, live." action={<PrimaryButton label="Find someone to hate" onPress={() => router.navigate('/search')} />} />
+          <Empty emoji="😈" title={t('scores.nobody')} body={t('scores.nobodyBody')} action={<PrimaryButton label={t('common.findSomeone')} onPress={() => router.navigate('/search')} />} />
         ) : f1 ? (
           <F1Empty next={nextF1} tracking={tracked.some((t) => t.league === 'f1')} now={now} />
         ) : (
-          <Empty emoji="🏟️" title={filter.league ? `No ${leagueName(filter.league)} ${word} today` : `No ${word} today`}
-            body="When a team you track, or a player's team, plays today, the game shows up here with the live score. Nothing's scheduled yet after that." />
+          <Empty emoji="🏟️" title={t('scores.none', { what: leagueWhat })}
+            body={t('scores.noneBody')} />
         )}
       />}
     </View>
@@ -234,6 +238,7 @@ export default function ScoresScreen() {
  * track on either. A fight opens the card with it on top.
  */
 function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { cards: UfcCard[] | null; failed: boolean; mode: Mode; onAll: () => void; refreshing: boolean; onRefresh: () => void }) {
+  const t = useT();
   const { follows } = useStore();
   const open = (c: UfcCard, fight?: string) => router.push(fight ? `/ufc/${c.event.id}?fight=${encodeURIComponent(fight)}` : `/ufc/${c.event.id}`);
   const [next, after] = cards ?? [];
@@ -243,13 +248,13 @@ function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { card
   const where = (c: UfcCard) => [cardDate(c.event.startsAt), c.event.venue].filter(Boolean).join(' · ');
 
   const body = !cards ? (failed
-    ? <Empty emoji="🥊" title="Couldn't load the UFC card" body="ESPN didn't answer. Pull down to try again." />
+    ? <Empty emoji="🥊" title={t('scores.ufc.failed')} body={t('scores.ufc.failedBody')} />
     : <View style={{ paddingTop: space(10) }}><ActivityIndicator color={colors.hate} /></View>)
-    : !next ? <Empty emoji="🥊" title="No UFC card coming up" body="ESPN's calendar has no card on it yet. Check back closer to fight night." />
+    : !next ? <Empty emoji="🥊" title={t('scores.ufc.none')} body={t('scores.ufc.noneBody')} />
     : mode === 'all' ? (
       <>
         <Pressable onPress={() => open(next)} style={({ pressed }) => [styles.preview, pressed && { opacity: 0.7 }]} accessibilityRole="button">
-          <Text style={styles.previewText}>Preview the card: the odds, the tale of the tape, every fight</Text>
+          <Text style={styles.previewText}>{t('scores.previewCard')}</Text>
         </Pressable>
         <Text style={styles.cardName}>{next.event.name}</Text>
         <Text style={styles.cardWhere}>{where(next)}</Text>
@@ -261,9 +266,9 @@ function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { card
         ))}
         {after ? (
           <>
-            <SectionHeader>Coming up</SectionHeader>
+            <SectionHeader>{t('scores.comingUp')}</SectionHeader>
             <Pressable onPress={() => open(after)} style={({ pressed }) => [styles.ahead, pressed && { backgroundColor: colors.surfaceHi }]}
-              accessibilityRole="button" accessibilityLabel={`${after.event.name}, ${cardDate(after.event.startsAt)}. Opens the card's preview`}>
+              accessibilityRole="button" accessibilityLabel={t('scores.ufc.opensPreview', { name: after.event.name, date: cardDate(after.event.startsAt) })}>
               <Text style={[styles.aheadName, { flex: 1 }]} numberOfLines={2}>{after.event.name}</Text>
               <Text style={styles.aheadWhen}>{cardDate(after.event.startsAt)}</Text>
             </Pressable>
@@ -276,11 +281,11 @@ function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { card
         {bouts.map((b) => <UfcBoutRow key={b.id} bout={b} onPress={() => open(c, b.id)} />)}
       </View>
     )) : !tracking ? (
-      <Empty emoji="🥊" title="No fighters tracked" body="Track a fighter, and their fights show up here: the odds before, the result after."
-        action={<PrimaryButton label="Find someone to hate" onPress={() => router.navigate('/search')} />} />
+      <Empty emoji="🥊" title={t('scores.ufc.noFighters')} body={t('scores.ufc.noFightersBody')}
+        action={<PrimaryButton label={t('common.findSomeone')} onPress={() => router.navigate('/search')} />} />
     ) : (
-      <Empty emoji="🥊" title={`None of your fighters are on the next ${after ? 'two cards' : 'card'}`} body={`Next: ${next.event.name}, ${cardDate(next.event.startsAt)}.${after ? ` Then ${after.event.name}, ${cardDate(after.event.startsAt)}.` : ''}`}
-        action={<PrimaryButton label="See all fights" onPress={onAll} />} />
+      <Empty emoji="🥊" title={t(after ? 'scores.ufc.noneTwo' : 'scores.ufc.noneOne')} body={`${t('scores.ufc.next', { name: next.event.name, date: cardDate(next.event.startsAt) })}${after ? ` ${t('scores.ufc.then', { name: after.event.name, date: cardDate(after.event.startsAt) })}` : ''}`}
+        action={<PrimaryButton label={t('scores.ufc.seeAll')} onPress={onAll} />} />
     );
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: space(10), flexGrow: 1 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.hate} />}>
@@ -291,10 +296,11 @@ function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { card
 
 /** A session of the weekend ahead that isn't on the tab yet: its name and when; it opens the weekend's preview. */
 function SessionAheadRow({ session }: { session: SessionAhead }) {
-  const when = new Date(session.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const t = useT();
+  const when = new Date(session.at).toLocaleString(currentLocale(), { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return (
     <Pressable onPress={() => router.push(`/f1/${session.eventId}`)} style={({ pressed }) => [styles.ahead, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityLabel={`${session.name}, ${when}. Opens the weekend preview`}>
+      accessibilityRole="button" accessibilityLabel={t('scores.opensWeekend', { name: session.name, when })}>
       <Text style={styles.aheadName}>{session.name}</Text>
       <Text style={styles.aheadWhen}>{when}</Text>
     </Pressable>
@@ -303,17 +309,18 @@ function SessionAheadRow({ session }: { session: SessionAhead }) {
 
 /** F1 with nothing on the tab. Practice isn't shown, so it says when the next race weekend is. */
 function F1Empty({ next, tracking, now }: { next: F1Weekend | null; tracking: boolean; now: number }) {
+  const t = useT();
   const when = next && (next.startsAt <= now
-    ? `The ${next.name} is this weekend. Practice isn't shown here.`
-    : `Next race weekend: ${next.name}, ${weekendDates(next.startsAt, next.endsAt)}.`);
+    ? t('scores.f1.thisWeekend', { name: next.name })
+    : t('scores.f1.nextWeekend', { name: next.name, dates: weekendDates(next.startsAt, next.endsAt) }));
   const how = tracking
-    ? 'Qualifying, sprints and races for the drivers and constructors you track show up here the day they run, with the live running order.'
-    : 'Track a driver or constructor, and their qualifying, sprints and races show up here the day they run, with the live running order.';
+    ? t('scores.f1.howTracking')
+    : t('scores.f1.howNot');
   // The weekend ahead has a page of its own (newer servers send its event): where, when, the championship.
-  const preview = next?.eventId ? <PrimaryButton label="Preview the weekend" onPress={() => router.push(`/f1/${next.eventId}`)} /> : null;
+  const preview = next?.eventId ? <PrimaryButton label={t('scores.f1.preview')} onPress={() => router.push(`/f1/${next.eventId}`)} /> : null;
   return (
-    <Empty emoji="🏁" title="No F1 sessions today" body={when ? `${when}\n\n${how}` : how}
-      action={tracking ? preview : <View style={{ gap: space(2) }}>{preview}<PrimaryButton label="Find someone to hate" onPress={() => router.navigate('/search')} /></View>} />
+    <Empty emoji="🏁" title={t('scores.f1.none')} body={when ? `${when}\n\n${how}` : how}
+      action={tracking ? preview : <View style={{ gap: space(2) }}>{preview}<PrimaryButton label={t('common.findSomeone')} onPress={() => router.navigate('/search')} /></View>} />
   );
 }
 

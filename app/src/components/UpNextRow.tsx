@@ -7,6 +7,7 @@ import { upNextWhen } from '../lib/scores';
 import { useAnyMostHated } from '../lib/mostHated';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { NextGame } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 /**
  * One tracked team's next game in "Up next": "Falcons vs Ravens", "NBC", and when ("Sun" / "8:20 PM").
@@ -15,15 +16,16 @@ import type { NextGame } from '../lib/types';
  * (red wins), like the Feed and the game cards.
  */
 export function UpNextRow({ game, now }: { game: NextGame; now: number }) {
+  const t = useT();
   const { follows, favorites } = useStore();
   const isMine = (key: string) => follows.has(key) || [...follows.values()].some((t) => t.kind === 'player' && t.teamKey === key);
   const both = isMine(game.home.key) && isMine(game.away.key);
   const homeIsMine = game.teamKey === game.home.key;
   const [mine, them] = homeIsMine ? [game.home, game.away] : [game.away, game.home];
-  const title = both ? `${game.away.shortName} at ${game.home.shortName}` : `${mine.shortName} ${homeIsMine ? 'vs' : 'at'} ${them.shortName}`;
+  const title = both ? t('score.atTeams', { away: game.away.shortName, home: game.home.shortName }) : t('score.matchup', { mine: mine.shortName, rel: t(homeIsMine ? 'score.rel.vs' : 'score.rel.at'), them: them.shortName });
   // A team tracked through its players says whose: "Tracking Aaron Judge".
-  const players = follows.has(mine.key) ? [] : [...follows.values()].filter((t) => t.kind === 'player' && t.teamKey === mine.key).map((t) => t.name);
-  const sub = [players.length ? `Tracking ${players.join(', ')}` : '', game.note, game.tv].filter(Boolean).join(' · ');
+  const players = follows.has(mine.key) ? [] : [...follows.values()].filter((x) => x.kind === 'player' && x.teamKey === mine.key).map((x) => x.name);
+  const sub = [players.length ? t('upnext.tracking', { names: players.join(', ') }) : '', game.note, game.tv].filter(Boolean).join(' · ');
   const sides = [game.home.key, game.away.key];
   const hated = useAnyMostHated([...sides, ...[...follows.values()].filter((t) => t.kind === 'player' && sides.includes(t.teamKey ?? '')).map((t) => t.key)]);
   const edge = hated ? HATE_RED : sides.some((k) => favorites.has(k)) ? GOLD : null;

@@ -1,5 +1,6 @@
 import type { GameCard, GameSide, RaceDriver, Target } from './types';
 import { isFootball } from './leagueUi';
+import { currentLocale, tr } from './i18n';
 
 // Scores tab helpers: which side of a game you hate, and how it's going for them.
 
@@ -33,13 +34,13 @@ export const isFavoriteGame = (g: GameCard, favorites: Map<string, unknown>): bo
 /** F1: a car's places since the start, "▲10 from P19", "▼3 from P4", "Started P1", read out in words. None out of it, or without a grid slot. */
 export function fromGrid(d: RaceDriver): { text: string; label: string; lost: boolean } | null {
   if (!d.grid || !d.position || d.out) return null;
-  const n = d.grid - d.position, places = (k: number) => `${k} place${k === 1 ? '' : 's'}`;
-  if (n > 0) return { text: `▲${n} from P${d.grid}`, label: `up ${places(n)} from P${d.grid}`, lost: false };
-  if (n < 0) return { text: `▼${-n} from P${d.grid}`, label: `down ${places(-n)} from P${d.grid}`, lost: true };
-  return { text: `Started P${d.grid}`, label: `started P${d.grid}`, lost: false };
+  const n = d.grid - d.position, grid = d.grid;
+  if (n > 0) return { text: tr('grid.up', { n, grid }), label: tr('grid.upLabel', { n, grid }), lost: false };
+  if (n < 0) return { text: tr('grid.down', { n: -n, grid }), label: tr('grid.downLabel', { n: -n, grid }), lost: true };
+  return { text: tr('grid.started', { grid }), label: tr('grid.startedLabel', { grid }), lost: false };
 }
 /** F1: "1 stop", "2 stops" (none before the first). */
-export const stopsText = (pits?: number) => (pits ? `${pits} stop${pits === 1 ? '' : 's'}` : null);
+export const stopsText = (pits?: number) => (pits ? tr('f1.stops', { n: pits }) : null);
 
 export type Tone = 'good' | 'warn' | 'neutral' | 'done';
 /**
@@ -50,11 +51,11 @@ export function hateTag(g: GameCard, side: Side | undefined): { text: string; to
   if (!side || !g.home || !g.away || g.state === 'pre') return null;
   const me = g[side]!, them = g[side === 'home' ? 'away' : 'home']!;
   const diff = (me.score ?? 0) - (them.score ?? 0);
-  if (g.state === 'post') return diff < 0 ? { text: 'Successful Hate Watch!', tone: 'done' } : { text: diff > 0 ? 'They won' : 'Tie', tone: 'neutral' };
+  if (g.state === 'post') return diff < 0 ? { text: tr('feed.successful'), tone: 'done' } : { text: tr(diff > 0 ? 'tag.won' : 'tag.tie'), tone: 'neutral' };
   const threat = (isFootball(g.league) && !!g.redZone && g.possession === me.team.key)
     || (g.league === 'mlb' && g.batting === me.team.key && !!g.bases && (g.bases.second || g.bases.third));
-  if (threat) return { text: 'Threatening', tone: 'warn' };
-  return diff < 0 ? { text: `Down ${-diff}`, tone: 'good' } : { text: diff > 0 ? `Up ${diff}` : 'Tied', tone: 'neutral' };
+  if (threat) return { text: tr('tag.threat'), tone: 'warn' };
+  return diff < 0 ? { text: tr('tag.down', { n: -diff }), tone: 'good' } : { text: diff > 0 ? tr('tag.up', { n: diff }) : tr('tag.tied'), tone: 'neutral' };
 }
 
 /**
@@ -71,8 +72,8 @@ export function loseChance(g: GameCard, side: Side | undefined) {
 /** "8:15 PM" today, "Tue 8:15 PM" otherwise. */
 export function startLabel(ts: number) {
   const d = new Date(ts);
-  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  const time = d.toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString(currentLocale(), { weekday: 'short' })} ${time}`;
 }
 
 /**
@@ -82,14 +83,14 @@ export function startLabel(ts: number) {
 export function upNextWhen(ts: number, timeValid: boolean, now = Date.now()) {
   const d = new Date(ts), today = new Date(now);
   const days = Math.round((new Date(d.toDateString()).getTime() - new Date(today.toDateString()).getTime()) / 86400_000);
-  const day = days <= 0 ? 'Today' : days === 1 ? 'Tomorrow' : days < 7 ? d.toLocaleDateString([], { weekday: 'short' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  return { day, time: timeValid ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Time TBA' };
+  const day = days <= 0 ? tr('time.today') : days === 1 ? tr('time.tomorrow') : days < 7 ? d.toLocaleDateString(currentLocale(), { weekday: 'short' }) : d.toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
+  return { day, time: timeValid ? d.toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' }) : tr('time.tba'), isToday: days <= 0 };
 }
 
 /** A race weekend's dates in the phone's time zone: "Oct 9–11", or "Oct 30 – Nov 1" across months. */
 export function weekendDates(from: number, to: number) {
   const a = new Date(from), b = new Date(to);
-  const month = (d: Date) => d.toLocaleDateString([], { month: 'short' });
+  const month = (d: Date) => d.toLocaleDateString(currentLocale(), { month: 'short' });
   if (a.toDateString() === b.toDateString()) return `${month(a)} ${a.getDate()}`;
   return month(a) === month(b) ? `${month(a)} ${a.getDate()}–${b.getDate()}` : `${month(a)} ${a.getDate()} – ${month(b)} ${b.getDate()}`;
 }
@@ -98,7 +99,7 @@ export function weekendDates(from: number, to: number) {
 function dayLabel(ts: number, now = Date.now()) {
   const d = new Date(ts), today = new Date(now);
   if (d.toDateString() === today.toDateString()) return '';
-  return d.toDateString() === new Date(now - 86400_000).toDateString() ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short' });
+  return d.toDateString() === new Date(now - 86400_000).toDateString() ? tr('time.yesterday') : d.toLocaleDateString(currentLocale(), { weekday: 'short' });
 }
 
 /** The status line under the teams: clock or inning, who has the ball, or the start time. Doubleheaders say which game. */
@@ -107,7 +108,7 @@ export function statusLine(g: GameCard, now = Date.now()) {
   if (g.state === 'pre') line = startLabel(g.startsAt);
   else if (isFootball(g.league) && g.state === 'in' && g.downDistance) {
     const ball = g.possession === g.home?.team.key ? g.home?.team.abbrev : g.possession === g.away?.team.key ? g.away?.team.abbrev : null;
-    line = `${g.detail} · ${ball ? `${ball} ball, ` : ''}${g.downDistance}`;
+    line = `${g.detail} · ${ball ? `${tr('score.ball', { team: ball })}, ` : ''}${g.downDistance}`;
   } else line = g.state === 'post' ? [g.detail, dayLabel(g.startsAt, now)].filter(Boolean).join(' · ') : g.detail;
   return g.note ? `${g.note} · ${line}` : line;
 }
@@ -120,7 +121,7 @@ export const inWindow = (g: GameCard, now = Date.now()) =>
   g.state === 'in' || (g.state === 'pre' && g.startsAt - now < 24 * 3600_000)
   || (g.state === 'post' && now - (g.endedAt ?? g.startsAt + gameLength(g.league)) < 24 * 3600_000);
 
-export const SECTION: Record<GameCard['state'], string> = { in: 'Live now', pre: 'Later today', post: 'Final' };
+export const sectionTitle = (state: GameCard['state']) => tr(`scores.section.${state}`);
 const RANK = { in: 0, pre: 1, post: 2 } as const;
 export const byState = (a: GameCard, b: GameCard) =>
   RANK[a.state] - RANK[b.state] || (a.state === 'post' ? b.startsAt - a.startsAt : a.startsAt - b.startsAt);

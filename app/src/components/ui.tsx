@@ -9,6 +9,7 @@ import { usePlus } from '../lib/plus';
 import { syncUpdate } from '../lib/updates';
 import type { Target } from '../lib/types';
 import { leagueColor } from '../lib/leagueUi';
+import { currentLocale, tr, useT } from '../lib/i18n';
 
 export function Chip({ label, active, onPress, color, style, accessibilityLabel }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   const { active: plus } = usePlus();
@@ -89,6 +90,7 @@ export function LeagueTag({ league }: { league: string }) {
 }
 
 export function FollowButton({ target, compact }: { target: Target; compact?: boolean }) {
+  const t = useT();
   const { isFollowing, toggleFollow } = useStore();
   const on = isFollowing(target.key);
   return (
@@ -97,15 +99,15 @@ export function FollowButton({ target, compact }: { target: Target; compact?: bo
       hitSlop={8}
       style={[styles.follow, on ? styles.followOn : styles.followOff, compact && { paddingHorizontal: space(3) }]}
       accessibilityRole="button"
-      accessibilityLabel={on ? `Unfollow ${target.name}` : `Follow ${target.name}`}
+      accessibilityLabel={t(on ? 'ui.unfollowName' : 'ui.followName', { name: target.name })}
     >
-      <Text style={[styles.followText, on && { color: colors.hate }]}>{on ? 'Tracking' : 'Track'}</Text>
+      <Text style={[styles.followText, on && { color: colors.hate }]}>{t(on ? 'ui.tracking' : 'ui.track')}</Text>
     </Pressable>
   );
 }
 
 export function subtitle(t: Target) {
-  if (t.kind === 'team') return t.league === 'f1' ? 'Constructor' : t.location ?? t.abbrev;
+  if (t.kind === 'team') return t.league === 'f1' ? tr('ui.constructor') : t.location ?? t.abbrev;
   // F1 team codes (RBR, AMR) are our own badge labels, so drivers show the constructor's name instead.
   const team = t.league === 'f1' ? t.teamName : t.teamAbbrev;
   return [team, t.position, t.jersey ? `#${t.jersey}` : null].filter(Boolean).join(' · ');
@@ -116,13 +118,14 @@ export function subtitle(t: Target) {
  * list the server just sent, or your own follow or unfollow), else the one on the target.
  */
 export function HaterCount({ target, size = 12, tint }: { target: Target; size?: number; tint?: string }) {
+  const t = useT();
   const { trackers, follows } = useStore();
   const n = trackers.get(target.key) ?? target.haters;
   if (n == null) return null;
   const mine = follows.has(target.key);
-  const label = n === 0 ? 'No haters yet' : n === 1 && mine ? 'Just you' : `${n.toLocaleString()} hater${n === 1 ? '' : 's'}`;
+  const label = n === 0 ? t('ui.noHaters') : n === 1 && mine ? t('ui.justYou') : t('ui.haters', { n });
   return (
-    <View style={styles.haters} accessible accessibilityLabel={n === 0 ? 'Nobody tracks them yet' : `${n} ${n === 1 ? 'person tracks' : 'people track'} them${mine ? ', you included' : ''}`}>
+    <View style={styles.haters} accessible accessibilityLabel={n === 0 ? t('ui.nobodyTracks') : t(mine ? 'ui.tracksThemYou' : 'ui.tracksThem', { n })}>
       <Ionicons name="eye" size={size} color={tint ?? colors.textFaint} />
       <Text style={[styles.hatersText, { fontSize: size }, tint ? { color: tint } : null]}>{label}</Text>
     </View>
@@ -177,9 +180,10 @@ export function TargetCard({ target, division, actions }: { target: Target; divi
 
 /** A Successful Hate Watch's company: "23 other hate watchers" got the same alert. */
 export function AlsoGot({ n }: { n: number }) {
-  const label = `${n.toLocaleString()} other hate watcher${n === 1 ? '' : 's'}`;
+  const t = useT();
+  const label = t('ui.otherWatchers', { n });
   return (
-    <View style={styles.alsoGot} accessible accessibilityLabel={`${label} got this alert too`}>
+    <View style={styles.alsoGot} accessible accessibilityLabel={t('ui.gotAlertToo', { label })}>
       <Text style={styles.alsoGotText}>{label}</Text>
     </View>
   );
@@ -217,26 +221,27 @@ export function useNow(ms = 10_000) {
 
 export function ago(ts: number, now: number) {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 10) return 'just now';
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (s < 10) return tr('ago.now');
+  if (s < 60) return tr('ago.s', { n: s });
+  if (s < 3600) return tr('ago.m', { n: Math.floor(s / 60) });
+  if (s < 86400) return tr('ago.h', { n: Math.floor(s / 3600) });
+  return new Date(ts).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' });
 }
 
 /** The LIVE badge's tap: syncs now and says so when there is nothing to take or the build can't take one. */
 async function tapSync() {
   try {
     const r = await syncUpdate();
-    if (r === 'off') Alert.alert('No updates here', 'This build (development or web) does not take over-the-air updates.');
-    else if (r === 'current') Alert.alert('Up to date', 'You have the latest version.');
+    if (r === 'off') Alert.alert(tr('ui.noUpdates'), tr('ui.noUpdatesBody'));
+    else if (r === 'current') Alert.alert(tr('ui.upToDate'), tr('ui.upToDateBody'));
   } catch {
-    Alert.alert("Couldn't check for updates", 'Try again in a moment.');
+    Alert.alert(tr('ui.updateFailed'), tr('ui.updateFailedBody'));
   }
 }
 
 /** The realtime connection state, for a tab's header (Feed, Scores). Tapping it syncs the latest over-the-air update. */
 export function LiveBadge() {
+  const t = useT();
   const { live } = useStore();
   const [busy, setBusy] = useState(false);
   const color = live === 'live' ? colors.live : live === 'connecting' ? colors.warn : colors.textFaint;
@@ -247,9 +252,9 @@ export function LiveBadge() {
     setBusy(false);
   };
   return (
-    <Pressable onPress={press} hitSlop={8} style={styles.liveWrap} accessibilityRole="button" accessibilityLabel={`Realtime ${live}. Tap to check for an app update`}>
+    <Pressable onPress={press} hitSlop={8} style={styles.liveWrap} accessibilityRole="button" accessibilityLabel={t('ui.realtimeA11y', { state: t(`ui.state.${live}` as never) })}>
       <View style={[styles.liveDot, { backgroundColor: color }]} />
-      <Text style={[styles.liveText, { color }]}>{busy ? 'CHECKING' : live === 'live' ? 'LIVE' : live === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</Text>
+      <Text style={[styles.liveText, { color }]}>{busy ? t('ui.checking') : t(live === 'live' ? 'ui.live' : live === 'connecting' ? 'ui.connecting' : 'ui.offline')}</Text>
     </Pressable>
   );
 }

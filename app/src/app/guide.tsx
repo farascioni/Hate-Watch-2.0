@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AlsoGot, LeagueTag } from '../components/ui';
 import { markGuideSeen, settleGuide } from '../lib/guide';
+import { useT, type T } from '../lib/i18n';
 import { GOLD, colors, radius, space } from '../theme';
 
 /**
@@ -16,14 +17,14 @@ type Icon = keyof typeof Ionicons.glyphMap;
 // demo is a function so it's built at render time (styles are defined at the bottom of the file).
 interface Page { key: string; icon?: Icon; where?: string; title: string; body: string; demo?: () => ReactNode }
 
-const PAGES: Page[] = [
+const buildPages = (t: T): Page[] => [
   {
-    key: 'welcome', title: 'Welcome to Hate Watch',
-    body: "Track the players and teams you can't stand. When something goes wrong for them, you'll know within seconds.",
+    key: 'welcome', title: t('guide.welcome.title'),
+    body: t('guide.welcome.body'),
   },
   {
-    key: 'track', icon: 'search', where: 'Search tab', title: 'Pick who to hate',
-    body: 'Type a player or team and tap Track. The NBA, MLB, NFL, college football, NHL, F1, the UFC, the Premier League and the WNBA are all here, and you can track as many as you like.',
+    key: 'track', icon: 'search', where: t('guide.track.where'), title: t('guide.track.title'),
+    body: t('guide.track.body'),
     demo: () => (
       <DemoCard>
         <Badge text="DAL" color="#041E42" />
@@ -31,19 +32,19 @@ const PAGES: Page[] = [
           <Text style={styles.demoTitle} numberOfLines={1}>Dallas Cowboys</Text>
           <View style={styles.inline}><LeagueTag league="nfl" /><Text style={styles.demoSub} numberOfLines={1}>Dallas</Text></View>
         </View>
-        <View style={styles.trackPill}><Text style={styles.trackText}>Track</Text></View>
+        <View style={styles.trackPill}><Text style={styles.trackText}>{t('guide.track.button')}</Text></View>
       </DemoCard>
     ),
   },
   {
-    key: 'feed', icon: 'flame', where: 'Feed tab', title: 'Every bad moment, live',
-    body: 'Alerts land in your feed the moment they happen, newest first, and arrive as notifications. A Successful Hate Watch (a team you track losing) shows how many other hate watchers got it too. Tap the share icon to send one to a friend.',
+    key: 'feed', icon: 'flame', where: t('guide.feed.where'), title: t('guide.feed.title'),
+    body: t('guide.feed.body'),
     demo: () => (
       <DemoCard>
         <Badge text="PHI" color="#06424d" />
         <View style={{ flex: 1, gap: 4 }}>
-          <Text style={styles.demoTitle}>Successful Hate Watch! Eagles lost to the Bears</Text>
-          <Text style={styles.demoSub}>Final Score: 24 to 17</Text>
+          <Text style={styles.demoTitle}>{t('guide.feed.demoTitle')}</Text>
+          <Text style={styles.demoSub}>{t('guide.feed.demoSub')}</Text>
           <AlsoGot n={23} />
         </View>
         <Ionicons name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={colors.textDim} style={{ alignSelf: 'flex-start' }} />
@@ -51,8 +52,8 @@ const PAGES: Page[] = [
     ),
   },
   {
-    key: 'scores', icon: 'trophy', where: 'Scores tab', title: 'Every game, live',
-    body: "Today's games for everyone you track: the score, how badly it's going for them, who has the ball or who's pitching, and the chance they lose. Finals stay for a day. Tap one for the play-by-play.",
+    key: 'scores', icon: 'trophy', where: t('guide.scores.where'), title: t('guide.scores.title'),
+    body: t('guide.scores.body'),
     demo: () => (
       <View style={styles.demoCard}>
         <View style={styles.row}>
@@ -66,13 +67,13 @@ const PAGES: Page[] = [
           <Text style={[styles.demoScore, { color: colors.textDim }]}>24</Text>
         </View>
         <View style={[styles.row, { marginTop: space(3), justifyContent: 'space-between' }]}>
-          <Text style={styles.demoSub}>Q4 · 2:14 · ATL ball, 3rd & 8</Text>
-          <View style={styles.downPill}><Text style={styles.downText}>Down 7</Text></View>
+          <Text style={styles.demoSub}>{t('guide.scores.status')}</Text>
+          <View style={styles.downPill}><Text style={styles.downText}>{t('guide.scores.down')}</Text></View>
         </View>
-        <Text style={[styles.demoFaint, { marginTop: space(2) }]}>Timeouts left: ATL 1 · NO 3</Text>
-        <Text style={styles.demoFaint}>Passing: <Text style={styles.demoStrong}>M. Penix Jr.</Text>, 18/27, 211 YDS</Text>
+        <Text style={[styles.demoFaint, { marginTop: space(2) }]}>{t('guide.scores.timeouts')}</Text>
+        <Text style={styles.demoFaint}>{t('guide.scores.passing')} <Text style={styles.demoStrong}>M. Penix Jr.</Text>, 18/27, 211 YDS</Text>
         <View style={[styles.row, { marginTop: space(2), justifyContent: 'space-between' }]}>
-          <Text style={styles.demoSub}>Chance the Falcons lose</Text>
+          <Text style={styles.demoSub}>{t('guide.scores.chance')}</Text>
           <Text style={[styles.demoSub, { color: colors.hateText, fontWeight: '800' }]}>78%</Text>
         </View>
         <View style={styles.bar}><View style={[styles.barFill, { width: '78%' }]} /></View>
@@ -80,8 +81,8 @@ const PAGES: Page[] = [
     ),
   },
   {
-    key: 'leaderboard', icon: 'podium', where: 'Top left of every tab', title: 'See who\'s most hated',
-    body: 'The leaderboard ranks athletes and teams by how many people hate them. Filter it like your feed: athletes or teams (drivers in F1, fighters in the UFC), one sport or all of them.',
+    key: 'leaderboard', icon: 'podium', where: t('guide.leaderboard.where'), title: t('guide.leaderboard.title'),
+    body: t('guide.leaderboard.body'),
     demo: () => (
       <View style={styles.demoCard}>
         {([['🥇', 'DAL', '#041E42', 'Dallas Cowboys', 'nfl', '1,204'], ['🥈', 'LAL', '#552583', 'Los Angeles Lakers', 'nba', '987'], ['🥉', 'NYY', '#0C2340', 'New York Yankees', 'mlb', '842']] as const)
@@ -95,7 +96,7 @@ const PAGES: Page[] = [
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.haterCount}>{n}</Text>
-                <Text style={styles.demoFaint}>haters</Text>
+                <Text style={styles.demoFaint}>{t('guide.leaderboard.haters')}</Text>
               </View>
             </View>
           ))}
@@ -103,26 +104,26 @@ const PAGES: Page[] = [
     ),
   },
   {
-    key: 'global', icon: 'options', where: 'Settings tab', title: 'Choose your alerts',
-    body: "Turn each kind of alert on or off for every league. An alert's bell decides whether it sends a notification or just lands in your feed.",
+    key: 'global', icon: 'options', where: t('guide.global.where'), title: t('guide.global.title'),
+    body: t('guide.global.body'),
     demo: () => (
       <View style={styles.demoCard}>
-        <ToggleRow label="🙅  Throws an interception" on push />
+        <ToggleRow label={t('guide.global.row1')} on push />
         <View style={styles.divider} />
-        <ToggleRow label="🙄  Makes an out" on push={false} note="Feed only: no notification" />
+        <ToggleRow label={t('guide.global.row2')} on push={false} note={t('guide.global.row2note')} />
       </View>
     ),
   },
   {
-    key: 'record', icon: 'medal', where: 'Settings tab', title: 'Keep score',
-    body: 'The top of Settings counts your Successful Hate Watches: every time a team or a UFC fighter you track loses, or the team of a player you track. Tap "+3 more" to see every team.',
+    key: 'record', icon: 'medal', where: t('guide.record.where'), title: t('guide.record.title'),
+    body: t('guide.record.body'),
     demo: () => (
       <View style={[styles.demoCard, { borderColor: colors.hateDim, gap: space(3) }]}>
         <View style={[styles.row, { gap: space(4) }]}>
           <Text style={styles.recordCount}>12</Text>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.demoTitle, { fontSize: 17 }]}>Successful Hate Watches</Text>
-            <Text style={styles.demoSub}>Each time a team or fighter you track lost.</Text>
+            <Text style={[styles.demoTitle, { fontSize: 17 }]}>{t('guide.record.demoTitle')}</Text>
+            <Text style={styles.demoSub}>{t('guide.record.demoSub')}</Text>
           </View>
         </View>
         <View style={[styles.inline, { flexWrap: 'wrap' }]}>
@@ -133,20 +134,20 @@ const PAGES: Page[] = [
               <Text style={styles.chipCount}>{n}</Text>
             </View>
           ))}
-          <View style={[styles.chip, { paddingLeft: space(2.5) }]}><Text style={styles.chipMore}>+3 more</Text><Ionicons name="chevron-down" size={14} color={colors.textDim} /></View>
+          <View style={[styles.chip, { paddingLeft: space(2.5) }]}><Text style={styles.chipMore}>{t('guide.record.more')}</Text><Ionicons name="chevron-down" size={14} color={colors.textDim} /></View>
         </View>
       </View>
     ),
   },
   {
-    key: 'one', icon: 'eye', where: 'Tracking tab', title: 'Fine-tune one player or team',
-    body: 'Everyone you track gets a card with these controls:',
+    key: 'one', icon: 'eye', where: t('guide.one.where'), title: t('guide.one.title'),
+    body: t('guide.one.body'),
     demo: () => (
       <View style={{ gap: space(4) }}>
         <View style={[styles.demoCard, { padding: 0, overflow: 'hidden' }]}>
           <View style={styles.banner}>
             <Text style={styles.bannerLeague}>NFL</Text>
-            <View style={[styles.inline, { gap: 4 }]}><Ionicons name="eye" size={12} color="#fff" /><Text style={styles.bannerLeague}>214 haters</Text></View>
+            <View style={[styles.inline, { gap: 4 }]}><Ionicons name="eye" size={12} color="#fff" /><Text style={styles.bannerLeague}>{t('guide.one.haters')}</Text></View>
           </View>
           <View style={{ padding: space(3), paddingTop: 0 }}>
             <View style={styles.bannerAvatar}><Badge text="DJ" color="#002C5F" /></View>
@@ -156,33 +157,33 @@ const PAGES: Page[] = [
               <RoundIcon name="close-outline" />
               <RoundIcon name="notifications" />
               <RoundIcon name="settings-sharp" highlight />
-              <View style={[styles.unfollowPill, { marginLeft: 'auto' }]}><Text style={styles.unfollowText}>Unfollow</Text></View>
+              <View style={[styles.unfollowPill, { marginLeft: 'auto' }]}><Text style={styles.unfollowText}>{t('guide.one.unfollow')}</Text></View>
             </View>
           </View>
         </View>
-        <Explain icon="eye" text="How many people hate them, you included." />
-        <Explain mark="❌" text="Red X: with Hate Watch Plus, marks your most hated. Their alerts get a red border in the Feed." />
-        <Explain icon="notifications" text="Bell: no notifications about just them. Their alerts still reach your feed." />
-        <Explain icon="settings-sharp" text="Gear: pick exactly which alerts you get about them. It beats your global settings." />
-        <Explain icon="remove-circle" text="Unfollow: stop tracking them entirely." />
+        <Explain icon="eye" text={t('guide.one.eye')} />
+        <Explain mark="❌" text={t('guide.one.x')} />
+        <Explain icon="notifications" text={t('guide.one.bell')} />
+        <Explain icon="settings-sharp" text={t('guide.one.gear')} />
+        <Explain icon="remove-circle" text={t('guide.one.unfollowHelp')} />
       </View>
     ),
   },
   {
-    key: 'plus', icon: 'star', where: 'Settings tab', title: 'Hate Watch Plus',
-    body: "A monthly subscription that keeps the servers running and the app ad free. It unlocks four extras, under Support Hate Watch in Settings:",
+    key: 'plus', icon: 'star', where: t('guide.plus.where'), title: t('guide.plus.title'),
+    body: t('guide.plus.body'),
     demo: () => (
       <View style={[styles.demoCard, { borderColor: GOLD, gap: space(4) }]}>
-        <Explain icon="color-palette" color={GOLD} text="Gold accents: swaps the red for gold throughout the app." />
-        <Explain icon="apps" color={GOLD} text="Gold app icon: a gold icon on your Home Screen." />
-        <Explain mark="❌" text="Most hated: mark players and teams on the Tracking tab. Their alerts in the Feed get a red border, and their games on the Scores tab get one too." />
-        <Explain icon="heart" color={GOLD} text="Favorite teams: tap the heart on a team in Search to root for it. While it plays, you get its opponent's alerts for that game, with a gold border in the Feed, and its next game shows in Up next." />
+        <Explain icon="color-palette" color={GOLD} text={t('guide.plus.gold')} />
+        <Explain icon="apps" color={GOLD} text={t('guide.plus.icon')} />
+        <Explain mark="❌" text={t('guide.plus.mostHated')} />
+        <Explain icon="heart" color={GOLD} text={t('guide.plus.favorites')} />
       </View>
     ),
   },
   {
-    key: 'done', icon: 'checkmark-circle', title: "You're all set",
-    body: 'You can watch this guide again any time from Settings.',
+    key: 'done', icon: 'checkmark-circle', title: t('guide.done.title'),
+    body: t('guide.done.body'),
   },
 ];
 
@@ -193,6 +194,8 @@ export default function GuideScreen() {
   const [listWidth, setListWidth] = useState(0);
   const width = listWidth || windowWidth; // the web version puts the guide in a column narrower than the window
   const insets = useSafeAreaInsets();
+  const t = useT();
+  const PAGES = useMemo(() => buildPages(t), [t]);
   const list = useRef<FlatList<Page>>(null);
   const [index, setIndex] = useState(0);
   const last = index === PAGES.length - 1;
@@ -211,13 +214,13 @@ export default function GuideScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + space(2), paddingBottom: insets.bottom + space(4) }]}>
       <View style={styles.topBar}>
         {index > 0 ? (
-          <Pressable onPress={() => go(index - 1)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Previous page">
-            <Text style={styles.topLink}>Back</Text>
+          <Pressable onPress={() => go(index - 1)} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('guide.previous')}>
+            <Text style={styles.topLink}>{t('guide.back')}</Text>
           </Pressable>
         ) : <View />}
         {!last ? (
-          <Pressable onPress={() => close()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Skip the guide">
-            <Text style={styles.topLink}>Skip</Text>
+          <Pressable onPress={() => close()} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('guide.skipLabel')}>
+            <Text style={styles.topLink}>{t('guide.skip')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -245,13 +248,13 @@ export default function GuideScreen() {
             <Text style={styles.body}>{item.body}</Text>
             {item.demo ? <View style={styles.demo}>{item.demo()}</View> : null}
             {item.key === PAGES[PAGES.length - 1].key && isFirstRun ? (
-              <Text style={styles.body}>Next, your phone will ask to send you notifications. Allow them so alerts reach you even when the app is closed.</Text>
+              <Text style={styles.body}>{t('guide.notifyNext')}</Text>
             ) : null}
           </ScrollView>
         )}
       />
 
-      <View style={styles.dots} accessibilityLabel={`Page ${index + 1} of ${PAGES.length}`}>
+      <View style={styles.dots} accessibilityLabel={t('guide.pageOf', { page: index + 1, total: PAGES.length })}>
         {PAGES.map((p, i) => <View key={p.key} style={[styles.dot, i === index && styles.dotOn]} />)}
       </View>
       <Pressable
@@ -259,7 +262,7 @@ export default function GuideScreen() {
         style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}
         accessibilityRole="button"
       >
-        <Text style={styles.primaryText}>{last ? (isFirstRun ? 'Find someone to hate' : 'Done') : 'Next'}</Text>
+        <Text style={styles.primaryText}>{last ? (isFirstRun ? t('guide.findSomeone') : t('guide.done')) : t('guide.next')}</Text>
       </Pressable>
     </View>
   );

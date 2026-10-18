@@ -10,8 +10,10 @@ import { useShare } from './ShareStyleSheet';
 import { useIsMostHated } from '../lib/mostHated';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: { item: FeedItem; now: number; fresh?: boolean; highlight?: boolean }) {
+  const tx = useT();
   const [pressed, setPressed] = useState(false);
   const { share, copied, sheet } = useShare(item);
   // Only the Feed tab passes `highlight`: the same card on a game, a target page or a shared alert stays plain.
@@ -36,7 +38,7 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
           </View>
         ) : (
           <Pressable onPress={() => router.push(targetHref(item.target))} hitSlop={4} accessibilityRole="button"
-            accessibilityLabel={'name' in item.target ? `${item.target.name}'s page` : 'Their page'}>
+            accessibilityLabel={'name' in item.target ? tx('alert.page', { name: item.target.name }) : tx('feedCard.theirPage')}>
             <Avatar target={item.target} size={52} />
             <Text style={styles.emoji}>{item.emoji}</Text>
           </Pressable>
@@ -53,9 +55,9 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
           </View>
         </View>
         {/* Its own tap target: sharing doesn't open the alert behind it. */}
-        {notice ? null : <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? 'Copied to clipboard' : 'Share this alert'}>
+        {notice ? null : <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
           <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
-          {copied ? <Text style={styles.copied}>Copied</Text> : null}
+          {copied ? <Text style={styles.copied}>{tx('alert.copied')}</Text> : null}
         </Pressable>}
       </Pressable>
       {sheet}
@@ -66,15 +68,16 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
 
 /** The alert's play on video, playing right here. `style`: its place (in a card, in line with the alert's text). */
 export function AlertClip({ clip, style }: { clip: Clip; style?: StyleProp<ViewStyle> }) {
+  const tx = useT();
   const [open, toggle] = useNowPlaying(`alert:${useId()}`);
   return (
     <View style={[styles.clip, style]}>
       {open ? <ClipPlayer clip={clip} /> : null}
       <Pressable onPress={toggle} style={({ pressed }) => [styles.clipRow, pressed && { opacity: 0.7 }]} accessibilityRole="button"
-        accessibilityLabel={`${open ? 'Close' : 'Watch'} the clip: ${clip.title}, ${duration(clip.seconds)}`}>
+        accessibilityLabel={tx(open ? 'feedCard.closeClip' : 'feedCard.watchClip', { title: clip.title, time: duration(clip.seconds) })}>
         <ClipThumb clip={clip} open={open} width={96} />
         <View style={{ flex: 1, gap: 1 }}>
-          <Text style={styles.watch}>{open ? 'Close' : 'Watch it'}</Text>
+          <Text style={styles.watch}>{open ? tx('feedCard.close') : tx('feedCard.watch')}</Text>
           <Text style={styles.clipTitle} numberOfLines={2}>{clip.title}</Text>
         </View>
       </Pressable>

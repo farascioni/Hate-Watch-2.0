@@ -6,6 +6,7 @@ import { LeagueTag } from './ui';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import type { HateWatchTally, Target } from '../lib/types';
+import { currentLocale, useT } from '../lib/i18n';
 
 const SHOWN = 3; // teams with a chip; "Show all" lists every one
 
@@ -16,22 +17,23 @@ const SHOWN = 3; // teams with a chip; "Show all" lists every one
  * settings are, so turning "Loses a game" off or clearing the feed doesn't reset it.
  */
 export function HateWatchCounter() {
+  const tx = useT();
   const { hateWatches } = useStore();
   const [open, setOpen] = useState(false);
   const total = hateWatches?.total;
   const teams = hateWatches?.teams ?? [];
-  const label = total === 1 ? 'Successful Hate Watch' : 'Successful Hate Watches';
+  const label = tx('counter.title', { n: total ?? 0 });
   const more = teams.length > SHOWN;
   const toggle = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setOpen((o) => !o); };
 
   return (
     <View style={styles.card}>
       <View style={styles.head} accessible accessibilityRole="summary"
-        accessibilityLabel={total == null ? 'Successful Hate Watches, loading' : `${total} ${label}`}>
-        <Text style={styles.count}>{total == null ? '–' : total.toLocaleString()}</Text>
+        accessibilityLabel={total == null ? tx('counter.loading') : `${total} ${label}`}>
+        <Text style={styles.count}>{total == null ? '–' : total.toLocaleString(currentLocale())}</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{label}</Text>
-          <Text style={styles.sub}>{total ? 'Each time a team or fighter you track lost.' : 'Your first one lands when a team or fighter you track loses.'}</Text>
+          <Text style={styles.sub}>{total ? tx('counter.sub') : tx('counter.subNone')}</Text>
         </View>
       </View>
 
@@ -50,8 +52,8 @@ export function HateWatchCounter() {
           ))}
           {more ? (
             <Pressable onPress={toggle} style={({ pressed }) => [styles.chip, styles.moreChip, pressed && { opacity: 0.7 }]}
-              accessibilityRole="button" accessibilityLabel={`Show all ${teams.length} teams`} aria-expanded={false} hitSlop={6}>
-              <Text style={styles.more}>+{teams.length - SHOWN} more</Text>
+              accessibilityRole="button" accessibilityLabel={tx('counter.showAll', { n: teams.length })} aria-expanded={false} hitSlop={6}>
+              <Text style={styles.more}>{tx('counter.more', { n: teams.length - SHOWN })}</Text>
               <Ionicons name="chevron-down" size={14} color={colors.textDim} />
             </Pressable>
           ) : null}
@@ -60,8 +62,8 @@ export function HateWatchCounter() {
 
       {open ? (
         <Pressable onPress={toggle} style={({ pressed }) => [styles.less, pressed && { opacity: 0.7 }]}
-          accessibilityRole="button" accessibilityLabel="Show fewer teams" aria-expanded hitSlop={6}>
-          <Text style={styles.more}>Show less</Text>
+          accessibilityRole="button" accessibilityLabel={tx('counter.showFewer')} aria-expanded hitSlop={6}>
+          <Text style={styles.more}>{tx('counter.showLess')}</Text>
           <Ionicons name="chevron-up" size={14} color={colors.textDim} />
         </Pressable>
       ) : null}
@@ -71,8 +73,9 @@ export function HateWatchCounter() {
 
 /** One team in the full list: logo, name, league, and how many times they lost on you. */
 function Row({ team: { target, count }, last }: { team: HateWatchTally['teams'][number]; last: boolean }) {
+  const tx = useT();
   return (
-    <View style={[styles.row, !last && styles.rowLine]} accessible accessibilityLabel={`${target.name}, ${count} Successful Hate Watch${count === 1 ? '' : 'es'}`}>
+    <View style={[styles.row, !last && styles.rowLine]} accessible accessibilityLabel={`${target.name}, ${count} ${tx('counter.title', { n: count })}`}>
       <Avatar target={target} size={28} />
       <Text style={styles.rowName} numberOfLines={1}>{target.name}</Text>
       <LeagueTag league={target.league} />

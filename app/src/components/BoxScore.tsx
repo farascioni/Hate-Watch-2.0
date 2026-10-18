@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { router } from 'expo-router';
 import { colors, radius, space } from '../theme';
 import type { BoxGroup, BoxScore, BoxTeam } from '../lib/types';
+import { useT } from '../lib/i18n';
 
 /** What you track (the store's follows): a key's in it or not. */
 type Tracked = { has: (key: string) => boolean };
@@ -49,6 +50,7 @@ const ROW_H = 38;
  * the stats leave (at least NAME_MIN); stats that don't fit next to that scroll sideways.
  */
 function Table({ group, tracked }: { group: BoxGroup; tracked: Tracked }) {
+  const t = useT();
   const widths = group.columns.map((_, i) => widthOf(group, i));
   const statsW = widths.reduce((a, b) => a + b, 0) + space(2);
   const [cardW, setCardW] = useState(0);
@@ -69,7 +71,7 @@ function Table({ group, tracked }: { group: BoxGroup; tracked: Tracked }) {
               <Pressable key={r.key} style={[styles.nameCell, r.sub && styles.indent, me(r.key) && styles.me]} onPress={() => router.push(`/target/${encodeURIComponent(r.key)}`)} accessibilityRole="link">{name}</Pressable>
             ) : <View key={r.key} style={[styles.nameCell, r.sub && styles.indent, me(r.key) && styles.me]}>{name}</View>;
           })}
-          {group.totals ? <View style={[styles.nameCell, styles.totals]}><Text style={[styles.nameText, { color: colors.text, fontWeight: '800' }]}>Team</Text></View> : null}
+          {group.totals ? <View style={[styles.nameCell, styles.totals]}><Text style={[styles.nameText, { color: colors.text, fontWeight: '800' }]}>{t('box.team')}</Text></View> : null}
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={cardW > 0 && nameW + statsW > cardW} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
           <View style={{ flexGrow: 1, minWidth: statsW }}>

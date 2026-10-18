@@ -1,6 +1,7 @@
 import { Platform, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import type { FeedItem } from './types';
+import { tr } from './i18n';
 
 /**
  * What gets shared: the alert's link. Its preview is a picture of the alert (drawn by the server), and
@@ -9,7 +10,7 @@ import type { FeedItem } from './types';
 export function shareText(item: FeedItem, url = item.shareUrl) {
   return url
     ? `${item.emoji} ${item.title}\n${url}`
-    : `${item.emoji} ${item.title}\n${item.body}\n\nvia Hate Watch 😈`;
+    : `${item.emoji} ${item.title}\n${item.body}\n\n${tr('share.via')}`;
 }
 
 /**
@@ -27,7 +28,7 @@ export async function shareAlert(item: FeedItem, url = item.shareUrl): Promise<'
   // share sheet only takes text, so the link goes at the end of it.
   const content = url && Platform.OS !== 'android' ? { url } : { message };
   try {
-    const result = await Share.share(content, { dialogTitle: 'Share this alert', subject: item.title });
+    const result = await Share.share(content, { dialogTitle: tr('share.dialog'), subject: item.title });
     return result.action === Share.sharedAction ? 'shared' : 'dismissed';
   } catch (e) {
     // Cancelling the web share sheet rejects with AbortError: that's a choice, not a failure.

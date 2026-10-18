@@ -16,6 +16,7 @@ import { trackedDrivers } from '../../lib/scores';
 import { colors, space } from '../../theme';
 import type { F1Preview, FeedItem, GameDetail } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
+import { phrase, useT } from '../../lib/i18n';
 
 /** Whether "Your alerts from this game" is open, as you last left it (every game screen; kept on the device). */
 const ALERTS_OPEN_KEY = 'game:alertsOpen';
@@ -27,6 +28,7 @@ const ALERTS_OPEN_KEY = 'game:alertsOpen';
  * highlights refresh every 15s while live.
  */
 export default function GameScreen() {
+  const tx = useT();
   const { key } = useLocalSearchParams<{ key: string }>();
   const gameKey = decodeURIComponent(key);
   const { games, feed, follows } = useStore();
@@ -63,10 +65,10 @@ export default function GameScreen() {
 
   if (!game) {
     return failed
-      ? <Empty emoji="🏟️" title="This game isn't available" body="Games stay on the Scores tab until the day after they finish." />
+      ? <Empty emoji="🏟️" title={tx('game.gone')} body={tx('game.goneBody')} />
       : <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
   }
-  const title = game.league === 'f1' ? game.session ?? 'Race' : `${game.away?.team.shortName} @ ${game.home?.team.shortName}`;
+  const title = game.league === 'f1' ? game.session ?? tx('game.race') : `${game.away?.team.shortName} @ ${game.home?.team.shortName}`;
   const mine = new Set(trackedDrivers(game, follows).map((d) => d.key));
 
   return (
@@ -80,13 +82,13 @@ export default function GameScreen() {
           <F1PreviewView preview={preview} current={game.key} />
         ) : game.league === 'f1' ? (
           <>
-            <SectionHeader>{game.state === 'post' ? 'Results' : 'Running order'}</SectionHeader>
+            <SectionHeader>{game.state === 'post' ? tx('game.results') : tx('game.runningOrder')}</SectionHeader>
             <RaceOrder game={game} mine={mine} />
           </>
         ) : (
           <>
             <View style={styles.tabs} accessibilityRole="tablist">
-              {([['box', 'Box score'], ['highlights', 'Highlights']] as const).map(([id, label]) => (
+              {([['box', tx('game.box')], ['highlights', tx('game.highlights')]] as const).map(([id, label]) => (
                 <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabOn]}
                   accessibilityRole="tab" accessibilityState={{ selected: tab === id }}>
                   <Text style={[styles.tabText, tab === id && styles.tabTextOn]}>{label}</Text>
@@ -95,21 +97,21 @@ export default function GameScreen() {
             </View>
             {tab === 'box' ? (
               detail?.box ? <BoxScoreView box={detail.box} tracked={follows} />
-                : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'The box score shows up here once it starts.' : 'No box score yet.') : 'Loading…'}</Text>
+                : <Text style={styles.none}>{detail ? (game.state === 'pre' ? tx('game.boxPre') : tx('game.boxNone')) : tx('game.loading')}</Text>
             ) : detail?.clips?.length || detail?.keyPlays?.length ? (
               <HighlightsView clips={detail.clips ?? []} plays={detail.keyPlays ?? []} now={now} />
-            ) : <Text style={styles.none}>{detail ? (game.state === 'pre' ? 'Highlights show up here once it starts.' : 'No highlights yet.') : 'Loading…'}</Text>}
+            ) : <Text style={styles.none}>{detail ? (game.state === 'pre' ? tx('game.highPre') : tx('game.highNone')) : tx('game.loading')}</Text>}
           </>
         )}
 
         <Pressable onPress={toggleAlerts} style={({ pressed }) => [styles.alertsHead, pressed && { opacity: 0.6 }]} hitSlop={6}
-          accessibilityRole="button" aria-expanded={alertsOpen} accessibilityHint={alertsOpen ? 'Minimizes your alerts' : 'Shows your alerts'}>
-          <SectionHeader>Your alerts from this {leagueUi(game.league).game} · {alerts.length}</SectionHeader>
+          accessibilityRole="button" aria-expanded={alertsOpen} accessibilityHint={alertsOpen ? tx('game.alertsHide') : tx('game.alertsShow')}>
+          <SectionHeader>{phrase(tx, 'game.yourAlerts', leagueUi(game.league).game, { n: alerts.length })}</SectionHeader>
           <Ionicons name={alertsOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textFaint} style={styles.alertsChevron} />
         </Pressable>
         {alertsOpen ? (alerts.length
           ? alerts.map((a) => <FeedCard key={a.id} item={a} now={now} />)
-          : <Text style={styles.none}>Nothing yet. When something goes wrong for them, it lands here.</Text>) : null}
+          : <Text style={styles.none}>{tx('game.alertsNone')}</Text>) : null}
       </ScrollView>
     </>
   );

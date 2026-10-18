@@ -9,16 +9,18 @@ import { GridRow } from '../../components/GridRow';
 import { chunkSections, useWebLayout } from '../../lib/webLayout';
 import { colors, space } from '../../theme';
 import type { FeedItem } from '../../lib/types';
+import { currentLocale, tr, useT } from '../../lib/i18n';
 
 function dayLabel(ts: number) {
   const d = new Date(ts); const today = new Date();
   const y = new Date(); y.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === y.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  if (d.toDateString() === today.toDateString()) return tr('time.today');
+  if (d.toDateString() === y.toDateString()) return tr('time.yesterday');
+  return d.toLocaleDateString(currentLocale(), { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 export default function FeedScreen() {
+  const tx = useT();
   const { feed, ready, refreshFeed, loadMore, markSeen, follows } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const [openedAt, setOpenedAt] = useState(Date.now());
@@ -65,11 +67,11 @@ export default function FeedScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.hate} onRefresh={async () => { setRefreshing(true); await refreshFeed().catch(() => {}); setRefreshing(false); }} />}
       ListEmptyComponent={
         feed.length && active ? (
-          <Empty emoji="🔎" title={`Nothing for ${describeFilter(filter)} yet`} body="Their alerts will show up here as they happen." action={<PrimaryButton label="Show everything" onPress={reset} />} />
+          <Empty emoji="🔎" title={tx('feed.nothingFor', { what: describeFilter(filter) })} body={tx('feed.nothingBody')} action={<PrimaryButton label={tx('tracking.showEverything')} onPress={reset} />} />
         ) : follows.size === 0 ? (
-          <Empty emoji="😈" title="Nobody to hate yet" body="Track the players and teams you can't stand. Every strikeout, pick and loss lands here the moment it happens." action={<PrimaryButton label="Find someone to hate" onPress={() => router.navigate('/search')} />} />
+          <Empty emoji="😈" title={tx('feed.nobody')} body={tx('feed.nobodyBody')} action={<PrimaryButton label={tx('common.findSomeone')} onPress={() => router.navigate('/search')} />} />
         ) : (
-          <Empty emoji="👀" title="Watching…" body={`Tracking ${follows.size} target${follows.size === 1 ? '' : 's'}. Their misfortune will show up here live.`} />
+          <Empty emoji="👀" title={tx('feed.watching')} body={tx('feed.watchingBody', { n: follows.size })} />
         )
       }
     />

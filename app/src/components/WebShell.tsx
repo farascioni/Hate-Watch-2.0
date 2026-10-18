@@ -12,14 +12,16 @@ import FollowingScreen from '../app/(tabs)/following';
 import SettingsScreen from '../app/(tabs)/settings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, space } from '../theme';
+import { useT } from '../lib/i18n';
+import type { Key } from '../lib/strings/en';
 
 type TabId = 'feed' | 'scores' | 'search' | 'following' | 'settings';
-const TABS: { id: TabId; path: string; title: string; icon: ComponentProps<typeof Ionicons>['name']; screen: ComponentType }[] = [
-  { id: 'feed', path: '/', title: 'Feed', icon: 'flame', screen: FeedScreen },
-  { id: 'scores', path: '/scores', title: 'Scores', icon: 'trophy', screen: ScoresScreen },
-  { id: 'search', path: '/search', title: 'Search', icon: 'search', screen: SearchScreen },
-  { id: 'following', path: '/following', title: 'Tracking', icon: 'eye', screen: FollowingScreen },
-  { id: 'settings', path: '/settings', title: 'Settings', icon: 'options', screen: SettingsScreen },
+const TABS: { id: TabId; path: string; title: Key; icon: ComponentProps<typeof Ionicons>['name']; screen: ComponentType }[] = [
+  { id: 'feed', path: '/', title: 'tab.feed', icon: 'flame', screen: FeedScreen },
+  { id: 'scores', path: '/scores', title: 'tab.scores', icon: 'trophy', screen: ScoresScreen },
+  { id: 'search', path: '/search', title: 'tab.search', icon: 'search', screen: SearchScreen },
+  { id: 'following', path: '/following', title: 'tab.tracking', icon: 'eye', screen: FollowingScreen },
+  { id: 'settings', path: '/settings', title: 'tab.settings', icon: 'options', screen: SettingsScreen },
 ];
 
 /**
@@ -64,6 +66,7 @@ function NavItem({ icon, label, active, onPress, rail, badge }: NavProps) {
 }
 
 function Sidebar({ active, onTab }: { active?: TabId; onTab: (t: (typeof TABS)[number]) => void }) {
+  const t = useT();
   const { rail, layout } = useWebLayout();
   const { unseen, follows } = useStore();
   const inset = useSafeAreaInsets(); // zero on the web; on an iPad the status bar, the home indicator and, turned, the notch side
@@ -72,13 +75,13 @@ function Sidebar({ active, onTab }: { active?: TabId; onTab: (t: (typeof TABS)[n
     <View style={[styles.side, { width: (rail ? RAIL : SIDEBAR) + inset.left, paddingTop: styles.side.paddingVertical + inset.top, paddingBottom: styles.side.paddingVertical + inset.bottom, paddingLeft: styles.side.paddingHorizontal + inset.left }]} role="navigation">
       <View style={[styles.brand, rail && { justifyContent: 'center' }]}>
         <Ionicons name="flame" size={22} color={colors.hate} />
-        {rail ? null : <Text style={styles.brandText}>Hate Watch</Text>}
+        {rail ? null : <Text style={styles.brandText}>{t('tab.title')}</Text>}
       </View>
-      {TABS.map((t) => <NavItem key={t.id} icon={t.icon} label={t.id === 'following' ? `${t.title} (${follows.size})` : t.title} active={active === t.id} onPress={() => onTab(t)} rail={rail} badge={badge(t.id)} />)}
-      <NavItem icon="podium" label="Leaderboard" onPress={() => router.push('/leaderboard')} rail={rail} />
+      {TABS.map((tb) => <NavItem key={tb.id} icon={tb.icon} label={tb.id === 'following' ? t('tab.trackingCount', { n: follows.size }) : t(tb.title)} active={active === tb.id} onPress={() => onTab(tb)} rail={rail} badge={badge(tb.id)} />)}
+      <NavItem icon="podium" label={t('web.leaderboard')} onPress={() => router.push('/leaderboard')} rail={rail} />
       <View style={{ flex: 1 }} />
-      {rail ? null : <Text style={styles.caption}>Layout</Text>}
-      {WEB_LAYOUTS.map((l) => <NavItem key={l.id} icon={l.icon} label={l.name} active={layout === l.id} onPress={() => setWebLayout(l.id)} rail={rail} />)}
+      {rail ? null : <Text style={styles.caption}>{t('tracking.layout')}</Text>}
+      {WEB_LAYOUTS.map((l) => <NavItem key={l.id} icon={l.icon} label={t(`weblayout.${l.id}` as Key)} active={layout === l.id} onPress={() => setWebLayout(l.id)} rail={rail} />)}
     </View>
   );
 }
@@ -89,6 +92,7 @@ function Sidebar({ active, onTab }: { active?: TabId; onTab: (t: (typeof TABS)[n
  * (the LIVE badge, Tracking's Layout menu) is whatever the screen sets with setOptions.
  */
 function ListPane({ tab }: { tab: TabId }) {
+  const t = useT();
   const { follows } = useStore();
   const [right, setRight] = useState<(() => ReactNode) | undefined>();
   const nav = useMemo(() => ({
@@ -98,13 +102,13 @@ function ListPane({ tab }: { tab: TabId }) {
     getId: () => undefined,
     setOptions: (o: { headerRight?: () => ReactNode }) => setRight(() => o.headerRight),
   }), []);
-  const t = TABS.find((x) => x.id === tab)!;
-  const Screen = t.screen;
+  const tb = TABS.find((x) => x.id === tab)!;
+  const Screen = tb.screen;
   const top = useSafeAreaInsets().top;
   return (
     <View style={styles.list}>
       <View style={[styles.listHead, { height: 56 + top, paddingTop: top }]}>
-        <Text style={styles.listTitle} numberOfLines={1}>{tab === 'feed' ? 'Hate Watch' : tab === 'following' ? `Tracking (${follows.size})` : t.title}</Text>
+        <Text style={styles.listTitle} numberOfLines={1}>{tab === 'feed' ? t('tab.title') : tab === 'following' ? t('tab.trackingCount', { n: follows.size }) : t(tb.title)}</Text>
         {right?.()}
       </View>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -115,11 +119,12 @@ function ListPane({ tab }: { tab: TabId }) {
 
 /** The right-hand pane before anything is opened: what the (tabs) route draws in panes. */
 export function DetailPlaceholder() {
+  const t = useT();
   return (
     <View style={styles.empty}>
       <Ionicons name="browsers-outline" size={40} color={colors.textFaint} />
-      <Text style={styles.emptyTitle}>Pick something</Text>
-      <Text style={styles.emptyBody}>A game, a player or an alert opens here.</Text>
+      <Text style={styles.emptyTitle}>{t('web.pick')}</Text>
+      <Text style={styles.emptyBody}>{t('web.pickBody')}</Text>
     </View>
   );
 }

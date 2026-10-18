@@ -2,6 +2,7 @@ import { Alert, Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Clipboard from 'expo-clipboard';
+import { tr } from './i18n';
 
 export const FEEDBACK_EMAIL = 'hatewatchfeedback@gmail.com';
 
@@ -19,10 +20,10 @@ export async function sendFeedback() {
     await Linking.openURL(url);
   } catch {
     // No mail app set up (common on iPads, or if the Mail app was deleted).
-    if (Platform.OS === 'web') { window.alert(`Send feedback to ${FEEDBACK_EMAIL}`); return; }
-    Alert.alert('Send feedback', `Email us at ${FEEDBACK_EMAIL}`, [
-      { text: 'Copy address', onPress: () => { Clipboard.setStringAsync(FEEDBACK_EMAIL).catch(() => {}); } },
-      { text: 'OK', style: 'cancel' },
+    if (Platform.OS === 'web') { window.alert(tr('feedback.sendTo', { email: FEEDBACK_EMAIL })); return; }
+    Alert.alert(tr('feedback.title'), tr('feedback.emailUs', { email: FEEDBACK_EMAIL }), [
+      { text: tr('feedback.copy'), onPress: () => { Clipboard.setStringAsync(FEEDBACK_EMAIL).catch(() => {}); } },
+      { text: tr('common.ok'), style: 'cancel' },
     ]);
   }
 }
