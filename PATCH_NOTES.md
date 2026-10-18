@@ -21,6 +21,7 @@ FEED AND SCORES
 - On the Scores tab, a favorite team's game card is edged gold in My games and All games alike, and a most hated team's is red in both. (Update)
 - The Scores tab's Up next now lists the next game of each favorite team too, and its rows are edged gold for a favorite and red for a most hated team, like the Feed and the game cards. (Update)
 - Hate Watch now has a web version: the same app in a browser, without push or Plus. Wide windows get a sidebar and layouts.
+- Hate Watch now runs natively on iPad, not as a scaled iPhone app: it turns to any orientation, and a wide window gets the web version's sidebar and its Card grid, One column and Panes layouts (the buttons at the bottom of the sidebar). In Split View or Slide Over it keeps the phone layout. Needs this build; it does not arrive as an update.
 - The app now speaks Spanish (Latin America): the tabs and all of Settings follow your phone's language, or pick English or Español in Settings under Language. Alert text still arrives in English for now; more screens and languages follow.
 
 LOCK SCREEN SCOREBOARD

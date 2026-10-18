@@ -10,7 +10,7 @@
     "backgroundColor": "#0B0B0D",
     "ios": {
       "bundleIdentifier": "com.hatewatch.app",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "associatedDomains": [
         "applinks:hate-watch-api.fly.dev"
       ],
@@ -23,7 +23,13 @@
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true,
-        "NSSupportsLiveActivitiesFrequentUpdates": true
+        "NSSupportsLiveActivitiesFrequentUpdates": true,
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
       }
     },
     "android": {

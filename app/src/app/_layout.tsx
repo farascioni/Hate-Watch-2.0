@@ -8,7 +8,7 @@ import { EasterEggOverlay } from '../components/EasterEggOverlay';
 import { needsGuide, settleGuide } from '../lib/guide';
 import { iapAvailable } from '../lib/plus';
 import { useAutoUpdate } from '../lib/updates';
-import { DETAIL_MAX, useWebLayout } from '../lib/webLayout';
+import { DETAIL_MAX, WIDE_HOST, useWebLayout } from '../lib/webLayout';
 import { WebShell } from '../components/WebShell';
 import { colors } from '../theme';
 
@@ -37,8 +37,8 @@ function FirstLaunchGuide() {
 // Required lazily: evaluating expo-iap without its native module (Expo Go, web) throws.
 const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require('../components/PlusStore').PlusStore : Fragment;
 
-// On the web the app is a phone layout in a centred column; in a wide window, a sidebar and the picked layout (WebShell).
-const Shell: ComponentType<{ children: ReactNode }> = Platform.OS === 'web' ? WebShell : Fragment;
+// On the web and on an iPad the app is a phone layout in a centred column; in a wide window, a sidebar and the picked layout (WebShell).
+const Shell: ComponentType<{ children: ReactNode }> = WIDE_HOST ? WebShell : Fragment;
 
 // The stack's screen wrapper paints the navigation theme's background (light grey) behind a screen that is narrower than the window (web, DETAIL_MAX).
 const appTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.bg } };

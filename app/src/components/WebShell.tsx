@@ -10,6 +10,7 @@ import ScoresScreen from '../app/(tabs)/scores';
 import SearchScreen from '../app/(tabs)/search';
 import FollowingScreen from '../app/(tabs)/following';
 import SettingsScreen from '../app/(tabs)/settings';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, space } from '../theme';
 
 type TabId = 'feed' | 'scores' | 'search' | 'following' | 'settings';
@@ -65,9 +66,10 @@ function NavItem({ icon, label, active, onPress, rail, badge }: NavProps) {
 function Sidebar({ active, onTab }: { active?: TabId; onTab: (t: (typeof TABS)[number]) => void }) {
   const { rail, layout } = useWebLayout();
   const { unseen, follows } = useStore();
+  const inset = useSafeAreaInsets(); // zero on the web; on an iPad the status bar, the home indicator and, turned, the notch side
   const badge = (id: TabId) => (id === 'feed' && unseen > 0 ? (unseen > 99 ? '99+' : String(unseen)) : undefined);
   return (
-    <View style={[styles.side, { width: rail ? RAIL : SIDEBAR }]} role="navigation">
+    <View style={[styles.side, { width: (rail ? RAIL : SIDEBAR) + inset.left, paddingTop: styles.side.paddingVertical + inset.top, paddingBottom: styles.side.paddingVertical + inset.bottom, paddingLeft: styles.side.paddingHorizontal + inset.left }]} role="navigation">
       <View style={[styles.brand, rail && { justifyContent: 'center' }]}>
         <Ionicons name="flame" size={22} color={colors.hate} />
         {rail ? null : <Text style={styles.brandText}>Hate Watch</Text>}
@@ -98,9 +100,10 @@ function ListPane({ tab }: { tab: TabId }) {
   }), []);
   const t = TABS.find((x) => x.id === tab)!;
   const Screen = t.screen;
+  const top = useSafeAreaInsets().top;
   return (
     <View style={styles.list}>
-      <View style={styles.listHead}>
+      <View style={[styles.listHead, { height: 56 + top, paddingTop: top }]}>
         <Text style={styles.listTitle} numberOfLines={1}>{tab === 'feed' ? 'Hate Watch' : tab === 'following' ? `Tracking (${follows.size})` : t.title}</Text>
         {right?.()}
       </View>
