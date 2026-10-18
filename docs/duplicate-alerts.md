@@ -86,7 +86,7 @@ from the tests):
 | A team's error (MLB, `mlb.fielder.error` on the fielding team) | `${gameId}:${playId}:mlb.fielder.error:team-${teamId}`, or on a runner's play with no batter the text-keyed `…:mlb.fielder.error:…:team-${teamId}`; same moment as the fielder's own alert | `G1:e1:mlb.fielder.error:team-5`, "Cleveland Guardians committed an error" |
 | Soccer's 3+ goal loss | `${gameId}:final:${league}.team.heavy_loss:${loserId}` | |
 | A player's final (their team lost, a bad night) | `${gameId}:final:${type}:${athleteId}` | `401815054:final:player.team_lost:39832`, "Shohei Ohtani and the Dodgers lost to the Giants" |
-| A half-inning (MLB) | `${gameId}:${halfKey}:${type}:${teamId}` | `401907994:Bottom1:mlb.team.down_in_order:5`, "Guardians went down in order"; NOBLETIGER is `…:mlb.team.nobletiger:…` |
+| A half-inning (MLB) | `${gameId}:${halfKey}:${type}:${teamId}`; `mlb.team.opponent_risp` also `${gameId}:${halfKey}:mlb.team.opponent_risp:third:${teamId}` (a runner reaching third on a runner play, once a half: `thirdSeen`) | `401907994:Bottom1:mlb.team.down_in_order:5`, "Guardians went down in order"; NOBLETIGER is `…:mlb.team.nobletiger:…` |
 | Scoreless at the half (NBA, WNBA) | `${gameId}:half:${league}.scoreless_half:${athleteId}` | (a player's alert, by athlete) |
 | Once a game (MLB) | `${gameId}:mlb.team.position_player_pitching:${teamId}` | |
 | A finished drive (football, `nflDriveEvents`) | `${gameId}:drive:${driveId}:${type}` | `401858481:drive:40185848117:cfb.team.three_and_out`, "Indiana went three-and-out" |

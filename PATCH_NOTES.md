@@ -7,7 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
-(nothing yet)
+- Server: the MLB "Opponent has runners in scoring position" alert now sends a second alert in the same half-inning when a runner steals third (or reaches it on a wild pitch or passed ball) after the first one went out. TB at CLE, October 18: Simpson doubled, then stole third, and the steal got nothing because the half-inning's one alert was used.
 
 ## Build 20 (October 18, 2026)
 

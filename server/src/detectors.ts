@@ -60,7 +60,7 @@ export interface GameCtx {
    * (`loadedTold`: it went out this half), and "goes down in order" (`pas`: each plate appearance's result;
    * `reached`: anyone got on or scored). A half's end is judged from its plays instead (halfFromPlays).
    */
-  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; loadedTold?: boolean; pas: { id: string; text: string }[]; reached: boolean };
+  half?: { key: string; loadedNoOuts: boolean; scoredSince: boolean; risp: boolean; thirdSeen?: boolean; loadedTold?: boolean; pas: { id: string; text: string }[]; reached: boolean };
   /** NFL: each team's quarterback in the game right now (teamId -> athleteId), from the latest pass/sack. */
   qbs?: Record<string, string>;
   /** MLB: the latest pitch's call went to an ABS challenge (so the at-bat result's "challenged" text is that one). */
@@ -714,7 +714,9 @@ function trackHalfInning(g: GameCtx, p: NPlay) {
     const on = (base: string) => p.participants.some((x) => x.role === base);
     if (on('onFirst') && on('onSecond') && on('onThird')) h.loadedNoOuts = true;
   }
-  if (inScoringPosition(basesAfter(p))) h.risp = true;
+  const after = basesAfter(p);
+  if (inScoringPosition(after)) h.risp = true;
+  if (after?.includes('third')) h.thirdSeen = true;
   // An at-bat result lists the runners after it: anyone on (a hit, a walk, an error, extra innings' runner
   // on second) or a run (a solo homer leaves the bases empty) means it wasn't 1-2-3.
   if (p.typeSlug === 'play-result' && p.participants.some((x) => x.role === 'batter') && !h.pas.some((x) => x.id === p.id)) {
@@ -745,12 +747,17 @@ const inScoringPosition = (bases: string[] | null) => !!bases && (bases.includes
  * Team alert for the FIELDING team: the opponent just got a runner to second or third. Once per
  * half-inning, the first time it happens; a threat already on base when we attached never fires late
  * (observePlay marks it for history plays too). If a run scores on the same play, the opponent-scored
- * alert says more, so this one is `unless` it.
+ * alert says more, so this one is `unless` it. One more per half-inning, `:third`, when a runner moves
+ * up to third between pitches (a steal, a wild pitch, a passed ball) after the first alert went out and
+ * nobody has been on third yet (Simpson stole third after his double, TB at CLE, October 18 2026).
  */
 function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
   const key = halfKey(p);
   const bases = basesAfter(p);
-  if (!key || !inScoringPosition(bases) || (g.half?.key === key && g.half.risp)) return [];
+  if (!key || !inScoringPosition(bases)) return [];
+  const h = g.half?.key === key ? g.half : undefined;
+  const nextBase = !!h?.risp && !p.participants.some((x) => x.role === 'batter') && bases!.includes('third') && !h.thirdSeen;
+  if (h?.risp && !nextBase) return [];
   const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
   const where = bases!.length === 3 ? 'the bases loaded' : bases!.length === 1 ? `a runner on ${bases![0]}` : `runners on ${bases![0]} and ${bases![1]}`;
   // An at-bat result or a steal explains how they got there; a pitch's text ("Ball 2") doesn't.
@@ -758,7 +765,7 @@ function opponentRisp(g: GameCtx, p: NPlay): Detected[] {
   // The play that loaded the bases has its own alert ("Opponent loads the bases"): this one only for those with that off.
   const loading = p.typeSlug === 'play-result' && bases!.length === 3;
   return [{
-    id: `${g.gameId}:${key}:mlb.team.opponent_risp:${fieldingId}`,
+    id: `${g.gameId}:${key}:mlb.team.opponent_risp:${nextBase ? 'third:' : ''}${fieldingId}`,
     type: 'mlb.team.opponent_risp',
     ...(loading ? { unless: 'mlb.team.bases_loaded' } : p.scoring ? { unless: 'team.opponent_scored' } : {}),
     targetKey: teamKey('mlb', fieldingId),

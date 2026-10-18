@@ -43,7 +43,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 - [Off-field trouble / Fined or suspended (every league, players and teams)](#off-field-trouble--fined-or-suspended-every-league-players-and-teams): ESPN's news, what counts, who it's about, one alert per story.
 - [MLB pitchers: blown save, no quality start, loss](#mlb-pitchers-blown-save-no-quality-start-loss): from the box score: blown saves, no quality start, chased early, the loss as a line on the team's loss.
 - [MLB loses a challenge](#mlb-loses-a-challenge): ABS challenges (held until the review settles), replay challenges, crew chief reviews.
-- [MLB opponent in scoring position](#mlb-opponent-in-scoring-position): a runner on second or third against the tracked team, once a half-inning.
+- [MLB opponent in scoring position](#mlb-opponent-in-scoring-position): a runner on second or third against the tracked team, once a half-inning, and once more when a runner steals or runs up to third.
 - [MLB opponent loads the bases](#mlb-opponent-loads-the-bases): the bases loaded against the tracked team, pushed, with the pitcher's walk as a line.
 - [College football](#college-football) (no table row): the NFL's alerts as a team's own `cfb.*` types, college flags, the AP poll, losing to an unranked team.
 - [UFC](#ufc) (no table row): fight starts, knockdowns, losses saying how and when, title fights, losing as the favorite, losing streaks.
@@ -1336,11 +1336,12 @@ One type (`mlb.challenge_lost`, "Loses a challenge") for teams and players (`als
 - **Who gets it:** the **fielding** team, the moment the other team gets a runner to second or third against it (`opponentRisp()` in `detectors.ts`).
 - **The bases:** from the snapshot on every pitch and at-bat result (they list the batter and every runner), plus runner plays between pitches that name the base taken: "Acuña Jr. stole second.", "Machado to second on wild pitch by Henderson." (passed balls, balks and errors too). Caught-stealing and pickoff text is ignored ("caught stealing second, catcher to second" isn't a runner on second); anything unreadable is caught up by the next pitch (`basesAfter`).
 - **Once per half-inning,** the first time (`g.half.risp`). A threat already on base when tracking started never fires late: `observePlay` marks it for history plays too.
+- **One more, up to third:** after that first alert, a runner play with no batter that puts a runner on third (a steal of third, a wild pitch, a passed ball, "to third on") sends a second alert, once per half-inning, if nobody has been on third yet this half (`g.half.thirdSeen`, set by any play that has a runner on third, history too). TB at CLE, October 18 2026: Simpson doubled and Cleveland got the alert, then "Simpson stole third." got nothing, because the half's one alert was used. A runner who reaches third on an at-bat (a single, a triple, an error) does not send it; the title is "<Team> have a runner on third against the <Team>" and the body the steal's text.
 - **Title:** "Rays have a runner on second against the Yankees", "Rays have runners on first and second against the Yankees" (`test/bundling.test.ts`), "Braves have runners on first and second against the Dodgers", "<Team> have the bases loaded against the <Team>".
 - **Body:** the half, and when the play says how they got there (an at-bat result or a runner play; a pitch's "Ball 2" doesn't), its text: "Top 4th: Caminero doubled to left. — TB 1, NYY 1".
 - **Not twice with a better alert:** if a run scores on the same play it's `unless: 'team.opponent_scored'` (the scored-on alert says more); on the at-bat result that loads the bases, `unless: 'mlb.team.bases_loaded'`.
 - **Off by default** (several a game: about 4 per tracked team per game in real games). Installs from before October 2026 kept it on (`WERE_ON`).
-- **Id:** `${gameId}:${halfKey}:mlb.team.opponent_risp:${fieldingTeamId}`.
+- **Id:** `${gameId}:${halfKey}:mlb.team.opponent_risp:${fieldingTeamId}`; the second, up-to-third alert `${gameId}:${halfKey}:mlb.team.opponent_risp:third:${fieldingTeamId}`. ESPN's twin copy of a steal (a play-result with the same text) finds `thirdSeen` set and sends nothing.
 
 **Tests:** `test/bundling.test.ts`, `test/logic.test.ts`.
 

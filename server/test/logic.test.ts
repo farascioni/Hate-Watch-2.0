@@ -325,6 +325,22 @@ test('MLB: opponent gets a runner in scoring position: the fielding team hears i
   observePlay(late, ab('Top 4', 'Murphy doubled.', ['onSecond']));
   assert.deepEqual(live(late, pitch('Top 4', ['onSecond'])), []);
   assert.deepEqual(live(late, ab('Top 4', 'Baldwin walked.', ['onFirst', 'onSecond'])), []);
+
+  // A runner moving up to third between pitches is news again, once per half-inning (Simpson, TB at CLE, October 18 2026).
+  const up = newGame();
+  const [dbl] = live(up, ab('Top 3', 'Simpson doubled to right.', ['onSecond']));
+  assert.match(dbl.id, /:mlb\.team\.opponent_risp:15$/);
+  const [toThird] = live(up, runnerPlay('Top 3', 'stolen-base', 'Simpson stole third.', ['onThird']));
+  assert.match(toThird.id, /:mlb\.team\.opponent_risp:third:15$/, 'its own id, so the database keeps both');
+  assert.match(toThird.title, /have a runner on third against the /);
+  assert.match(toThird.body, /^Top 3rd: Simpson stole third\. — /);
+  assert.deepEqual(live(up, runnerPlay('Top 3', 'play-result', 'Simpson stole third.', ['onThird'])), [], "ESPN's duplicate of the steal");
+  assert.deepEqual(live(up, runnerPlay('Top 3', 'passed-ball', 'Perez to third on passed ball by Bo.', ['onThird'])), [], 'once per half-inning');
+  // Third already reached by an at-bat (a single that moved him up): a later runner play adds nothing.
+  const tri = newGame();
+  live(tri, ab('Bottom 4', 'Cruz singled.', ['onSecond']));
+  live(tri, ab('Bottom 4', 'Cruz to third on a throwing error.', ['onThird']));
+  assert.deepEqual(live(tri, runnerPlay('Bottom 4', 'wild-pitch', 'Cruz to third on wild pitch by Smith.', ['onThird'])), []);
 });
 
 test('scored on AND fell behind on the same play: one alert per user, not two', () => {
