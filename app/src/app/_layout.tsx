@@ -1,6 +1,6 @@
 import { Fragment, useEffect, type ComponentType, type ReactNode } from 'react';
 import { Platform, type ViewStyle } from 'react-native';
-import { Stack, router, useRootNavigationState } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, router, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { StoreProvider } from '../lib/store';
@@ -40,6 +40,9 @@ const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require
 // On the web the app is a phone layout in a centred column; in a wide window, a sidebar and the picked layout (WebShell).
 const Shell: ComponentType<{ children: ReactNode }> = Platform.OS === 'web' ? WebShell : Fragment;
 
+// The stack's screen wrapper paints the navigation theme's background (light grey) behind a screen that is narrower than the window (web, DETAIL_MAX).
+const appTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.bg } };
+
 export default function RootLayout() {
   useAutoUpdate();
   const { wide } = useWebLayout();
@@ -52,6 +55,7 @@ export default function RootLayout() {
       {Platform.OS !== 'web' && <NotificationRouter />}
       <FirstLaunchGuide />
       <Shell>
+      <ThemeProvider value={appTheme}>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
@@ -71,6 +75,7 @@ export default function RootLayout() {
         <Stack.Screen name="a/[code]" options={{ title: 'Shared alert', headerBackTitle: 'Back' }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
+      </ThemeProvider>
       </Shell>
       <EasterEggOverlay />
     </StoreProvider>
