@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 FEED AND SCORES
+- The red X on the Tracking tab is now shown only to Hate Watch Plus subscribers; without Plus it is gone (it used to offer Plus when tapped), along with the line about it at the top of the tab. (Update)
 - Tap LIVE (the badge at the top of the Feed and Scores tabs) to check for an app update: if there is one it downloads and the app restarts into it, otherwise it says you are up to date. Before, a new update only arrived after you force-quit and reopened the app, sometimes twice. (Update)
 - The Tracking tab's classic cards keep all four icons (X, bell, gear, minus) on one line; the minus used to drop to a second line. (Update)
 - A favorite team's game now shows under My games on the Scores tab, not only in Up next, and its live score updates there. Before, only the teams you track did.

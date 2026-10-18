@@ -17,17 +17,10 @@ import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFi
 import { HATE_RED, colors, radius, space } from '../../theme';
 import type { Player, Target, Team } from '../../lib/types';
 
-/** Hate Watch Plus: marks one of your trackers as a most hated (a red border on their alerts in the Feed). */
-function MostHatedStar({ target, allowed, compact }: { target: Target; allowed: boolean; compact?: boolean }) {
+/** Hate Watch Plus: marks one of your trackers as a most hated (a red border on their alerts in the Feed). Only drawn for subscribers. */
+function MostHatedStar({ target, compact }: { target: Target; compact?: boolean }) {
   const on = useIsMostHated(target.key);
   const press = () => {
-    if (!allowed && !on) {
-      Alert.alert('Most hated is a Plus perk', 'Hate Watch Plus subscribers can mark their most hated players and teams with a red X, and their alerts get a red border in the Feed.', [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'See Plus', onPress: () => router.navigate('/settings') },
-      ]);
-      return;
-    }
     Haptics.selectionAsync().catch(() => {});
     toggleMostHated(target.key);
   };
@@ -83,7 +76,7 @@ export default function FollowingScreen() {
     const full = leagueInfo(t.league)?.name ?? '';
     return d && d !== full && !(leagueUi(t.league).fullName ?? '').includes(d) ? d : undefined;
   };
-  // A saved most-hated list keeps its stars working when the store can't confirm the subscription (offline).
+  // The ❌ shows only for subscribers; a saved most-hated list keeps it working when the store can't confirm the subscription (offline).
   const { active: plus } = usePlus();
   const starred = useMostHatedCount();
   const starAllowed = plus || starred > 0;
@@ -124,7 +117,7 @@ export default function FollowingScreen() {
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
       renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.count}</SectionHeader>}
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
-      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The − (it asks first) stops tracking them entirely. With Hate Watch Plus, ❌ marks your most hated: their alerts get a red border in the Feed.</Text>}
+      ListHeaderComponent={<Text style={styles.hint}>🔕 turns off push notifications for one player or team; their alerts still show up in your feed. ⚙️ picks which alerts you get for just that player or team. The − (it asks first) stops tracking them entirely.{starAllowed ? ' ❌ marks your most hated: their alerts get a red border in the Feed.' : ''}</Text>}
       renderItem={({ item: row }) => (
         <View style={per > 1 ? styles.tiles : undefined}>
         {row.map((item) => (
@@ -135,7 +128,7 @@ export default function FollowingScreen() {
           info={{ division: divisionOf(item), record: formOf(item)?.record, streak: formOf(item)?.streak, standing: formOf(item)?.standing, game: gameInfo(item, games, upNext) }}
           actions={(compact) => (
             <View style={styles.actions}>
-              <MostHatedStar target={item} allowed={starAllowed} compact={compact} />
+              {starAllowed && <MostHatedStar target={item} compact={compact} />}
               <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={[styles.icon, compact && styles.iconSm]} accessibilityLabel={muted.has(item.key) ? `Turn push notifications back on for ${item.name}` : `Turn off push notifications for ${item.name} (alerts stay in your feed)`}>
                 <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={compact ? 17 : 20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
               </Pressable>
