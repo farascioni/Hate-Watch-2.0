@@ -1,11 +1,13 @@
 # Lock screen scoreboard
 
+<!-- README section: the README has its summary and links here; the vault puts this text back in its place -->
 
 ## Index
 
 **Summary:** an iOS Live Activity ("the board") on the lock screen lists the live games of the teams a device tracks, favorites first, then most hated, then the rest, four lines and a "+N more" (Compact), or, chosen in Settings, three two-line games with the bases and a win chance bar (Detailed), four cells two across (Grid) or the top game big with two lines under it (Hero). The server builds each device's board and pushes every change straight to Apple; the app starts the activity and hands the server its push token and its most hated list. Off by default (Settings), iOS only, and inert on the server until the APNs key and the `liveActivity` switch are set.
 
 **Sections:**
+- **Lock screen scoreboard**: the summary the README carries.
 - **What it shows**: who is on the board, the order, what a row says, the four layouts.
 - **How it works**: the app side, the server side, the routes and the table.
 - **Privacy**: what leaves the device that did not before.
@@ -13,6 +15,10 @@
 - **Limits**: what v1 does not do.
 
 The README's "Lock screen scoreboard" has the summary; this is the full detail. Read this index first, then only the part you need.
+
+## Lock screen scoreboard
+
+**In short:** with the switch on in Settings, an iOS Live Activity on the lock screen lists the live games of the teams the device tracks: a favorite's games first, then most hated, then the rest, four lines and "+N more" (four layouts to pick in Settings: Compact; Detailed, three two-line games; Grid, four cells two across; Hero, the top game big and two lines). The server builds each device's board and pushes it to Apple itself (`server/src/live-activity.ts`, `apns.ts`; inert until the APNs key and the `liveActivity` switch are set); the app starts it and sends its push token and its most hated list, so that list now leaves the device while the board is on. Needs a native build once (the widget extension); after it, the board's wording, colors and rows change with a server deploy, and the widget's layout code (`ScoreboardActivity.tsx`) ships over the air with an EAS Update, using only the components and modifiers that build already has.
 
 ## What it shows
 
