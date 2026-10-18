@@ -7,6 +7,7 @@ import { StoreProvider } from '../lib/store';
 import { EasterEggOverlay } from '../components/EasterEggOverlay';
 import { needsGuide, settleGuide } from '../lib/guide';
 import { iapAvailable } from '../lib/plus';
+import { useAutoUpdate } from '../lib/updates';
 import { colors } from '../theme';
 
 /** A screen opened straight from a link (a shared alert) still has the tabs underneath to go back to. */
@@ -35,6 +36,7 @@ function FirstLaunchGuide() {
 const PlusStore: ComponentType<{ children: ReactNode }> = iapAvailable ? require('../components/PlusStore').PlusStore : Fragment;
 
 export default function RootLayout() {
+  useAutoUpdate();
   return (
     <PlusStore>
     <StoreProvider>

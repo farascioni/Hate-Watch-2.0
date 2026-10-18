@@ -6,6 +6,7 @@ import { Avatar, readableOn } from './Avatar';
 import { useStore } from '../lib/store';
 import { GOLD, colors, radius, space } from '../theme';
 import { usePlus } from '../lib/plus';
+import { syncUpdate } from '../lib/updates';
 import type { Target } from '../lib/types';
 import { leagueColor } from '../lib/leagueUi';
 
@@ -223,14 +224,12 @@ export function ago(ts: number, now: number) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** Checks for an over-the-air update, downloads it and restarts into it; says so when there is none or the build can't take one. */
-async function syncUpdate() {
+/** The LIVE badge's tap: syncs now and says so when there is nothing to take or the build can't take one. */
+async function tapSync() {
   try {
-    const Updates = require('expo-updates');
-    if (!Updates.isEnabled) return Alert.alert('No updates here', 'This build (development or web) does not take over-the-air updates.');
-    if (!(await Updates.checkForUpdateAsync()).isAvailable) return Alert.alert('Up to date', 'You have the latest version.');
-    await Updates.fetchUpdateAsync();
-    await Updates.reloadAsync();
+    const r = await syncUpdate();
+    if (r === 'off') Alert.alert('No updates here', 'This build (development or web) does not take over-the-air updates.');
+    else if (r === 'current') Alert.alert('Up to date', 'You have the latest version.');
   } catch {
     Alert.alert("Couldn't check for updates", 'Try again in a moment.');
   }
@@ -244,7 +243,7 @@ export function LiveBadge() {
   const press = async () => {
     if (busy) return;
     setBusy(true);
-    await syncUpdate();
+    await tapSync();
     setBusy(false);
   };
   return (
