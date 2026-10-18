@@ -39,6 +39,3 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
-# Wrangler dev state (the Cloudflare web preview)
-.wrangler/
