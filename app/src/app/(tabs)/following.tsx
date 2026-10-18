@@ -6,9 +6,9 @@ import * as Haptics from 'expo-haptics';
 import { useStore } from '../../lib/store';
 import { api } from '../../lib/api';
 import { leagueUi } from '../../lib/leagueUi';
-import { toggleMostHated, useIsMostHated, useMostHatedCount } from '../../lib/mostHated';
+import { toggleMostHated, useIsMostHated, useMostHatedCount, useMostHatedSet } from '../../lib/mostHated';
 import { usePlus } from '../../lib/plus';
-import { Empty, PrimaryButton, SectionHeader } from '../../components/ui';
+import { Chip, Empty, PrimaryButton, SectionHeader } from '../../components/ui';
 import { TrackingCard } from '../../components/TrackingCard';
 import { LayoutSheet } from '../../components/LayoutSheet';
 import { useTrackingLayout } from '../../lib/trackingLayout';
@@ -82,18 +82,23 @@ export default function FollowingScreen() {
   const starAllowed = plus || starred > 0;
   const muted = new Set(prefs?.muted ?? []);
   const customized = new Set([...Object.keys(prefs?.targetTypes ?? {}), ...Object.keys(prefs?.targetPushTypes ?? {})]);
-  const { filter, setFilter, active, reset } = useFilter();
+  const { filter, setFilter, active: filtered, reset: resetFilter } = useFilter();
+  const hated = useMostHatedSet();
+  const [hatedOnly, setHatedOnly] = useState(false);
+  const showHated = hatedOnly && starAllowed; // the filter goes with the ❌
+  const active = filtered || showHated;
+  const reset = () => { resetFilter(); setHatedOnly(false); };
 
   // Rows of cards: one each, two in the tiles layout (the section's count is of the cards, not the rows).
   const per = layout === 'tiles' ? 2 : 1;
   const sections = useMemo((): { title: string; count: number; data: Target[][] }[] => {
-    const all = [...follows.values()].filter((t) => matchesFilter(filter, t)).sort((a, b) => a.name.localeCompare(b.name));
+    const all = [...follows.values()].filter((t) => matchesFilter(filter, t) && (!showHated || hated.has(t.key))).sort((a, b) => a.name.localeCompare(b.name));
     const groups = byWeightClass(filter) ? groupByWeightClass(all) : [
       { title: 'Teams', data: all.filter((t) => t.kind === 'team') },
       { title: playersTitle(filter.league), data: all.filter((t) => t.kind === 'player') },
     ].filter((s) => s.data.length);
     return groups.map((g) => ({ title: g.title, count: g.data.length, data: Array.from({ length: Math.ceil(g.data.length / per) }, (_, i) => g.data.slice(i * per, i * per + per)) }));
-  }, [follows, filter, per]);
+  }, [follows, filter, per, showHated, hated]);
 
   const confirmUnfollow = (t: Target) => Alert.alert(`Unfollow ${t.name}?`, 'You stop getting their alerts.', [
     { text: 'Cancel', style: 'cancel' },
@@ -111,7 +116,10 @@ export default function FollowingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-    <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View>
+    <View style={styles.filters}>
+      <FilterBar filter={filter} onChange={setFilter} />
+      {starAllowed ? <View style={styles.hatedRow}><Chip label="❌ Most hated" active={showHated} onPress={() => setHatedOnly(!showHated)} /></View> : null}
+    </View>
     <SectionList
       sections={sections}
       keyExtractor={(row) => row.map((t) => t.key).join('|')}
@@ -158,7 +166,7 @@ export default function FollowingScreen() {
         {per > 1 && row.length < per ? <View style={{ flex: 1 }} /> : null}
         </View>
       )}
-      ListEmptyComponent={active ? <Empty emoji="🔎" title={`You're not tracking any ${describeFilter(filter)}`} body="Change the filter, or find some on the Search tab." action={<PrimaryButton label="Show everything" onPress={reset} />} /> : null}
+      ListEmptyComponent={active ? <Empty emoji="🔎" title={showHated ? `None of your ${filtered ? describeFilter(filter) : 'trackers'} are starred as most hated` : `You're not tracking any ${describeFilter(filter)}`} body={showHated ? 'Tap the ❌ on a player or team to star them.' : 'Change the filter, or find some on the Search tab.'} action={<PrimaryButton label="Show everything" onPress={reset} />} /> : null}
       contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />
     <LayoutSheet open={menu} onClose={() => setMenu(false)} />
@@ -168,6 +176,7 @@ export default function FollowingScreen() {
 
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  hatedRow: { flexDirection: 'row', paddingHorizontal: space(3), paddingBottom: space(2) },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(1.5) },
   tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },

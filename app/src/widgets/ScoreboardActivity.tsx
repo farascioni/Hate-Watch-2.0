@@ -29,6 +29,8 @@ const ScoreboardActivity = (props: Props) => {
   'widget';
   const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '❌ ' : '');
   const score = (n: number | null) => (n === null ? '-' : String(n));
+  // The island's pills shrink when another app's activity shares it ("17-10" was cut to "17-..."): away over home, codes left and scores right.
+  const mini = (g?: Game, codes = false) => (g ? <VStack spacing={0}><Text modifiers={[font({ size: 11, weight: 'bold' })]}>{codes ? g.a : score(g.as)}</Text><Text modifiers={[font({ size: 11, weight: 'bold' })]}>{codes ? g.h : score(g.hs)}</Text></VStack> : <Text>{''}</Text>);
   const base = (g: Game) => g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451');
   const awayColor = (g: Game) => g.ac ?? base(g);
   const homeColor = (g: Game) => g.hc ?? base(g);
@@ -126,9 +128,9 @@ const ScoreboardActivity = (props: Props) => {
           {props.games.slice(0, 2).map(row)}
         </VStack>
       ),
-      compactLeading: <Text>{lead ? lead.a : ''}</Text>,
-      compactTrailing: <Text>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>,
-      minimal: <Text modifiers={[font({ size: 12, weight: 'bold' })]}>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>, // both scores: the round pill shared with another app's activity showed only the away team's
+      compactLeading: mini(lead, true),
+      compactTrailing: mini(lead),
+      minimal: mini(lead),
       // Long-pressed Dynamic Island: the top game's scores either side, its clock and bases in the middle, its sub line and
       // win chance under them, then the other games as one-line rows.
       expandedLeading: <Text modifiers={[font({ size: 17, weight: 'semibold' })]}>{lead ? `${lead.a} ${score(lead.as)}` : ''}</Text>,
@@ -169,9 +171,9 @@ const ScoreboardActivity = (props: Props) => {
         {props.games.slice(0, 2).map(row)}
       </VStack>
     ),
-    compactLeading: <Text>{lead ? lead.a : ''}</Text>,
-    compactTrailing: <Text>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>,
-    minimal: <Text modifiers={[font({ size: 12, weight: 'bold' })]}>{lead ? `${score(lead.as)}-${score(lead.hs)}` : ''}</Text>, // both scores: the round pill shared with another app's activity showed only the away team's
+    compactLeading: mini(lead, true),
+    compactTrailing: mini(lead),
+    minimal: mini(lead),
     // Long-pressed Dynamic Island: the top game across the middle, the rest below.
     expandedCenter: lead ? row(lead) : <Text>{''}</Text>,
     expandedBottom: (

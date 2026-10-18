@@ -21,9 +21,10 @@ FEED AND SCORES
 - The Scores tab's Up next now lists the next game of each favorite team too, and its rows are edged gold for a favorite and red for a most hated team, like the Feed and the game cards. (Update)
 
 LOCK SCREEN SCOREBOARD
-- A lock on each game card (Scores tab) adds the game to the lock screen scoreboard, or takes it off. It works for any game that has not ended. (Update; needs the next server update too)
+- An eye on each game card (Scores tab) adds the game to the lock screen scoreboard, or takes it off. (Update)
 - The lock screen scoreboard is now on by default and turns on by itself when a game of a team you track or favorite is live or starts within the hour. It starts while the app is open (checked once a minute); with the app closed it cannot start by itself yet, but a board that is up keeps updating. Games about to start show "Starts soon". Settings, Delivery, turns it off. While it is on, the app sends your most hated list and the games you picked to Hate Watch.
-- The round Dynamic Island pill (when another app's activity shares the island) showed only the away team's score; it now shows both. (Update)
+- Tracking tab: a "Most hated" chip shows only your starred ones (Plus). (Update)
+- Dynamic Island pills no longer cut the score short when another app shares the island: stacked, away over home. (Update)
 - Each team now has its own color on the lock screen scoreboard: a favorite team is gold with a heart before its code, a most hated team is red with a red X, and every other team is white. If you favorite one team and hate the other in the same game, each shows its own color. This applies to all four layouts (Compact, Detailed, Grid and Hero). (Update)
 
 ## Build 19 (October 17, 2026)

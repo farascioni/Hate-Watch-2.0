@@ -82,7 +82,7 @@ function BoardButton({ game }: { game: GameCard }) {
   return (
     <Pressable onPress={() => { toggleBoardGame(game.key).catch(() => {}); }} hitSlop={10} accessibilityRole="button" accessibilityState={{ selected: onBoard }}
       accessibilityLabel={onBoard ? 'Remove this game from your lock screen scoreboard' : 'Add this game to your lock screen scoreboard'}>
-      <Ionicons name={onBoard ? 'lock-closed' : 'lock-closed-outline'} size={16} color={onBoard ? colors.live : colors.textDim} />
+      <Ionicons name={onBoard ? 'eye' : 'eye-outline'} size={16} color={onBoard ? colors.live : colors.textDim} />
     </Pressable>
   );
 }
