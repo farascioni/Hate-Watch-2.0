@@ -2,7 +2,7 @@
 
 ## Index
 
-**Summary:** the path from nothing to Hate Watch on Google Play, written for someone who builds on Windows and has no Android phone. It costs $25 once and takes about three weeks, almost all of it Google's 14-day closed test with at least 12 testers. A borrowed Android phone is needed for about five minutes, once. The app itself needs no Android rewrite: EAS builds it in the cloud, and `app/app.json` and `app/eas.json` already have what Android needs, except the Firebase file for push and the Play Console upload settings (see "Where the repo stands today"). The steps run in order. Steps 2 to 7 can be done while Google reviews your identity, and the phone check (step 9) can be done any time before applying for production.
+**Summary:** the path from nothing to Hate Watch on Google Play, written for someone who builds on Windows and has no Android phone. It costs $25 once and takes about three weeks, almost all of it Google's 14-day closed test with at least 12 testers. A borrowed Android phone is needed for about five minutes, once. The app itself needs no Android rewrite: EAS builds it in the cloud, and `app/app.json` and `app/eas.json` already have what Android needs, except the Play Console upload settings and the FCM key upload (see "Where the repo stands today"). The steps run in order. Steps 2 to 7 can be done while Google reviews your identity, and the phone check (step 9) can be done any time before applying for production.
 
 **Sections:**
 - **Before you start: what this takes**: the $25 fee, the borrowed phone, the 12 testers for 14 days, the three weeks, and how an organization account skips the phone and the testers.
@@ -43,13 +43,14 @@ What is already in place (checked against the files on October 11, 2026):
 - **The icons:** an adaptive icon with foreground, background and monochrome layers (`app/assets/android-icon-*.png`) on `#0B0B0D`, generated with the rest by `app/scripts/build-icons.mjs` (`npm run icons` in `app/`). Android's notification icon (`app/assets/notification-icon.png`, tinted `#E5232B`) is set in the `expo-notifications` plugin.
 - **The notification channel:** alerts go to the channel `hate-events` (`defaultChannel` in the `expo-notifications` plugin).
 - **Predictive back is off** (`predictiveBackGestureEnabled: false`).
+- **Firebase for push:** `app/google-services.json` (project `hate-watch-7a930`, package `com.hatewatch.app`, public identifiers only) is committed, and `android.googleServicesFile` in `app/app.json` points at it. It does not change the iOS fingerprint (checked October 18, 2026: same hash before and after), so iOS over-the-air updates still reach every build. The FCM service-account key is not in the repo: it is uploaded to EAS (step 2, item 5).
 - **The build profiles** (`app/eas.json`): `preview` builds an installable `.apk` (`android.buildType: "apk"`, added in b249331) against the production API, and `production` builds the `.aab` Google Play takes. `autoIncrement` gives each production build a new version code, and EAS keeps the count (`appVersionSource: "remote"`). Both profiles have an update channel (`preview`, `production`) for over-the-air updates.
 - **Hate Watch Plus:** `app/src/lib/plus.ts` holds the subscription's product id (`com.hatewatch.app.plus.monthly`). `expo-iap` is in the plugins. The comment in `plus.ts` says to create the same id in Play Console as a subscription with one monthly base plan.
 - **The privacy policy and the data deletion** that Play Console asks about are on the server: `https://hate-watch-api.fly.dev/privacy`, and Settings → "Delete all my data" (`DELETE /me`).
 
 What is not there yet:
 
-- **No `app/google-services.json`**, and no `googleServicesFile` in `app.json`. Without them, Android builds get no push notifications (step 2).
+- **The FCM key is only in EAS if you uploaded it** (step 2, item 5). Without it, Android builds get no push notifications.
 - **No Android submit settings** in `eas.json`. `submit.production` has only `ios.ascAppId`, so `--auto-submit` can't send an Android build to Play Console until step 6 adds them.
 - **No Android App Links:** the server serves `/.well-known/apple-app-site-association` for iOS share links, but no `assetlinks.json` (see "After launch").
 
@@ -78,7 +79,7 @@ On Android, Expo's push notifications are delivered through Google's Firebase Cl
    ```
    Choose **production** → **Google Service Account** → **Manage your Google Service Account Key for Push Notifications (FCM V1)** → **Set up a Google Service Account Key for Push Notifications (FCM V1)** → **Upload a new service account key**, and pick the file from step 4. After uploading, you can delete your local copy.
 
-**Claude can do this:** once `google-services.json` is in `app/`, I add `"googleServicesFile": "./google-services.json"` under `android` in `app.json` and commit it.
+Done in the repo: `google-services.json` is in `app/` and `app.json` has `"googleServicesFile": "./google-services.json"` under `android`. Only the key upload (item 5) is yours, because it puts a private key into EAS.
 
 ## Step 3: Build the Android app with EAS
 

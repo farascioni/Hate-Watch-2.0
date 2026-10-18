@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.hatewatch.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0B0B0D",
         "foregroundImage": "./assets/android-icon-foreground.png",
