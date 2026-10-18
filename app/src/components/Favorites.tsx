@@ -31,8 +31,8 @@ export function Favorites() {
       <Text style={styles.title}>Favorite teams</Text>
       <Text style={styles.blurb}>
         {list.length
-          ? "While a favorite plays, its opponent's alerts land in your feed and push to your phone. They stop when the game ends."
-          : "Tap the heart on Search or a team's page to root for a team. Its opponent's alerts reach you for that game only."}
+          ? "While a favorite plays, its opponent's alerts land in your feed and push to your phone. They stop when the game ends. A favorite constructor's drivers show in gold in the F1 tables."
+          : "Tap the heart on Search or a team's page to root for a team or an F1 constructor. A team's opponent's alerts reach you for that game only."}
       </Text>
       {list.map((f) => (
         <View key={f.key} style={styles.row}>
@@ -41,6 +41,7 @@ export function Favorites() {
             <Text style={styles.name} numberOfLines={1}>{f.target!.name}</Text>
             <LeagueTag league={f.target!.league} />
           </View>
+          {f.target!.league === 'f1' ? null : <>
           <Pressable onPress={() => updateFavorite(f.key, { push: !f.push }).catch(fail)} hitSlop={8} style={styles.icon} accessibilityRole="button"
             accessibilityLabel={f.push ? `Turn off push notifications for ${f.target!.name} games` : `Turn push notifications back on for ${f.target!.name} games`}>
             <Ionicons name={f.push ? 'notifications' : 'notifications-off'} size={20} color={f.push ? colors.text : colors.textFaint} />
@@ -48,6 +49,7 @@ export function Favorites() {
           <Pressable onPress={() => router.push(`/alerts/${encodeURIComponent(f.key)}?fav=1`)} hitSlop={8} style={styles.icon} accessibilityRole="button" accessibilityLabel={`Alerts for ${f.target!.name} games`}>
             <Ionicons name="settings-outline" size={20} color={colors.text} />
           </Pressable>
+          </>}
           <Pressable onPress={() => removeFavorite(f.key).catch(fail)} hitSlop={8} style={styles.icon} accessibilityRole="button" accessibilityLabel={`Remove ${f.target!.name} from your favorites`}>
             <Ionicons name="close" size={20} color={colors.textDim} />
           </Pressable>

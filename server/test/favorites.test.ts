@@ -103,6 +103,19 @@ test('a tracked team’s own alert choices beat the favorite’s: a type off for
   assert.ok(!feed('both').some((r) => r.event_id.includes(':p7:')));
 });
 
+test('a favorite of the Rays gets the Guardians’ error (mlb.fielder.error, team scope); a tracker of the Guardians gets it too; one device gets it once', () => {
+  for (const id of ['err-fan', 'err-tracker']) device.run(id, 's', 'test', `tok-${id}`, JSON.stringify(DEFAULT_PREFS));
+  addFavorite('err-fan', 'team:mlb:30');
+  db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('err-tracker', 'team:mlb:5');
+  const error = (play: string) => ({ id: `G1:${play}:mlb.fielder.error:team-5`, type: 'mlb.fielder.error', targetKey: 'team:mlb:5', title: 'Cleveland Guardians committed an error', body: 'Throwing error by the shortstop', at: 1000, meta: { gameId: 'G1', playId: play } });
+  publish([error('e1')], 'mlb');
+  publish([error('e1')], 'mlb'); // a re-poll
+  assert.deepEqual(feed('err-fan').map((r) => [r.event_id, r.fav]), [['G1:e1:mlb.fielder.error:team-5', 1]]);
+  assert.deepEqual(feed('err-tracker').map((r) => [r.event_id, r.fav]), [['G1:e1:mlb.fielder.error:team-5', 0]]);
+  assert.equal(feed('yankee-fan').filter((r) => r.event_id.includes('mlb.fielder.error')).length, 0, 'a fan of another team');
+  removeFavorite('err-fan', 'team:mlb:30');
+});
+
 test('removing a favorite stops the scan', () => {
   for (const d of ['fan', 'quiet-fan', 'both']) removeFavorite(d, 'team:mlb:30');
   assert.ok(!favoriteTeamKeys().has('team:mlb:30'));
@@ -121,4 +134,12 @@ test('a favorite gets "Hate Watch Starting" when its team’s game begins: once,
   assert.equal(feed('start-fan-both').length, 1);
   assert.equal(pushes.filter((p) => p.startsWith('tok-start-fan|')).length, 1);
   assert.equal((db.prepare('SELECT title FROM events WHERE id = ?').get('G9:team.game_start:5') as any).title, 'Hate Watch Starting: Guardians vs Rays');
+});
+
+test('an F1 constructor favorite brings no alerts: a race has no single opponent, so another constructor’s alert is not its copy', () => {
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('f1-fan', 's', 'test', 'tok-f1-fan', JSON.stringify(DEFAULT_PREFS));
+  addFavorite('f1-fan', 'team:f1:ALP');
+  publish([{ id: 'R1:team.opponent_scored:FER', type: 'team.opponent_scored', targetKey: 'team:f1:FER', title: 'Ferrari', body: 'x', at: 1, meta: { gameId: 'R1' } } as any], 'f1');
+  assert.equal(feed('f1-fan').length, 0);
+  assert.ok(!pushes.some((p) => p.startsWith('tok-f1-fan')));
 });

@@ -185,8 +185,9 @@ const flagMap = (v: unknown): Record<string, boolean | null> => Object.fromEntri
 route('GET', '/me/favorites', true, (req) => ({ favorites: favoritesOf(req.deviceId!).map(favoriteDto) }));
 route('PUT', '/me/favorites/:key', true, (req, _u, [key]) => {
   const k = decodeURIComponent(key), t = targetDto(k);
-  if (!t || t.kind !== 'team' || !(GAME_LEAGUES as League[]).includes(t.league)) throw new HttpError(404, 'a favorite is a team in a league of games');
+  if (!t || t.kind !== 'team' || !([...GAME_LEAGUES, 'f1'] as League[]).includes(t.league)) throw new HttpError(404, 'a favorite is a team in a league of games, or an F1 constructor');
   addFavorite(req.deviceId!, k);
+  forgetDeviceTeams(req.deviceId!); // its game is on the Scores tab now
   engine.kick(); // a game in progress for it is tracked right now
   return { favorite: favoriteDto(favoriteOf(req.deviceId!, k)!) };
 });
@@ -195,8 +196,8 @@ route('PUT', '/me/favorites/:key/settings', true, (req, _u, [key], body) => {
   if (!row) throw new HttpError(404, 'not a favorite');
   return { favorite: favoriteDto(row) };
 });
-route('DELETE', '/me/favorites/:key', true, (req, _u, [key]) => { removeFavorite(req.deviceId!, decodeURIComponent(key)); return { ok: true }; });
-route('DELETE', '/me/favorites', true, (req) => { removeFavorite(req.deviceId!); return { ok: true }; }); // Plus lapsed
+route('DELETE', '/me/favorites/:key', true, (req, _u, [key]) => { removeFavorite(req.deviceId!, decodeURIComponent(key)); forgetDeviceTeams(req.deviceId!); return { ok: true }; });
+route('DELETE', '/me/favorites', true, (req) => { removeFavorite(req.deviceId!); forgetDeviceTeams(req.deviceId!); return { ok: true }; }); // Plus lapsed
 
 // ─── Lock screen scoreboard (live-activity.ts): the Live Activity's push token, and the keys starred as most hated ──
 route('GET', '/me/live-activity', true, (req) => ({ board: getLiveActivity(req.deviceId!) }));

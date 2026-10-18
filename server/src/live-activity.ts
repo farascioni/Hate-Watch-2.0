@@ -100,7 +100,7 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     const keys = [g.home.team.key, g.away.team.key];
     const t = keys.some((k) => favs.has(k)) ? 0 : keys.some((k) => hated.has(k)) ? 1 : 2;
     if (t && !keys.some((k) => tracked.has(k))) continue; // only a favorite's game comes without tracking
-    const tier = (team: string) => (favs.has(team) ? 0 : hated.has(team) ? 1 : 2);
+    const tier = (team: string) => (hated.has(team) ? 1 : favs.has(team) ? 0 : 2); // a team both favorite and most hated is red, as everywhere in the app
     const ta = tier(g.away.team.key), th = tier(g.home.team.key);
     const a = g.away.team.abbrev, h = g.home.team.abbrev, st = live ? g.detail : 'Final';
     const score = (n: number | null) => (n === null ? '-' : String(n));

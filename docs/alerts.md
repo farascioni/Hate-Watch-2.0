@@ -62,7 +62,7 @@ The MLB player alerts that come from a single play: strikeouts, outs, double pla
 | `mlb.batter.popout` | Makes an out | player, not SP, RP, P | Offense | off |
 | `mlb.runner.out_on_bases` | Gets thrown out on the bases | player, not SP, RP, P | Offense | push |
 | `mlb.batter.hitless` | Goes hitless | player, not SP, RP, P | Offense | feed only |
-| `mlb.fielder.error` | Commits an error | player | Defense | push |
+| `mlb.fielder.error` | Commits an error | player and team | Defense | push |
 | `mlb.catcher.passed_ball` | Lets a run score on a passed ball | player, only C | Defense | push |
 | `mlb.pitcher.home_run_allowed` | Gives up a home run | player, only SP, RP, P | Pitching | push |
 | `mlb.pitcher.gift_run` | Hands over a run | player, only SP, RP, P | Pitching | push |

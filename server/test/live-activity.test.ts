@@ -73,8 +73,8 @@ test('each team has its own color and mark: favorite gold with a heart, most hat
   assert.deepEqual(look(b.games[2]), ['#FFFFFF', '', '#FFFFFF', ''], 'a game of tracked teams has no mark');
   db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev3', 's', 'ios', '{}');
   addFavorite('dev3', T.TB);
-  putLiveActivity('dev3', { mostHated: [T.MIA, T.TB] }); // TB is both: the favorite wins
-  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '❌ ', '#F5C451', '♥ '], 'MIA@TB: each team its own, a favorite that is also hated stays gold');
+  putLiveActivity('dev3', { mostHated: [T.MIA, T.TB] }); // TB is both: red wins, as on the cards
+  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '❌ ', '#E5232B', '❌ '], 'MIA@TB: each team its own, a favorite that is also hated is red');
 });
 
 test('past four games the rest are counted, and the payload stays small', () => {

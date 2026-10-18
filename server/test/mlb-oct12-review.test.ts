@@ -167,9 +167,12 @@ test('NLCS G2 F6: an error moved from the pitcher to the first baseman: a line o
   const s = scenario('error-moved', BREWERS, DODGERS);
   const stewart = idOf('Brock Stewart'), freeman = idOf('Freddie Freeman');
   await s.read(0);
-  assert.equal(alerts(s.game).filter((a) => a.type === 'mlb.fielder.error').length, 1);
+  const fielders = () => alerts(s.game).filter((a) => a.type === 'mlb.fielder.error' && a.target.startsWith('player:'));
+  assert.equal(fielders().length, 1);
+  const teamErrors = () => alerts(s.game).filter((a) => a.type === 'mlb.fielder.error' && a.target.startsWith('team:'));
+  assert.equal(teamErrors().length, 1, 'the fielding team gets its own error alert (what a favorite of the other side is sent)');
   await s.read(1);
-  const errors = alerts(s.game).filter((a) => a.type === 'mlb.fielder.error');
+  const errors = fielders();
   assert.equal(errors.length, 2);
   const second = errors.find((a) => a.target === `player:mlb:${freeman}`)!;
   assert.ok(errors.some((a) => a.target === `player:mlb:${stewart}`));
@@ -177,7 +180,7 @@ test('NLCS G2 F6: an error moved from the pitcher to the first baseman: a line o
   assert.equal(second.title, 'Freddie Freeman committed an error');
   assert.match(second.body, /pickoff error by first baseman Freeman/);
   await s.read(1);
-  assert.equal(alerts(s.game).filter((a) => a.type === 'mlb.fielder.error').length, 2, 'a re-poll sends nothing');
+  assert.equal(fielders().length, 2, 'a re-poll sends nothing');
 });
 
 // ─── NLCS Game 2 F3, with ALCS Game 1 F6: a challenge sentence ESPN adds to a posted result ───

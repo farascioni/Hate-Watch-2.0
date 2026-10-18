@@ -1340,6 +1340,12 @@ function mlb(g: GameCtx, p: NPlay): Detected[] {
     const fieldingTeam = p.teamId === g.homeId ? g.awayId : g.homeId;
     const who = byLastName(g, fieldingTeam, err[2], err[1]);
     if (who) out.push({ ...mk(g, p, 'mlb.fielder.error', who, `${nameOf('mlb', who)} committed an error`), ...(twin ? { id: textId('mlb.fielder.error', who) } : {}) });
+    // The fielding team's own alert, even when the fielder can't be matched: its trackers and, in `recipients`, the favorites of the other side.
+    out.push({
+      id: twin ? textId('mlb.fielder.error', `team-${fieldingTeam}`) : `${g.gameId}:${p.id}:mlb.fielder.error:team-${fieldingTeam}`,
+      type: 'mlb.fielder.error', targetKey: teamKey('mlb', fieldingTeam), title: `${teamName('mlb', fieldingTeam)} committed an error`,
+      body: `${goalWords(g.league, p)} — ${scoreLine(g, p)}`, at: p.at, meta: { gameId: g.gameId, playId: p.id },
+    });
   }
   return out;
 }

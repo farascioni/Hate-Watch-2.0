@@ -41,3 +41,5 @@ export const useIsMostHated = (key: string) => useSyncExternalStore(subscribe, (
 export const useAnyMostHated = (targets: string[]) => useSyncExternalStore(subscribe, () => targets.some((k) => keys.has(k)));
 /** How many are marked: Following keeps the star working for someone whose subscription can't be confirmed (offline). */
 export const useMostHatedCount = () => useSyncExternalStore(subscribe, () => keys.size);
+/** The whole set, for a list that checks many keys (F1 rows by constructor). */
+export const useMostHatedSet = () => useSyncExternalStore(subscribe, () => keys);

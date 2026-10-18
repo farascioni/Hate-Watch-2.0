@@ -559,7 +559,8 @@ export class GameTracker {
     }
     const again = PLAYER_DETECTORS.mlb({ ...this.ctx }, p); // on a copy of the game's state: a rewrite changes none of it
     if (!prev.scoring && p.scoring) events.push(...again.filter((e) => e.type === 'mlb.pitcher.runs_allowed' || e.type === 'mlb.pitcher.home_run_allowed'));
-    const errors = (this.sent.get(p.id) ?? []).filter((e) => e.type === 'mlb.fielder.error'), now2 = again.filter((e) => e.type === 'mlb.fielder.error');
+    const fielder = (e: Detected) => e.type === 'mlb.fielder.error' && e.targetKey.startsWith('player:'); // the team's own alert doesn't move with the error
+    const errors = (this.sent.get(p.id) ?? []).filter(fielder), now2 = again.filter(fielder);
     if (errors.length && now2.length && !now2.some((e) => errors.some((x) => x.targetKey === e.targetKey))) {
       const to = catalog.player(now2[0].targetKey)?.name ?? 'another fielder';
       changed.push(...this.ledger.linesOn(errors, `ESPN moved this error to ${to}.`));

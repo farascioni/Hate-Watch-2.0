@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SectionHeader } from './ui';
 import { useStore } from '../lib/store';
+import { useF1Tone, toneRow, toneName, toneMark, toneStyles, type F1Tone } from '../lib/f1Tone';
 import { colors, radius, space } from '../theme';
 import type { F1Preview } from '../lib/types';
 
@@ -11,21 +12,26 @@ const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: 'numeric'
 const opens = (name: string) => name !== '?';
 const open = (key: string) => router.push(`/target/${encodeURIComponent(key)}`);
 const pressedBg = { backgroundColor: colors.surfaceHi };
+/** A name with its tone's mark (♥ a favorite constructor's, ❌ a most hated one's). */
+const Name = ({ children, tone, style, ...rest }: { children: string; tone?: F1Tone; style?: any; numberOfLines?: number }) => (
+  <Text style={[style, toneName(tone)]} {...rest}>{children}{tone ? <Text style={toneStyles.mark}>{` ${toneMark[tone]}`}</Text> : null}</Text>
+);
 
 /**
  * An F1 weekend before its race, as other sports' previews come before a game: where it is and its
  * sessions (one on the Scores tab opens its screen), the next grid once it's set, and the championship
  * with each driver's last three races. Tracked drivers and constructors (and a tracked constructor's
- * drivers) are highlighted; each name opens its page. `current`: the session whose screen this is, marked in the schedule.
+ * drivers) are highlighted, and a favorite constructor's drivers are gold and a most hated one's red (f1Tone.ts); each name opens its page. `current`: the session whose screen this is, marked in the schedule.
  * ESPN has no F1 odds, so there are no win chances here.
  */
 export function F1PreviewView({ preview, current }: { preview: F1Preview; current?: string }) {
   const { follows, games } = useStore();
+  const tone = useF1Tone();
   const mine = (key: string, teamKey?: string | null) => follows.has(key) || (!!teamKey && follows.has(teamKey));
   const { event, sessions, grid, gridAfter, drivers, constructors } = preview;
   // The championship: the top ten, and anyone tracked below them.
-  const table = drivers.filter((d, i) => i < 10 || mine(d.key, d.teamKey));
-  const teams = constructors.filter((t, i) => i < 5 || follows.has(t.key));
+  const table = drivers.filter((d, i) => i < 10 || mine(d.key, d.teamKey) || tone(d.teamKey));
+  const teams = constructors.filter((t, i) => i < 5 || follows.has(t.key) || tone(t.key));
   return (
     <View>
       <SectionHeader>Where and when</SectionHeader>
@@ -56,9 +62,9 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {grid.cars.map((c) => (
               <Pressable key={c.key} disabled={!opens(c.name)} onPress={() => open(c.key)} accessibilityRole={opens(c.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, mine(c.key, c.teamKey) && styles.mine, pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, mine(c.key, c.teamKey) && styles.mine, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
                 <Text style={styles.when}>P{c.grid}</Text>
-                <Text style={[styles.text, mine(c.key, c.teamKey) && styles.strong]}>{c.name}</Text>
+                <Name style={[styles.text, mine(c.key, c.teamKey) && styles.strong]} tone={tone(c.teamKey)}>{c.name}</Name>
               </Pressable>
             ))}
           </View>
@@ -71,10 +77,10 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {table.map((d) => (
               <Pressable key={d.key} disabled={!opens(d.name)} onPress={() => open(d.key)} accessibilityRole={opens(d.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, mine(d.key, d.teamKey) && styles.mine, pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, mine(d.key, d.teamKey) && styles.mine, toneRow(tone(d.teamKey)), pressed && pressedBg]}>
                 <Text style={styles.rank}>{d.rank}</Text>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.text, mine(d.key, d.teamKey) && styles.strong]} numberOfLines={1}>{d.name}</Text>
+                  <Name style={[styles.text, mine(d.key, d.teamKey) && styles.strong]} tone={tone(d.teamKey)} numberOfLines={1}>{d.name}</Name>
                   {d.form.length ? <Text style={styles.form} accessibilityLabel={`Last races: ${d.form.join(', ')}`}>Last races: {d.form.join(' · ')}</Text> : null}
                 </View>
                 <Text style={styles.side}>{d.points} pts</Text>
@@ -90,9 +96,9 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
           <View style={styles.list}>
             {teams.map((t) => (
               <Pressable key={t.key} disabled={!opens(t.name)} onPress={() => open(t.key)} accessibilityRole={opens(t.name) ? 'link' : undefined}
-                style={({ pressed }) => [styles.row, follows.has(t.key) && styles.mine, pressed && pressedBg]}>
+                style={({ pressed }) => [styles.row, follows.has(t.key) && styles.mine, toneRow(tone(t.key)), pressed && pressedBg]}>
                 <Text style={styles.rank}>{t.rank}</Text>
-                <Text style={[styles.text, follows.has(t.key) && styles.strong]} numberOfLines={1}>{t.name}</Text>
+                <Name style={[styles.text, follows.has(t.key) && styles.strong]} tone={tone(t.key)} numberOfLines={1}>{t.name}</Name>
                 <Text style={styles.side}>{t.points} pts</Text>
               </Pressable>
             ))}
@@ -109,6 +115,7 @@ export function F1PreviewView({ preview, current }: { preview: F1Preview; curren
  */
 export function F1Grid({ grid }: { grid: NonNullable<F1Preview['grid']> }) {
   const { follows } = useStore();
+  const tone = useF1Tone();
   const mine = (c: { key: string; teamKey: string | null }) => follows.has(c.key) || (!!c.teamKey && follows.has(c.teamKey));
   const rows = Array.from({ length: Math.ceil(grid.cars.length / 2) }, (_, i) => grid.cars.slice(i * 2, i * 2 + 2));
   return (
@@ -118,9 +125,9 @@ export function F1Grid({ grid }: { grid: NonNullable<F1Preview['grid']> }) {
         <View key={i} style={styles.gridRow}>
           {pair.map((c) => (
             <Pressable key={c.key} disabled={!opens(c.name)} onPress={() => open(c.key)} accessibilityRole={opens(c.name) ? 'link' : undefined}
-              accessibilityLabel={`P${c.grid} ${c.name}`} style={({ pressed }) => [styles.gridCell, mine(c) && styles.mine, pressed && pressedBg]}>
+              accessibilityLabel={`P${c.grid} ${c.name}`} style={({ pressed }) => [styles.gridCell, mine(c) && styles.mine, toneRow(tone(c.teamKey)), pressed && pressedBg]}>
               <Text style={styles.gridPos}>P{c.grid}</Text>
-              <Text style={[styles.gridName, mine(c) && styles.strong]} numberOfLines={1}>{c.name}</Text>
+              <Name style={[styles.gridName, mine(c) && styles.strong]} tone={tone(c.teamKey)} numberOfLines={1}>{c.name}</Name>
             </Pressable>
           ))}
           {pair.length < 2 ? <View style={styles.gridCell} /> : null}

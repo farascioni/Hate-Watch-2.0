@@ -83,6 +83,7 @@ from the tests):
 | A scoring play against a team (`teamScoreEvents`) | `${gameId}:${playId}:team.opponent_scored:${teamId}`, `…:team.fell_behind:…`, `…:team.blew_lead:…` | `401810230:40181023024:team.fell_behind:10`, "Pelicans scored 3 to take the lead over the Rockets" |
 | A team's loss (`gameLostEvent`) | `${gameId}:final:team.lost:${loserId}` | `401815054:final:team.lost:19`, "Successful Hate Watch! Dodgers lost to the Giants" |
 | A loss's facts, sent as alerts (`lossFacts`) | `${gameId}:final:${type}:${loserId}` | `401815054:final:team.lost_as_favorite:19`, "…Dodgers lost to the Giants as 64% favorites" |
+| A team's error (MLB, `mlb.fielder.error` on the fielding team) | `${gameId}:${playId}:mlb.fielder.error:team-${teamId}`, or on a runner's play with no batter the text-keyed `…:mlb.fielder.error:…:team-${teamId}`; same moment as the fielder's own alert | `G1:e1:mlb.fielder.error:team-5`, "Cleveland Guardians committed an error" |
 | Soccer's 3+ goal loss | `${gameId}:final:${league}.team.heavy_loss:${loserId}` | |
 | A player's final (their team lost, a bad night) | `${gameId}:final:${type}:${athleteId}` | `401815054:final:player.team_lost:39832`, "Shohei Ohtani and the Dodgers lost to the Giants" |
 | A half-inning (MLB) | `${gameId}:${halfKey}:${type}:${teamId}` | `401907994:Bottom1:mlb.team.down_in_order:5`, "Guardians went down in order"; NOBLETIGER is `…:mlb.team.nobletiger:…` |
@@ -593,6 +594,7 @@ This is one reason for the decision **"No production restarts during live games"
 ## Known gaps
 
 - **A favorite team's copy** (`recipients()` adds `favoriters(opponentOf(...))`, `docs/favorites.md`) goes through the same moment rules, once per device: a device that tracks the team gets the ordinary alert, not a second copy for the favorite. The game registry (`registerGame`) is in memory, so after a restart a favorite gets nothing for a game until its tracker attaches again and registers it.
+- **A team's error alert is not moved with the error.** When ESPN moves an error to another fielder (`revisedResult`), the fielder's alert gets its line and the new fielder an alert, but the team alert made on the first read stays as sent; if the new fielder is on the other team, that team gets no error alert and the first one keeps a wrong team.
 - **Pushes have no collapse id.** Only the database rows keep a push single. A second `publish` of an id sends
   nothing, but code that pushed without going through `publish` would not be caught by anything.
 - **Text-keyed MLB ids** depend on ESPN's text staying the same. A re-judged rewritten result would make a new id,

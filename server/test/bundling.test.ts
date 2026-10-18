@@ -57,6 +57,15 @@ test("a homer that gives the Rays the lead: Cole's alert and the Yankees' are on
   assert.equal(pushed('yankees-and-cole'), 1);
 });
 
+test("an error: the fielder's alert and his team's are one for a device tracking both, and each alone gets its own", () => {
+  const e = (id: string, targetKey: string, title: string) => ({ id: `G1:err1:mlb.fielder.error:${id}`, type: 'mlb.fielder.error', targetKey, title, body: 'Throwing error by the pitcher', at: 1, meta: { gameId: 'G1', playId: 'err1' } });
+  publish(bundleByPlay([e('32081', 'player:mlb:32081', 'Gerrit Cole committed an error'), e('team-10', 'team:mlb:10', 'Yankees committed an error')]), 'mlb');
+  const errors = (dev: string) => got(dev).filter((r) => r.includes('committed an error')).map((r) => r.split(' | ')[0]);
+  assert.deepEqual(errors('yankees-and-cole'), ['Gerrit Cole committed an error'], 'one row for both targets');
+  assert.deepEqual(errors('yankees-only'), ['Yankees committed an error']);
+  assert.deepEqual(errors('cole-only'), ['Gerrit Cole committed an error']);
+});
+
 test("a fact that comes a poll later goes on the alert already sent: a line, no push (the inning ends on Judge's strikeout)", () => {
   fan('yankees-and-judge', ['team:mlb:10', 'player:mlb:33192']);
   const judgeFrames: any[] = [];

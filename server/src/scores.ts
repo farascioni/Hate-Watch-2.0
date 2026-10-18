@@ -9,6 +9,7 @@ import { catalog, teamDto } from './catalog.ts';
 import { ordinal } from './detectors.ts';
 import { BASKETBALL, FOOTBALL, LEAGUE_IDS, SOCCER, TEAMS_ONLY, playerKey, teamKey, urls, type League } from './leagues.ts';
 import { getPrefs, sendToConnected } from './fanout.ts';
+import { favoritesOf } from './favorites.ts';
 import { boxScore, type BoxScore } from './boxscore.ts';
 import { clipsOf, highlights, type Clip, type Highlights } from './highlights.ts';
 
@@ -455,10 +456,10 @@ export function setF1Calendar(cal: any) {
 export const nextF1Weekend = (now = Date.now()) => f1Weekends.find((w) => w.endsAt > now);
 
 // ─── Whose games ──────────────────────────────────────────────────────────────────────────────
-interface Mine { teams: Set<string>; f1: boolean }
+interface Mine { teams: Set<string>; favs: Set<string>; f1: boolean }
 const mineCache = new Map<string, { at: number; mine: Mine }>();
 
-/** A device's teams: the ones it tracks, plus the team of every player it tracks, unless that player's "Show their team's games" is off. */
+/** A device's teams: the ones it tracks, plus the team of every player it tracks, unless that player's "Show their team's games" is off. `favs` are its Plus favorites: their games are on its Scores tab too, but they are not "tracked". */
 export function deviceTeams(deviceId: string): Mine {
   const hit = mineCache.get(deviceId);
   if (hit && Date.now() - hit.at < 5000) return hit.mine;
@@ -469,7 +470,8 @@ export function deviceTeams(deviceId: string): Mine {
     if (k.startsWith('team:')) teams.add(k);
     else if (playerTeams[k]?.scores !== false) { const p = catalog.player(k); if (p) teams.add(p.teamKey); }
   }
-  const mine = { teams, f1: keys.some((k) => k.includes(':f1:')) };
+  const favs = new Set(favoritesOf(deviceId).map((f) => f.team_key));
+  const mine = { teams, favs, f1: [...keys, ...favs].some((k) => k.includes(':f1:')) }; // a favorite constructor brings the race too
   mineCache.set(deviceId, { at: Date.now(), mine });
   return mine;
 }
@@ -477,7 +479,7 @@ export function deviceTeams(deviceId: string): Mine {
 export const forgetDeviceTeams = (deviceId: string) => mineCache.delete(deviceId);
 
 const involves = (g: GameCard, mine: Mine) =>
-  g.league === 'f1' ? mine.f1 : !!(g.home && mine.teams.has(g.home.team.key)) || !!(g.away && mine.teams.has(g.away.team.key));
+  g.league === 'f1' ? mine.f1 : !!(g.home && (mine.teams.has(g.home.team.key) || mine.favs.has(g.home.team.key))) || !!(g.away && (mine.teams.has(g.away.team.key) || mine.favs.has(g.away.team.key)));
 
 /** How long a final stays on the Scores tab after it ends: the last game a team played, for a day. */
 export const KEEP_FINALS_MS = 24 * 3600_000;

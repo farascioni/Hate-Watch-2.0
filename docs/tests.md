@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 581 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 585 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 581 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 585 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 581 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 585 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 581 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 585 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -41,7 +41,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `favorites.test.ts` | Plus favorite teams: the opponent's alerts in a favorite's game, push and feed, the tracker's settings winning, and a favorite's feed item carrying `fav` (the gold edge), and a favorite's start alert (one per device, even favoriting both sides) |
 | `fiu-jxst.test.ts` | FIU at Jax State (October 13, 2026), through a real tracker, for the three fixes its post game recording report found: a college team's flag is a weak alert (the tying touchdown, the go-ahead field goal and the three-and-out keep their own alerts, the flag never pushes), and the alerts a football play still has take ESPN's rewrite of its words and score (a sack's yards, the extra point on a touchdown). |
 | `box-score.test.ts` | The game screen's box score (`boxscore.ts`): a table per stat group, away team first, the bad numbers marked for red |
-| `bundling.test.ts` | One alert per play per device (`bundleByPlay`): the team's and its players' alerts become one with lines; `alt` gives one line; a later fact goes on the alert already sent, without a push |
+| `bundling.test.ts` | One alert per play per device (`bundleByPlay`): the team's and its players' alerts become one with lines; `alt` gives one line; a later fact goes on the alert already sent, without a push; a fielder's error and his team's are one row for a device tracking both |
 | `catalog-injured.test.ts` | Players on an injured list but off the roster (MLB's 60-day IL) still join their team |
 | `cfb.test.ts` | College football: its URLs, catalog, plays from drives, the college alert types (a blocked, missed or good extra point), cards with top-25 ranks, the AP poll, an upset by an unranked team, a bowl game not being an elimination |
 | `challenges.test.ts` | MLB "Loses a challenge", ABS and replay, from ATL @ LAD (2026-10-04) and CHW @ CLE (2026-10-05), one alert per device per challenge |

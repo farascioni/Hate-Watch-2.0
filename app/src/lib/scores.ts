@@ -26,6 +26,10 @@ export const gameTargetKeys = (g: GameCard, follows: Map<string, Target>): strin
     ? trackedDrivers(g, follows).flatMap((d) => [d.key, ...(d.teamKey ? [d.teamKey] : [])])
     : SIDES.flatMap((k) => (g[k] ? [g[k]!.team.key, ...trackedPlayers(g, k, follows).map((p) => p.key)] : []));
 
+/** Hate Watch Plus: a favorite's game: either team is a favorite, or (F1) a favorite constructor has a car in the session. */
+export const isFavoriteGame = (g: GameCard, favorites: Map<string, unknown>): boolean =>
+  g.league === 'f1' ? (g.order ?? []).some((d) => !!d.teamKey && favorites.has(d.teamKey)) : SIDES.some((k) => !!g[k] && favorites.has(g[k]!.team.key));
+
 /** F1: a car's places since the start, "▲10 from P19", "▼3 from P4", "Started P1", read out in words. None out of it, or without a grid slot. */
 export function fromGrid(d: RaceDriver): { text: string; label: string; lost: boolean } | null {
   if (!d.grid || !d.position || d.out) return null;

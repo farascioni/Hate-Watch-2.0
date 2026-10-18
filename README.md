@@ -53,9 +53,9 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
-- **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
+- **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks, favorites first, then most hated, then the rest; off by default.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 581 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 585 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
@@ -93,7 +93,7 @@ The full detail: [docs/notifications.md](docs/notifications.md).
 
 ## Scores tab
 
-**In short:** The Scores tab lists games. "My games" is today's games for the teams you track and the teams of the players you track (live first, then later today, then finals, each kept for 24 hours after it ends), followed by "Up next", each tracked team's and each Plus favorite's next game. "All games" is every game live now or starting in the next 24 hours, whether you track anyone in it or not. The cards come from the server's ESPN scoreboard reads every 10 seconds, with scores and details patched in sooner by the 2-second game tracker, and every change is pushed over the WebSocket to the devices that track a side; tapping a card opens its game screen, with the live card, the box score and highlights, and your alerts from that game.
+**In short:** The Scores tab lists games. "My games" is today's games for the teams you track, the teams of the players you track and your Plus favorites (live first, then later today, then finals, each kept for 24 hours after it ends), followed by "Up next", each tracked team's and each Plus favorite's next game. "All games" is every game live now or starting in the next 24 hours, whether you track anyone in it or not. The cards come from the server's ESPN scoreboard reads every 10 seconds, with scores and details patched in sooner by the 2-second game tracker, and every change is pushed over the WebSocket to the devices that track a side; tapping a card opens its game screen, with the live card, the box score and highlights, and your alerts from that game.
 
 The full detail: [docs/scores-tab.md](docs/scores-tab.md).
 
@@ -153,7 +153,7 @@ The full detail: [docs/sharing.md](docs/sharing.md).
 
 ## Favorite teams
 
-**In short:** a Hate Watch Plus subscriber can favorite a team with the heart on Search or a team's page. A favorite is not tracked: while it is in a game, the alerts about its opponent in that game land in the feed and push, with the favorite's own alert choices and push switch (Settings, under Support Hate Watch), and stop when the game ends. They are not hate watches. `server/src/favorites.ts`; Plus is checked on the device only.
+**In short:** a Hate Watch Plus subscriber can favorite a team (or an F1 constructor, which turns its drivers gold in the F1 tables) with the heart on Search or a team's page. A favorite is not tracked (its games are on My games, though): while it is in a game, the alerts about its opponent in that game land in the feed and push, with the favorite's own alert choices and push switch (Settings, under Support Hate Watch), and stop when the game ends. They are not hate watches. `server/src/favorites.ts`; Plus is checked on the device only.
 
 The full detail: [docs/favorites.md](docs/favorites.md).
 
@@ -165,7 +165,7 @@ The full detail: [docs/live-activity.md](docs/live-activity.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 581 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 585 tests in 74 files, offline, in about 4 seconds, all passing on October 17, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

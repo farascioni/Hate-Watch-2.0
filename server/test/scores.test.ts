@@ -351,3 +351,20 @@ test("an upcoming game's preview: each side's chance from the line, records, pro
   const preseason = { ...ev, competitions: [{ ...ev.competitions[0], competitors: ev.competitions[0].competitors.map((c) => ({ ...c, records: [{ type: 'total', summary: '0-0' }], probables: [] })), odds: [], series: undefined }] };
   assert.equal(S.gameCard('nba', preseason)!.preview, undefined, 'nothing to say: no preview (a 0-0 record is no record)');
 });
+
+test("a Plus favorite's game is on My games without the team being tracked; an F1 constructor brings the race", async () => {
+  const { addFavorite, removeFavorite } = await import('../src/favorites.ts');
+  for (const id of ['fav-fan', 'fav-f1']) device.run(id, 's', 'test', JSON.stringify(DEFAULT_PREFS));
+  addFavorite('fav-fan', 'team:nfl:1');
+  addFavorite('fav-f1', 'team:f1:FER');
+  S.forgetDeviceTeams('fav-fan');
+  S.forgetDeviceTeams('fav-f1');
+  assert.deepEqual(S.gamesFor('fav-fan').map((g) => g.key), S.gamesFor('falcons-fan').map((g) => g.key), 'the same list as tracking the team');
+  assert.ok(S.gamesFor('fav-fan').length > 0);
+  assert.deepEqual(S.gamesFor('fav-f1').map((g) => g.key), ['f1:R1']);
+  assert.equal(S.deviceTeams('fav-fan').teams.has('team:nfl:1'), false, 'not tracked: the lock screen board and Up next ignore it');
+  assert.equal(S.deviceTeams('fav-fan').favs.has('team:nfl:1'), true);
+  removeFavorite('fav-fan', 'team:nfl:1');
+  S.forgetDeviceTeams('fav-fan');
+  assert.deepEqual(S.gamesFor('fav-fan'), [], 'removed: gone from My games');
+});
