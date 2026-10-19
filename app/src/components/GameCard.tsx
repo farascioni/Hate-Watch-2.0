@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
+import { SeriesStrip } from './SeriesStrip';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
 import { useAnyMostHated } from '../lib/mostHated';
@@ -21,7 +22,7 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
   done: { bg: '#0F2E1A', fg: colors.live },      // a Successful Hate Watch
 };
 
-/** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). */
+/** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). An MLB regular-season game in a series (`game.series`) gets the series strip under the card (`SeriesStrip`). */
 export const GameCardView = memo(function GameCardView({ game, latest, now, big }: { game: GameCard; latest?: FeedItem; now: number; big?: boolean }) {
   const tx = useT();
   const { follows, favorites } = useStore();
@@ -68,15 +69,31 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
     </>
   );
   if (big) return <View style={[styles.card, styles.bigCard]}>{content}</View>;
-  return (
-    <Pressable onPress={open} style={({ pressed }) => [styles.card, mostHated && styles.mostHated, favorite && styles.favorite, game.state === 'post' && { opacity: 0.8 }, pressed && { backgroundColor: colors.surfaceHi }]}
-      accessibilityRole="button" accessibilityHint={tx('gc.openHint')}
-      accessibilityActions={teams.map((k) => ({ name: k, label: tx('gc.openTeam', { name: game[k]!.team.shortName }) }))}
-      onAccessibilityAction={(e) => { const k = teams.find((t) => t === e.nativeEvent.actionName); if (k) openTeam(game[k]!.team.key); }}>
-      {content}
-    </Pressable>
+  const press = {
+    onPress: open, accessibilityRole: 'button' as const, accessibilityHint: tx('gc.openHint'),
+    accessibilityActions: teams.map((k) => ({ name: k, label: tx('gc.openTeam', { name: game[k]!.team.shortName }) })),
+    onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => { const k = teams.find((t) => t === e.nativeEvent.actionName); if (k) openTeam(game[k]!.team.key); },
+  };
+  const frame = [styles.card, mostHated && styles.mostHated, favorite && styles.favorite, game.state === 'post' && { opacity: 0.8 }];
+  // MLB series (server/src/series.ts): the strip is a sibling of the card's button, never inside it.
+  if (game.series && game.series.games.length > 1) return (
+    <View style={frame}>
+      <Pressable {...press} style={({ pressed }) => [{ gap: space(2), borderRadius: radius.md }, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>
+      <SeriesStrip game={game} games={game.series.games} title={seriesTitle(game, tx)} />
+    </View>
   );
+  return <Pressable {...press} style={({ pressed }) => [...frame, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>;
 });
+
+/** "Game 2 of 3 · Rays lead 1–0": this game's place in its regular-season series and the series so far. */
+function seriesTitle(game: GameCard, tx: ReturnType<typeof useT>): string {
+  const games = game.series!.games, n = games.findIndex((g) => g.id === game.id) + 1;
+  const wins = (k?: string) => games.filter((g) => g.winner === k).length;
+  const [home, away] = [game.home!, game.away!], a = wins(home.team.key), b = wins(away.team.key);
+  const lead = a > b ? home : away, hi = Math.max(a, b), lo = Math.min(a, b);
+  const status = a + b === 0 ? null : a === b ? tx('event.seriesTied', { a, b }) : tx(a + b === games.length ? 'event.seriesWon' : 'event.seriesLeads', { team: lead.team.shortName, a: hi, b: lo });
+  return [n ? tx('event.gameOf', { n, of: games.length }) : null, status].filter(Boolean).join(' · ');
+}
 
 /** The lock: puts the game on the lock screen scoreboard (docs/live-activity.md), or takes it off. iOS builds with the widget only. */
 function BoardButton({ game }: { game: GameCard }) {

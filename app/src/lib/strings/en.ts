@@ -183,6 +183,7 @@ export const en = {
   'event.mostHated': 'Most hated',
   'event.favorite': '★ Favorite',
   'event.gameShort': 'G{n}',
+  'event.gameOf': 'Game {n} of {of}',
   'event.coming': 'Coming up · next 7 days',
   'event.whoLose': 'Who do you want to lose?',
   'event.toLose': '{team} to lose',

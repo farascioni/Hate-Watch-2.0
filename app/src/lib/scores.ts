@@ -125,3 +125,17 @@ export const sectionTitle = (state: GameCard['state']) => tr(`scores.section.${s
 const RANK = { in: 0, pre: 1, post: 2 } as const;
 export const byState = (a: GameCard, b: GameCard) =>
   RANK[a.state] - RANK[b.state] || (a.state === 'post' ? b.startsAt - a.startsAt : a.startsAt - b.startsAt);
+
+/**
+ * One card per series (a playoff series' `event.seriesKey`, an MLB regular-season series' `series.key`; the others are the strip's cells):
+ * the one on now, else the next one to start, else the last final. A game with no series is kept as it is.
+ */
+export function oneCardPerSeries(list: GameCard[]): GameCard[] {
+  const rank = (g: GameCard) => (g.state === 'in' ? 0 : g.state === 'pre' ? 1 : 2);
+  const shown = new Map<string, GameCard>();
+  for (const g of list) {
+    const k = g.event?.seriesKey ?? g.series?.key, was = k ? shown.get(k) : undefined;
+    if (k && (!was || rank(g) < rank(was) || (rank(g) === rank(was) && (g.state === 'post' ? g.startsAt > was.startsAt : g.startsAt < was.startsAt)))) shown.set(k, g);
+  }
+  return list.filter((g) => { const k = g.event?.seriesKey ?? g.series?.key; return !k || shown.get(k) === g; });
+}

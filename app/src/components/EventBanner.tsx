@@ -4,13 +4,14 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { Bases } from './GameCard';
+import { SeriesStrip } from './SeriesStrip';
 import { VoteBlock } from './UpcomingEvent';
 import { useStore } from '../lib/store';
 import { useAnyMostHated } from '../lib/mostHated';
-import { gameTargetKeys, isFavoriteGame, loseChance, startLabel, statusLine, trackedSides, type Side } from '../lib/scores';
+import { gameTargetKeys, isFavoriteGame, loseChance, statusLine, trackedSides, type Side } from '../lib/scores';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import { useT } from '../lib/i18n';
-import type { EventLine, GameCard, SeriesGame, UpcomingEvent } from '../lib/types';
+import type { EventLine, GameCard, UpcomingEvent } from '../lib/types';
 
 /**
  * A postseason game on the Scores tab's Special Events view (`game.event`, server/src/scores.ts), as the "Ledger":
@@ -28,22 +29,12 @@ export const EventBanner = memo(function EventBanner({ game, now, vote }: { game
   const sides = trackedSides(game, follows);
   const hated: Side | undefined = sides.length === 1 ? sides[0] : undefined;
   const lose = loseChance(game, hated);
-  const abbrevOf = (key: string) => (game.home?.team.key === key ? game.home : game.away)?.team.abbrev ?? '';
-  // The ledger is marked from one team's side: the one you hate (a win of theirs is red, a loss green), else a favorite (a win of theirs is gold).
-  const focus = hated ? game[hated]?.team.key : (['home', 'away'] as const).map((k) => game[k]?.team).find((tm) => tm && favorites.has(tm.key))?.key;
-  const mark = (g: SeriesGame) => {
-    if (g.state === 'in') return colors.live;
-    if (g.state !== 'post' || !g.winner || !focus) return colors.border;
-    if (hated) return g.winner === focus ? HATE_RED : colors.live;
-    return g.winner === focus ? GOLD : colors.border;
-  };
   const wins = ev.wins, need = ev.bestOf ? Math.ceil(ev.bestOf / 2) : 0;
   const series = wins ? (() => {
     const lead = wins.home === wins.away ? null : wins.home > wins.away ? game.home! : game.away!;
     const a = Math.max(wins.home, wins.away), b = Math.min(wins.home, wins.away);
     return !lead ? t('event.seriesTied', { a, b }) : t(a >= need ? 'event.seriesWon' : 'event.seriesLeads', { team: lead.team.shortName, a, b });
   })() : null;
-  const nextGame = ev.games?.find((g) => g.state === 'pre' && !g.ifNeeded && g.id !== game.id);
 
   return (
     <View style={[styles.card, mostHated && styles.mostHated, favorite && styles.favorite, game.state === 'post' && { opacity: 0.9 }]}>
@@ -78,27 +69,7 @@ export const EventBanner = memo(function EventBanner({ game, now, vote }: { game
           </View>
         ) : null}
       </Pressable>
-      {ev.games?.length ? (
-        <View style={{ gap: space(1.5) }}>
-          <View style={styles.ledger}>
-            {ev.games.map((g) => {
-              const played = g.state !== 'pre';
-              const score = g.score ? `${g.score[0]}–${g.score[1]}` : '';
-              return (
-                <Pressable key={g.n} disabled={!played} onPress={() => router.push(`/game/${encodeURIComponent(`${game.league}:${g.id}`)}`)}
-                  style={({ pressed }) => [styles.cell, g.state === 'in' && { borderColor: colors.live }, g.ifNeeded && g.state === 'pre' && styles.cellIf, pressed && { backgroundColor: colors.surfaceHi }]}
-                  accessibilityRole={played ? 'button' : undefined} accessibilityLabel={played ? [t('event.gameShort', { n: g.n }), g.winner ? abbrevOf(g.winner) : '', score].filter(Boolean).join(' ') : undefined}>
-                  <Text style={styles.cellN}>{t('event.gameShort', { n: g.n })}</Text>
-                  <Text style={styles.cellW} numberOfLines={1}>{g.state === 'in' ? t('ui.state.live').toUpperCase() : g.winner ? abbrevOf(g.winner) : ' '}</Text>
-                  <Text style={styles.cellS} numberOfLines={1}>{score || (g.state === 'pre' && !g.ifNeeded ? startLabel(g.startsAt).split(' ')[0] : ' ')}</Text>
-                  <View style={[styles.cellMark, { backgroundColor: mark(g) }]} />
-                </Pressable>
-              );
-            })}
-          </View>
-          {nextGame && game.state === 'post' ? <Text style={styles.small} numberOfLines={1}>{`G${nextGame.n} · ${startLabel(nextGame.startsAt)}`}</Text> : null}
-        </View>
-        ) : null}
+      {ev.games?.length ? <SeriesStrip game={game} games={ev.games} /> : null}
       {vote ? <VoteBlock item={vote.item} sides={[game.away!, game.home!]} open={!vote.item.closed} failed={vote.failed} onVote={vote.onVote} onAlert={vote.onAlert} /> : null}
     </View>
   );
@@ -173,11 +144,4 @@ const styles = StyleSheet.create({
   small: { color: colors.textDim, fontSize: 12, fontWeight: '600', flexShrink: 1 },
   bar: { height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' },
   barFill: { height: '100%', backgroundColor: colors.hate },
-  ledger: { flexDirection: 'row', gap: 4 },
-  cell: { flex: 1, minWidth: 0, alignItems: 'center', paddingTop: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  cellIf: { borderStyle: 'dashed', opacity: 0.6 },
-  cellN: { color: colors.textFaint, fontSize: 10, fontWeight: '700' },
-  cellW: { color: colors.text, fontSize: 12, fontWeight: '800', marginTop: 1 },
-  cellS: { color: colors.textDim, fontSize: 10, marginTop: 1 },
-  cellMark: { alignSelf: 'stretch', height: 3, marginTop: 4 },
 });

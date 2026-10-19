@@ -174,6 +174,7 @@ export const ja: Record<Key, string> = {
   'event.mostHated': '最も嫌い',
   'event.favorite': '★ お気に入り',
   'event.gameShort': 'G{n}',
+  'event.gameOf': '{of}試合中{n}試合目',
   'event.coming': 'まもなく · 今後7日間',
   'event.whoLose': 'どちらに負けてほしい？',
   'event.toLose': '{team}に負けてほしい',

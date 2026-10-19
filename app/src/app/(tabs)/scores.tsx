@@ -13,7 +13,7 @@ import { Empty, LiveBadge, PrimaryButton, SectionHeader, useNow } from '../../co
 import { FilterBar, useFilter } from '../../components/FilterBar';
 import { GridRow } from '../../components/GridRow';
 import { chunkSections, useWebLayout } from '../../lib/webLayout';
-import { sectionTitle, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
+import { sectionTitle, byState, inWindow, oneCardPerSeries, upNextWhen, weekendDates } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
 import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard, UpcomingEvent } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
@@ -37,7 +37,7 @@ interface SessionAhead { kind: 'session'; key: string; name: string; at: number;
 /**
  * My games: today's games for the teams you track (and the teams of players you track): live first, then
  * later today, then finals. Scores, clocks and win probability update live over the socket (see store.tsx).
- * Then "Up next": each team's next game that isn't already a card here, soonest first. On a day with no
+ * Then "Up next": each team's next game that isn't already a card here or a cell of a series card's strip, soonest first. On a day with no
  * games (for the filter), that list is the screen, under "No games today" (UFC: fights; All: events).
  * All games: every game live now, then every one starting within a day, tracked or not, each by league,
  * re-read every 15s while it's showing (the socket only carries games you track; those use its fresher copy).
@@ -84,7 +84,7 @@ export default function ScoresScreen() {
     .map((state) => ({ title: sectionTitle(state), data: list.filter((g) => g.state === state) }))
     .filter((s) => s.data.length);
   const sections = useMemo(
-    () => byStateSections([...games.values()].filter((g) => inWindow(g, now) && (!filter.league || g.league === filter.league)).sort(byState)),
+    () => byStateSections(oneCardPerSeries([...games.values()].filter((g) => inWindow(g, now) && (!filter.league || g.league === filter.league))).sort(byState)),
     [games, filter.league, now]);
   // Special Events: postseason games (the server's `event`), from the All list and your own, with the socket's fresher copy;
   // then the games and series still a few days off (a series' first game is only there, not also as a card), each with its vote.
@@ -94,10 +94,8 @@ export default function ScoresScreen() {
     const later = new Set(upcoming.map((u) => u.game.key));
     for (const g of [...allGames, ...games.values()]) if (g.event && !later.has(g.key) && inWindow(g, now) && (!filter.league || g.league === filter.league)) m.set(g.key, games.get(g.key) ?? g);
     // One list with no Live now / Later today / Final headers: a series card says its own status, and "Final" over a series still under way reads as over.
-    // One card per series: its newest game (the live or coming one, else the last final); earlier games are the ledger strip's cells.
-    const newest = new Map<string, GameCard>();
-    for (const g of m.values()) { const k = g.event?.seriesKey; if (k && (!newest.get(k) || g.startsAt > newest.get(k)!.startsAt)) newest.set(k, g); }
-    const shown = [...m.values()].filter((g) => !g.event?.seriesKey || newest.get(g.event.seriesKey) === g).sort(byState);
+    // One card per series: the game on now, else the next, else the last final; earlier games are the ledger strip's cells.
+    const shown = oneCardPerSeries([...m.values()]).sort(byState);
     return [...(shown.length ? [{ title: '', data: shown }] : []), ...(upcomingShown.length ? [{ title: t('event.coming'), data: upcomingShown.map((u) => u.game), upcoming: true }] : [])];
   }, [allGames, games, filter.league, now, upcoming, upcomingShown, t]);
   // Special Events is a switch only while it has something to show; a pick of it falls back to My when it empties.
@@ -118,9 +116,10 @@ export default function ScoresScreen() {
     setVoteFailed(null);
     api.alertEvent(item.voteKey, on).then((r) => { const swap = (all: UpcomingEvent[]) => all.map((u) => (u.voteKey === item.voteKey ? r.event : u)); setUpcoming(swap); setStarted(swap); refreshFollows().catch(() => {}); }, () => setVoteFailed(item.voteKey));
   };
-  // Up next: not one already on the tab as a card, and only games still to come.
+  // Up next: not one already on the tab as a card (or in a card's series strip), and only games still to come.
   const next = useMemo(() => {
-    const shown = new Set(sections.flatMap((s) => s.data.map((g) => g.key)));
+    // a series' later games are on its card's strip, so they aren't "up next" too
+    const shown = new Set(sections.flatMap((s) => s.data.flatMap((g) => [g.key, ...((g.series?.games ?? g.event?.games)?.map((x) => `${g.league}:${x.id}`) ?? [])])));
     return upNext.filter((n) => !shown.has(n.key) && n.startsAt > now - 3600_000 && (!filter.league || n.league === filter.league));
   }, [upNext, sections, filter.league, now]);
 
@@ -128,8 +127,8 @@ export default function ScoresScreen() {
   const leagueName = (id: string) => leagueInfo(id)?.name ?? id.toUpperCase();
   // All games: live by league, then upcoming by league (the server sends them in that order). A game you
   // track comes from the socket-fed store, which is ahead of the 15s read; one that has ended since drops off.
-  const everyGame = useMemo(() => allGames
-    .map((g) => games.get(g.key) ?? g)
+  const everyGame = useMemo(() => oneCardPerSeries(allGames
+    .map((g) => games.get(g.key) ?? g))
     .filter((g) => (g.state === 'in' || (g.state === 'pre' && inWindow(g, now))) && (!filter.league || g.league === filter.league)), [allGames, games, filter.league, now]);
   const allSections = useMemo(() => {
     const out: { title: string; kind: string; data: GameCard[] }[] = [];

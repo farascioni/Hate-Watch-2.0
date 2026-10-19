@@ -174,6 +174,7 @@ export const fr: Record<Key, string> = {
   'event.mostHated': 'Le plus détesté',
   'event.favorite': '★ Favori',
   'event.gameShort': 'M{n}',
+  'event.gameOf': 'Match {n} sur {of}',
   'event.coming': 'À venir · 7 prochains jours',
   'event.whoLose': 'Qui voulez-vous voir perdre ?',
   'event.toLose': '{team} perd',

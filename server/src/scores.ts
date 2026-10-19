@@ -36,6 +36,8 @@ export interface LivePlayer { id: string; key: string; name: string; line?: stri
 export interface EventLine { periods: number[]; h?: number; e?: number; rec?: string; split?: string }
 /** One game of a postseason series, from the team's ESPN schedule (series.ts). `winner` is a team key, `score` the winner's first. */
 export interface SeriesGame { n: number; id: string; state: 'pre' | 'in' | 'post'; startsAt: number; ifNeeded?: boolean; winner?: string; score?: [number, number] }
+/** An MLB regular-season series: the key its saved games are filed under and each of its games (`n` is its place; the length is its number of games). */
+export interface RegularSeries { key: string; games: SeriesGame[] }
 export interface GameCard {
   key: string;            // `${league}:${ESPN event id}` (F1: `f1:${session id}`)
   league: League;
@@ -55,6 +57,8 @@ export interface GameCard {
     /** Once it starts: each side's box line, for the Special Events banner's scoreboard. */
     lines?: { home: EventLine; away: EventLine };
   };
+  /** MLB regular season: the series this game is in, once series.ts has read the home team's schedule (the playoffs' `event.games` is the same ledger). */
+  series?: RegularSeries;
   home?: Side;
   away?: Side;
   possession?: string;    // NFL: team key with the ball
@@ -424,10 +428,19 @@ export const getGame = (key: string) => cards.get(key);
 
 /** Postseason series' results (series.ts reads them from the team schedules), added to each of the series' cards. A handful per postseason, so never pruned. */
 const seriesGames = new Map<string, SeriesGame[]>();
+/** Regular-season MLB series (series.ts regularSeries), by game key; dropped with the card (pruneGames). */
+const cardSeries = new Map<string, RegularSeries>();
 const withSeries = (g: GameCard): GameCard => {
   const games = g.event?.seriesKey ? seriesGames.get(g.event.seriesKey) : undefined;
-  return games && g.event ? { ...g, event: { ...g.event, games } } : g;
+  if (games && g.event) return { ...g, event: { ...g.event, games } };
+  const series = cardSeries.get(g.key);
+  return series ? { ...g, series } : g;
 };
+export function setCardSeries(gameKey: string, series: RegularSeries) {
+  cardSeries.set(gameKey, series);
+  const g = cards.get(gameKey);
+  if (g) upsertGame(g);
+}
 export function setSeriesGames(key: string, games: SeriesGame[]) {
   seriesGames.set(key, games);
   for (const g of [...cards.values()]) if (g.event?.seriesKey === key) upsertGame(g);
@@ -486,7 +499,7 @@ export function patchGame(key: string, patch: { home?: number; away?: number; wi
 export function pruneGames(league: League, seen: Set<string>, now = Date.now()) {
   for (const [k, g] of cards) {
     if (g.league !== league || seen.has(k) || now - g.startsAt < 36 * 3600_000 || (g.state === 'post' && inWindow(g, now))) continue;
-    cards.delete(k); lastSent.delete(k); pitchCounts.delete(k);
+    cards.delete(k); lastSent.delete(k); pitchCounts.delete(k); cardSeries.delete(k);
   }
 }
 

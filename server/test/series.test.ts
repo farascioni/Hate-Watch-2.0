@@ -269,3 +269,54 @@ test('an earlier game of the ledger that the board already forgot is rebuilt fro
     assert.equal(reads, after, 'a game ESPN lacked is not read again, and a saved one is not either');
   } finally { E.seriesDeps.getJson = wasSeries; S.scoresDeps.getJson = wasScores; }
 });
+
+test('an MLB regular-season series: the home team\'s run of games against one opponent, a rain-out left out, a doubleheader in', () => {
+  const ev = (id: string, date: string, home: string, away: string, state: 'pre' | 'post', winner?: string, completed = state === 'post') => ({
+    id, date,
+    competitions: [{ status: { type: { state, completed } }, competitors: [home, away].map((t, i) => ({ id: t, homeAway: i ? 'away' : 'home', ...(state === 'post' && completed ? { winner: t === winner, score: { value: t === winner ? 5 : 2 } } : {}) })) }],
+  });
+  const res = { events: [
+    ev('1', '2026-09-01T23:00Z', '30', '4', 'post', '30'), // an earlier series, other opponent
+    ev('10', '2026-09-08T23:00Z', '5', '30', 'post', '5'),
+    ev('11', '2026-09-09T23:00Z', '5', '30', 'post', '30', false), // rained out: not a game
+    ev('12', '2026-09-10T17:00Z', '5', '30', 'post', '30'),
+    ev('13', '2026-09-10T23:00Z', '5', '30', 'pre'), // makeup, a doubleheader's second game
+    ev('14', '2026-09-15T23:00Z', '30', '5', 'pre'), // the return series, the other park
+  ] };
+  const s = E.regularSeries('mlb', res, '12')!;
+  assert.deepEqual(s.games.map((g) => [g.n, g.id, g.state]), [[1, '10', 'post'], [2, '12', 'post'], [3, '13', 'pre']]);
+  assert.equal(s.games[0].winner, 'team:mlb:5');
+  assert.equal(s.key, 'mlb:20260908:30-5', 'the day of its first game and the two teams');
+  assert.equal(E.regularSeries('mlb', res, '13')!.key, s.key, 'every game of the series files under one key');
+  assert.equal(E.regularSeries('mlb', res, '14'), null, 'a lone game is no series');
+  assert.equal(E.regularSeries('mlb', res, '999'), null);
+});
+
+test('a regular-season card on the board gets its series from the home team\'s schedule (real ESPN data), its final is saved, and the saved series goes 3 days after the last game', async () => {
+  const card = S.gameCard('mlb', fx('mlb-chw-cle-20260915.json').events[0])!;
+  assert.equal(card.event, undefined, 'ESPN gives a regular-season game no event');
+  S.upsertGame(card);
+  const T = card.startsAt + 4 * 3600_000;
+  const urls: string[] = [];
+  const wasSeries = E.seriesDeps.getJson, wasScores = S.scoresDeps.getJson;
+  E.seriesDeps.getJson = async (url: string) => { urls.push(url); return url.includes('schedule') ? fx('mlb-cle-regular-schedule.json') : { events: [] }; };
+  S.scoresDeps.getJson = async () => ({ boxscore: { players: [] } });
+  const reads = () => urls.filter((u) => u.includes('seasontype=2')).length;
+  try {
+    await E.refreshSeries(T);
+    assert.ok(urls.some((u) => u.includes('/teams/5/schedule') && u.includes('seasontype=2')), 'the home team\'s regular-season schedule is read');
+    const { series } = S.getGame(card.key)!;
+    assert.deepEqual(series!.games.map((g) => [g.n, g.id, g.state]), [[1, '401816934', 'post'], [2, '401816945', 'post'], [3, '401816960', 'post']]);
+    assert.equal(series!.key, 'mlb:20260914:4-5');
+    assert.ok(series!.games.every((g) => g.winner && g.score), 'ESPN\'s schedule gives each final its winner and score');
+    assert.ok(E.savedGame(card.key), 'the final on the board is saved for its strip');
+    const before = reads();
+    await E.refreshSeries(T + 5 * 60_000);
+    assert.equal(reads(), before, 'a finished series is read again only hours later, not every 2 minutes');
+    S.pruneGames('mlb', new Set(), T + 100 * 3600_000); // the board forgets it
+    await E.keepSeriesGames(card.startsAt + 2 * 86400_000);
+    assert.ok(E.savedGame(card.key), 'kept until 3 days after the last game');
+    await E.keepSeriesGames(card.startsAt + 4 * 86400_000);
+    assert.equal(E.savedGame(card.key), undefined, 'then dropped');
+  } finally { E.seriesDeps.getJson = wasSeries; S.scoresDeps.getJson = wasScores; }
+});

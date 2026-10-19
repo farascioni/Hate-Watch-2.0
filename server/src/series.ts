@@ -4,6 +4,10 @@
 //    (seasontype=3), keyed by `seriesKey` (not by game id: a rained-out game's makeup has a new id) and added
 //    to each of the series' cards as `event.games` (scores.ts setSeriesGames). Read often while a game is on or
 //    just ended, rarely otherwise.
+//  - Regular season (MLB): a series is the back-to-back games of the same two teams at one park (a gap over 3 days
+//    starts another), found in the home team's regular-season schedule (seasontype=2, regularSeries) and added to the
+//    card as `series` (scores.ts setCardSeries) so it shows the same strip as a playoff card, and its finals are saved like
+//    a playoff series'. No votes, alert toggle or Special Events. Read every 2 minutes while a game is on, else every 6 hours.
 //  - Upcoming: the scoreboards of the next 8 days (single dates: ESPN refuses ranges), the postseason games
 //    not yet started, a series once (its first game, while it's 0-0), a one-off game (a wild card is a series;
 //    the Super Bowl is one game) once. Every 30 minutes; a failed read keeps the last list.
@@ -26,17 +30,33 @@ import { getJson as espnGetJson, mapLimit } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import type { BoxScore } from './boxscore.ts';
 import { teamKey, urls, type League } from './leagues.ts';
-import { cardList, forgetDeviceTeams, gameCard, gameDetail, setSeriesGames, type GameCard, type SeriesGame } from './scores.ts';
+import { cardList, forgetDeviceTeams, gameCard, gameDetail, setCardSeries, setSeriesGames, type GameCard, type RegularSeries, type SeriesGame } from './scores.ts';
 
 /** Seam for tests (test/series.test.ts). Production never changes it. */
 export const seriesDeps = { getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number }) => Promise<any> };
 
 const LIVE_READ_MS = 60_000;          // a series with a game on, or a finished game its ledger lacks
 const IDLE_READ_MS = 30 * 60_000;     // between games
+const REG_LIVE_READ_MS = 2 * 60_000;  // regular season: the same, but up to 15 games at once
+const REG_IDLE_READ_MS = 6 * 3600_000;
+const REG_KEEP_MS = 3 * 86400_000;      // a regular-season series' saved games, after its last game
 const AHEAD_MS = 7 * 86400_000;
 const UPCOMING_LEAGUES: League[] = ['mlb', 'nfl', 'nba', 'nhl', 'wnba'];
 
 const headlineOf = (c: any): string => String((c?.notes ?? []).map((n: any) => n.headline).find(Boolean) ?? '');
+
+/** One game of a series from a schedule event; null for a postponed game (its makeup is a game of its own). score is the winner's then the loser's. */
+function seriesGameOf(lg: League, ev: any, n: number): SeriesGame | null {
+  const c = ev.competitions?.[0], state = c?.status?.type?.state;
+  if (state === 'post' && c.status.type.completed !== true) return null;
+  const won = c.competitors.find((x: any) => x.winner === true);
+  const lost = c.competitors.find((x: any) => x.winner === false);
+  const pts = (x: any) => Number(x.score?.value ?? x.score);
+  return {
+    n, id: String(ev.id), state, startsAt: Date.parse(ev.date),
+    ...(state === 'post' && won && lost ? { winner: teamKey(lg, String(won.id)), score: [pts(won), pts(lost)] as [number, number] } : {}),
+  };
+}
 
 /**
  * One series' games from a team's postseason schedule: oldest first, a postponed game left out (its makeup
@@ -50,20 +70,35 @@ export function ledgerFromSchedule(lg: League, res: any, name: string, a: string
     const [round] = headline.split(/\s+-\s+/);
     const ids = (c?.competitors ?? []).map((x: any) => String(x.id));
     if (round !== name || ids.length !== 2 || !ids.every((id: string) => want.has(id))) continue;
-    const state = c.status?.type?.state;
-    if (state === 'post' && c.status.type.completed !== true) continue; // postponed
     const n = Number(headline.match(/\bgame (\d+)/i)?.[1]);
     if (!Number.isFinite(n)) continue;
-    const won = c.competitors.find((x: any) => x.winner === true);
-    const lost = c.competitors.find((x: any) => x.winner === false);
-    const pts = (x: any) => Number(x.score?.value ?? x.score);
-    out.push({
-      n, id: String(ev.id), state, startsAt: Date.parse(ev.date),
-      ...(/\bif necessary\b/i.test(headline) ? { ifNeeded: true } : {}),
-      ...(state === 'post' && won && lost ? { winner: teamKey(lg, String(won.id)), score: [pts(won), pts(lost)] as [number, number] } : {}),
-    });
+    const g = seriesGameOf(lg, ev, n);
+    if (g) out.push({ ...g, ...(/\bif necessary\b/i.test(headline) ? { ifNeeded: true } : {}) });
   }
   return out.sort((x, y) => x.n - y.n);
+}
+
+/**
+ * The regular-season series a game is in, from the home team's schedule (seasontype=2): the run of back-to-back games
+ * of the same two teams at the same park, a postponed game left out and a gap of more than 3 days starting another.
+ * Null for a game not in it (the All-Star Game) or alone in its run. Pure, for tests on real payloads.
+ */
+export function regularSeries(lg: League, res: any, gameId: string): RegularSeries | null {
+  let run: { ev: any; home: string; pair: string }[] = [], found: typeof run | undefined;
+  const flush = () => { if (run.some((x) => String(x.ev.id) === gameId)) found = run; };
+  for (const ev of res?.events ?? []) {
+    const cs: any[] = ev.competitions?.[0]?.competitors ?? [];
+    const home = cs.find((x) => x.homeAway === 'home');
+    if (cs.length !== 2 || !home || (ev.competitions[0].status?.type?.state === 'post' && ev.competitions[0].status.type.completed !== true)) continue;
+    const next = { ev, home: String(home.id), pair: cs.map((x) => String(x.id)).sort().join('-') };
+    const last = run[run.length - 1];
+    if (last && (last.home !== next.home || last.pair !== next.pair || Date.parse(ev.date) - Date.parse(last.ev.date) > 3 * 86400_000)) { flush(); run = []; }
+    run.push(next);
+  }
+  flush();
+  if (!found || found.length < 2) return null;
+  const games = found.map((x, i) => seriesGameOf(lg, x.ev, i + 1)!);
+  return { key: `${lg}:${etDay(games[0].startsAt)}:${found[0].pair}`, games };
 }
 
 // ─── Ledgers ──────────────────────────────────────────────────────────────────────────────────
@@ -92,13 +127,32 @@ export async function refreshSeries(now = Date.now()) {
         if (games.length) setSeriesGames(key, games);
       } catch { /* try again next tick */ }
     });
+    await refreshRegular(now);
   } finally { reading = false; }
   endEventAlerts(now);
   await keepSeriesGames(now).catch(() => {}); // a failed read of ESPN's summary tries again next tick
 }
 
+/** The MLB regular-season games on the board, by home team: read that team's schedule when due and give each game its series. */
+async function refreshRegular(now: number) {
+  const byHome = new Map<string, GameCard[]>();
+  for (const g of cardList()) if (g.league === 'mlb' && !g.event && !g.home!.team.espnId.startsWith('-')) byHome.set(g.home!.team.espnId, [...(byHome.get(g.home!.team.espnId) ?? []), g]);
+  const due = [...byHome].filter(([home, cards]) => {
+    const behind = cards.some((g) => g.state === 'post' && g.series && !g.series.games.some((x) => x.id === g.id && x.winner));
+    return now - (readAt.get(`reg:${home}`) ?? 0) >= (behind || cards.some((g) => g.state === 'in') ? REG_LIVE_READ_MS : REG_IDLE_READ_MS);
+  });
+  await mapLimit(due, 3, async ([home, cards]) => {
+    try {
+      const res = await seriesDeps.getJson(`${urls.teamSchedule('mlb', home)}?seasontype=2`, { timeoutMs: 10_000 });
+      readAt.set(`reg:${home}`, now);
+      for (const g of cards) { const s = regularSeries('mlb', res, g.id); if (s) setCardSeries(g.key, s); }
+    } catch { /* try again next tick */ }
+  });
+}
+
 // ─── Saved box scores ─────────────────────────────────────────────────────────────────────────
-// A series' finished games stay tappable on its card for as long as the series is on Special Events, but the board forgets
+// A series' finished games stay tappable on its card for as long as the series is on Special Events (a regular-season
+// series: until 3 days after its last game), but the board forgets
 // a game a day and a half after it was played (scores.ts pruneGames) and ESPN's scoreboard has only today's. Each final is
 // saved (its card and box score) in `kv` under its series, and dropped once the series is won and no card of it is left
 // on the board. A series that never shows a winner (a postponed finish) is dropped after SERIES_ALERT_MS.
@@ -123,11 +177,11 @@ export async function keepSeriesGames(now = Date.now()) {
   const onBoard = new Set<string>(), keys = new Set(cardList().map((g) => g.key));
   const finals: { g: GameCard; sk: string }[] = [];
   for (const g of cardList()) {
-    const sk = g.event?.seriesKey;
+    const sk = g.event?.seriesKey ?? g.series?.key;
     if (!sk) continue;
     onBoard.add(sk);
     if (g.state === 'post') finals.push({ g, sk });
-    for (const l of g.event?.games ?? []) {
+    for (const l of g.event?.games ?? g.series?.games ?? []) {
       const key = `${g.league}:${l.id}`;
       if (l.state !== 'post' || missed.has(key) || keys.has(key) || kvGet<SavedSeries>(SAVED + sk)?.[key] || finals.some((f) => f.g.key === key)) continue;
       const old = await ledgerCard(g, l);
@@ -136,6 +190,7 @@ export async function keepSeriesGames(now = Date.now()) {
   }
   for (const { g, sk } of finals) {
     const have = kvGet<SavedSeries>(SAVED + sk)?.[g.key];
+    if (g.series && have && (have.box || now - have.at > 3600_000)) continue; // a regular-season final doesn't change: not rewritten every tick
     const box = have && (have.box || now - have.at > 3600_000) ? have.box : (await gameDetail(g).catch(() => null))?.box ?? null;
     kvSet(SAVED + sk, { ...kvGet<SavedSeries>(SAVED + sk), [g.key]: { card: g, box, at: have?.at ?? now } });
   }
@@ -143,7 +198,8 @@ export async function keepSeriesGames(now = Date.now()) {
     if (onBoard.has(k.slice(SAVED.length))) continue;
     const games = Object.values(kvGet<SavedSeries>(k) ?? {});
     const newest = games.reduce((a, b) => (b.card.startsAt > a.card.startsAt ? b : a), games[0]);
-    if (!newest || won(newest.card) || now - newest.card.startsAt > SERIES_ALERT_MS) db.prepare('DELETE FROM kv WHERE key = ?').run(k);
+    // a regular-season series is over when its last game was played 3 days ago (the board forgets a card after 36 hours)
+    if (!newest || won(newest.card) || now - newest.card.startsAt > (newest.card.series ? REG_KEEP_MS : SERIES_ALERT_MS)) db.prepare('DELETE FROM kv WHERE key = ?').run(k);
   }
 }
 
@@ -153,7 +209,7 @@ async function ledgerCard(from: GameCard, l: SeriesGame): Promise<GameCard | nul
     try {
       const ev = (await seriesDeps.getJson(urls.scoreboard(from.league, d), { timeoutMs: 10_000 }))?.events?.find((e: any) => String(e.id) === l.id);
       const c = ev && gameCard(from.league, ev);
-      if (c) return { ...c, event: c.event ?? from.event };
+      if (c) return { ...c, event: c.event ?? from.event, ...(from.series ? { series: from.series } : {}) };
     } catch { /* tried again on the next tick */ }
   }
   return null;
@@ -245,6 +301,7 @@ function openEvent(key: string, now: number): GameCard | undefined {
 // shortcut: a series has no known end date, so its alerts are cut off after 21 days (a best of 7 is about 2 weeks), a one-off game after 12 hours, if the board never shows the finish.
 const SERIES_ALERT_MS = 21 * 86400_000;
 const GAME_ALERT_MS = 12 * 3600_000;
+
 /** After the event is over, alerts last this long, so the deciding game's loss, recap and late ESPN edits still reach the device. */
 const OVER_GRACE_MS = 3 * 3600_000;
 const setFollow = (deviceId: string, team: string, g: GameCard, now: number) =>

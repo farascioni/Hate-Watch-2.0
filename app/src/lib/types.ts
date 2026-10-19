@@ -89,6 +89,8 @@ export interface GameCard {
   note?: string;
   /** Postseason (newer servers): the event ("ALCS", "Super Bowl LXI"), its game ("Game 5") and, for a series, how many games it runs to and who has won how many. */
   event?: EventInfo;
+  /** MLB regular season (newer servers): the series this game is in, its key and every game of it. */
+  series?: { key: string; games: SeriesGame[] };
   /** Finals that gave you a Successful Hate Watch: how many other people got it too (your copy of the card only). */
   hateWatch?: { alsoGot: number };
   home?: GameSide; away?: GameSide;
