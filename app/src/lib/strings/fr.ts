@@ -183,7 +183,7 @@ export const fr: Record<Key, string> = {
   'event.footer': 'Les matchs et séries des séries éliminatoires s\'affichent ici 7 jours avant le premier match, dès que les deux équipes sont connues. Les résultats s\'affichent après votre vote.',
   'event.at': 'à',
   'event.tapChange': 'Touchez une équipe pour changer votre vote',
-  'event.alertMe': "M'alerter quand {team} perd",
+  'event.alertMe': "M'alerter des défaites de {team}",
   'event.alertTracked': 'Vous suivez {team}',
   'scores.previewWeekend': 'Aperçu du week-end : la grille, le championnat, toutes les séances',
   'scores.noneDot': 'Pas de {what} aujourd’hui.',

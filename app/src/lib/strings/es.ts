@@ -188,7 +188,7 @@ export const es: Record<Key, string> = {
   'event.footer': 'Los juegos y series de playoffs aparecen aquí 7 días antes del primer juego, cuando se conocen los dos equipos. Los resultados se ven después de votar.',
   'event.at': 'en',
   'event.tapChange': 'Toca un equipo para cambiar tu voto',
-  'event.alertMe': 'Avísame cuando pierda {team}',
+  'event.alertMe': 'Avísame de las derrotas de {team}',
   'event.alertTracked': 'Ya sigues a {team}',
   'scores.previewWeekend': 'Adelanto del fin de semana: la parrilla, el campeonato, todas las sesiones',
   'scores.noneDot': 'Hoy no hay {what}.',

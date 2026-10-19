@@ -183,7 +183,7 @@ export const de: Record<Key, string> = {
   'event.footer': 'Playoff-Spiele und -Serien erscheinen hier 7 Tage vor dem ersten Spiel, sobald beide Teams feststehen. Die Ergebnisse siehst du nach deiner Stimme.',
   'event.at': 'bei',
   'event.tapChange': 'Tippe auf ein Team, um deine Stimme zu ändern',
-  'event.alertMe': 'Benachrichtige mich, wenn {team} verliert',
+  'event.alertMe': 'Benachrichtige mich über Niederlagen von {team}',
   'event.alertTracked': 'Du verfolgst {team}',
   'scores.previewWeekend': 'Vorschau aufs Wochenende: die Startaufstellung, die Meisterschaft, jede Session',
   'scores.noneDot': 'Heute keine {what}.',

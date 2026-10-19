@@ -192,7 +192,7 @@ export const en = {
   'event.footer': 'Playoff games and series show here 7 days before the first game, once both teams are set. Results show after you vote.',
   'event.at': 'at',
   'event.tapChange': 'Tap a team to change your vote',
-  'event.alertMe': 'Alert me when {team} loses',
+  'event.alertMe': 'Alert me about {team} losses',
   'event.alertTracked': 'You track {team}',
   'scores.previewWeekend': 'Preview the weekend: the grid, the championship, every session',
   'scores.leagueWord': '{league} {word}',
