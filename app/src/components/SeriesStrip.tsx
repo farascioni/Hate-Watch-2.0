@@ -18,12 +18,12 @@ export function SeriesStrip({ game, games, title }: { game: GameCard; games: Ser
   const sides = trackedSides(game, follows);
   const hated = sides.length === 1 ? sides[0] : undefined;
   const abbrevOf = (key: string) => (game.home?.team.key === key ? game.home : game.away)?.team.abbrev ?? '';
-  // The ledger is marked from one team's side: the one you hate (a win of theirs is red, a loss green), else a favorite (a win of theirs is gold).
+  // The ledger is marked from one team's side: the one you hate (a win of theirs is red, a loss green, or gold when the winner is a favorite), else a favorite (a win of theirs is gold).
   const focus = hated ? game[hated]?.team.key : (['home', 'away'] as const).map((k) => game[k]?.team).find((tm) => tm && favorites.has(tm.key))?.key;
   const mark = (g: SeriesGame) => {
     if (g.state === 'in') return colors.live;
     if (g.state !== 'post' || !g.winner || !focus) return colors.border;
-    if (hated) return g.winner === focus ? HATE_RED : colors.live;
+    if (hated) return g.winner === focus ? HATE_RED : favorites.has(g.winner) ? GOLD : colors.live;
     return g.winner === focus ? GOLD : colors.border;
   };
   const nextGame = games.find((g) => g.state === 'pre' && !g.ifNeeded && g.id !== game.id);
