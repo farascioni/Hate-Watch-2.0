@@ -58,6 +58,8 @@ test('link previews get a page whose preview image is the alert card', () => {
     assert.equal(meta(html, 'twitter:card'), 'summary_large_image');
     assert.equal(meta(html, 'apple-itunes-app'), 'app-id=6819054268');
     assert.match(html, new RegExp(`href="${APP_STORE_URL}"`), 'a download button for desktop and Android visitors');
+    assert.match(html, /<meta name="robots" content="noindex, follow">/, 'one thin page per alert stays out of search');
+    assert.match(html, /href="https:\/\/hatewatch\.dev\/about\/"/, 'a link back to the site');
   }
   const gone = shareLink('nope', DESKTOP, ORIGIN);
   assert.equal(gone.status, 404);

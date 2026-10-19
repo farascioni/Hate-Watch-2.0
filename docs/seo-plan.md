@@ -99,6 +99,8 @@ Done when: the homepage is indexed (URL Inspection), shows the right title in re
 
 ## Phase 3: shared alerts and the store listings
 
+**Status (2026-10-19): steps 1 and 2 built, not committed.** `sharePage` in `server/src/pages.ts` now adds `noindex, follow` and a visible "See how rival alerts work" link to `https://hatewatch.dev/about/` (the landing page, not `/`, which is the app); the test is in `server/test/share.test.ts` and `docs/sharing.md` has the decision. Because the pages are noindex, the link is for visitors, not for passing link equity (Google drops links from long-term noindex pages), so the plan's equity reason for step 1 is weak; the choice is kept because the pages are one thin page per alert. Needs a server deploy to take effect.
+
 1. **A link back to hatewatch.dev on every shared alert page. [server]** `server/src/pages.ts` builds the share page; add a visible link to the homepage. This sends some of the link equity the share pages earn on fly.dev to hatewatch.dev. Small, server deploy only.
 2. **Decide on purpose whether share pages are indexed. [server]** Each is one alert; `noindex` (or a canonical to the homepage) keeps thousands of thin pages from diluting the domain. Note the choice in `docs/sharing.md`.
 3. **Marketing URL and website. [you]** Set the App Store Connect "Marketing URL" and the Play Console store listing website to `https://hatewatch.dev`. Both are account settings and are among the few direct backlinks available.

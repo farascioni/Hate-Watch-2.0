@@ -115,7 +115,7 @@ app; you can also email ${mail}.</p>
 `);
 }
 
-/** The page behind an alert's share link. Its Open Graph tags make the link's preview a picture of the alert. */
+/** The page behind an alert's share link. Its Open Graph tags make the link's preview a picture of the alert. It is noindex (one thin page per alert would only dilute hatewatch.dev's search standing, docs/seo-plan.md Phase 3) and links to the site's landing page. */
 export function sharePage(o: { title: string; description: string; pageUrl: string; imageUrl: string | null; storeUrl: string; appId?: string }) {
   const image = o.imageUrl ? `
 <meta property="og:image" content="${esc(o.imageUrl)}">
@@ -126,6 +126,7 @@ export function sharePage(o: { title: string; description: string; pageUrl: stri
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${esc(o.imageUrl)}">` : '';
   const head = `
+<meta name="robots" content="noindex, follow">
 <meta name="description" content="${esc(o.description)}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Hate Watch">
@@ -137,7 +138,7 @@ export function sharePage(o: { title: string; description: string; pageUrl: stri
   return layout(o.title, `
 ${o.imageUrl ? `<img class="shot" src="${esc(o.imageUrl)}" width="1200" height="630" alt="${esc(o.title)}">` : `<h1>${esc(o.title)}</h1>`}
 <p><a class="cta" href="${esc(o.storeUrl)}">Download Hate Watch on the App Store</a></p>
-<p>Hate Watch tracks the players and teams you can't stand and tells you the second something goes wrong for them.</p>`, head);
+<p>Hate Watch tracks the players and teams you can't stand and tells you the second something goes wrong for them. <a href="https://hatewatch.dev/about/">See how rival alerts work</a>.</p>`, head);
 }
 
 export function supportPage() {
