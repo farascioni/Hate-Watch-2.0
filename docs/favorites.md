@@ -41,7 +41,7 @@ The README's "Favorite teams" has the summary; this is the full detail. Read thi
 
 ## Trying it
 
-In a development build, Settings has "🧪 Hate Watch Plus (dev): on/off" beside the test event (`useDevPlus` in `app/src/lib/plus.ts`, kept in `AsyncStorage` as `hw.devPlus`, `__DEV__` only): on, the device reads as subscribed everywhere. Run the server with `HW_DEV=1` (`docs/run-it.md`). "🧪 Send a test event" then picks at random among what the device follows and its favorites; for a favorite it registers a made-up game (`sim-game-<uuid>`) against another team of its league and publishes one of that team's alerts, which reaches the favorite's feed. Tests: `server/test/favorites.test.ts`.
+In a development build, Settings has "🧪 Hate Watch Plus (dev): on/off" beside the test event (`useDevPlus` in `app/src/lib/plus.ts`, kept in `AsyncStorage` as `hw.devPlus`, `__DEV__` only: `setDevPlus` returns at once otherwise, so the minifier drops the key from release builds, which CLAUDE.md's "Before a build" scan checks): on, the device reads as subscribed everywhere. Run the server with `HW_DEV=1` (`docs/run-it.md`). "🧪 Send a test event" then picks at random among what the device follows and its favorites; for a favorite it registers a made-up game (`sim-game-<uuid>`) against another team of its league and publishes one of that team's alerts, which reaches the favorite's feed. Tests: `server/test/favorites.test.ts`.
 
 ## Limits
 

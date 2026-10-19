@@ -65,7 +65,9 @@ const DEV_KEY = 'hw.devPlus';
 let devOn = false;
 const devListeners = new Set<() => void>();
 const devLoaded = __DEV__ ? AsyncStorage.getItem(DEV_KEY).then((v) => { devOn = v === '1'; devListeners.forEach((l) => l()); }).catch(() => {}) : Promise.resolve();
+// Behind __DEV__ so the minifier drops the body and the 'hw.devPlus' string from release builds (a strings scan of the archive finds nothing).
 export const setDevPlus = (on: boolean) => {
+  if (!__DEV__) return;
   devOn = on;
   devListeners.forEach((l) => l());
   AsyncStorage.setItem(DEV_KEY, on ? '1' : '0').catch(() => {});

@@ -118,5 +118,6 @@ export const api = {
   ufcCards: () => request<{ cards: UfcCard[] }>('GET', '/ufc/cards', undefined, false),
   ufcCard: (eventId: string) => request<UfcCard>('GET', `/ufc/cards/${enc(eventId)}`, undefined, false),
   deleteMe: () => request('DELETE', '/me'),
-  simulate: () => request('POST', '/dev/simulate', {}),
+  // Dev only (the Settings button is __DEV__ too); the guard keeps '/dev/simulate' out of release builds.
+  simulate: () => (__DEV__ ? request('POST', '/dev/simulate', {}) : Promise.reject(new Error('dev only'))),
 };
