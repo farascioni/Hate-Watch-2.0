@@ -22,7 +22,7 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
   done: { bg: '#0F2E1A', fg: colors.live },      // a Successful Hate Watch
 };
 
-/** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). An MLB regular-season game in a series (`game.series`) gets the series strip under the card (`SeriesStrip`). */
+/** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). A game in a series (`game.series` for MLB regular season, `game.event.games` for a postseason series) gets the series strip under the card (`SeriesStrip`). */
 export const GameCardView = memo(function GameCardView({ game, latest, now, big }: { game: GameCard; latest?: FeedItem; now: number; big?: boolean }) {
   const tx = useT();
   const { follows, favorites } = useStore();
@@ -76,14 +76,25 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   };
   const frame = [styles.card, mostHated && styles.mostHated, favorite && styles.favorite, game.state === 'post' && { opacity: 0.8 }];
   // MLB series (server/src/series.ts): the strip is a sibling of the card's button, never inside it.
-  if (game.series && game.series.games.length > 1) return (
+  // A postseason series (`game.event.games`, the Special Events card's ledger) gets the same strip in My and All Events.
+  const strip = game.series?.games ?? game.event?.games;
+  if (strip && strip.length > 1) return (
     <View style={frame}>
       <Pressable {...press} style={({ pressed }) => [{ gap: space(2), borderRadius: radius.md }, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>
-      <SeriesStrip game={game} games={game.series.games} title={seriesTitle(game, tx)} />
+      <SeriesStrip game={game} games={strip} title={game.series ? seriesTitle(game, tx) : eventSeriesTitle(game, tx)} />
     </View>
   );
   return <Pressable {...press} style={({ pressed }) => [...frame, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>;
 });
+
+/** "ALCS · Game 6 / 7 · Rays lead 3–2": a postseason game's place in its series, from ESPN's note and series score (as EventBanner's header). */
+function eventSeriesTitle(game: GameCard, tx: ReturnType<typeof useT>): string {
+  const ev = game.event!, w = ev.wins, need = ev.bestOf ? Math.ceil(ev.bestOf / 2) : 0;
+  const a = w ? Math.max(w.home, w.away) : 0, b = w ? Math.min(w.home, w.away) : 0;
+  const lead = !w || w.home === w.away ? null : w.home > w.away ? game.home! : game.away!;
+  const status = !w ? null : !lead ? tx('event.seriesTied', { a, b }) : tx(a >= need ? 'event.seriesWon' : 'event.seriesLeads', { team: lead.team.shortName, a, b });
+  return [ev.name, ev.game && ev.bestOf ? `${ev.game} / ${ev.bestOf}` : ev.game, status].filter(Boolean).join(' · ');
+}
 
 /** "Game 2 of 3 · Rays lead 1–0": this game's place in its regular-season series and the series so far. */
 function seriesTitle(game: GameCard, tx: ReturnType<typeof useT>): string {
