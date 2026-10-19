@@ -24,31 +24,31 @@ export const FBS_GROUP = '80';
  * look and filters change with a server deploy, not an app build.
  * `color`: its chip and tag. `kinds`: what its filter offers (teams, players or both). `players`: what its people are
  * called ("drivers"). `groupPlayers`: lists of its people grouped (the UFC's by weight class). `game`, `events`: what
- * one of its events is and what the Scores tab's switch says ("race", "fights"). `football`: its cards' down and
+ * one of its events is and what the Scores tab's switch says ("race", "fights"). `special`: the word on its Special Events segment ("playoffs", "bowls"; "events" when none fits). `football`: its cards' down and
  * distance, possession and timeouts. `divisions`: Search can sort its teams by division. `sportName`: the heading
  * it's listed under in the filter's More sheet ("Basketball", "Combat sports"), and `fullName` what that sheet's
  * search also finds it by ("English Premier League"): both filled in below, from SPORT_NAMES and LEAGUES.
  */
 export interface LeagueUi {
   color?: string; kinds: ('team' | 'player')[]; players: string; groupPlayers?: 'weightClass';
-  game: string; events: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
+  game: string; events: string; special: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
 }
-const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', divisions: true, ...x });
+const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', special: 'events', divisions: true, ...x });
 
 /**
  * `slug`: ESPN's id for the league in its URLs, when it isn't ours (soccer leagues are codes: the EPL is "eng.1").
  * `fullName`: ESPN's own name for it, where it splits a player's stats by competition (soccer).
  */
 export const LEAGUES: Record<League, { sport: string; name: string; slug?: string; fullName?: string; ui: LeagueUi }> = {
-  nba: { sport: 'basketball', name: 'NBA', ui: UI({ color: '#C9082A' }) },
-  mlb: { sport: 'baseball', name: 'MLB', ui: UI({ color: '#1D6FD8' }) },
-  nfl: { sport: 'football', name: 'NFL', ui: UI({ color: '#2E7D32', football: true }) },
-  nhl: { sport: 'hockey', name: 'NHL', ui: UI({ color: '#9CA3AF' }) },
+  nba: { sport: 'basketball', name: 'NBA', ui: UI({ color: '#C9082A', special: 'playoffs' }) },
+  mlb: { sport: 'baseball', name: 'MLB', ui: UI({ color: '#1D6FD8', special: 'playoffs' }) },
+  nfl: { sport: 'football', name: 'NFL', ui: UI({ color: '#2E7D32', football: true, special: 'playoffs' }) },
+  nhl: { sport: 'hockey', name: 'NHL', ui: UI({ color: '#9CA3AF', special: 'playoffs' }) },
   f1: { sport: 'racing', name: 'F1', ui: UI({ color: '#E10600', players: 'drivers', game: 'race', events: 'races', divisions: false }) },
   epl: { sport: 'soccer', name: 'EPL', slug: 'eng.1', fullName: 'English Premier League', ui: UI({ color: '#7B2FBE' }) },
   ufc: { sport: 'mma', name: 'UFC', ui: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false }) },
-  cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football', ui: UI({ color: '#B45309', kinds: ['team'], football: true }) },
-  wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C' }) },
+  cfb: { sport: 'football', name: 'CFB', slug: 'college-football', fullName: 'College Football', ui: UI({ color: '#B45309', kinds: ['team'], football: true, special: 'bowls' }) },
+  wnba: { sport: 'basketball', name: 'WNBA', ui: UI({ color: '#E8590C', special: 'playoffs' }) },
 };
 
 /** A sport's name for people, by ESPN's word for it (LEAGUES `sport`); one not here is its word, capitalized. */

@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 588 tests in 75 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 588 tests in 75 files, offline, in about 4 seconds, all passing on October 18, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 588 tests in 75 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 585 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 603 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -94,6 +94,8 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
+| `series.test.ts` | Special Events beyond today's scoreboard: a series' game-by-game ledger from a team's postseason schedule (a postponed game left out, "If Necessary" marked), the upcoming list (a series once as its first game, a wild card, a one-off game; none past a week, none with a team not yet decided, none once a series has started), and the votes (one per device, changeable, percentages withheld until the device has voted, closed at the first game's start; a started series stays open under its scoreboard until it is won, read from its newest game, then keeps its results for a device that voted) |
+| `series-card.test.ts` | Special Events: a postseason game's card carries its event (ALCS, Game 5), the series length and each side's wins; a series' Game 1 with no series from ESPN yet still gets its seriesKey; a one-game event has no series; regular-season games and doubleheader notes carry none |
 | `share.test.ts` | Share links: the `/a/<code>` page, its preview picture, the iPhone redirect to the App Store, codes for old alerts |
 | `share-styles.test.ts` | Share looks (ticket stub, void, boarding pass, parking ticket, scratch-off, torn): which looks each alert can be shared in, that each draws a 1200×630 card, that an unknown or inapplicable `?s=` is the classic card, the link's `og:image`, and `shareStyles` on the feed item |
 | `soccer.test.ts` | Fouls and dives, penalties conceded, losing the ball, passes given away, and a 3+ goal loss (Coventry 0-5 Brighton, Fulham 1-1 Man United) |

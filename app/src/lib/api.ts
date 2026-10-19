@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, LiveBoard, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
+import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, LiveBoard, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, UpcomingEvent, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 // Without it, a release build (a TestFlight build, or an over-the-air update published without it) uses production's,
@@ -104,6 +104,10 @@ export const api = {
   scores: () => request<{ games: GameCard[]; nextF1?: F1Weekend; upNext?: NextGame[] }>('GET', '/me/scores'),
   /** Every game live now, then every one starting within a day, tracked or not (the Scores tab's All games). */
   allScores: () => request<{ games: GameCard[] }>('GET', '/me/scores/all'),
+  /** Playoff games and series starting within 7 days, with the vote on who loses (a server from before it answers 404). */
+  upcomingEvents: () => request<{ events: UpcomingEvent[]; started?: UpcomingEvent[] }>('GET', '/me/events/upcoming'),
+  alertEvent: (voteKey: string, on: boolean) => request<{ event: UpcomingEvent }>('PUT', `/me/events/${enc(voteKey)}/alert`, { on }),
+  voteEvent: (voteKey: string, team: string) => request<{ event: UpcomingEvent }>('PUT', `/me/events/${enc(voteKey)}/vote`, { team }),
   hateWatches: () => request<HateWatchTally>('GET', '/me/hate-watches'),
   game: (key: string) => request<GameDetail>('GET', `/me/games/${enc(key)}`),
   /** Every F1 driver, by constructor (a server from before it answers 404). */

@@ -63,6 +63,20 @@ export interface FeedItem {
   clip?: Clip;
 }
 
+/** A postseason event's side of a scoreboard: runs by period (MLB: innings) and, in MLB, hits and errors; record and home/road split. */
+export interface EventLine { periods: number[]; h?: number; e?: number; rec?: string; split?: string }
+/** One game of a series, from its ledger (server/src/series.ts): `winner` is a team key, `score` the winner's then the loser's. */
+export interface SeriesGame { n: number; id: string; state: 'pre' | 'in' | 'post'; startsAt: number; ifNeeded?: boolean; winner?: string; score?: [number, number] }
+export interface EventInfo {
+  name: string; game?: string; bestOf?: number; wins?: { home: number; away: number };
+  /** Newer servers: the series' key, every game of it (the ledger) and, once started, each side's line score. */
+  seriesKey?: string; games?: SeriesGame[]; lines?: { home: EventLine; away: EventLine };
+}
+/** A playoff game or series in the next 7 days with its vote (GET /me/events/upcoming). `votes` (team key → count) only once this device has voted for `mine`. */
+export interface UpcomingEvent { voteKey: string; game: GameCard; closed?: boolean; mine?: string; votes?: Record<string, number>;
+  /** The alert toggle under the vote: 'event' = on for this event, 'tracked' = you already track that team. Absent = off. */
+  alert?: 'event' | 'tracked' }
+
 /** One game on the Scores tab (server/src/scores.ts). F1 sessions have `session` + `order` instead of sides. */
 export interface GameSide { team: Team; score: number | null; winner?: boolean }
 export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
@@ -73,6 +87,8 @@ export interface GameCard {
   endedAt?: number;
   /** Doubleheaders: "Game 1" / "Game 2". */
   note?: string;
+  /** Postseason (newer servers): the event ("ALCS", "Super Bowl LXI"), its game ("Game 5") and, for a series, how many games it runs to and who has won how many. */
+  event?: EventInfo;
   /** Finals that gave you a Successful Hate Watch: how many other people got it too (your copy of the card only). */
   hateWatch?: { alsoGot: number };
   home?: GameSide; away?: GameSide;

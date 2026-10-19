@@ -85,6 +85,13 @@ CREATE TABLE IF NOT EXISTS live_activities (
   most_hated TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL
 );
 
+-- Special Events votes (series.ts): who a device wants to lose, one vote per device per series or game, changeable.
+CREATE TABLE IF NOT EXISTS event_votes (
+  event_key TEXT NOT NULL, device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  team_key TEXT NOT NULL, voted_at INTEGER NOT NULL,
+  PRIMARY KEY (event_key, device_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `);
 
@@ -112,6 +119,10 @@ if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c
 // 1 on a favorite's row (favorites.ts): the device roots against this team's opponent, so it isn't a Successful Hate Watch and isn't counted in "N others got it" (RECIPIENTS).
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'fav')) {
   db.exec('ALTER TABLE feed ADD COLUMN fav INTEGER NOT NULL DEFAULT 0');
+}
+// A follow made by a Special Events vote's alert toggle (series.ts): it is that event's, and ends with it (event_until is the latest it can last).
+for (const col of ['event_key TEXT', 'event_until INTEGER']) {
+  if (!(db.prepare('PRAGMA table_info(follows)').all() as { name: string }[]).some((c) => c.name === col.split(' ')[0])) db.exec(`ALTER TABLE follows ADD COLUMN ${col}`);
 }
 // The device's lock screen scoreboard layout (live-activity.ts LAYOUTS): 0 compact, 1 detailed, 2 grid, 3 hero.
 if (!(db.prepare('PRAGMA table_info(live_activities)').all() as { name: string }[]).some((c) => c.name === 'layout')) {

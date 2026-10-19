@@ -4,6 +4,8 @@ import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { api } from '../../lib/api';
 import { GameCardView } from '../../components/GameCard';
+import { EventBanner } from '../../components/EventBanner';
+import { UpcomingCard } from '../../components/UpcomingEvent';
 import { UpNextRow } from '../../components/UpNextRow';
 import { F1Grid } from '../../components/F1Preview';
 import { UfcBoutRow, cardDate, fightTime } from '../../components/UfcCard';
@@ -13,7 +15,7 @@ import { GridRow } from '../../components/GridRow';
 import { chunkSections, useWebLayout } from '../../lib/webLayout';
 import { sectionTitle, byState, inWindow, upNextWhen, weekendDates } from '../../lib/scores';
 import { colors, radius, space } from '../../theme';
-import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard } from '../../lib/types';
+import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard, UpcomingEvent } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
 import { currentLocale, phrase, useT, wordT } from '../../lib/i18n';
 
@@ -22,8 +24,8 @@ const ALL_GAMES_MS = 15_000;
 /** And the UFC's cards, with its chip on (the server reads ESPN every 20 seconds while a fight's live, else every 5 minutes). */
 const UFC_MS = 30_000;
 
-type Mode = 'mine' | 'all';
-const MODES: Mode[] = ['mine', 'all'];
+type Mode = 'mine' | 'events' | 'all';
+const MODES: Mode[] = ['mine', 'events', 'all'];
 /** What the tab lists, by the league chip: games; the UFC's fights; every league at once, events (F1's: races, its own switch). */
 const eventsWord = (league?: string) => (!league ? 'events' : leagueUi(league).events); // the server's word for a league (leagueUi)
 /** F1 (its chip on): every session is everyone's, so the switch is when, not whose. */
@@ -39,44 +41,78 @@ interface SessionAhead { kind: 'session'; key: string; name: string; at: number;
  * games (for the filter), that list is the screen, under "No games today" (UFC: fights; All: events).
  * All games: every game live now, then every one starting within a day, tracked or not, each by league,
  * re-read every 15s while it's showing (the socket only carries games you track; those use its fresher copy).
+ * Special Events (between the two): the postseason games (`game.event`) as EventBanners, live, then later today, then finals.
  * F1's chip on: Live races (live now, then today's finished) and Upcoming races (the weekend's sprint,
  * qualifying and race still to come: a card once it's on the tab, else a row that opens the weekend preview).
  * The UFC's chip on: the next card and the one after (UfcScores).
  */
 export default function ScoresScreen() {
   const t = useT();
-  const { games, nextF1, upNext, refreshScores, follows, feed, leagues } = useStore();
+  const { games, nextF1, upNext, refreshScores, refreshFollows, follows, feed, leagues } = useStore();
   const { filter, setFilter } = useFilter();
-  const [mode, setMode] = useState<Mode>('mine');
+  const [picked, setMode] = useState<Mode>('mine');
   const [f1Pick, setF1Pick] = useState<F1Mode | null>(null);
   const [allGames, setAllGames] = useState<GameCard[]>([]);
   const [ufc, setUfc] = useState<UfcCard[] | null>(null);
   const [ufcFailed, setUfcFailed] = useState(false);
+  const [upcoming, setUpcoming] = useState<UpcomingEvent[]>([]);
+  const [started, setStarted] = useState<UpcomingEvent[]>([]);
+  const [voteFailed, setVoteFailed] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const now = useNow();
   const nav = useNavigation();
   useEffect(() => { nav.setOptions({ headerRight: () => <LiveBadge /> }); }, [nav]);
   const readAllGames = useCallback(() => api.allScores().then((r) => setAllGames(r.games)), []);
+  // Special Events' playoff games and series in the next 7 days, and the series under way, with your votes. An older server has none (404): the section just isn't there.
+  const readUpcoming = useCallback(() => api.upcomingEvents().then((r) => { setUpcoming(r.events); setStarted(r.started ?? []); }, () => {}), []);
   const readUfc = useCallback(() => api.ufcCards().then((r) => { setUfc(r.cards); setUfcFailed(false); }, () => setUfcFailed(true)), []);
   useFocusEffect(useCallback(() => {
     refreshScores().catch(() => {});
-    readAllGames().catch(() => {}); // the switch shows how many are live, in either view
+    readAllGames().catch(() => {}); // with the votes, they decide whether the Special Events switch shows at all
+    readUpcoming();
     if (filter.league === 'ufc') {
       readUfc();
       const timer = setInterval(() => { readUfc(); }, UFC_MS);
       return () => clearInterval(timer);
     }
-    if (mode !== 'all' && filter.league !== 'f1') return; // F1's views read every session, tracked or not
-    const timer = setInterval(() => { readAllGames().catch(() => {}); }, ALL_GAMES_MS);
+    if (picked === 'mine' && filter.league !== 'f1') return; // F1's views read every session, tracked or not
+    const timer = setInterval(() => { readAllGames().catch(() => {}); readUpcoming(); }, ALL_GAMES_MS);
     return () => clearInterval(timer);
-  }, [refreshScores, readAllGames, readUfc, mode, filter.league]));
+  }, [refreshScores, readAllGames, readUfc, readUpcoming, picked, filter.league]));
 
-  const sections = useMemo(() => {
-    const list = [...games.values()].filter((g) => inWindow(g, now) && (!filter.league || g.league === filter.league)).sort(byState);
-    return (['in', 'pre', 'post'] as const)
-      .map((state) => ({ title: sectionTitle(state), data: list.filter((g) => g.state === state) }))
-      .filter((s) => s.data.length);
-  }, [games, filter.league, now]);
+  const byStateSections = (list: GameCard[]) => (['in', 'pre', 'post'] as const)
+    .map((state) => ({ title: sectionTitle(state), data: list.filter((g) => g.state === state) }))
+    .filter((s) => s.data.length);
+  const sections = useMemo(
+    () => byStateSections([...games.values()].filter((g) => inWindow(g, now) && (!filter.league || g.league === filter.league)).sort(byState)),
+    [games, filter.league, now]);
+  // Special Events: postseason games (the server's `event`), from the All list and your own, with the socket's fresher copy;
+  // then the games and series still a few days off (a series' first game is only there, not also as a card), each with its vote.
+  const upcomingShown = useMemo(() => upcoming.filter((u) => !filter.league || u.game.league === filter.league), [upcoming, filter.league]);
+  const eventSections = useMemo((): { title: string; data: GameCard[]; upcoming?: boolean }[] => {
+    const m = new Map<string, GameCard>();
+    const later = new Set(upcoming.map((u) => u.game.key));
+    for (const g of [...allGames, ...games.values()]) if (g.event && !later.has(g.key) && inWindow(g, now) && (!filter.league || g.league === filter.league)) m.set(g.key, games.get(g.key) ?? g);
+    return [...byStateSections([...m.values()].sort(byState)), ...(upcomingShown.length ? [{ title: t('event.coming'), data: upcomingShown.map((u) => u.game), upcoming: true }] : [])];
+  }, [allGames, games, filter.league, now, upcoming, upcomingShown, t]);
+  // Special Events is a switch only while it has something to show; a pick of it falls back to My when it empties.
+  const mode: Mode = picked === 'events' && !eventSections.length ? 'mine' : picked;
+  const upcomingByGame = useMemo(() => new Map(upcoming.map((u) => [u.game.key, u])), [upcoming]);
+  const startedBySeries = useMemo(() => new Map(started.map((u) => [u.voteKey, u])), [started]);
+  // A series can show two cards (today's game and yesterday's final): only the newest carries the vote and its alert switch.
+  const voteCard = useMemo(() => {
+    const m = new Map<string, GameCard>();
+    for (const s of eventSections) for (const g of s.data) { const k = g.event?.seriesKey; if (k && (!m.get(k) || g.startsAt > m.get(k)!.startsAt)) m.set(k, g); }
+    return m;
+  }, [eventSections]);
+  const vote = (item: UpcomingEvent, team: string) => {
+    setVoteFailed(null);
+    api.voteEvent(item.voteKey, team).then((r) => { const swap = (all: UpcomingEvent[]) => all.map((u) => (u.voteKey === item.voteKey ? r.event : u)); setUpcoming(swap); setStarted(swap); }, () => setVoteFailed(item.voteKey));
+  };
+  const setEventAlert = (item: UpcomingEvent, on: boolean) => {
+    setVoteFailed(null);
+    api.alertEvent(item.voteKey, on).then((r) => { const swap = (all: UpcomingEvent[]) => all.map((u) => (u.voteKey === item.voteKey ? r.event : u)); setUpcoming(swap); setStarted(swap); refreshFollows().catch(() => {}); }, () => setVoteFailed(item.voteKey));
+  };
   // Up next: not one already on the tab as a card, and only games still to come.
   const next = useMemo(() => {
     const shown = new Set(sections.flatMap((s) => s.data.map((g) => g.key)));
@@ -135,7 +171,8 @@ export default function ScoresScreen() {
     return <Text style={styles.gridNote}>{t(s.name === 'Sprint' ? 'scores.gridAfterSprint' : 'scores.gridAfterQuali')}</Text>;
   };
 
-  const listed: { title: string; data: (GameCard | NextGame | SessionAhead)[]; upNext?: boolean; kind?: string }[] = f1Only ? f1Sections
+  const listed: { title: string; data: (GameCard | NextGame | SessionAhead)[]; upNext?: boolean; kind?: string; upcoming?: boolean }[] = f1Only ? f1Sections
+    : mode === 'events' ? eventSections
     : mode === 'all' ? allSections
     : next.length ? [...sections, { title: t('scores.section.upNext'), data: next, upNext: true }] : sections;
   // Card grid (web): a race's grid sits under its card, so F1 stays one to a row.
@@ -151,13 +188,14 @@ export default function ScoresScreen() {
   }, [feed]);
 
   const word = eventsWord(filter.league);
+  const specialWord = !filter.league ? 'events' : leagueUi(filter.league).special;
   const leagueWhat = filter.league ? t('scores.leagueWord', { league: leagueName(filter.league), word: wordT(t, word) }) : wordT(t, word);
   const tracked = [...follows.values()];
   const f1 = filter.league === 'f1' || (!filter.league && tracked.length > 0 && tracked.every((t) => t.league === 'f1'));
   const ufcOnly = filter.league === 'ufc';
-  const liveCount = ufcOnly ? (ufc?.[0]?.segments.flatMap((s) => s.bouts).filter((b) => b.state === 'in').length ?? 0) : everyGame.filter((g) => g.state === 'in').length;
+  const view: Mode = ufcOnly && mode === 'events' ? 'all' : mode; // the UFC has no special events: its switch is My / All
 
-  const onRefresh = async () => { setRefreshing(true); await Promise.all([refreshScores(), readAllGames(), ...(ufcOnly ? [readUfc()] : [])]).catch(() => {}); setRefreshing(false); };
+  const onRefresh = async () => { setRefreshing(true); await Promise.all([refreshScores(), readAllGames(), readUpcoming(), ...(ufcOnly ? [readUfc()] : [])]).catch(() => {}); setRefreshing(false); };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -175,21 +213,20 @@ export default function ScoresScreen() {
             })}
           </View>
         ) : <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={t('scores.whichGames')}>
-          {MODES.map((id) => {
-            const on = mode === id;
-            const label = phrase(t, id === 'all' ? 'scores.all' : 'scores.mine', word);
-            const text = id === 'all' && liveCount ? t('scores.liveCount', { label, n: liveCount }) : label;
+          {MODES.filter((id) => id !== 'events' || (!ufcOnly && eventSections.length > 0)).map((id) => {
+            const on = view === id;
+            const label = id === 'events' ? phrase(t, 'scores.special', specialWord) : phrase(t, id === 'all' ? 'scores.all' : 'scores.mine', word);
             return (
               <Pressable key={id} onPress={() => setMode(id)} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}
-                accessibilityLabel={id === 'all' ? `${phrase(t, 'scores.all', word)}${t('scores.allA11y')}${liveCount ? t('scores.allA11yLive', { n: liveCount }) : ''}` : t('scores.mineA11y', { Word: wordT(t, word)[0].toUpperCase() + wordT(t, word).slice(1) })}>
-                <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{text}</Text>
+                accessibilityLabel={id === 'events' ? label : id === 'all' ? `${label}${t('scores.allA11y')}` : t('scores.mineA11y', { Word: wordT(t, word)[0].toUpperCase() + wordT(t, word).slice(1) })}>
+                <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{label}</Text>
               </Pressable>
             );
           })}
         </View>}
         <FilterBar filter={filter} onChange={setFilter} kinds={false} />
       </View>
-      {ufcOnly ? <UfcScores cards={ufc} failed={ufcFailed} mode={mode} onAll={() => setMode('all')} refreshing={refreshing} onRefresh={onRefresh} /> : <SectionList<(GameCard | NextGame | SessionAhead)[], { title: string; upNext?: boolean; kind?: string }>
+      {ufcOnly ? <UfcScores cards={ufc} failed={ufcFailed} mode={view} onAll={() => setMode('all')} refreshing={refreshing} onRefresh={onRefresh} /> : <SectionList<(GameCard | NextGame | SessionAhead)[], { title: string; upNext?: boolean; kind?: string; upcoming?: boolean }>
         sections={rows}
         keyExtractor={(row, i) => `${row.map((g) => g.key).join('|')}:${i}`}
         // A day with no games for this filter: say so above what's next (unless what's next is today: a
@@ -205,8 +242,11 @@ export default function ScoresScreen() {
         renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} render={(item) => (section.upNext
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
+          : section.upcoming ? (() => { const u = upcomingByGame.get(item.key); return u ? <UpcomingCard item={u} now={now} failed={voteFailed === u.voteKey} onVote={(team) => vote(u, team)} onAlert={(on) => setEventAlert(u, on)} /> : null; })()
+          : mode === 'events' ? (() => { const g = item as GameCard, u = g.event?.seriesKey && voteCard.get(g.event.seriesKey) === g ? startedBySeries.get(g.event.seriesKey) : undefined; return <EventBanner game={g} now={now} vote={u ? { item: u, failed: voteFailed === u.voteKey, onVote: (team) => vote(u, team), onAlert: (on) => setEventAlert(u, on) } : undefined} />; })()
           : <>{<GameCardView game={item as GameCard} latest={latest.get((item as GameCard).id)} now={now} />}{f1Only && f1Mode === 'upcoming' ? gridUnder(item.key) : null}</>)} />}
         stickySectionHeadersEnabled={false}
+        ListFooterComponent={mode === 'events' && eventSections.length ? <Text style={styles.footnote}>{t('event.footer')}</Text> : null}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.hate} />}
         contentContainerStyle={{ paddingBottom: space(10), flexGrow: 1 }}
         ListEmptyComponent={f1Only && f1Mode === 'live' ? (
@@ -334,6 +374,7 @@ const styles = StyleSheet.create({
   aheadWhen: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   cardName: { color: colors.text, fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: space(4), marginHorizontal: space(4) },
   cardWhere: { color: colors.textDim, fontSize: 13, textAlign: 'center', marginTop: space(1), marginHorizontal: space(4) },
+  footnote: { color: colors.textFaint, fontSize: 12, lineHeight: 18, textAlign: 'center', marginHorizontal: space(4), marginTop: space(2) },
   gridNote: { color: colors.textFaint, fontSize: 13, marginHorizontal: space(4), marginTop: -space(1), marginBottom: space(3) },
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   // The same two-way switch as the Feed's Everything / Teams / Players (FilterBar).

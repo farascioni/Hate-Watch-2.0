@@ -21,6 +21,7 @@ import { withoutImages } from './images.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
+import { castVote, setAlert, startedFor, upcomingFor, type UpcomingItem } from './series.ts';
 import { statsFor } from './stats.ts';
 import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
@@ -168,7 +169,7 @@ route('GET', '/me/follows', true, (req) => ({
 route('PUT', '/me/follows/:key', true, (req, _u, [key]) => {
   const k = decodeURIComponent(key);
   if (!targetDto(k)) throw new HttpError(404, 'unknown team/player');
-  db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').run(req.deviceId!, k, Date.now());
+  db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?,?,?) ON CONFLICT (device_id, target_key) DO UPDATE SET event_key = NULL, event_until = NULL').run(req.deviceId!, k, Date.now());
   forgetDeviceTeams(req.deviceId!); // their Scores tab changes now
   engine.kick(); // a game in progress for this target starts tracking right now
   return { ok: true, trackers: trackers(k) };
@@ -211,6 +212,20 @@ route('DELETE', '/me/live-activity', true, (req) => { deleteLiveActivity(req.dev
 route('GET', '/me/scores', true, (req) => ({ games: withHateWatch(req.deviceId!, gamesFor(req.deviceId!)), nextF1: nextF1Weekend(), upNext: upNextFor([...deviceTeams(req.deviceId!).teams, ...favoritesOf(req.deviceId!).map((f) => f.team_key)]) }));
 // "All games" on the Scores tab: every game live now or starting within a day, tracked or not.
 route('GET', '/me/scores/all', true, (req) => ({ games: withHateWatch(req.deviceId!, allGames()) }));
+// Special Events: the playoff games and series starting within a week (events) and the series under way (started), and who this device wants to lose (series.ts). Percentages only after it voted.
+const withGame = (deviceId: string) => (e: UpcomingItem) => ({ ...e, game: withHateWatch(deviceId, [e.game])[0] });
+route('GET', '/me/events/upcoming', true, (req) => ({ events: upcomingFor(req.deviceId!).map(withGame(req.deviceId!)), started: startedFor(req.deviceId!).map(withGame(req.deviceId!)) }));
+route('PUT', '/me/events/:key/vote', true, (req, _u, [key], body) => {
+  const out = typeof body?.team === 'string' ? castVote(req.deviceId!, decodeURIComponent(key), body.team) : null;
+  if (!out) throw new HttpError(400, 'not open for voting, or not one of its teams');
+  return { event: { ...out, game: withHateWatch(req.deviceId!, [out.game])[0] } };
+});
+route('PUT', '/me/events/:key/alert', true, (req, _u, [key], body) => {
+  const out = typeof body?.on === 'boolean' ? setAlert(req.deviceId!, decodeURIComponent(key), body.on) : null;
+  if (!out) throw new HttpError(400, 'not open, or this device has not voted');
+  engine.kick(); // a game in progress for the team starts tracking right now
+  return { event: { ...out, game: withHateWatch(req.deviceId!, [out.game])[0] } };
+});
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   const game = getGame(decodeURIComponent(key));
   if (!game) throw new HttpError(404, 'game not found');

@@ -7,20 +7,20 @@ import type { LeagueInfo } from './types';
  * sends none: then this build's own (FALLBACK), which match what it said when this build was made.
  * `kinds`: what its filter offers. `players`: what its people are called. `groupPlayers`: the UFC's by weight
  * class. `game` / `events`: one event, and the Scores switch's word. `football`: down and distance, possession and
- * timeouts on its cards. `divisions`: Search can sort its teams by division. `sportName`: its heading in the
+ * timeouts on its cards. `special`: the word for its Special Events segment ("playoffs", "bowls"; "events" where there is no better one). `divisions`: Search can sort its teams by division. `sportName`: its heading in the
  * filter's More sheet ("Combat sports"); `fullName`: what that sheet's search also finds it by ("English Premier League").
  */
 export interface LeagueUi {
   color?: string; kinds: ('team' | 'player')[]; players: string; groupPlayers?: 'weightClass';
-  game: string; events: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
+  game: string; events: string; special: string; football?: boolean; divisions: boolean; sportName?: string; fullName?: string;
 }
-const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', divisions: true, ...x });
+const UI = (x: Partial<LeagueUi> = {}): LeagueUi => ({ kinds: ['team', 'player'], players: 'players', game: 'game', events: 'games', special: 'events', divisions: true, ...x });
 const FALLBACK: Record<string, LeagueUi> = {
-  nba: UI(), mlb: UI(), nhl: UI(), epl: UI(), wnba: UI(),
-  nfl: UI({ football: true }),
+  nba: UI({ special: 'playoffs' }), mlb: UI({ special: 'playoffs' }), nhl: UI({ special: 'playoffs' }), epl: UI(), wnba: UI({ special: 'playoffs' }),
+  nfl: UI({ football: true, special: 'playoffs' }),
   f1: UI({ players: 'drivers', game: 'race', events: 'races', divisions: false }),
   ufc: UI({ kinds: ['player'], players: 'fighters', groupPlayers: 'weightClass', game: 'fight', events: 'fights', divisions: false, sportName: 'Combat sports' }),
-  cfb: UI({ kinds: ['team'], football: true }),
+  cfb: UI({ kinds: ['team'], football: true, special: 'bowls' }),
 };
 
 let fromServer = new Map<string, Partial<LeagueUi>>();

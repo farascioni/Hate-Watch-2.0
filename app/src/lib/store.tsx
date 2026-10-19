@@ -38,6 +38,8 @@ interface Store {
   /** How many people track each of your players and teams, you included (the Tracking tab). */
   trackers: Map<string, number>;
   refreshTrackers: () => Promise<void>;
+  /** Reload what you track from the server (the Special Events alert toggle tracks a team for you), and the scores that follow from it. */
+  refreshFollows: () => Promise<void>;
   /** Newer hater counts from a list the server just sent (Search, a roster): the freshest number wins. */
   noteTrackers: (items: { key: string; haters?: number }[]) => void;
   isFollowing: (key: string) => boolean;
@@ -156,6 +158,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setGames(new Map(list.map((g) => [g.key, g])));
     setNextF1(next ?? null);
   }, []);
+  const refreshFollows = useCallback(async () => {
+    const f = await api.follows();
+    setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
+    setTrackers(countsFrom(f.follows));
+    await refreshScores();
+  }, [refreshScores]);
 
   // ── Realtime socket with backoff; on every (re)connect we re-sync the feed to close any gap.
   useEffect(() => {
@@ -240,7 +248,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<Store>(() => ({
-    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers,
+    ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, refreshFollows, noteTrackers,
     markSeen: () => setUnseen(0),
     refreshFeed,
     loadMore: async () => {
@@ -322,7 +330,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },
-  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, refreshFeed, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, noteTrackers]);
+  }), [ready, live, feed, unseen, eventTypes, leagues, leagueInfo, prefs, follows, favorites, push, refreshFeed, games, nextF1, upNext, refreshScores, hateWatches, trackers, refreshTrackers, refreshFollows, noteTrackers]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

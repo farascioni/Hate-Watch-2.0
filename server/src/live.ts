@@ -5,6 +5,7 @@ import { addBoxPlayers, catalog } from './catalog.ts';
 import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
+import { refreshSeries, refreshUpcoming } from './series.ts';
 import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
@@ -1475,6 +1476,8 @@ class LiveEngine {
     every(CFB_POLL_MS, () => scanCfbPoll()); // college football's AP Top 25: see cfb-poll.ts
     every(RECAP_MS, async () => weeklyRecaps());
     for (const lg of LEAGUE_IDS) if (!TEAMS_ONLY.has(lg)) every(NEWS_MS, () => scanNews(lg));
+    every(60_000, () => refreshSeries()); // Special Events: a postseason series' game-by-game ledger (series.ts decides which are due)
+    every(30 * 60_000, () => refreshUpcoming()); // ...and the playoff games starting within a week, for the vote
     this.upNextKick = startUpNext(() => new Set([...watchedTeamKeys(), ...favoriteTeamKeys()])); // the Scores tab's "Up next": tracked teams and Plus favorites
   }
 

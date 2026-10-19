@@ -2,7 +2,7 @@
 // every 10s (and each tracked live game's summary every 2s, F1's scoreboard every 30s). This keeps one
 // card per game from those reads and pushes { kind: 'score', game } to connected devices that track a
 // team in the game, or a player on one. GET /me/scores lists a device's games, GET /me/scores/all every
-// game live or starting within a day (tracked or not); GET /me/games/<key> adds its alerts from that game and the play-by-play.
+// game live or starting within a day (tracked or not); a postseason card carries `event` (ESPN's note "ALCS - Game 5", the series length and wins) for the app's Special Events view; GET /me/games/<key> adds its alerts from that game and the play-by-play.
 import { getJson as espnGetJson } from './espn.ts';
 import { db } from './db.ts';
 import { catalog, teamDto } from './catalog.ts';
@@ -32,6 +32,10 @@ export interface Driver {
 }
 /** MLB: who's pitching and who's up. `line` is ESPN's (pitcher "4.1 IP, 0 ER, 5 K"; batter "0-2" today). */
 export interface LivePlayer { id: string; key: string; name: string; line?: string; pitches?: number }
+/** One side's line on the scoreboard: its score by inning or period, MLB hits and errors, its record and its home or road record. */
+export interface EventLine { periods: number[]; h?: number; e?: number; rec?: string; split?: string }
+/** One game of a postseason series, from the team's ESPN schedule (series.ts). `winner` is a team key, `score` the winner's first. */
+export interface SeriesGame { n: number; id: string; state: 'pre' | 'in' | 'post'; startsAt: number; ifNeeded?: boolean; winner?: string; score?: [number, number] }
 export interface GameCard {
   key: string;            // `${league}:${ESPN event id}` (F1: `f1:${session id}`)
   league: League;
@@ -43,6 +47,14 @@ export interface GameCard {
   detail: string;         // ESPN's short status: "Q4 - 2:14", "Bot 8th", "Final/OT" ('' before the start)
   /** Doubleheaders: "Game 1" / "Game 2", from ESPN's note ("Doubleheader - Game 1 - Makeup from May 23"). */
   note?: string;
+  /** Postseason: ESPN's note split into the event ("ALCS", "Super Bowl LXI") and its game ("Game 5"), with the series score when it is a series. */
+  event?: {
+    name: string; game?: string; bestOf?: number; wins?: { home: number; away: number };
+    /** A best-of series: the key its results are filed under (series.ts), and those results (each game of it, "if needed" ones too). */
+    seriesKey?: string; games?: SeriesGame[];
+    /** Once it starts: each side's box line, for the Special Events banner's scoreboard. */
+    lines?: { home: EventLine; away: EventLine };
+  };
   home?: Side;
   away?: Side;
   possession?: string;    // NFL: team key with the ball
@@ -116,6 +128,9 @@ export function competitorScore(lg: League, c: any): number {
   return Number.isFinite(sum) ? Math.max(score, sum) : score;
 }
 
+/** A series' key: its league, round and the two teams (the same whichever hosts), so a makeup game under a new id is still the same series. */
+export const seriesKey = (lg: League, name: string, a: unknown, b: unknown) => `${lg}:${name}:${[String(a), String(b)].sort().join('-')}`;
+
 /** One game from a scoreboard event (NBA, MLB, NFL, NHL, EPL, college football). Pure, so it can be tested on real payloads. */
 export function gameCard(lg: League, ev: any): GameCard | null {
   const c = ev?.competitions?.[0];
@@ -145,6 +160,30 @@ export function gameCard(lg: League, ev: any): GameCard | null {
   const doubleheader = (c.notes ?? []).map((n: any) => String(n.headline ?? '')).find((h: string) => /doubleheader/i.test(h));
   const gameNo = doubleheader?.match(/\bgame (\d)\b/i)?.[1];
   if (gameNo) card.note = `Game ${gameNo}`;
+  const headline = (c.notes ?? []).map((n: any) => String(n.headline ?? '')).find((h: string) => h && !/doubleheader/i.test(h));
+  if (headline && ev.season?.slug === 'post-season') {
+    const [name, game] = headline.split(/\s+-\s+/);
+    const best = c.series?.type === 'playoff' ? Number(c.series.totalCompetitions) : 0;
+    const wins = (x: any) => Number(c.series?.competitors?.find((s: any) => String(s.id) === String(x.id))?.wins ?? 0);
+    card.event = {
+      name, ...(game ? { game } : {}),
+      ...(best > 1 ? { bestOf: best, wins: { home: wins(home), away: wins(away) } } : {}),
+      // ESPN sends no series before a series' first game: "Game 1" alone still makes it a series.
+      ...(best > 1 || /^game \d/i.test(game ?? '') ? { seriesKey: seriesKey(lg, name, home.id, away.id) } : {}),
+    };
+    if (state !== 'pre') {
+      const line = (x: any): EventLine => {
+        const rec = (t: string) => x.records?.find((r: any) => r.type === t)?.summary;
+        const split = rec(x.homeAway === 'home' ? 'home' : 'road');
+        return {
+          periods: (x.linescores ?? []).map((l: any) => Number(l.value ?? 0)),
+          ...(lg === 'mlb' ? { h: Number(x.hits ?? 0), e: Number(x.errors ?? 0) } : {}),
+          ...(rec('total') ? { rec: String(rec('total')) } : {}), ...(split ? { split: String(split) } : {}),
+        };
+      };
+      card.event.lines = { home: line(home), away: line(away) };
+    }
+  }
   const sit = c.situation;
   if (state === 'in' && sit) {
     if (FOOTBALL.has(lg)) {
@@ -383,13 +422,24 @@ const withPitches = (g: GameCard): GameCard => {
 };
 export const getGame = (key: string) => cards.get(key);
 
+/** Postseason series' results (series.ts reads them from the team schedules), added to each of the series' cards. A handful per postseason, so never pruned. */
+const seriesGames = new Map<string, SeriesGame[]>();
+const withSeries = (g: GameCard): GameCard => {
+  const games = g.event?.seriesKey ? seriesGames.get(g.event.seriesKey) : undefined;
+  return games && g.event ? { ...g, event: { ...g.event, games } } : g;
+};
+export function setSeriesGames(key: string, games: SeriesGame[]) {
+  seriesGames.set(key, games);
+  for (const g of [...cards.values()]) if (g.event?.seriesKey === key) upsertGame(g);
+}
+
 /**
  * Store a card from a scoreboard read (or a tracker update) and push it if anything changed. While a
  * game is live, each side's score only goes up: the scoreboard trails the play-by-play the tracker
  * reads by several seconds, and a stale read must not undo a run the feed already announced.
  */
 export function upsertGame(next: GameCard) {
-  next = withPitches(next); // the scoreboard has the pitcher; the box score has his pitch count
+  next = withSeries(withPitches(next)); // the scoreboard has the pitcher; the box score has his pitch count
   const prev = cards.get(next.key);
   if (prev && next.state === 'in' && prev.state === 'in') {
     for (const s of ['home', 'away'] as const) {

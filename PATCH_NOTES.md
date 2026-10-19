@@ -7,6 +7,10 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): the event and game, both teams with their scores, the inning-by-inning line score while it is on, the series line ("Series tied 2 - 2") and the series game by game, with each game's score and winner. The border is red when a most hated team is in it, gold for a favorite.
+- Scores: under those games, "Coming up" lists the playoff games and series starting in the next 7 days, with "Who do you want to lose?". Vote for either team; then you see what share of fans voted for each, and you can change your vote until the first game starts. A series that has started keeps the vote (and the share of fans) under its scoreboard until it is won. The Special Events view hides when there is nothing to show, and is named for the league picked: Playoffs for MLB, NBA, NFL, NHL and WNBA, Bowl Games for college football, Special Events for All.
+- Scores: under your vote in Special Events there is an "Alert me when (team) loses" switch, off by default. On, the team you voted to lose is tracked for you: its alerts reach you like any team you track, and it shows in Tracking. For a series it ends by itself, silently, once the series is won; for a one-off game such as the Super Bowl it covers that game only. Changing your vote moves the alert to the other team; a team you already track is left alone.
+- Server: cards carry the event, the series and each game's result from ESPN's postseason schedule; a new vote table. Until the server update, the Special Events view stays hidden.
 - Server: the MLB "Opponent has runners in scoring position" alert now sends a second alert in the same half-inning when a runner steals third (or reaches it on a wild pitch or passed ball) after the first one went out. TB at CLE, October 18: Simpson doubled, then stole third, and the steal got nothing because the half-inning's one alert was used.
 
 ## Build 20 (October 18, 2026)
