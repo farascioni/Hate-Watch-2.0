@@ -41,7 +41,7 @@ interface SessionAhead { kind: 'session'; key: string; name: string; at: number;
  * games (for the filter), that list is the screen, under "No games today" (UFC: fights; All: events).
  * All games: every game live now, then every one starting within a day, tracked or not, each by league,
  * re-read every 15s while it's showing (the socket only carries games you track; those use its fresher copy).
- * Special Events (between the two): the postseason games (`game.event`) as EventBanners, live, then later today, then finals.
+ * Special Events (between the two): the postseason games (`game.event`) as EventBanners, live, then later today, then finals, under no section headers.
  * F1's chip on: Live races (live now, then today's finished) and Upcoming races (the weekend's sprint,
  * qualifying and race still to come: a card once it's on the tab, else a row that opens the weekend preview).
  * The UFC's chip on: the next card and the one after (UfcScores).
@@ -93,7 +93,9 @@ export default function ScoresScreen() {
     const m = new Map<string, GameCard>();
     const later = new Set(upcoming.map((u) => u.game.key));
     for (const g of [...allGames, ...games.values()]) if (g.event && !later.has(g.key) && inWindow(g, now) && (!filter.league || g.league === filter.league)) m.set(g.key, games.get(g.key) ?? g);
-    return [...byStateSections([...m.values()].sort(byState)), ...(upcomingShown.length ? [{ title: t('event.coming'), data: upcomingShown.map((u) => u.game), upcoming: true }] : [])];
+    // One list with no Live now / Later today / Final headers: a series card says its own status, and "Final" over a series still under way reads as over.
+    const shown = [...m.values()].sort(byState);
+    return [...(shown.length ? [{ title: '', data: shown }] : []), ...(upcomingShown.length ? [{ title: t('event.coming'), data: upcomingShown.map((u) => u.game), upcoming: true }] : [])];
   }, [allGames, games, filter.league, now, upcoming, upcomingShown, t]);
   // Special Events is a switch only while it has something to show; a pick of it falls back to My when it empties.
   const mode: Mode = picked === 'events' && !eventSections.length ? 'mine' : picked;
@@ -238,7 +240,7 @@ export default function ScoresScreen() {
         ) : null) : mode === 'mine' && !sections.length && next.length && !upNextWhen(next[0].startsAt, true, now).isToday ? (
           <Text style={styles.none}>{t('scores.noneDot', { what: leagueWhat })}</Text>
         ) : null}
-        renderSectionHeader={({ section }) => <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${t(`scores.kind.${section.kind}` as never)}` : ''}</SectionHeader>}
+        renderSectionHeader={({ section }) => !section.title ? null : <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${t(`scores.kind.${section.kind}` as never)}` : ''}</SectionHeader>}
         renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} render={(item) => (section.upNext
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
