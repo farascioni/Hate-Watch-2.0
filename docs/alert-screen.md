@@ -15,7 +15,7 @@ The README's "An alert on its own screen" has the summary; this is the full deta
 
 **In short:** A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the copy that was tapped. A developer notice opens the same way, from Hate Watch, with no page to open and nothing to share.
 
-**Where it opens from:** any alert card (`FeedCard`): the Feed, a game's "Your alerts from this game", a player's or team's "Recent misery", and a shared alert's screen. The card shows the title and three lines of the body; tapping it calls `openAlert` (`app/src/lib/alerts.ts`), which remembers the tapped alert in memory and opens `/alert/<id>` (the id URL-encoded, and decoded again on the screen, as is if it can't be).
+**Where it opens from:** any alert card (`FeedCard`): the Feed, a game's "Your alerts from this game", a player's or team's "Recent Misery", and a shared alert's screen. The card shows the title and three lines of the body; tapping it calls `openAlert` (`app/src/lib/alerts.ts`), which remembers the tapped alert in memory and opens `/alert/<id>` (the id URL-encoded, and decoded again on the screen, as is if it can't be).
 
 **What's on it, top to bottom:**
 

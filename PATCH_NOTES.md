@@ -20,6 +20,7 @@ FEED AND SCORES
 - When a newer build is out, the app shows "Update available" with Update (opens TestFlight or the App Store) and Later, once per build. (Update)
 - The red X on the Tracking tab is now shown only to Hate Watch Plus subscribers. (Update)
 - The Tracking tab's classic cards keep all four icons (X, bell, gear, minus) on one line. (Update)
+- English filter labels are capitalized the same way as the rest of the Scores switch: Live Races and Upcoming Races (F1), Most Hated (Tracking), By Division (Search), and the Box Score and Recent Misery tabs. (Update)
 - A favorite team's game now shows under My games on Scores, not only in Up next, and its live score updates there. Up next lists each favorite team's next game too. (Update)
 - Colors: a favorite team's alerts, game cards and Up next rows are edged gold, a most hated team's red, everywhere (Feed, My games, All games). Most hated is now a red X in place of the star; unfollow is a minus. (Update)
 - Hate Watch Plus: favorite an F1 constructor (the heart on its page). Its drivers are gold with a heart in the race results, grid and tables; a most hated constructor's are red, and red wins if it is both. With the gold accent, tracked drivers are a neutral grey highlight. (Update) Saving the heart needs the next server update.
