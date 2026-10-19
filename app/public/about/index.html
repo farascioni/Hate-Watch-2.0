@@ -35,6 +35,11 @@ ol,ul{padding-left:22px;margin:0 0 16px}
 li{margin-bottom:8px}
 .leagues{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}
 .leagues li{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 14px;margin:0;font-weight:600}
+.shots{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 16px}
+.shots figure{margin:0}
+.shots img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);display:block}
+.shots figcaption{font-size:.85rem;color:var(--muted);margin-top:6px}
+@media(max-width:520px){.shots{grid-template-columns:1fr 1fr 1fr;gap:8px}.shots figcaption{font-size:.75rem}}
 details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
 summary{font-weight:700;cursor:pointer}
 details p{margin:10px 0 0;color:var(--muted)}
@@ -57,11 +62,17 @@ footer a{margin-right:16px}
 <li><strong>Get the alert as it happens.</strong> A notification on your phone, and a feed you can scroll back through.</li>
 </ol>
 
+<div class="shots">
+<figure><img src="/about/search.jpg" width="520" height="1127" alt="Hate Watch search screen listing four teams matching Boston, each with a Track button and a count of how many people root against them" loading="lazy"><figcaption>Search any team or athlete</figcaption></figure>
+<figure><img src="/about/tracking.jpg" width="520" height="1127" alt="Hate Watch Tracking screen showing six tracked teams across NBA, NHL, MLB and NFL, each with a hater count and alert controls" loading="lazy"><figcaption>Everyone you track</figcaption></figure>
+<figure><img src="/about/alert-settings.jpg" width="520" height="1127" alt="Hate Watch settings listing NBA alert types such as gets blocked, misses a free throw and technical foul, each with its own push toggle" loading="lazy"><figcaption>Pick the alerts per league</figcaption></figure>
+</div>
+
 <h2>Nine leagues in one app</h2>
 <ul class="leagues">
-<li>NFL</li><li>NBA</li><li>WNBA</li><li>MLB</li><li>NHL</li><li>College football</li><li>Premier League</li><li>Formula 1</li><li>UFC</li>
+<li><a href="/leagues/nfl/">NFL</a></li><li><a href="/leagues/nba/">NBA</a></li><li>WNBA</li><li><a href="/leagues/mlb/">MLB</a></li><li>NHL</li><li>College football</li><li>Premier League</li><li>Formula 1</li><li>UFC</li>
 </ul>
-<p>Rival-alert apps like OPPS and Score Losers cover a single sport. Hate Watch covers all nine, so one app handles the football team, the basketball team and the driver you can't stand.</p>
+<p>Rival-alert apps like OPPS and Score Losers cover a single sport. Hate Watch covers all nine, so one app handles the football team, the basketball team and the driver you can't stand. See <a href="/rival-alerts/">how rival alerts work</a>.</p>
 
 <h2>What you get</h2>
 <ul>
