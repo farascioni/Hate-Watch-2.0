@@ -14,14 +14,14 @@ import { ja } from './strings/ja';
  */
 export type Lang = 'en' | 'es' | 'fr' | 'pt' | 'de' | 'ja';
 const DICTS: Record<Lang, Partial<Record<Key, string>>> = { en, es, fr, pt, de, ja };
-/** What the picker offers, each in its own language. Add a language here when its file lands in strings/. */
-export const LANGS: { id: Lang; name: string }[] = [
-  { id: 'en', name: 'English' },
-  { id: 'es', name: 'Español' },
-  { id: 'fr', name: 'Français (Canada)' },
-  { id: 'pt', name: 'Português (Brasil)' },
-  { id: 'de', name: 'Deutsch' },
-  { id: 'ja', name: '日本語' },
+/** What the picker offers: a short code on the chip, the name in its own language for screen readers. Add a language here when its file lands in strings/. */
+export const LANGS: { id: Lang; code: string; name: string }[] = [
+  { id: 'en', code: 'EN', name: 'English' },
+  { id: 'es', code: 'ES', name: 'Español' },
+  { id: 'fr', code: 'FR', name: 'Français (Canada)' },
+  { id: 'pt', code: 'PT', name: 'Português (Brasil)' },
+  { id: 'de', code: 'DE', name: 'Deutsch' },
+  { id: 'ja', code: 'JA', name: '日本語' },
 ];
 /** The Intl locale per language (Latin American Spanish, Canadian French and Brazilian Portuguese, as the store pages). */
 const TAGS: Record<Lang, string> = { en: 'en-US', es: 'es-419', fr: 'fr-CA', pt: 'pt-BR', de: 'de-DE', ja: 'ja-JP' };

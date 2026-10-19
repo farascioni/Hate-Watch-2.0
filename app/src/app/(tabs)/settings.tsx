@@ -158,10 +158,10 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <View style={styles.layoutRow}>
           <Text style={styles.desc}>{t('settings.languageDesc')}</Text>
-          <View style={styles.layoutChips}>
-            {([['auto', t('settings.languageDevice')], ...LANGS.map((l) => [l.id, l.name] as const)] as const).map(([id, name]) => (
-              <Pressable key={id} onPress={() => setLangPref(id)} accessibilityRole="radio" aria-checked={id === langPref} style={[styles.layoutChip, id === langPref && styles.layoutChipOn]}>
-                <Text style={[styles.layoutChipText, id === langPref && { color: colors.text }]}>{name}</Text>
+          <View style={styles.langChips}>
+            {([['auto', t('settings.languageDevice'), t('settings.languageDevice')], ...LANGS.map((l) => [l.id, l.code, l.name] as const)] as const).map(([id, label, name]) => (
+              <Pressable key={id} onPress={() => setLangPref(id)} accessibilityRole="radio" accessibilityLabel={name} aria-checked={id === langPref} style={[styles.langChip, id === langPref && styles.layoutChipOn]}>
+                <Text numberOfLines={1} style={[styles.layoutChipText, id === langPref && { color: colors.text }]}>{label}</Text>
               </Pressable>
             ))}
           </View>
@@ -227,6 +227,9 @@ const styles = StyleSheet.create({
   layoutTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   layoutChips: { flexDirection: 'row', gap: space(2), marginTop: space(2.5) },
   layoutChip: { flex: 1, alignItems: 'center', paddingVertical: space(2), borderRadius: radius.pill, backgroundColor: colors.surfaceHi, borderWidth: 1, borderColor: colors.border },
+  // Language chips wrap onto a second line instead of squeezing, so a big font size or a narrow screen never breaks a label.
+  langChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), marginTop: space(2.5) },
+  langChip: { flexGrow: 1, minWidth: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: space(2), paddingHorizontal: space(3), borderRadius: radius.pill, backgroundColor: colors.surfaceHi, borderWidth: 1, borderColor: colors.border },
   layoutChipOn: { borderColor: colors.hate },
   layoutChipText: { color: colors.textDim, fontSize: 13, fontWeight: '700' },
   card: { marginHorizontal: space(3), backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
