@@ -58,6 +58,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
 - **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
+- **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
 
 The other docs: [docs/alerts.md](docs/alerts.md) (every alert in detail), [docs/duplicate-alerts.md](docs/duplicate-alerts.md), [docs/android-release.md](docs/android-release.md), and [docs/working-in-this-repo.md](docs/working-in-this-repo.md) (the explanations behind CLAUDE.md's rules).
@@ -181,6 +182,12 @@ The full detail: [docs/tests.md](docs/tests.md).
 **In short:** every recorded game gets one report when it ends, in every sport (MLB, NBA, NHL, NFL, college football, EPL, F1, UFC): a private claude.ai Artifact with the score table, the facts, and a card per finding (the alert as it went out, what is wrong, the proposed change, before and after), where the user picks Approve, Change or Skip and the choice is saved with the page. Only approved findings are built. The page template, a builder that checks a report's data, a blank data file and the ALDS Game 5 data as a worked example are in `docs/post-game-recording-report/`, so a report is a copy of those files, not a rebuild.
 
 The full detail: [docs/post-game-recording-report.md](docs/post-game-recording-report.md).
+
+## SEO plan for hatewatch.dev
+
+**In short:** hatewatch.dev is the Expo web export, a client-rendered shell with one generic title, no description, and `robots.txt` and `sitemap.xml` that return the app instead of real files, so search engines see almost nothing. The plan is five phases, each step tagged by how it goes out (push, server deploy, OTA, native build): real `robots.txt` and `sitemap.xml`, a proper head, plain HTML landing and league pages in `app/public/` (no `app.json` change, so the OTA fingerprint holds), a link back from shared alerts, the store listing's website field, then measurement in Search Console. No ESPN images and never the loss rating on a public page. Phase 0 steps 1 to 3 (`app/public/robots.txt` and `sitemap.xml`, and `app/worker.js` for the homepage head) are built; the rest is not.
+
+The full detail: [docs/seo-plan.md](docs/seo-plan.md).
 
 ## Known limits
 

@@ -1,11 +1,15 @@
 {
   // The web version of the app: `npx expo export --platform web` writes ./dist,
   // Cloudflare serves it. Unknown paths get index.html so Expo Router's client
-  // routes (/game/..., /stats/...) work on reload.
+  // routes (/game/..., /stats/...) work on reload. worker.js runs for "/" only, to put the
+  // title, description and social tags in the homepage HTML (docs/seo-plan.md, Phase 0).
   "name": "hate-watch-2-0",
+  "main": "./worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/"]
   }
 }
