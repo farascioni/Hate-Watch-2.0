@@ -21,7 +21,7 @@ import { withoutImages } from './images.ts';
 import { RECIPIENTS, hateWatchTally, withHateWatch } from './hate-watches.ts';
 import { LEADERBOARD_MAX, leaderboard, withHaters } from './leaderboard.ts';
 import { upNextFor } from './upnext.ts';
-import { castVote, setAlert, startedFor, upcomingFor, type UpcomingItem } from './series.ts';
+import { castVote, savedGame, setAlert, startedFor, upcomingFor, type UpcomingItem } from './series.ts';
 import { statsFor } from './stats.ts';
 import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
@@ -227,14 +227,16 @@ route('PUT', '/me/events/:key/alert', true, (req, _u, [key], body) => {
   return { event: { ...out, game: withHateWatch(req.deviceId!, [out.game])[0] } };
 });
 route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
-  const game = getGame(decodeURIComponent(key));
+  const onBoard = getGame(decodeURIComponent(key));
+  const saved = onBoard ? undefined : savedGame(decodeURIComponent(key)); // a finished game of a series on Special Events, kept after the board forgot it (series.ts)
+  const game = onBoard ?? saved?.card;
   if (!game) throw new HttpError(404, 'game not found');
   const rows = db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND e.game_id = ? ORDER BY f.occurred_at DESC LIMIT 100`).all(req.deviceId!, game.id) as any[];
   const detail = await gameDetail(game).catch(() => null); // the score card still works if ESPN hiccups
   const mine = new Set(rows.map((r) => JSON.parse(r.meta ?? 'null')?.playId).filter(Boolean).map(String)); // the plays that sent this device alerts
   return {
-    game: withHateWatch(req.deviceId!, [game])[0], alerts: rows.map(feedItem), plays: detail?.plays ?? [], box: detail?.box ?? null,
+    game: withHateWatch(req.deviceId!, [game])[0], alerts: rows.map(feedItem), plays: detail?.plays ?? [], box: detail?.box ?? saved?.box ?? null,
     clips: flagOn('clips.highlights') ? detail?.clips ?? [] : [], keyPlays: detail ? forDevice(detail.highlights, mine) : [], // clips: a switch (flags.ts)
   };
 });

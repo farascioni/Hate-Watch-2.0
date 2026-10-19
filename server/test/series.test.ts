@@ -212,3 +212,60 @@ test('a one-off game\'s alerts apply to that game only', () => {
   E.endEventAlerts(until);
   assert.equal(follow('d1', a), undefined, 'then dropped');
 });
+
+test('each final of a series on the board is saved with its box score, served after the board forgets it, and dropped once the series is won and off the board', async () => {
+  const card = S.gameCard('mlb', live.events[0])!;
+  const ev = { ...card.event!, seriesKey: 'mlb:kept-series' };
+  const batting = { name: 'batting', labels: ['H-AB', 'AB', 'R', 'H', 'RBI', 'HR', 'BB', 'K', '#P', 'AVG', 'OBP', 'SLG'], athletes: [{ athlete: { id: '1', shortName: 'A. Hitter' }, position: { abbreviation: 'RF' }, starter: true, stats: ['1-4', '4', '1', '1', '0', '0', '0', '1', '15', '.250', '.300', '.400'] }], totals: [] };
+  const summary = { boxscore: { players: [card.home!, card.away!].map((s) => ({ team: { id: s.team.espnId }, statistics: [batting] })) } };
+  const was = S.scoresDeps.getJson;
+  S.scoresDeps.getJson = async () => summary;
+  try {
+    const g1 = { ...card, key: 'mlb:kept-1', id: 'kept-1', state: 'post' as const, startsAt: NOW - 2 * 86400_000, event: { ...ev, wins: { home: 1, away: 0 } } };
+    S.upsertGame(g1);
+    await E.keepSeriesGames(NOW);
+    const saved = E.savedGame('mlb:kept-1');
+    assert.ok(saved, 'the final is saved');
+    assert.ok(saved.box, 'with its box score');
+    assert.equal(E.savedGame('mlb:nope'), undefined);
+    S.pruneGames('mlb', new Set(), NOW + 100 * 3600_000); // the board forgets it (and every other old card)
+    assert.equal(S.getGame('mlb:kept-1'), undefined);
+    await E.keepSeriesGames(NOW + 100 * 3600_000);
+    assert.ok(E.savedGame('mlb:kept-1'), 'a series not yet won keeps its games with no card on the board');
+    S.upsertGame({ ...g1, key: 'mlb:kept-4', id: 'kept-4', startsAt: NOW, event: { ...ev, wins: { home: 4, away: 0 } } });
+    await E.keepSeriesGames(NOW);
+    assert.ok(E.savedGame('mlb:kept-4'), 'the deciding game is saved while its card is on the board');
+    await E.keepSeriesGames(NOW + 1000);
+    assert.ok(E.savedGame('mlb:kept-1'), 'won, but the card is still on the board: kept');
+    S.pruneGames('mlb', new Set(), NOW + 100 * 3600_000);
+    await E.keepSeriesGames(NOW + 100 * 3600_000);
+    assert.equal(E.savedGame('mlb:kept-1'), undefined, 'won and gone from the board: dropped');
+    assert.equal(E.savedGame('mlb:kept-4'), undefined);
+  } finally { S.scoresDeps.getJson = was; }
+});
+
+test('an earlier game of the ledger that the board already forgot is rebuilt from its day\'s scoreboard, saved with its box score, and not asked for again when ESPN lacks it', async () => {
+  const board = S.gameCard('mlb', live.events[0])!;
+  const sk = 'mlb:backfill-series';
+  const old = { ...live.events[0], id: 'old-3', status: { type: { state: 'post', completed: true } } };
+  const et = (t: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(t)).replaceAll('-', '');
+  const games = [
+    { n: 3, id: 'old-3', state: 'post' as const, startsAt: NOW - 3 * 86400_000 },
+    { n: 2, id: 'gone-2', state: 'post' as const, startsAt: NOW - 4 * 86400_000 },
+    { n: 5, id: board.id, state: 'post' as const, startsAt: NOW },
+  ];
+  S.upsertGame({ ...board, key: `mlb:${board.id}`, state: 'post', event: { ...board.event!, seriesKey: sk, games } });
+  let reads = 0;
+  const wasSeries = E.seriesDeps.getJson, wasScores = S.scoresDeps.getJson;
+  E.seriesDeps.getJson = async (url: string) => { reads++; return { events: url.includes(`dates=${et(NOW - 3 * 86400_000)}`) ? [old] : [] }; };
+  S.scoresDeps.getJson = async () => ({ boxscore: { players: [] } });
+  try {
+    await E.keepSeriesGames(NOW);
+    assert.equal(E.savedGame('mlb:old-3')?.card.id, 'old-3', 'the forgotten game is saved');
+    assert.ok(E.savedGame(`mlb:${board.id}`), 'and the one on the board');
+    assert.equal(E.savedGame('mlb:gone-2'), undefined, 'ESPN has no scoreboard entry for it');
+    const after = reads;
+    await E.keepSeriesGames(NOW + 60_000);
+    assert.equal(reads, after, 'a game ESPN lacked is not read again, and a saved one is not either');
+  } finally { E.seriesDeps.getJson = wasSeries; S.scoresDeps.getJson = wasScores; }
+});

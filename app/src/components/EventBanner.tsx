@@ -17,7 +17,7 @@ import type { EventLine, GameCard, SeriesGame, UpcomingEvent } from '../lib/type
  * the event and game, the series, both teams with their scores right-aligned, the line score while it's on or done,
  * the situation and the chance the team you hate loses, then the series game by game (server/src/series.ts).
  * Once the series has started, `vote` puts who-should-lose under the scoreboard (the buttons, then the fans' shares; closed when the series is won).
- * Red border: a team on your most hated list is in it; gold: a favorite (red wins), as on the other cards. Opens the game.
+ * Red border: a team on your most hated list is in it; gold: a favorite (red wins), as on the other cards. Opens the game; a played cell in the series strip opens that game's box score.
  */
 export const EventBanner = memo(function EventBanner({ game, now, vote }: { game: GameCard; now: number; vote?: { item: UpcomingEvent; failed: boolean; onVote: (team: string) => void; onAlert: (on: boolean) => void } }) {
   const t = useT();
@@ -77,22 +77,28 @@ export const EventBanner = memo(function EventBanner({ game, now, vote }: { game
             <View style={styles.bar}><View style={[styles.barFill, { width: `${Math.round(lose * 100)}%` }]} /></View>
           </View>
         ) : null}
-        {ev.games?.length ? (
-          <View style={{ gap: space(1.5) }}>
-            <View style={styles.ledger}>
-              {ev.games.map((g) => (
-                <View key={g.n} style={[styles.cell, g.state === 'in' && { borderColor: colors.live }, g.ifNeeded && g.state === 'pre' && styles.cellIf]}>
+      </Pressable>
+      {ev.games?.length ? (
+        <View style={{ gap: space(1.5) }}>
+          <View style={styles.ledger}>
+            {ev.games.map((g) => {
+              const played = g.state !== 'pre';
+              const score = g.score ? `${g.score[0]}–${g.score[1]}` : '';
+              return (
+                <Pressable key={g.n} disabled={!played} onPress={() => router.push(`/game/${encodeURIComponent(`${game.league}:${g.id}`)}`)}
+                  style={({ pressed }) => [styles.cell, g.state === 'in' && { borderColor: colors.live }, g.ifNeeded && g.state === 'pre' && styles.cellIf, pressed && { backgroundColor: colors.surfaceHi }]}
+                  accessibilityRole={played ? 'button' : undefined} accessibilityLabel={played ? [t('event.gameShort', { n: g.n }), g.winner ? abbrevOf(g.winner) : '', score].filter(Boolean).join(' ') : undefined}>
                   <Text style={styles.cellN}>{t('event.gameShort', { n: g.n })}</Text>
                   <Text style={styles.cellW} numberOfLines={1}>{g.state === 'in' ? t('ui.state.live').toUpperCase() : g.winner ? abbrevOf(g.winner) : ' '}</Text>
-                  <Text style={styles.cellS} numberOfLines={1}>{g.score ? `${g.score[0]}–${g.score[1]}` : g.state === 'pre' && !g.ifNeeded ? startLabel(g.startsAt).split(' ')[0] : ' '}</Text>
+                  <Text style={styles.cellS} numberOfLines={1}>{score || (g.state === 'pre' && !g.ifNeeded ? startLabel(g.startsAt).split(' ')[0] : ' ')}</Text>
                   <View style={[styles.cellMark, { backgroundColor: mark(g) }]} />
-                </View>
-              ))}
-            </View>
-            {nextGame && game.state === 'post' ? <Text style={styles.small} numberOfLines={1}>{`G${nextGame.n} · ${startLabel(nextGame.startsAt)}`}</Text> : null}
+                </Pressable>
+              );
+            })}
           </View>
+          {nextGame && game.state === 'post' ? <Text style={styles.small} numberOfLines={1}>{`G${nextGame.n} · ${startLabel(nextGame.startsAt)}`}</Text> : null}
+        </View>
         ) : null}
-      </Pressable>
       {vote ? <VoteBlock item={vote.item} sides={[game.away!, game.home!]} open={!vote.item.closed} failed={vote.failed} onVote={vote.onVote} onAlert={vote.onAlert} /> : null}
     </View>
   );

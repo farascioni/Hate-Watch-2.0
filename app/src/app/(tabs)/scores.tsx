@@ -94,14 +94,17 @@ export default function ScoresScreen() {
     const later = new Set(upcoming.map((u) => u.game.key));
     for (const g of [...allGames, ...games.values()]) if (g.event && !later.has(g.key) && inWindow(g, now) && (!filter.league || g.league === filter.league)) m.set(g.key, games.get(g.key) ?? g);
     // One list with no Live now / Later today / Final headers: a series card says its own status, and "Final" over a series still under way reads as over.
-    const shown = [...m.values()].sort(byState);
+    // One card per series: its newest game (the live or coming one, else the last final); earlier games are the ledger strip's cells.
+    const newest = new Map<string, GameCard>();
+    for (const g of m.values()) { const k = g.event?.seriesKey; if (k && (!newest.get(k) || g.startsAt > newest.get(k)!.startsAt)) newest.set(k, g); }
+    const shown = [...m.values()].filter((g) => !g.event?.seriesKey || newest.get(g.event.seriesKey) === g).sort(byState);
     return [...(shown.length ? [{ title: '', data: shown }] : []), ...(upcomingShown.length ? [{ title: t('event.coming'), data: upcomingShown.map((u) => u.game), upcoming: true }] : [])];
   }, [allGames, games, filter.league, now, upcoming, upcomingShown, t]);
   // Special Events is a switch only while it has something to show; a pick of it falls back to My when it empties.
   const mode: Mode = picked === 'events' && !eventSections.length ? 'mine' : picked;
   const upcomingByGame = useMemo(() => new Map(upcoming.map((u) => [u.game.key, u])), [upcoming]);
   const startedBySeries = useMemo(() => new Map(started.map((u) => [u.voteKey, u])), [started]);
-  // A series can show two cards (today's game and yesterday's final): only the newest carries the vote and its alert switch.
+  // The vote and its alert switch go on each series' one card.
   const voteCard = useMemo(() => {
     const m = new Map<string, GameCard>();
     for (const s of eventSections) for (const g of s.data) { const k = g.event?.seriesKey; if (k && (!m.get(k) || g.startsAt > m.get(k)!.startsAt)) m.set(k, g); }

@@ -17,10 +17,16 @@
 //    works as if the device tracked it. endEventAlerts drops those rows silently (no alert, no notice) when the
 //    series is won or the one game is final, or at the cap. A team the device tracks itself is left alone. No new
 //    alert kind or id, so this isn't an alert file (docs/duplicate-alerts.md).
+//  - Saved games: a card is dropped from the board 36 h after its start (and a restart empties it), so each final of a
+//    series on the board is saved with its box score (kv `series-games:<seriesKey>`, keepSeriesGames; earlier ledger games
+//    the board forgot are rebuilt from their day's scoreboard, ledgerCard) and served by
+//    GET /me/games/:key when the board no longer has it (savedGame). Dropped once the series is won and none of its
+//    cards is on the board (the card has left Special Events), or at the cap. Not alert state.
 import { getJson as espnGetJson, mapLimit } from './espn.ts';
-import { db } from './db.ts';
+import { db, kvGet, kvSet } from './db.ts';
+import type { BoxScore } from './boxscore.ts';
 import { teamKey, urls, type League } from './leagues.ts';
-import { cardList, forgetDeviceTeams, gameCard, setSeriesGames, type GameCard, type SeriesGame } from './scores.ts';
+import { cardList, forgetDeviceTeams, gameCard, gameDetail, setSeriesGames, type GameCard, type SeriesGame } from './scores.ts';
 
 /** Seam for tests (test/series.test.ts). Production never changes it. */
 export const seriesDeps = { getJson: espnGetJson as (url: string, opts?: { timeoutMs?: number }) => Promise<any> };
@@ -88,6 +94,69 @@ export async function refreshSeries(now = Date.now()) {
     });
   } finally { reading = false; }
   endEventAlerts(now);
+  await keepSeriesGames(now).catch(() => {}); // a failed read of ESPN's summary tries again next tick
+}
+
+// ─── Saved box scores ─────────────────────────────────────────────────────────────────────────
+// A series' finished games stay tappable on its card for as long as the series is on Special Events, but the board forgets
+// a game a day and a half after it was played (scores.ts pruneGames) and ESPN's scoreboard has only today's. Each final is
+// saved (its card and box score) in `kv` under its series, and dropped once the series is won and no card of it is left
+// on the board. A series that never shows a winner (a postponed finish) is dropped after SERIES_ALERT_MS.
+const SAVED = 'series-games:';
+interface SavedGame { card: GameCard; box: BoxScore | null; at: number }
+type SavedSeries = Record<string, SavedGame>;
+const missed = new Set<string>(); // ledger games ESPN's scoreboards no longer have
+const savedKeys = () => (db.prepare('SELECT key FROM kv WHERE key LIKE ?').all(`${SAVED}%`) as { key: string }[]).map((r) => r.key);
+
+/** A saved game's card and box score by game key, for a game the board no longer has (GET /me/games/:key). */
+export function savedGame(gameKey: string): SavedGame | undefined {
+  for (const k of savedKeys()) { const g = kvGet<SavedSeries>(k)?.[gameKey]; if (g) return g; }
+  return undefined;
+}
+
+/**
+ * Save each final game of the series on the board (its box score is retried for an hour if ESPN has none yet), including
+ * the earlier games its ledger lists that the board has already forgotten (rebuilt from that day's scoreboard, which ESPN
+ * keeps), then drop the series that are over and gone from the board.
+ */
+export async function keepSeriesGames(now = Date.now()) {
+  const onBoard = new Set<string>(), keys = new Set(cardList().map((g) => g.key));
+  const finals: { g: GameCard; sk: string }[] = [];
+  for (const g of cardList()) {
+    const sk = g.event?.seriesKey;
+    if (!sk) continue;
+    onBoard.add(sk);
+    if (g.state === 'post') finals.push({ g, sk });
+    for (const l of g.event?.games ?? []) {
+      const key = `${g.league}:${l.id}`;
+      if (l.state !== 'post' || missed.has(key) || keys.has(key) || kvGet<SavedSeries>(SAVED + sk)?.[key] || finals.some((f) => f.g.key === key)) continue;
+      const old = await ledgerCard(g, l);
+      if (old) finals.push({ g: old, sk }); else missed.add(key); // not asked again until a restart
+    }
+  }
+  for (const { g, sk } of finals) {
+    const have = kvGet<SavedSeries>(SAVED + sk)?.[g.key];
+    const box = have && (have.box || now - have.at > 3600_000) ? have.box : (await gameDetail(g).catch(() => null))?.box ?? null;
+    kvSet(SAVED + sk, { ...kvGet<SavedSeries>(SAVED + sk), [g.key]: { card: g, box, at: have?.at ?? now } });
+  }
+  for (const k of savedKeys()) {
+    if (onBoard.has(k.slice(SAVED.length))) continue;
+    const games = Object.values(kvGet<SavedSeries>(k) ?? {});
+    const newest = games.reduce((a, b) => (b.card.startsAt > a.card.startsAt ? b : a), games[0]);
+    if (!newest || won(newest.card) || now - newest.card.startsAt > SERIES_ALERT_MS) db.prepare('DELETE FROM kv WHERE key = ?').run(k);
+  }
+}
+
+/** A finished game of a series that the board forgot: its card from the scoreboard of its day (ET; the day before is tried too, for a game filed under UTC), carrying the series. Null when ESPN no longer has it. */
+async function ledgerCard(from: GameCard, l: SeriesGame): Promise<GameCard | null> {
+  for (const d of [etDay(l.startsAt), etDay(l.startsAt - 86400_000)]) {
+    try {
+      const ev = (await seriesDeps.getJson(urls.scoreboard(from.league, d), { timeoutMs: 10_000 }))?.events?.find((e: any) => String(e.id) === l.id);
+      const c = ev && gameCard(from.league, ev);
+      if (c) return { ...c, event: c.event ?? from.event };
+    } catch { /* tried again on the next tick */ }
+  }
+  return null;
 }
 
 // ─── Upcoming ─────────────────────────────────────────────────────────────────────────────────
