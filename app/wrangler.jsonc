@@ -1,15 +1,33 @@
 {
   // The web version of the app: `npx expo export --platform web` writes ./dist,
-  // Cloudflare serves it. Unknown paths get index.html so Expo Router's client
-  // routes (/game/..., /stats/...) work on reload. worker.js runs for "/" only, to put the
-  // title, description and social tags in the homepage HTML (docs/seo-plan.md, Phase 0).
+  // Cloudflare serves it. worker.js runs only for the app's own routes (one line per file in
+  // src/app/, below): it serves them the app shell so Expo Router's client routes (/game/...,
+  // /stats/...) work on reload, and adds the title, description and social tags to "/" (docs/seo-plan.md,
+  // Phase 0). Every other path is a plain file in ./dist or a real 404 (public/404.html).
+  // A NEW ROUTE FILE IN src/app/ MUST BE ADDED TO run_worker_first, or its address returns 404 on reload.
   "name": "hate-watch-2-0",
   "main": "./worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/"]
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/",
+      "/following",
+      "/scores",
+      "/search",
+      "/settings",
+      "/guide",
+      "/leaderboard",
+      "/a/*",
+      "/alert/*",
+      "/alerts/*",
+      "/f1/*",
+      "/game/*",
+      "/stats/*",
+      "/target/*",
+      "/ufc/*"
+    ]
   }
 }
