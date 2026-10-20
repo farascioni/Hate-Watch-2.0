@@ -9,7 +9,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 - Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only. (Update)
 - Tabs: quick tab swaps no longer leave a blank screen. (Update)
-- Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes or "Starts soon". (Update, after the server deploy)
+- Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes; the clock and quarter sit between the two teams; Hero shows it big. (Update)
 - Guide: the drawings now move, replaying on each page. The web guide's page background is dark.
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, scores swell, tabs settle in under a gliding line, and more. Off under Reduce Motion. (Update)
 - Server: bad requests get a 400 or 413, new devices are limited per address, share links use our own address.

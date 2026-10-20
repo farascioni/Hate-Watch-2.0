@@ -64,13 +64,24 @@ const ScoreboardActivity = (props: Props) => {
         {g.l ?? `${mark(g.t)}${g.a} ${score(g.as)}  ${g.h} ${score(g.hs)}`}
       </Text>
     );
-  const row = (g: Game) => (
-    <HStack key={g.k}>
-      {teams(g)}
-      <Spacer />
-      <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
-    </HStack>
-  );
+  // A game's line: away team and score at the left, the clock and period in the middle, home team and score at the right.
+  // Without per-team fields (an older server) the one string `l` stays at the left and the status at the right.
+  // Both sides get the same fixed width so the clock sits in the middle of the row, whatever the marks and scores.
+  const SIDE = 100;
+  const line = (g: Game) => {
+    const clock = <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>;
+    if (g.ac === undefined) return <HStack>{teams(g)}<Spacer />{clock}</HStack>;
+    return (
+      <HStack>
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), frame({ width: SIDE, alignment: 'leading' }), foregroundStyle(awayColor(g))]}>{`${awayMark(g)}${g.a} ${score(g.as)}`}</Text>
+        <Spacer />
+        {clock}
+        <Spacer />
+        <Text modifiers={[font({ size: 15, weight: 'semibold' }), frame({ width: SIDE, alignment: 'trailing' }), foregroundStyle(homeColor(g))]}>{`${g.hm ?? ''}${g.h} ${score(g.hs)}`}</Text>
+      </HStack>
+    );
+  };
+  const row = (g: Game) => <VStack key={g.k}>{line(g)}</VStack>;
   const more = props.mt ?? (props.more > 0 ? `+${props.more} more` : '');
   const moreLine = more ? <Text modifiers={[font({ size: 12 }), foregroundStyle('#9A9AA2')]}>{more}</Text> : null;
   const lead = props.games[0];
@@ -94,11 +105,7 @@ const ScoreboardActivity = (props: Props) => {
     );
   const detailRow = (g: Game) => (
     <VStack key={g.k} alignment="leading" spacing={2}>
-      <HStack>
-        {teams(g)}
-        <Spacer />
-        <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
-      </HStack>
+      {line(g)}
       <HStack spacing={6}>
         {g.bs ? diamond(g.bs) : null}
         <Text modifiers={[font({ size: 12 }), foregroundStyle(g.sc ?? '#9A9AA2')]}>{g.sub ?? ''}</Text>
@@ -131,6 +138,10 @@ const ScoreboardActivity = (props: Props) => {
       <Text modifiers={[font({ size: 13 }), foregroundStyle(color)]}>{name}</Text>
       <Text modifiers={[font({ size: 34, weight: 'bold' }), foregroundStyle(color)]}>{score(n)}</Text>
     </VStack>
+  );
+  // A game not yet started has no scores: the team names go big at the sides and the start time big in the middle.
+  const heroPre = (name: string, color: string) => (
+    <Text modifiers={[font({ size: 26, weight: 'bold' }), foregroundStyle(color)]}>{name}</Text>
   );
   if (props.lay === 1) {
     return {
@@ -217,20 +228,21 @@ const ScoreboardActivity = (props: Props) => {
     };
   }
   if (props.lay === 3 && lead) {
+    const pre = !lead.live && lead.as == null && lead.hs == null;
     return {
       ...compact,
       banner: (
         <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 12 })]}>
           <HStack>
-            {heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false)}
+            {pre ? heroPre(`${awayMark(lead)}${lead.a}`, awayColor(lead)) : heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false)}
             <Spacer />
             <VStack spacing={2}>
-              <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
+              <Text modifiers={[font(pre ? { size: 22, weight: 'bold' } : { size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
               {lead.bs ? diamond(lead.bs) : null}
               {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
             </VStack>
             <Spacer />
-            {heroSide(`${lead.hm ?? ''}${lead.h}`, lead.hs, homeColor(lead), true)}
+            {pre ? heroPre(`${lead.hm ?? ''}${lead.h}`, homeColor(lead)) : heroSide(`${lead.hm ?? ''}${lead.h}`, lead.hs, homeColor(lead), true)}
           </HStack>
           {props.games.slice(1).map(row)}
           {moreLine}
