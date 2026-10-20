@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing } from 'react-native';
 import { useIsFocused } from 'expo-router';
 
 /**
- * The little motion the app shares (docs/motion.md): the reduce-motion setting as a plain getter, a hook that
- * fires only when a value changes after the first render, a pop, two looping effects (a pulse and a breath) that run
+ * The little motion the app shares (docs/motion.md): the reduce-motion setting as a plain getter and as a hook, a hook that
+ * fires only when a value changes after the first render, a pop, a slide for a list under a switch, three looping effects (a pulse, a breath and a shimmer sweep) that run
  * only while their screen is the one showing, and the first-load wave of cards. Only React Native's own Animated, on the
  * native driver (opacity and transform), so it ships over the air.
  */
@@ -14,6 +14,17 @@ AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => { still = v; })
 
 /** True when the phone asks for less motion: every animation then skips to its end. */
 export const reduceMotion = () => still;
+
+/** The same setting as state, for what is decided at render (the tab transition): a change of the setting applies at once. */
+export function useReduceMotion() {
+  const [v, setV] = useState(still);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setV).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setV);
+    return () => sub.remove();
+  }, []);
+  return v;
+}
 
 /** Calls `fn(prev, next)` when `value` changes, never on the first render. */
 export function useOnChange<T>(value: T, fn: (prev: T, next: T) => void) {
@@ -29,12 +40,13 @@ export function useOnChange<T>(value: T, fn: (prev: T, next: T) => void) {
   }, [value]);
 }
 
-/** A scale that swells to `peak` and springs back; use `scale` in a transform and call `pop()`. */
+/** A scale that swells to `peak` and springs back; use `scale` in a transform and call `pop()` (optionally after `delay` ms). */
 export function usePop(peak = 1.3) {
   const scale = useRef(new Animated.Value(1)).current;
-  const pop = () => {
+  const pop = (delay = 0) => {
     if (still) return;
     Animated.sequence([
+      Animated.delay(delay),
       Animated.timing(scale, { toValue: peak, duration: 130, useNativeDriver: true }),
       Animated.spring(scale, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
     ]).start();
@@ -70,6 +82,29 @@ export const usePulse = (on: boolean) => useLoop(on, pulse);
 
 /** A 4,200 ms there-and-back (0→1→0) for a slow glow. */
 export const useBreath = (on: boolean) => useLoop(on, breath);
+
+const sweep = (v: Animated.Value) => Animated.timing(v, { toValue: 1, duration: 1300, easing: Easing.linear, useNativeDriver: true });
+
+/** One 1,300 ms 0→1 sweep for the light crossing placeholder cards (see Skeleton). */
+export const useShimmer = (on: boolean) => useLoop(on, sweep);
+
+/**
+ * A translateX that starts 16 px off, in the direction `index` moved, and settles to 0 in 240 ms: the list under a switch sliding the way you
+ * went. `group` names which switch's indexes these are; a change of group (another set of options) changes the index without sliding.
+ */
+export function useSlide(index: number, group = '') {
+  const x = useRef(new Animated.Value(0)).current;
+  const was = useRef(group);
+  const same = useRef(true);
+  same.current = was.current === group;
+  was.current = group;
+  useOnChange(index, (p, n) => {
+    if (still || !same.current) return;
+    x.setValue(n > p ? 16 : -16);
+    Animated.timing(x, { toValue: 0, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  });
+  return { transform: [{ translateX: x }] };
+}
 
 const WAVE_ROWS = 6, WAVE_WINDOW = 400, WAVE_GAP = 45;
 const waves = new Map<string, { at: number; n: number }>();

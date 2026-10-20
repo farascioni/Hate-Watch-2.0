@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
@@ -14,6 +14,7 @@ import { ROSTER_GROUPS } from '../../lib/positions';
 import { tr, useT } from '../../lib/i18n';
 
 const DAY = 24 * 3600_000;
+const FOLD = 48; // px of scroll over which the header folds
 const MISERY_DAYS = 30; // "Recent misery": the last 30 days (server MISERY_DAYS)
 
 /** A loss is a "Successful Hate Watch!" only for someone who tracks the team or player; the server's list has no such wording. */
@@ -26,6 +27,7 @@ export default function TargetScreen() {
   const { noteTrackers, leagueInfo, isFollowing } = useStore();
   const [misery, setMisery] = useState<FeedItem[] | null>(null); // null: not loaded yet
   const [miseryFailed, setMiseryFailed] = useState(false);
+  const y = useRef(new Animated.Value(0)).current; // scroll offset: the header fold
   const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first (F1 and the UFC have stats pages too: f1-stats.ts, ufc.ts)
   const [stats, setStats] = useState<StatsPage | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
@@ -63,12 +65,15 @@ export default function TargetScreen() {
   const accent = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.hate;
   const roster = (position && groups.find((g) => g.label === position)?.players) || target.roster || [];
   const view = tab;
+  // The header fold (docs/motion.md): over the first 48 px of scroll the big name shrinks and fades while the bar's small title fades in.
+  const fold = (from: number, to: number) => ({ opacity: y.interpolate({ inputRange: [0, FOLD], outputRange: [from, to], extrapolate: 'clamp' }) });
+  const navTitle = target.kind === 'team' ? target.abbrev : target.shortName ?? target.name;
 
   const header = (
     <View>
       <View style={[styles.hero, { borderBottomColor: accent }]}>
         <Avatar target={target} size={112} />
-        <Text style={styles.name}>{target.name}</Text>
+        <Animated.Text style={[styles.name, fold(1, 0), { transform: [{ scale: y.interpolate({ inputRange: [0, FOLD], outputRange: [1, 0.88], extrapolate: 'clamp' }) }] }]}>{target.name}</Animated.Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
           <LeagueTag league={target.league} />
           {/* F1's subtitle already starts with the constructor's name */}
@@ -122,8 +127,10 @@ export default function TargetScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: target.kind === 'team' ? target.abbrev : target.shortName ?? target.name }} />
-      <FlatList
+      <Stack.Screen options={{ title: navTitle, headerTitle: () => <Animated.Text numberOfLines={1} style={[styles.navTitle, fold(0, 1)]}>{navTitle}</Animated.Text> }} />
+      <Animated.FlatList
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y } } }], { useNativeDriver: true })}
+        scrollEventThrottle={16}
         data={roster}
         keyExtractor={(p) => p.key}
         ListHeaderComponent={header}
@@ -139,6 +146,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   hero: { alignItems: 'center', gap: space(2), paddingVertical: space(6), borderBottomWidth: 3, backgroundColor: colors.surface },
   name: { color: colors.text, fontSize: 26, fontWeight: '900', marginTop: space(2), textAlign: 'center', paddingHorizontal: space(4) },
+  navTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
   sub: { color: colors.textDim, fontSize: 14 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(3) },
   // Stats and Recent misery: edge-to-edge tabs, the open one underlined in red.

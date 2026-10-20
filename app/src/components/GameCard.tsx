@@ -14,7 +14,7 @@ import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 import { liveBoardSupported, toggleBoardGame, useOnBoard } from '../lib/liveScoreboard';
 import { useT } from '../lib/i18n';
-import { reduceMotion, useOnChange, usePulse } from '../lib/motion';
+import { reduceMotion, useOnChange, usePop, usePulse } from '../lib/motion';
 import type { Key } from '../lib/strings/en';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
@@ -81,13 +81,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
       {game.hateWatch && game.state === 'post' ? <AlsoGot n={game.hateWatch.alsoGot} /> : null}
       {game.state === 'pre' ? <PreviewDetails game={game} big={big} /> : <LiveDetails game={game} big={big} />}
       {lose != null && side ? (
-        <View style={{ gap: 4 }}>
-          <View style={styles.meta}>
-            <Text style={styles.metaText}>{tx('gc.chanceLose', { team: game[side]!.team.shortName })}</Text>
-            <Text style={[styles.metaText, { color: colors.hateText, fontWeight: '800' }]}>{Math.round(lose * 100)}%</Text>
-          </View>
-          <View style={styles.bar}><View style={[styles.barFill, { width: `${Math.round(lose * 100)}%` }]} /></View>
-        </View>
+        <OddsRow label={tx('gc.chanceLose', { team: game[side]!.team.shortName })} pct={Math.round(lose * 100)} />
       ) : null}
     </>
   );
@@ -118,6 +112,37 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   );
   return <Pressable {...press} style={({ pressed }) => [...frame, pressed && { backgroundColor: colors.surfaceHi }]}>{content}{sheen}</Pressable>;
 });
+
+/**
+ * The odds line: the red fill glides to a new share over 700 ms and the percentage counts along, but only for a move of 2 points or more
+ * (a flicker just sits at it), and not under reduce motion. The fill is a full-width layer scaled from the left, so only a transform animates.
+ */
+function OddsRow({ label, pct }: { label: string; pct: number }) {
+  const fill = useRef(new Animated.Value(pct / 100)).current;
+  const num = useRef(new Animated.Value(pct)).current;
+  const [shown, setShown] = useState(pct);
+  useEffect(() => {
+    const id = num.addListener(({ value }) => setShown(Math.round(value)));
+    return () => num.removeListener(id);
+  }, [num]);
+  useOnChange(pct, (p, n) => {
+    if (Math.abs(n - p) < 2 || reduceMotion()) { fill.setValue(n / 100); num.setValue(n); return; }
+    const ease = { duration: 700, easing: Easing.out(Easing.cubic) };
+    Animated.timing(fill, { toValue: n / 100, ...ease, useNativeDriver: true }).start();
+    Animated.timing(num, { toValue: n, ...ease, useNativeDriver: false }).start();
+  });
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={styles.meta}>
+        <Text style={styles.metaText}>{label}</Text>
+        <Text style={[styles.metaText, { color: colors.hateText, fontWeight: '800' }]}>{shown}%</Text>
+      </View>
+      <View style={styles.bar}>
+        <Animated.View style={[styles.barFill, { width: '100%', transformOrigin: 'left center', transform: [{ scaleX: fill }] }]} />
+      </View>
+    </View>
+  );
+}
 
 /** The live dot: green, with two rings that swell and fade a half cycle apart (docs/motion.md). Just the dot while off screen or under reduce motion. */
 function LiveDot() {
@@ -198,12 +223,13 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   const split = side === 'home' ? pv?.records?.homeSplit : pv?.records?.awaySplit;
   const chance = pv?.chance?.[side];
   const open = () => openTeam(s.team.key);
-  // A run scores: the number rolls up and the row flashes red for a moment (an overlay, so only opacity animates).
+  // A run scores: the number rolls up, pops a beat later, and the row washes red and fades (an overlay, so only opacity animates).
   const wash = useRef(new Animated.Value(0)).current;
-  const flash = () => { wash.setValue(1); Animated.timing(wash, { toValue: 0, duration: 700, useNativeDriver: true }).start(); };
+  const { scale, pop } = usePop(1.3);
+  const flash = () => { wash.setValue(1); Animated.timing(wash, { toValue: 0, duration: 1200, useNativeDriver: true }).start(); pop(120); };
   return (
     <View style={styles.team}>
-      <Animated.View pointerEvents="none" style={[styles.wash, { opacity: wash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.22] }) }]} />
+      <Animated.View pointerEvents="none" style={[styles.wash, { opacity: wash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.35] }) }]} />
       {/* The logo and the name (as wide as it is) open the team's page; the rest of the card, the game. */}
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && { opacity: 0.6 }}>
         <Avatar target={s.team} size={big ? 40 : 30} />
@@ -221,8 +247,10 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
       </View>
       {chance != null
         ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={tx('gc.chanceWin', { n: chance })}>{chance}%</Text>
-        : <RollingNumber value={s.score} text={s.score == null ? '' : String(s.score)} onRoll={flash} lineHeight={big ? 36 : 24}
-          style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]} />}
+        : <Animated.View style={{ transform: [{ scale }] }}>
+          <RollingNumber value={s.score} text={s.score == null ? '' : String(s.score)} onRoll={flash} lineHeight={big ? 36 : 24}
+            style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]} />
+        </Animated.View>}
     </View>
   );
 }

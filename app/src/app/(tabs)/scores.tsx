@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { api } from '../../lib/api';
@@ -7,6 +7,8 @@ import { GameCardView, noteFinished } from '../../components/GameCard';
 import { EventBanner } from '../../components/EventBanner';
 import { UpcomingCard } from '../../components/UpcomingEvent';
 import { UpNextRow } from '../../components/UpNextRow';
+import { Segment } from '../../components/Segment';
+import { Skeleton } from '../../components/Skeleton';
 import { F1Grid } from '../../components/F1Preview';
 import { UfcBoutRow, cardDate, fightTime } from '../../components/UfcCard';
 import { Empty, LiveBadge, PrimaryButton, SectionHeader, useNow } from '../../components/ui';
@@ -18,6 +20,7 @@ import { colors, radius, space } from '../../theme';
 import type { F1Preview, F1Weekend, GameCard, NextGame, UfcCard, UpcomingEvent } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
 import { currentLocale, phrase, useT, wordT } from '../../lib/i18n';
+import { useSlide } from '../../lib/motion';
 
 /** How often "All games" re-reads the server while it's on screen (it reads ESPN's scoreboards every 10s). */
 const ALL_GAMES_MS = 15_000;
@@ -200,37 +203,25 @@ export default function ScoresScreen() {
   const ufcOnly = filter.league === 'ufc';
   const view: Mode = ufcOnly && mode === 'events' ? 'all' : mode; // the UFC has no special events: its switch is My / All
 
+  const showEvents = !ufcOnly && eventSections.length > 0;
+  const slide = useSlide(f1Only ? F1_MODES.indexOf(f1Mode) : MODES.filter((id) => id !== 'events' || showEvents).indexOf(view), f1Only ? 'f1' : showEvents ? 'three' : 'two');
+
   const onRefresh = async () => { setRefreshing(true); await Promise.all([refreshScores(), readAllGames(), readUpcoming(), ...(ufcOnly ? [readUfc()] : [])]).catch(() => {}); setRefreshing(false); };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={styles.filters}>
-        {f1Only ? (
-          <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={t('scores.whichRaces')}>
-            {F1_MODES.map((id) => {
-              const label = t(id === 'live' ? 'scores.f1.live' : 'scores.f1.upcoming');
-              const on = f1Mode === id;
-              return (
-                <Pressable key={id} onPress={() => setF1Pick(id)} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-                  <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{id === 'live' && liveF1.length ? `${label} · ${liveF1.length}` : label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : <View style={styles.segment} accessibilityRole="tablist" accessibilityLabel={t('scores.whichGames')}>
-          {MODES.filter((id) => id !== 'events' || (!ufcOnly && eventSections.length > 0)).map((id) => {
-            const on = view === id;
-            const label = id === 'events' ? phrase(t, 'scores.special', specialWord) : phrase(t, id === 'all' ? 'scores.all' : 'scores.mine', word);
-            return (
-              <Pressable key={id} onPress={() => setMode(id)} style={[styles.segBtn, on && styles.segOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}
-                accessibilityLabel={id === 'events' ? label : id === 'all' ? `${label}${t('scores.allA11y')}` : t('scores.mineA11y', { Word: wordT(t, word)[0].toUpperCase() + wordT(t, word).slice(1) })}>
-                <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>{label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>}
+        {f1Only
+          ? <Segment<F1Mode> label={t('scores.whichRaces')} value={f1Mode} onChange={setF1Pick}
+            options={F1_MODES.map((id) => { const l = t(id === 'live' ? 'scores.f1.live' : 'scores.f1.upcoming'); return { id, label: id === 'live' && liveF1.length ? `${l} · ${liveF1.length}` : l }; })} />
+          : <Segment<Mode> label={t('scores.whichGames')} value={view} onChange={setMode}
+            options={MODES.filter((id) => id !== 'events' || showEvents).map((id) => {
+              const label = id === 'events' ? phrase(t, 'scores.special', specialWord) : phrase(t, id === 'all' ? 'scores.all' : 'scores.mine', word);
+              return { id, label, a11y: id === 'events' ? label : id === 'all' ? `${label}${t('scores.allA11y')}` : t('scores.mineA11y', { Word: wordT(t, word)[0].toUpperCase() + wordT(t, word).slice(1) }) };
+            })} />}
         <FilterBar filter={filter} onChange={setFilter} kinds={false} />
       </View>
+      <Animated.View style={[{ flex: 1 }, slide]}>
       {ufcOnly ? <UfcScores cards={ufc} failed={ufcFailed} mode={view} onAll={() => setMode('all')} refreshing={refreshing} onRefresh={onRefresh} /> : <SectionList<(GameCard | NextGame | SessionAhead)[], { title: string; upNext?: boolean; kind?: string; upcoming?: boolean }>
         sections={rows}
         keyExtractor={(row, i) => `${row.map((g) => g.key).join('|')}:${i}`}
@@ -273,6 +264,7 @@ export default function ScoresScreen() {
             body={t('scores.noneBody')} />
         )}
       />}
+      </Animated.View>
     </View>
   );
 }
@@ -294,7 +286,7 @@ function UfcScores({ cards, failed, mode, onAll, refreshing, onRefresh }: { card
 
   const body = !cards ? (failed
     ? <Empty emoji="🥊" title={t('scores.ufc.failed')} body={t('scores.ufc.failedBody')} />
-    : <View style={{ paddingTop: space(10) }}><ActivityIndicator color={colors.hate} /></View>)
+    : <Skeleton cards={3} />)
     : !next ? <Empty emoji="🥊" title={t('scores.ufc.none')} body={t('scores.ufc.noneBody')} />
     : mode === 'all' ? (
       <>
@@ -382,10 +374,4 @@ const styles = StyleSheet.create({
   footnote: { color: colors.textFaint, fontSize: 12, lineHeight: 18, textAlign: 'center', marginHorizontal: space(4), marginTop: space(2) },
   gridNote: { color: colors.textFaint, fontSize: 13, marginHorizontal: space(4), marginTop: -space(1), marginBottom: space(3) },
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  // The same two-way switch as the Feed's Everything / Teams / Players (FilterBar).
-  segment: { flexDirection: 'row', marginHorizontal: space(3), marginBottom: space(2), padding: 3, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-  segBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: space(2), borderRadius: radius.sm },
-  segOn: { backgroundColor: colors.surfaceHi },
-  segText: { color: colors.textDim, fontWeight: '700', fontSize: 14 },
-  segTextOn: { color: colors.text },
 });

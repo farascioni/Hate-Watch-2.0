@@ -175,7 +175,7 @@ The full detail: [docs/live-activity.md](docs/live-activity.md).
 
 ## Motion
 
-**In short:** the app moves a little where something just happened: a live alert drops in with a red wash, the Successful Hate Watch counter and a game's score roll up, a series cell fills, the heart, the red X and the share check pop; a live game's dot pulses, a tab's first cards wave in, a fresh loss glints gold, an F1 order slides when it reshuffles and the Plus upsell glows. It is only React Native's `Animated` on the native driver (opacity and transform) with the phone's reduce-motion setting honoured, so it ships over the air; each animation fires only on a real change in the session, never on load, and none depends on a haptic.
+**In short:** the app moves a little where something just happened: a live alert drops in with a red wash, the Successful Hate Watch counter and a game's score roll up, a series cell fills, the heart, the red X and the share check pop; a live game's dot pulses, a tab's first cards wave in, a fresh loss glints gold, an F1 order slides when it reshuffles, the Plus upsell glows, the Scores switches slide a thumb, odds glide, the first load shimmers, a team screen's name folds into the nav bar, an un-favorited heart breaks, the Feed badge swells and the tabs settle in with a line gliding under the bar. It is only React Native's `Animated` on the native driver (opacity and transform) with the phone's reduce-motion setting honoured, so it ships over the air; each animation fires only on a real change in the session, never on load, and none depends on a haptic.
 
 The full detail: [docs/motion.md](docs/motion.md).
 

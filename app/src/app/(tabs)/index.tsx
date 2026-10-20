@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { FeedCard } from '../../components/FeedCard';
 import { Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
 import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
 import { GridRow } from '../../components/GridRow';
+import { Skeleton } from '../../components/Skeleton';
 import { chunkSections, useWebLayout } from '../../lib/webLayout';
 import { colors, space } from '../../theme';
 import type { FeedItem } from '../../lib/types';
@@ -50,7 +51,7 @@ export default function FeedScreen() {
 
   const rows = useMemo(() => chunkSections(sections, () => cols), [sections, cols]);
 
-  if (!ready) return <View style={styles.center}><ActivityIndicator color={colors.hate} /></View>;
+  if (!ready) return <Skeleton />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -84,6 +85,5 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   day: { color: colors.textFaint, backgroundColor: colors.bg, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(4), paddingBottom: space(2) },
 });
