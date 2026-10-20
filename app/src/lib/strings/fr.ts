@@ -701,4 +701,12 @@ export const fr: Record<Key, string> = {
   'preset.name': 'Nom du préréglage',
   'preset.full': 'Vous pouvez garder jusqu’à {n} préréglages. Supprimez-en un pour faire de la place.',
   'preset.nothingToSave': 'Modifiez d’abord quelques alertes de {name}, puis vous pourrez les enregistrer comme préréglage.',
+  'preset.edit': 'Modifier',
+  'preset.new': 'Nouveau préréglage',
+  'preset.editTitle': 'Modifier le préréglage',
+  'preset.editHint': 'Touchez un choix pour l’appliquer à l’alerte; touchez-le à nouveau pour laisser l’alerte hors du préréglage.',
+  'preset.tierOff': 'Non',
+  'preset.tierFeed': 'Fil',
+  'preset.tierPush': 'Push',
+  'preset.back': 'Retour',
 };

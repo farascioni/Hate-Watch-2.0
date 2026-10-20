@@ -44,6 +44,13 @@ export const saveAlertPreset = (name: string, choices: Choices): boolean => {
   publish([...presets, { id, name: clean, choices }]);
   return true;
 };
+/** Renames and re-tiers a saved preset in place (same id, same place in the list). False if the name is empty, there are no choices, or the id is gone. */
+export const updateAlertPreset = (id: string, name: string, choices: Choices): boolean => {
+  const clean = name.trim().slice(0, MAX_PRESET_NAME);
+  if (!clean || !Object.keys(choices).length || !presets.some((p) => p.id === id)) return false;
+  publish(presets.map((p) => (p.id === id ? { ...p, name: clean, choices } : p)));
+  return true;
+};
 export const deleteAlertPreset = (id: string) => publish(presets.filter((p) => p.id !== id));
 export const clearAlertPresets = () => { if (presets.length) publish([]); };
 

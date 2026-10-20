@@ -701,4 +701,12 @@ export const ja: Record<Key, string> = {
   'preset.name': 'プリセット名',
   'preset.full': 'プリセットは最大{n}件まで保存できます。1件削除して空きを作ってください。',
   'preset.nothingToSave': 'まず{name}のアラートをいくつか変更してください。そのあとプリセットとして保存できます。',
+  'preset.edit': '編集',
+  'preset.new': '新しいプリセット',
+  'preset.editTitle': 'プリセットを編集',
+  'preset.editHint': '選択をタップするとそのアラートに設定され、もう一度タップするとプリセットから外れます。',
+  'preset.tierOff': 'オフ',
+  'preset.tierFeed': 'フィード',
+  'preset.tierPush': 'プッシュ',
+  'preset.back': '戻る',
 };

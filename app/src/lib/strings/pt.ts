@@ -701,4 +701,12 @@ export const pt: Record<Key, string> = {
   'preset.name': 'Nome da predefinição',
   'preset.full': 'Você pode ter até {n} predefinições. Exclua uma para abrir espaço.',
   'preset.nothingToSave': 'Mude primeiro alguns alertas de {name}; depois você poderá salvá-los como predefinição.',
+  'preset.edit': 'Editar',
+  'preset.new': 'Nova predefinição',
+  'preset.editTitle': 'Editar predefinição',
+  'preset.editHint': 'Toque em uma opção para defini-la nesse alerta; toque de novo para deixar o alerta fora da predefinição.',
+  'preset.tierOff': 'Desl.',
+  'preset.tierFeed': 'Feed',
+  'preset.tierPush': 'Push',
+  'preset.back': 'Voltar',
 };

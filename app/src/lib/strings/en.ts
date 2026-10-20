@@ -710,6 +710,14 @@ export const en = {
   'preset.name': 'Preset name',
   'preset.full': 'You can keep up to {n} presets. Delete one to make room.',
   'preset.nothingToSave': 'Change some of {name}\'s alerts first, then you can save them as a preset.',
+  'preset.edit': 'Edit',
+  'preset.new': 'New preset',
+  'preset.editTitle': 'Edit preset',
+  'preset.editHint': 'Tap a choice to set it for that alert, tap it again to leave the alert out of the preset.',
+  'preset.tierOff': 'Off',
+  'preset.tierFeed': 'Feed',
+  'preset.tierPush': 'Push',
+  'preset.back': 'Back',
 } as const;
 
 export type Key = keyof typeof en;

@@ -706,4 +706,12 @@ export const es: Record<Key, string> = {
   'preset.name': 'Nombre del preajuste',
   'preset.full': 'Puede tener hasta {n} preajustes. Elimine uno para hacer sitio.',
   'preset.nothingToSave': 'Cambie primero algunas alertas de {name}; después podrá guardarlas como preajuste.',
+  'preset.edit': 'Editar',
+  'preset.new': 'Nuevo preajuste',
+  'preset.editTitle': 'Editar preajuste',
+  'preset.editHint': 'Toque una opción para fijarla en esa alerta; tóquela de nuevo para dejar la alerta fuera del preajuste.',
+  'preset.tierOff': 'No',
+  'preset.tierFeed': 'Feed',
+  'preset.tierPush': 'Push',
+  'preset.back': 'Atrás',
 };

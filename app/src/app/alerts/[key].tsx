@@ -181,7 +181,7 @@ export default function TargetAlertsScreen() {
           <Text style={styles.resetAllText}>{customCount ? t('alerts.resetAll', { n: customCount }) : t('alerts.allGlobal')}</Text>
         </Pressable>
       </ScrollView>
-      {presets ? <PresetSheet name={name} applicable={ids} current={current} onApply={applyPreset} onClose={() => setPresets(false)} /> : null}
+      {presets ? <PresetSheet name={name} types={types} current={current} onApply={applyPreset} onClose={() => setPresets(false)} /> : null}
     </>
   );
 }

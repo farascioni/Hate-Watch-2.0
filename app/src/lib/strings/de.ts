@@ -701,4 +701,12 @@ export const de: Record<Key, string> = {
   'preset.name': 'Name der Vorlage',
   'preset.full': 'Sie können bis zu {n} Vorlagen behalten. Löschen Sie eine, um Platz zu schaffen.',
   'preset.nothingToSave': 'Ändern Sie zuerst einige Alerts von {name}, dann können Sie sie als Vorlage speichern.',
+  'preset.edit': 'Bearbeiten',
+  'preset.new': 'Neue Vorlage',
+  'preset.editTitle': 'Vorlage bearbeiten',
+  'preset.editHint': 'Tippen Sie auf eine Auswahl, um sie für den Alert zu setzen; erneut tippen nimmt den Alert aus der Vorlage.',
+  'preset.tierOff': 'Aus',
+  'preset.tierFeed': 'Feed',
+  'preset.tierPush': 'Push',
+  'preset.back': 'Zurück',
 };
