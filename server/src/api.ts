@@ -1,3 +1,8 @@
+// The HTTP and WebSocket API the app and the public pages talk to: a route table (`route`), device-token auth, and the
+// server that reads each request. Nothing in a request is trusted: a body is JSON of at most 64 KB (400 / 413 otherwise),
+// a numeric query value is clamped to its route's range (`intParam`), a device registers with a known platform at
+// most 30 times an hour per client IP (429), and a share link's host is the caller's only if it is one of ours (`origin`).
+// Docs: docs/run-it.md "Request limits", docs/sharing.md (the host rule).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
@@ -46,6 +51,51 @@ class HttpError extends Error {
   constructor(status: number, msg: string) { super(msg); this.status = status; }
 }
 
+/** A numeric query value truncated and clamped to [min, max]; `def` when it is missing or not a number (it reaches SQLite as a bound number, where NaN or a negative LIMIT misbehave). */
+const intParam = (url: URL, name: string, def: number, min: number, max: number) => {
+  const raw = url.searchParams.get(name)?.trim();
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), min), max) : def;
+};
+
+/** A push token from a request body: a string, or null / absent for none. */
+const pushTokenOf = (v: unknown) => {
+  if (v == null) return null;
+  if (typeof v !== 'string') throw new HttpError(400, 'pushToken is a string or null');
+  return v;
+};
+
+/** What `POST /devices` takes for platform: `Platform.OS` in the app's `ensureToken` (the web export registers too). */
+const PLATFORMS = ['ios', 'android', 'web'];
+
+const MAX_BODY = 64 * 1024;
+/** The request's JSON body ({} when empty). Past MAX_BODY it is 413: the rest of the upload is read but dropped, since
+ * abandoning the stream would reset the connection before the 413 reached the caller. */
+async function readBody(req: IncomingMessage) {
+  if (Number(req.headers['content-length']) > MAX_BODY) throw new HttpError(413, 'body too large');
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const c of req) if ((size += (c as Buffer).length) <= MAX_BODY) chunks.push(c as Buffer);
+  if (size > MAX_BODY) throw new HttpError(413, 'body too large');
+  if (!size) return {};
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new HttpError(400, 'bad json'); }
+}
+
+/** Fly's proxy puts the client's address in `fly-client-ip` (its docs don't say it replaces one a caller sends: unchecked, so the device cap is abuse control, not a guarantee). Off Fly: the first `x-forwarded-for` entry, which is whatever the caller sent, then the socket's. */
+const clientIp = (req: IncomingMessage) =>
+  String(req.headers['fly-client-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || 'unknown';
+
+// A device row costs a feed row on every developer notice (notices.ts), so one address registers only so many an hour.
+// shortcut: fixed window, in memory (a restart forgets it), one machine; upgrade when the API runs on more than one.
+const DEVICES_PER_HOUR = 30;
+const newDevices = new Map<string, { n: number; resetAt: number }>(); // oldest window first, so pruning stops at the first live one
+const overDeviceCap = (ip: string, now = Date.now()) => {
+  for (const [k, v] of newDevices) { if (v.resetAt > now) break; newDevices.delete(k); }
+  const w = newDevices.get(ip) ?? { n: 0, resetAt: now + 3_600_000 };
+  newDevices.set(ip, w);
+  return ++w.n > DEVICES_PER_HOUR;
+};
+
 const routes: { method: string; re: RegExp; auth: boolean; fn: Handler }[] = [];
 const route = (method: string, path: string, auth: boolean, fn: Handler) =>
   routes.push({ method, re: new RegExp(`^${path.replace(/:[a-zA-Z]+/g, '([^/]+)')}$`), auth, fn });
@@ -77,7 +127,7 @@ route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {
     league: (url.searchParams.get('league') as League) || undefined,
     kind: (url.searchParams.get('kind') as 'team' | 'player') || undefined,
-    limit: Math.min(Number(url.searchParams.get('limit') ?? 40), 100),
+    limit: intParam(url, 'limit', 40, 1, 100),
   })),
 }));
 // ?by=division: each team says its division (`division`, and `divisionOrder`: ESPN's order of them) and, where
@@ -146,15 +196,18 @@ route('GET', '/targets/:key', false, (_r, _u, [key]) => {
 });
 
 // ─── Devices (anonymous accounts) ─────────────────────────────────────────────────────────────
-route('POST', '/devices', false, (_r, _u, _p, body) => {
+route('POST', '/devices', false, (req, _u, _p, body) => {
+  if (!PLATFORMS.includes(body?.platform)) throw new HttpError(400, `platform is ${PLATFORMS.join(', ')}`);
+  const pushToken = pushTokenOf(body.pushToken);
+  if (overDeviceCap(clientIp(req))) throw new HttpError(429, 'too many new devices from this address, try again later');
   const id = randomUUID();
   const secret = randomBytes(24).toString('base64url');
   db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?,?,?,?,?,?)')
-    .run(id, secret, String(body?.platform ?? 'unknown'), body?.pushToken ?? null, JSON.stringify(DEFAULT_PREFS), Date.now());
+    .run(id, secret, body.platform, pushToken, JSON.stringify(DEFAULT_PREFS), Date.now());
   return { token: `${id}.${secret}`, deviceId: id };
 });
 route('PUT', '/me/push-token', true, (req, _u, _p, body) => {
-  db.prepare('UPDATE devices SET push_token = ? WHERE id = ?').run(body?.pushToken ?? null, req.deviceId!);
+  db.prepare('UPDATE devices SET push_token = ? WHERE id = ?').run(pushTokenOf(body?.pushToken), req.deviceId!);
   return { ok: true };
 });
 
@@ -263,9 +316,9 @@ route('PUT', '/me/prefs', true, (req, _u, _p, body) => {
 
 // ─── Feed (chronological by when it happened, newest first) ───────────────────────────────────
 route('GET', '/me/feed', true, (req, url) => {
-  const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200);
-  const before = Number(url.searchParams.get('before') ?? Number.MAX_SAFE_INTEGER);
-  const after = Number(url.searchParams.get('after') ?? 0);
+  const limit = intParam(url, 'limit', 50, 1, 200);
+  const before = intParam(url, 'before', Number.MAX_SAFE_INTEGER, 0, Number.MAX_SAFE_INTEGER);
+  const after = intParam(url, 'after', 0, 0, Number.MAX_SAFE_INTEGER);
   const target = url.searchParams.get('target'); // one player's or team's alerts (their page's "Recent misery")
   const rows = db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
     WHERE f.device_id = ? AND f.occurred_at < ? AND f.occurred_at > ?${target ? ` AND e.target_key = ? AND e.type != '${RECAP_TYPE}'` : ''}
@@ -291,8 +344,15 @@ route('GET', '/privacy', false, () => new Html(privacyPage()));
 route('GET', '/support', false, () => new Html(supportPage()));
 
 // ─── Share links: a page whose preview is a picture of the alert (see share.ts) ───────────────
-const origin = (req: IncomingMessage) =>
-  req.headers.host ? `${String(req.headers['x-forwarded-proto'] ?? 'http').split(',')[0]}://${req.headers.host}` : PUBLIC_URL;
+// The Host header is the caller's, and a share page is cached for 5 minutes, so a made-up Host would put someone else's
+// site in the canonical, og:url and card image links everyone gets. Only our own hosts (and localhost, for development) are used.
+const SHARE_HOSTS = ['hate-watch-api.fly.dev', 'hatewatch.dev', 'www.hatewatch.dev'];
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+const origin = (req: IncomingMessage) => {
+  const host = String(req.headers.host ?? '').toLowerCase();
+  if (LOCAL_HOST.test(host)) return `http://${host}`;
+  return SHARE_HOSTS.includes(host) ? `https://${host}` : PUBLIC_URL; // PUBLIC_URL itself for anything else, its own host included
+};
 route('GET', '/a/:code/card.png', false, async (_r, u, [code]) => {
   const png = await shareCard(code, u.searchParams.get('s'));
   if (!png) throw new HttpError(404, 'no such alert');
@@ -353,11 +413,7 @@ export function startApi(port: number) {
       if (!r) throw new HttpError(404, 'no route');
       if (r.auth && !(req.deviceId = authDevice(req.headers.authorization))) throw new HttpError(401, 'bad token');
       let body: any;
-      if (req.method === 'POST' || req.method === 'PUT') {
-        const chunks: Buffer[] = [];
-        for await (const c of req) chunks.push(c as Buffer);
-        body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
-      }
+      if (req.method === 'POST' || req.method === 'PUT') body = await readBody(req);
       const out = await r.fn(req, url, url.pathname.match(r.re)!.slice(1), body);
       if (out instanceof Html) return void res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300' }).end(out.body);
       if (out instanceof Raw) return void res.writeHead(out.reply.status, out.reply.headers).end(out.reply.body);

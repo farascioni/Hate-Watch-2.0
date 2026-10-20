@@ -77,7 +77,7 @@ test("a device's scores carry its teams' next games", async () => {
   const server = startApi(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const token = (await (await fetch(`${base}/devices`, { method: 'POST', body: '{}' })).json()).token as string;
+  const token = (await (await fetch(`${base}/devices`, { method: 'POST', body: '{"platform":"ios"}' })).json()).token as string;
   const auth = { authorization: `Bearer ${token}` };
   await fetch(`${base}/me/follows/${encodeURIComponent('team:epl:364')}`, { method: 'PUT', headers: auth });
   const scores = await (await fetch(`${base}/me/scores`, { headers: auth })).json();

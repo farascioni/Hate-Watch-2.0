@@ -8,6 +8,7 @@
 
 **Sections:**
 - **Run it**: Start the server with `cd server && npm ci && npm start`.
+- **Request limits**: what the server accepts from a caller: a JSON body of at most 64 KB (400 / 413), numeric query values clamped to their route's range, a known platform and a string-or-null push token on devices, at most 30 new devices an hour per address (429), and a share link's host that is one of ours.
 
 The README's "Run it" has the summary; this is the full detail. Read this index first, then only the part you need.
 
@@ -111,3 +112,20 @@ npx eas-cli@latest build --profile development --platform all
 The `development` profile in `eas.json` is a development client (`developmentClient: true`) for internal distribution. Set `EXPO_ACCESS_TOKEN` on the server if you turn on enhanced push security in Expo.
 
 **Dev mode: a test alert.** Starting the server with `HW_DEV=1 npm start` adds `POST /dev/simulate` (`server/src/api.ts`). The route needs a device's token, like the app's own requests. It takes an optional `targetKey` and `type` in the body. Without them, it picks one of the device's follows at random, and an alert type at random that fits it (a player or team alert for that league). It then publishes the alert through the normal path, so it reaches the feed, the WebSocket and push. The alert's title reads `[TEST] <name>: <alert label>`, its body "Simulated event from /dev/simulate", and its id is `sim:<uuid>`. A device that follows nothing gets 400 "follow something first". In the app, Settings shows a "Send a test event (dev)" button in every development build (`__DEV__`). That button calls this route, so against a server started without `HW_DEV=1` it fails with "Simulate failed" (404, "no route").
+
+## Request limits
+
+Nothing in a request is trusted (`server/src/api.ts`, header comment; `server/test/request-hardening.test.ts`). A request that breaks a limit gets its own status, never a 500 and never a silently wrong answer:
+
+| Limit | Answer | Where |
+|---|---|---|
+| **A body is JSON of at most 64 KB** (`MAX_BODY`, `readBody`; every POST and PUT, an empty body is `{}`). | Not JSON: 400 `bad json`. Over the cap: 413 `body too large`. A `Content-Length` over the cap is refused at once; an upload with none (chunked) is read to its end and dropped, because abandoning the stream would reset the connection before the 413 arrived. | `readBody` |
+| **A number in a query** (`intParam`): `/me/feed` `limit` (1 to 200, default 50), `before` (default none) and `after` (default 0), and `/search` `limit` (1 to 100, default 40). | Missing, empty or not a finite number: the default. Out of range: clamped to the nearest end. Decimals are cut. `limit=abc` and `before=abc` on the feed are the same list as no value; `/search?limit=-1` no longer drops the last result. `/leaderboard` has always clamped its own `limit` (`leaderboard()`, top 100). | `intParam` |
+| **A push token is a string, or null / absent for none** (`PUT /me/push-token` and `POST /devices`). | Anything else (an object, a number): 400 `pushToken is a string or null`. | `pushTokenOf` |
+| **A device registers with `platform` ios, android or web** (`PLATFORMS`: what `Platform.OS` is in the app's `ensureToken`). | Missing or anything else: 400, checked before the cap, so a bad request costs nothing. | `POST /devices` |
+| **30 new devices an hour per address** (`DEVICES_PER_HOUR`). A device costs a feed row on every developer notice (`notices.ts`), so a script registering thousands would bloat the database. | The 31st: 429 `too many new devices from this address, try again later`, until the hour (a fixed window from the address's first device) ends. | `overDeviceCap` |
+| **A share link's host is one of ours** (`origin`; `docs/sharing.md`). | Any other `Host` header: `HW_PUBLIC_URL`. | `origin` |
+
+**The address** (`clientIp`) is Fly's `fly-client-ip` header ("the IP address of the client from the perspective of Fly Proxy", docs.fly.io/networking/request-headers). Fly's docs don't say whether the proxy replaces a `fly-client-ip` a caller sends, and this was not tested, so the cap stops a careless script, not a determined one. Without the header (development) it is the first address of `x-forwarded-for`, which is whatever the caller sent, then the socket's.
+
+**What the cap doesn't do:** it lives in the server's memory (`newDevices`, a Map that drops expired windows as it goes), so a restart clears it, and it counts one machine, which is what production is (`docs/known-limits.md`). Addresses behind one network (a school, a mobile carrier's shared address) share a count; 30 an hour is far above what real installs do. Raising it is the one number `DEVICES_PER_HOUR`.
