@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 612 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 612 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 612 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 603 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 612 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -92,6 +92,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
 | `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
+| `push-receipts.test.ts` | Expo's push receipts (`push.ts`), with a stubbed `fetch` and mock timers: a `DeviceNotRegistered` receipt clears the device's token 15 minutes after the send and an `ok` one leaves it, another receipt error is logged once and the token stays, an id with no receipt (or a failed request) is asked about once more, then dropped, and a `DeviceNotRegistered` ticket still clears at once |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
 | `series.test.ts` | Special Events beyond today's scoreboard: a series' game-by-game ledger from a team's postseason schedule (a postponed game left out, "If Necessary" marked), the upcoming list (a series once as its first game, a wild card, a one-off game; none past a week, none with a team not yet decided, none once a series has started), and the votes (one per device, changeable, percentages withheld until the device has voted, closed at the first game's start; a started series stays open under its scoreboard until it is won, read from its newest game, then keeps its results for a device that voted), and an MLB regular-season series (a home team's run of games against one opponent from its schedule, a rain-out left out, a doubleheader in; on real ESPN data, the card gets its strip, its final is saved and the save goes 3 days after the last game) |
