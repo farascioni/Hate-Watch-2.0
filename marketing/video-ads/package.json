@@ -1,0 +1,20 @@
+{
+  "name": "hate-watch-ads",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:a": "remotion render src/index.ts FailFeed out/hate-watch-ad-1-fail-feed.mp4",
+    "render:b": "remotion render src/index.ts FeatureTour out/hate-watch-ad-2-feature-tour.mp4",
+    "render:c": "remotion render src/index.ts Ad3 out/hate-watch-ad-3-rough-week.mp4",
+    "render:guide": "remotion render src/index.ts GuideVideo out/hate-watch-guide-video.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.537",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.537",
+    "typescript": "^7.0.2"
+  }
+}

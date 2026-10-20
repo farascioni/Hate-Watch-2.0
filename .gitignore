@@ -7,3 +7,6 @@ Thumbs.db
 
 # Claude Code per-user settings
 .claude/settings.local.json
+
+# Rendered videos (reproducible from marketing/video-ads/src)
+marketing/video-ads/out/
