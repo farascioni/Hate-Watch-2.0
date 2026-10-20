@@ -7,14 +7,15 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
-- Guide: the drawings now move (typing, counting, flipping switches), replaying on each page; still under Reduce Motion. The web guide's page background is dark.
-- Motion: alerts drop in, counts roll, series fill, hearts pop. Off under Reduce Motion.
+- Guide: the drawings now move (typing, counting, flipping switches), replaying on each page. The web guide's page background is dark.
+- Motion: alerts drop in, counts roll, series fill, hearts pop. Off under Reduce Motion. (Update)
+- Motion: live dots pulse, first cards wave in, a loss glints gold, the F1 order slides, the Plus upsell glows. Off under Reduce Motion. (Update)
 - Server: bad requests get a clear 400 or 413 instead of an error, new devices are limited per address, and share links use our own address.
 - Server: saving alert settings rejects a malformed body (bad time zone, muted list, quiet hours time) and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts 15 minutes after each send, so a deleted app stops being sent to.
 - Server: shared alert web pages are marked noindex and carry a link to hatewatch.dev's "how rival alerts work" page.
 - Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the line score while it is on, the series line ("Series tied 2 - 2") and each game's score and winner. Red border for a most hated team, gold for a favorite. No Live now / Later today / Final headers: a Final over a series still under way read as the series being over.
-- Scores: under those games, "Coming up" lists the playoff games and series starting in the next 7 days with "Who do you want to lose?". Vote for either team, see each team's share of the vote, and change yours until the first game starts; a started series keeps the vote under its scoreboard until it is won. The view hides when empty and is named for the league: Playoffs for MLB, NBA, NFL, NHL and WNBA, Bowl Games for college football, Special Events for All.
+- Scores: under those games, "Coming up" lists playoff games and series starting in the next 7 days with "Who do you want to lose?". Vote for either team, see each team's share, and change yours until the first game starts. The view hides when empty and is named for the league: Playoffs, Bowl Games (college football) or Special Events (All).
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. On, the team you voted to lose is tracked for you: its alerts reach you like any team you track, and it shows in Tracking. A series ends it once won; a one-off game like the Super Bowl covers that game only. Changing your vote moves it.
 - Scores: a playoff series is the same ledger card (with the vote) in My, All and Special Events, one per series (the game on now, else the next, else the last final), so a doubleheader or yesterday's final no longer shows twice. The series strip under it: "ALCS · Game 6 / 7 · Rays lead 3-2", or "Game 2 of 3 · Rays lead 1-0" for regular-season MLB, a cell per game (tap a played one for its box score) and "G3 · 7:05 PM" for the next. A favorite's win is gold even when you track the other team (Update; the strip needs the server update.)
 - Server: cards carry the event, the series and each game's result from ESPN's postseason schedule; regular-season MLB cards carry `series` from the home team's schedule. Finished games keep their box scores until 3 days after the series (postseason: until its card leaves Special Events). A new vote table. Until the server update, Special Events stays hidden.

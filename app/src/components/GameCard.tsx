@@ -1,6 +1,5 @@
-import { memo, type ReactNode } from 'react';
-import { useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
@@ -15,6 +14,7 @@ import type { FeedItem, GameCard, LivePlayer } from '../lib/types';
 import { isFootball } from '../lib/leagueUi';
 import { liveBoardSupported, toggleBoardGame, useOnBoard } from '../lib/liveScoreboard';
 import { useT } from '../lib/i18n';
+import { reduceMotion, useOnChange, usePulse } from '../lib/motion';
 import type { Key } from '../lib/strings/en';
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
@@ -22,6 +22,26 @@ const TONE: Record<Tone, { bg: string; fg: string }> = {
   warn: { bg: '#3D2A06', fg: colors.warn },      // they could score
   neutral: { bg: colors.surfaceHi, fg: colors.textDim },
   done: { bg: '#0F2E1A', fg: colors.live },      // a Successful Hate Watch
+};
+
+/**
+ * Games seen going from live to final in the data the Scores tab holds (called as it renders, before its cards do), by key and when:
+ * a card plays its loss glint only for one of these, within seconds, so a scroll, a reload or a game that was already over never glints.
+ * The Scores tab splits its sections by state, so a finished game's card is a new one, not the live card changing.
+ */
+const lastState = new Map<string, string>();
+const justFinished = new Map<string, number>();
+const GLINT_WINDOW_MS = 10_000;
+export function noteFinished(games: Iterable<GameCard>) {
+  for (const g of games) {
+    if (lastState.get(g.key) === 'in' && g.state === 'post') justFinished.set(g.key, Date.now());
+    lastState.set(g.key, g.state);
+  }
+}
+const takeFinished = (key: string) => {
+  const at = justFinished.get(key);
+  justFinished.delete(key);
+  return at != null && Date.now() - at < GLINT_WINDOW_MS;
 };
 
 /** One game on the Scores tab. `big` is the header of the game screen (no tap-through, larger scores). A game in a series (`game.series` for MLB regular season, `game.event.games` for a postseason series) gets the series strip under the card (`SeriesStrip`). */
@@ -36,6 +56,12 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
   const side: Side | undefined = sides.length === 1 ? sides[0] : undefined; // hating both sides: no "down 7"
   const tag = hateTag(game, side);
   const lose = loseChance(game, side);
+  // A tracked team just lost, as you watch: a gold glint crosses the card once (see noteFinished). Never on the game screen's header.
+  const [glint, setGlint] = useState(false);
+  const lostOne = sides.some((k) => game[k === 'home' ? 'away' : 'home']?.winner);
+  const tryGlint = () => { if (!big && takeFinished(game.key) && lostOne && !reduceMotion()) setGlint(true); };
+  useEffect(() => { if (game.state === 'post') tryGlint(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnChange(game.state, (_, now) => { if (now === 'post') tryGlint(); });
   const open = () => router.push(`/game/${encodeURIComponent(game.key)}`);
   // A team's row opens its page; VoiceOver reads the card as one button, so the teams are its actions too.
   const teams = game.league === 'f1' ? [] : (['away', 'home'] as const).filter((k) => game[k]);
@@ -45,7 +71,9 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
       {game.state === 'pre' && game.preview?.chance ? <Text style={styles.chanceHead} importantForAccessibility="no">{tx('gc.winPct')}</Text> : null}
       {(['away', 'home'] as const).map((k) => <TeamRow key={k} game={game} side={k} tracked={sides.includes(k)} big={big} />)}
       <View style={styles.meta}>
-        <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>
+        {game.state === 'in' ? (
+          <View style={styles.status}><LiveDot /><Text style={[styles.metaText, styles.statusText]} numberOfLines={2}>{statusLine(game, now)}</Text></View>
+        ) : <Text style={styles.metaText} numberOfLines={2}>{statusLine(game, now)}</Text>}
         {game.bases ? <Bases bases={game.bases} count={game.count} /> : null}
         {tag ? <View style={[styles.pill, { backgroundColor: TONE[tag.tone].bg }]}><Text style={[styles.pillText, { color: TONE[tag.tone].fg }]}>{tag.text}</Text></View> : null}
         {!big && game.state !== 'post' ? <BoardButton game={game} /> : null}
@@ -71,6 +99,7 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
     </>
   );
   if (big) return <View style={[styles.card, styles.bigCard]}>{content}</View>;
+  const sheen = glint ? <Glint onDone={() => setGlint(false)} /> : null;
   const press = {
     onPress: open, accessibilityRole: 'button' as const, accessibilityHint: tx('gc.openHint'),
     accessibilityActions: teams.map((k) => ({ name: k, label: tx('gc.openTeam', { name: game[k]!.team.shortName }) })),
@@ -84,10 +113,44 @@ export const GameCardView = memo(function GameCardView({ game, latest, now, big 
     <View style={frame}>
       <Pressable {...press} style={({ pressed }) => [{ gap: space(2), borderRadius: radius.md }, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>
       <SeriesStrip game={game} games={strip} title={game.series ? seriesTitle(game, tx) : eventSeriesTitle(game, tx)} />
+      {sheen}
     </View>
   );
-  return <Pressable {...press} style={({ pressed }) => [...frame, pressed && { backgroundColor: colors.surfaceHi }]}>{content}</Pressable>;
+  return <Pressable {...press} style={({ pressed }) => [...frame, pressed && { backgroundColor: colors.surfaceHi }]}>{content}{sheen}</Pressable>;
 });
+
+/** The live dot: green, with two rings that swell and fade a half cycle apart (docs/motion.md). Just the dot while off screen or under reduce motion. */
+function LiveDot() {
+  const { v, running } = usePulse(true);
+  const ring = (offset: boolean) => ({
+    opacity: v.interpolate(offset ? { inputRange: [0, 0.5, 0.5, 1], outputRange: [0.3, 0, 0.6, 0.3] } : { inputRange: [0, 1], outputRange: [0.6, 0] }),
+    transform: [{ scale: v.interpolate(offset ? { inputRange: [0, 0.5, 0.5, 1], outputRange: [2, 3, 1, 2] } : { inputRange: [0, 1], outputRange: [1, 3] }) }],
+  });
+  return (
+    <View style={styles.dotWrap} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      {running ? <><Animated.View style={[styles.dot, styles.ring, ring(false)]} /><Animated.View style={[styles.dot, styles.ring, ring(true)]} /></> : null}
+      <View style={styles.dot} />
+    </View>
+  );
+}
+
+/** A 28 px gold bar crossing a card that just turned into a loss: 200 ms after it lands, 750 ms across, clipped by the card. */
+function Glint({ onDone }: { onDone: () => void }) {
+  const [w, setW] = useState(0);
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!w) return;
+    const a = Animated.timing(t, { toValue: 1, duration: 750, delay: 200, easing: Easing.inOut(Easing.quad), useNativeDriver: true });
+    a.start(({ finished }) => { if (finished) onDone(); });
+    return () => a.stop();
+  }, [w, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <View pointerEvents="none" style={styles.glint} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {w ? <Animated.View style={[styles.glintBar, { opacity: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0] }), transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [-GLINT_W, w] }) }] }]} /> : null}
+    </View>
+  );
+}
+const GLINT_W = 28;
 
 /** "ALCS · Game 6 / 7 · Rays lead 3–2": a postseason game's place in its series, from ESPN's note and series score (as EventBanner's header). */
 function eventSeriesTitle(game: GameCard, tx: ReturnType<typeof useT>): string {
@@ -324,6 +387,13 @@ const styles = StyleSheet.create({
   chance: { color: colors.textDim, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
   // "Win %" once, over the column of chances.
   chanceHead: { color: colors.textFaint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textAlign: 'right', marginBottom: -space(1.5) },
+  status: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space(2) },
+  statusText: { flexShrink: 1 },
+  dotWrap: { width: 8, height: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.live },
+  ring: { position: 'absolute' },
+  glint: { ...StyleSheet.absoluteFill, overflow: 'hidden', borderRadius: radius.lg },
+  glintBar: { position: 'absolute', top: 0, bottom: 0, left: 0, width: GLINT_W, backgroundColor: GOLD },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(2) },
   metaText: { color: colors.textDim, fontSize: 12, fontWeight: '600', flexShrink: 1 },
   pill: { borderRadius: radius.pill, paddingHorizontal: space(2.5), paddingVertical: 3 },

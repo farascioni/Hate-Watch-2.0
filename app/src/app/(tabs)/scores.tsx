@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, SectionList, 
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { api } from '../../lib/api';
-import { GameCardView } from '../../components/GameCard';
+import { GameCardView, noteFinished } from '../../components/GameCard';
 import { EventBanner } from '../../components/EventBanner';
 import { UpcomingCard } from '../../components/UpcomingEvent';
 import { UpNextRow } from '../../components/UpNextRow';
@@ -80,6 +80,7 @@ export default function ScoresScreen() {
     return () => clearInterval(timer);
   }, [refreshScores, readAllGames, readUfc, readUpcoming, picked, filter.league]));
 
+  useMemo(() => noteFinished(games.values()), [games]); // before the cards render: a live game turning final is what plays a loss's glint
   const byStateSections = (list: GameCard[]) => (['in', 'pre', 'post'] as const)
     .map((state) => ({ title: sectionTitle(state), data: list.filter((g) => g.state === state) }))
     .filter((s) => s.data.length);
@@ -243,7 +244,7 @@ export default function ScoresScreen() {
           <Text style={styles.none}>{t('scores.noneDot', { what: leagueWhat })}</Text>
         ) : null}
         renderSectionHeader={({ section }) => !section.title ? null : <SectionHeader>{section.title} · {section.data.reduce((n, r) => n + r.length, 0)}{section.kind ? ` ${t(`scores.kind.${section.kind}` as never)}` : ''}</SectionHeader>}
-        renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} render={(item) => (section.upNext
+        renderItem={({ item: row, section }) => <GridRow row={row} cols={rowCols} wave="scores" render={(item) => (section.upNext
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
           : section.upcoming ? (() => { const u = upcomingByGame.get(item.key); return u ? <UpcomingCard item={u} now={now} failed={voteFailed === u.voteKey} onVote={(team) => vote(u, team)} onAlert={(on) => setEventAlert(u, on)} /> : null; })()

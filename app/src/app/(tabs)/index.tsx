@@ -58,7 +58,10 @@ export default function FeedScreen() {
     <SectionList
       sections={rows}
       keyExtractor={(row) => row.map((i) => i.id).join('|')}
-      renderItem={({ item: row }) => <GridRow row={row} cols={cols} render={(item) => <FeedCard item={item} now={now} highlight fresh={item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000} />} />}
+      renderItem={({ item: row }) => {
+        const fresh = (item: FeedItem) => item.detectedAt > openedAt - 15_000 && now - item.detectedAt < 60_000; // those drop in on their own
+        return <GridRow row={row} cols={cols} wave={row.some(fresh) ? undefined : 'feed'} render={(item) => <FeedCard item={item} now={now} highlight fresh={fresh(item)} />} />;
+      }}
       renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
       stickySectionHeadersEnabled
       contentContainerStyle={{ paddingBottom: space(6), flexGrow: 1 }}

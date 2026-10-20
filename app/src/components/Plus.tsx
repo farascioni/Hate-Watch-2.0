@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { API_URL } from '../lib/api';
 import { EULA_URL, MANAGE_URL, applyGold, goldIconOn, goldIconSupported, iapAvailable, setGoldIcon, usePlus } from '../lib/plus';
 import { SettingRow } from './SettingRow';
 import { colors, gold, radius, space } from '../theme';
 import { tr, useT } from '../lib/i18n';
+import { useBreath } from '../lib/motion';
 
 const open = (url: string) => Linking.openURL(url).catch(() => {});
 
@@ -18,6 +19,8 @@ export function Plus() {
   // A saved gold choice keeps its switch even if the store can't be reached to confirm the subscription right now.
   const [iconOn, setIconOn] = useState(goldIconOn);
   const canToggle = active || gold || iconOn;
+  const showUpsell = !canToggle && iapAvailable;
+  const glow = useBreath(showUpsell);
 
   return (
     <View style={styles.card}>
@@ -43,6 +46,13 @@ export function Plus() {
         </View>
       ) : iapAvailable ? (
         <>
+          <View>
+            {glow.running ? (
+              <Animated.View pointerEvents="none" style={[styles.glow, { opacity: glow.v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] }), transform: [{ scale: glow.v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) }] }]}>
+                <View style={[styles.halo, styles.haloOuter]} />
+                <View style={[styles.halo, styles.haloInner]} />
+              </Animated.View>
+            ) : null}
           <Pressable
             onPress={subscribe}
             disabled={busy}
@@ -52,6 +62,7 @@ export function Plus() {
           >
             {busy ? <ActivityIndicator color={colors.onHate} /> : <Text style={styles.subscribeText}>{price ? t('plus.subscribePrice', { price }) : t('plus.subscribe')}</Text>}
           </Pressable>
+          </View>
           <Text style={styles.fine}>
             {t(Platform.OS === 'ios' ? (price ? 'plus.fineIos' : 'plus.fineIosNoPrice') : (price ? 'plus.fineAndroid' : 'plus.fineAndroidNoPrice'), { price: price ?? '' })}
           </Text>
@@ -78,6 +89,10 @@ const styles = StyleSheet.create({
   blurb: { color: colors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 18 },
   subscribe: { backgroundColor: colors.hate, borderRadius: radius.pill, paddingVertical: space(3), alignItems: 'center' },
   subscribeText: { color: colors.onHate, fontWeight: '800', fontSize: 16 },
+  glow: { ...StyleSheet.absoluteFill },
+  halo: { position: 'absolute', backgroundColor: colors.hate, borderRadius: radius.pill },
+  haloOuter: { top: -12, bottom: -12, left: -12, right: -12, opacity: 0.12 },
+  haloInner: { top: -5, bottom: -5, left: -5, right: -5, opacity: 0.22 },
   switchWrap: { marginHorizontal: -space(4), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   fine: { color: colors.textFaint, fontSize: 11, lineHeight: 15, textAlign: 'center' },
   links: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: space(4), rowGap: space(2) },

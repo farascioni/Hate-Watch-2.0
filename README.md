@@ -56,7 +56,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
-- **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
+- **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop, a live dot pulses, the first cards wave in, a loss glints), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
 - **Video ads** ([docs/video-ads.md](docs/video-ads.md)): three vertical ads and a video of the startup guide, React components rendered to MP4 with Remotion in `marketing/video-ads/`; the sources are in git, the renders are not.
 - **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
@@ -175,7 +175,7 @@ The full detail: [docs/live-activity.md](docs/live-activity.md).
 
 ## Motion
 
-**In short:** the app moves a little where something just happened: a live alert drops in with a red wash, the Successful Hate Watch counter and a game's score roll up, a series cell fills, the heart, the red X and the share check pop. It is only React Native's `Animated` on the native driver (opacity and transform) with the phone's reduce-motion setting honoured, so it ships over the air; each animation fires only on a real change in the session, never on load, and none depends on a haptic.
+**In short:** the app moves a little where something just happened: a live alert drops in with a red wash, the Successful Hate Watch counter and a game's score roll up, a series cell fills, the heart, the red X and the share check pop; a live game's dot pulses, a tab's first cards wave in, a fresh loss glints gold, an F1 order slides when it reshuffles and the Plus upsell glows. It is only React Native's `Animated` on the native driver (opacity and transform) with the phone's reduce-motion setting honoured, so it ships over the air; each animation fires only on a real change in the session, never on load, and none depends on a haptic.
 
 The full detail: [docs/motion.md](docs/motion.md).
 
