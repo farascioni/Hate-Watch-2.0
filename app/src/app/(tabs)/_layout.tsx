@@ -7,7 +7,7 @@ import { useStore } from '../../lib/store';
 import { DetailPlaceholder } from '../../components/WebShell';
 import { useWebLayout } from '../../lib/webLayout';
 import { useT } from '../../lib/i18n';
-import { reduceMotion, useOnChange, usePop, useReduceMotion } from '../../lib/motion';
+import { reduceMotion, useOnChange, usePop } from '../../lib/motion';
 import { colors, space } from '../../theme';
 
 /** Top left of every tab: the leaderboard (the most hated athletes and teams), instead of a sixth tab. */
@@ -77,14 +77,25 @@ const fade = (name: string) => {
   if (!v) fades.set(name, (v = new Animated.Value(0)));
   return v;
 };
-/** The old screen fades out fast, the new one fades up from 10 px low. */
-const settle = (name: string) => () => ({
-  sceneStyle: {
-    opacity: fade(name).interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
-    transform: [{ translateY: fade(name).interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-  },
-});
-const SETTLE = { animation: 'timing' as const, config: { duration: 240, easing: Easing.out(Easing.cubic) } };
+/**
+ * The new screen fades up from 10 px low (the old one goes at once). This is the scene's own style, built once per tab: the
+ * navigator's `animation`/`transitionSpec` is left off because it drives each screen's native `activityState` with an
+ * Animated node, and when that node was swapped for the plain "on top" value the Feed was left inactive (nothing scrolled or
+ * took a tap) after a switch from another tab.
+ */
+const scenes = new Map<string, object>();
+const scene = (name: string) => {
+  let s = scenes.get(name);
+  if (!s) {
+    const v = fade(name);
+    scenes.set(name, (s = {
+      backgroundColor: colors.bg,
+      opacity: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+      transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+    }));
+  }
+  return s;
+};
 
 export default function TabLayout() {
   const { unseen, follows } = useStore();
@@ -96,20 +107,18 @@ export default function TabLayout() {
   // Panes draw the tab beside the router's stack (WebShell's ListPane), so the router's own tab screens would be a second copy.
   if (panes) return <DetailPlaceholder />;
   // A sidebar (WebShell) replaces the tab bar and the leaderboard button.
-  // Under reduce motion the screens swap with no animation (read at render, so a change applies from the next render on).
-  const still = useReduceMotion();
+  // Under reduce motion GlideTabBar sets each fade value outright, so the screens swap with no animation.
   return (
     <Tabs
       tabBar={(p) => <GlideTabBar {...p} />}
       screenOptions={({ route }) => ({
-        ...(still ? {} : { sceneStyleInterpolator: settle(route.name), transitionSpec: SETTLE }),
         headerStyle: { backgroundColor: colors.bg, borderBottomColor: colors.border },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '900' },
         tabBarStyle: wide ? { display: 'none' } : { backgroundColor: colors.bg, borderTopColor: colors.border },
         tabBarActiveTintColor: colors.hate,
         tabBarInactiveTintColor: colors.textFaint,
-        sceneStyle: { backgroundColor: colors.bg },
+        sceneStyle: scene(route.name),
         headerLeft: wide ? undefined : () => <LeaderboardButton />,
       })}
     >
