@@ -4,7 +4,8 @@
 // link: see appSiteAssociation); without the app it goes to the App Store; anywhere else the page shows
 // the card and a download button. The picture is drawn here from our own alert data (nothing is uploaded).
 // An alert can have other looks (share-styles.ts: ticket stub, boarding pass...): a link's ?s= picks one, and an
-// unknown or inapplicable one is the classic card.
+// unknown or inapplicable one is the classic card. A device's season card (season.ts) is the same: a row with a code, drawn
+// by its one layout (share-styles.ts), with the same page, image and cache rules as an alert's.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import satori from 'satori';
@@ -16,7 +17,7 @@ import { feedItem, noticeLook, NOTICE_SENDER, NOTICE_TYPE } from './fanout.ts';
 import { miseryByCode } from './misery.ts';
 import { LEAGUES, type League } from './leagues.ts';
 import { sharePage } from './pages.ts';
-import { clip, h, initials, readableOn, shareStyles, styleTree, type El, type EventRow } from './share-styles.ts';
+import { clip, h, initials, readableOn, SEASON_TYPE, shareStyles, styleTree, type El, type EventRow } from './share-styles.ts';
 
 export const APP_STORE_URL = process.env.HW_APP_STORE_URL ?? 'https://apps.apple.com/app/id6819054268';
 const APP_STORE_ID = APP_STORE_URL.match(/\/id(\d+)/)?.[1];
@@ -32,10 +33,12 @@ export const appSiteAssociation = () => ({
   applinks: { details: [{ appIDs: [IOS_APP_ID], components: [{ '/': '/a/*', comment: 'Shared alerts' }] }] },
 });
 
-/** The shared alert as a feed item, for the app screen a share link opens. */
+/** The shared alert as a feed item, for the app screen a share link opens. A season card (season.ts) isn't an alert type, so it names itself. */
 export function sharedAlert(code: string) {
   const row = (db.prepare('SELECT * FROM events WHERE share_code = ?').get(code) ?? miseryByCode(code)) as Parameters<typeof feedItem>[0] | undefined; // an alert, or a Recent misery row nobody was sent
-  return row ? feedItem(row) : null;
+  if (!row) return null;
+  const item = feedItem(row);
+  return row.type === SEASON_TYPE ? { ...item, typeLabel: 'Season in misery' } : item;
 }
 
 /** Link-preview fetchers (Messages sends "facebookexternalhit … Twitterbot") must get the page, never the redirect. */

@@ -1,6 +1,7 @@
 // The weekly misery recap: on Monday morning, each device's last week in one alert. Its Successful Hate
 // Watches by team, how many alerts it got, and the worst loss ("Your week in misery: 4 Successful Hate
 // Watches", "Yankees 2, Jets 1, Lakers 1. 37 alerts in all. Low point: Jets got BLOWN OUT by the Bills.").
+// The counting is `miserySpan`, over any range of time: season.ts uses it for the "season in misery" share card.
 import { createHash } from 'node:crypto';
 import { db } from './db.ts';
 import { catalog } from './catalog.ts';
@@ -20,7 +21,26 @@ function localNow(now: number, tz: string) {
   }).formatToParts(now).map((p) => [p.type, p.value]));
   return { weekday: parts.weekday, hour: Number(parts.hour), sinceMidnight: ((Number(parts.hour) * 60 + Number(parts.minute)) * 60 + Number(parts.second)) * 1000 };
 }
-const dateIn = (at: number, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(at);
+export const dateIn = (at: number, tz: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(at);
+const nameOf = (key: string) => catalog.team(key)?.shortName ?? catalog.player(key)?.name ?? key;
+
+/**
+ * One device's Successful Hate Watches by team (most first), alerts, and worst loss in [start, end): what the
+ * weekly recap and the season card (season.ts) both say. `low` is that loss's title: the worst loss they got,
+ * whichever of its alerts it was (the team's, "their team lost", a fact in its place: its team loss is `lostId`):
+ * an elimination first, then the biggest margin.
+ */
+export function miserySpan(deviceId: string, start: number, end: number) {
+  const watches = db.prepare(`SELECT target_key, COUNT(*) AS n FROM hate_watches WHERE device_id = ? AND occurred_at >= ? AND occurred_at < ?
+    GROUP BY target_key ORDER BY n DESC, MAX(occurred_at) DESC`).all(deviceId, start, end) as { target_key: string; n: number }[];
+  const alerts = (db.prepare(`SELECT COUNT(*) AS n FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
+    AND e.type NOT IN ('${RECAP_TYPE}', '${NOTICE_TYPE}')`).get(deviceId, start, end) as { n: number }).n;
+  const low = (db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id LEFT JOIN events l ON l.id = json_extract(e.meta, '$.lostId')
+    WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ? AND (e.type = 'team.lost' OR json_extract(e.meta, '$.lostId') IS NOT NULL)
+    ORDER BY COALESCE(json_extract(e.meta, '$.eliminated'), json_extract(l.meta, '$.eliminated'), 0) DESC,
+      CAST(COALESCE(json_extract(e.meta, '$.margin'), json_extract(l.meta, '$.margin')) AS INTEGER) DESC LIMIT 1`).get(deviceId, start, end) as { title: string } | undefined)?.title;
+  return { watches, total: watches.reduce((s, w) => s + w.n, 0), alerts, low };
+}
 
 /**
  * One device's recap of the week that ended at midnight this Monday, or null for a quiet week. Its time
@@ -31,26 +51,15 @@ export function recapFor(deviceId: string, now = Date.now()) {
   const local = localNow(now, tz);
   const end = now - local.sinceMidnight, start = end - 7 * 86400_000;
   const week = dateIn(start + 3600_000, tz); // the Monday it began
-  const watches = db.prepare(`SELECT target_key, COUNT(*) AS n FROM hate_watches WHERE device_id = ? AND occurred_at >= ? AND occurred_at < ?
-    GROUP BY target_key ORDER BY n DESC, MAX(occurred_at) DESC`).all(deviceId, start, end) as { target_key: string; n: number }[];
-  const alerts = (db.prepare(`SELECT COUNT(*) AS n FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
-    AND e.type NOT IN ('${RECAP_TYPE}', '${NOTICE_TYPE}')`).get(deviceId, start, end) as { n: number }).n;
-  const total = watches.reduce((s, w) => s + w.n, 0);
+  const { watches, total, alerts, low } = miserySpan(deviceId, start, end);
   if (!total && alerts < MIN_ALERTS) return null;
-  // The worst loss they got, whichever of its alerts it was (the team's, "their team lost", a fact in its place: its
-  // team loss is `lostId`): an elimination first, then the biggest margin.
-  const low = db.prepare(`SELECT e.title FROM feed f JOIN events e ON e.id = f.event_id LEFT JOIN events l ON l.id = json_extract(e.meta, '$.lostId')
-    WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ? AND (e.type = 'team.lost' OR json_extract(e.meta, '$.lostId') IS NOT NULL)
-    ORDER BY COALESCE(json_extract(e.meta, '$.eliminated'), json_extract(l.meta, '$.eliminated'), 0) DESC,
-      CAST(COALESCE(json_extract(e.meta, '$.margin'), json_extract(l.meta, '$.margin')) AS INTEGER) DESC LIMIT 1`).get(deviceId, start, end) as { title: string } | undefined;
   const top = watches[0]?.target_key ?? (db.prepare(`SELECT e.target_key FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.occurred_at >= ? AND f.occurred_at < ?
     AND e.type != '${NOTICE_TYPE}' GROUP BY e.target_key ORDER BY COUNT(*) DESC LIMIT 1`).get(deviceId, start, end) as { target_key: string } | undefined)?.target_key;
   if (!top) return null;
-  const name = (key: string) => catalog.team(key)?.shortName ?? catalog.player(key)?.name ?? key;
   const body = [
-    watches.length ? `${watches.slice(0, 5).map((w) => `${name(w.target_key)} ${w.n}`).join(', ')}${watches.length > 5 ? ', and more' : ''}.` : '',
+    watches.length ? `${watches.slice(0, 5).map((w) => `${nameOf(w.target_key)} ${w.n}`).join(', ')}${watches.length > 5 ? ', and more' : ''}.` : '',
     `${alerts} alert${alerts === 1 ? '' : 's'} in all.`,
-    low ? `Low point: ${low.title.replace(/^Successful Hate Watch! /, '')}.` : '',
+    low ? `Low point: ${low.replace(/^Successful Hate Watch! /, '')}.` : '',
   ].filter(Boolean).join(' ');
   return {
     // The device's id is hashed: events outlive a device that deletes its data.

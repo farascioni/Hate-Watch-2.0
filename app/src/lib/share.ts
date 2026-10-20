@@ -18,8 +18,12 @@ export function shareText(item: FeedItem, url = item.shareUrl) {
  * a share sheet get the text copied to the clipboard instead. `url` is the link of the look the person picked
  * (ShareStyleSheet); without one, the alert's own.
  */
-export async function shareAlert(item: FeedItem, url = item.shareUrl): Promise<'shared' | 'copied' | 'dismissed'> {
-  const message = shareText(item, url);
+export const shareAlert = (item: FeedItem, url = item.shareUrl) => shareContent(shareText(item, url), url, item.title, tr('share.dialog'));
+
+/** The "season in misery" card's link (api.shareSeason), shared like an alert's. */
+export const shareSeason = (url: string) => shareContent(`${tr('counter.shareMessage')}\n${url}`, url, tr('counter.shareMessage'), tr('counter.share'));
+
+async function shareContent(message: string, url: string | undefined, subject: string, dialogTitle: string): Promise<'shared' | 'copied' | 'dismissed'> {
   const copy = async () => {
     try { await Clipboard.setStringAsync(message); return 'copied' as const; } catch { return 'dismissed' as const; }
   };
@@ -28,7 +32,7 @@ export async function shareAlert(item: FeedItem, url = item.shareUrl): Promise<'
   // share sheet only takes text, so the link goes at the end of it.
   const content = url && Platform.OS !== 'android' ? { url } : { message };
   try {
-    const result = await Share.share(content, { dialogTitle: tr('share.dialog'), subject: item.title });
+    const result = await Share.share(content, { dialogTitle, subject });
     return result.action === Share.sharedAction ? 'shared' : 'dismissed';
   } catch (e) {
     // Cancelling the web share sheet rejects with AbortError: that's a choice, not a failure.

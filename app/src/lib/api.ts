@@ -55,7 +55,7 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
       await storage.set(TOKEN_KEY, oldToken).catch(() => {});
     }
   }
-  if (!res.ok) throw new Error(`${method} ${path} failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(`${method} ${path} failed (${res.status})`), { status: res.status });
   return res.json() as Promise<T>;
 }
 
@@ -82,6 +82,8 @@ export const api = {
   leaderboard: (f: { kind?: 'team' | 'player'; league?: League }) =>
     request<Leaderboard>('GET', `/leaderboard?limit=100${f.kind ? `&kind=${f.kind}` : ''}${f.league ? `&league=${f.league}` : ''}`, undefined, false),
   shared: (code: string) => request<{ item: FeedItem }>('GET', `/shared/${enc(code)}`, undefined, false),
+  /** The link to this device's "season in misery" card; a 400 means it has no alerts yet. */
+  shareSeason: () => request<{ url: string }>('POST', '/me/share/season'),
 
   /** `trackers`: how many people (devices) track each one, you included. */
   follows: () => request<{ follows: { key: string; followedAt: number; trackers?: number; target: Target | null }[] }>('GET', '/me/follows'),

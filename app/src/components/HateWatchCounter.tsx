@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
 import { LeagueTag } from './ui';
+import { api } from '../lib/api';
+import { shareSeason } from '../lib/share';
 import { useStore } from '../lib/store';
 import { colors, radius, space } from '../theme';
 import type { HateWatchTally, Target } from '../lib/types';
@@ -14,12 +16,25 @@ const SHOWN = 3; // teams with a chip; "Show all" lists every one
  * The top of Settings: how many Successful Hate Watches you've had (a team you track lost, or a tracked
  * player's team, counted under the team; F1, your constructor scored no points; a UFC fighter you track lost, under the fighter), and the teams that gave you the most. With more than three teams,
  * "+N more" expands it into the full list, most first. Counted on the server whatever your alert
- * settings are, so turning "Loses a game" off or clearing the feed doesn't reset it.
+ * settings are, so turning "Loses a game" off or clearing the feed doesn't reset it. "Share your season" asks
+ * the server for the link to the season card (server/src/season.ts) and opens the share sheet with it; a device
+ * with no alerts yet gets one line saying so.
  */
 export function HateWatchCounter() {
   const tx = useT();
   const { hateWatches } = useStore();
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const share = async () => {
+    if (busy) return;
+    setBusy(true); setNote('');
+    try {
+      if ((await shareSeason((await api.shareSeason()).url)) === 'copied') setNote(tx('alert.copied'));
+    } catch (e) {
+      setNote(tx((e as { status?: number }).status === 400 ? 'counter.shareNone' : 'counter.shareFailed'));
+    } finally { setBusy(false); }
+  };
   const total = hateWatches?.total;
   const teams = hateWatches?.teams ?? [];
   const label = tx('counter.title', { n: total ?? 0 });
@@ -67,6 +82,13 @@ export function HateWatchCounter() {
           <Ionicons name="chevron-up" size={14} color={colors.textDim} />
         </Pressable>
       ) : null}
+
+      <Pressable onPress={share} disabled={busy} style={({ pressed }) => [styles.share, (pressed || busy) && { opacity: 0.6 }]}
+        accessibilityRole="button" accessibilityLabel={tx('counter.share')} hitSlop={6}>
+        <Ionicons name={Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={colors.text} />
+        <Text style={styles.shareText}>{tx('counter.share')}</Text>
+      </Pressable>
+      {note ? <Text style={styles.note} accessibilityLiveRegion="polite">{note}</Text> : null}
     </View>
   );
 }
@@ -105,4 +127,7 @@ const styles = StyleSheet.create({
   rowName: { color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 },
   rowCount: { color: colors.hate, fontSize: 15, fontWeight: '900', minWidth: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
   less: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(1), alignSelf: 'center', paddingVertical: space(1), paddingHorizontal: space(3) },
+  share: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(2), backgroundColor: colors.surfaceHi, borderRadius: radius.pill, paddingVertical: space(2.5) },
+  shareText: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  note: { color: colors.textDim, fontSize: 13, textAlign: 'center' },
 });

@@ -22,6 +22,12 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update, which adds `watching` to a game's data.)
 - Settings: "Reset alerts to defaults" now resets every alert setting and asks first; tracked teams and your tally stay. (Update, after the server update)
 - Server: a device can reset its alert settings.
+- Settings: "Share your season" shares a picture of your whole run (over the air, after the server update).
+- Server: a season card, a picture of a device's run with its own link (POST /me/share/season).
+- Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): the event and game, both teams with their scores, the inning-by-inning line score while it is on, the series line ("Series tied 2 - 2") and the series game by game, with each game's score and winner. The border is red when a most hated team is in it, gold for a favorite. The list has no Live now / Later today / Final headers, because a Final over a series still under way looked like the series was over.
+- Scores: regular-season MLB games show the series strip under the card, as the playoffs do: "Game 2 of 3 · Rays lead 1-0", a cell for each game of the series (tap a played one for its box score) and "G3 · 7:05 PM" for the next. A series is one card in My, All and Special Events: the game on now, else the next, else the last final, so a doubleheader or yesterday's final and today's game no longer show twice. (Update; the strip needs the server update.)
+- Server: MLB regular-season cards carry `series`, the series' games read from the home team's schedule (every 2 minutes while a game is on, else every 6 hours), and their finals are saved with box scores until 3 days after the series.
+- Server: cards carry the event, the series and each game's result from ESPN's postseason schedule; a new vote table. Until the server update, the Special Events view stays hidden.
 
 ## Build 20 (October 18, 2026)
 
