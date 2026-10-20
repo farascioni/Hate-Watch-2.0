@@ -8,6 +8,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 - Server: bad requests get a clear 400 or 413 instead of an error, new devices are limited per address, and share links use our own address.
+- Server: saving alert settings rejects a malformed body (bad time zone, muted list, quiet hours time) and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts 15 minutes after each send, so a phone that deleted the app stops being sent to; other receipt errors are logged.
 - Server: shared alert web pages are marked noindex and carry a link to hatewatch.dev's "how rival alerts work" page.
 - Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the line score while it is on, the series line ("Series tied 2 - 2") and the series game by game with each game's score and winner. Red border for a most hated team, gold for a favorite. No Live now / Later today / Final headers, since a Final over a series still under way looked like the series was over.

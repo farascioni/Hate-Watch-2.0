@@ -12,6 +12,9 @@ import { shareStyles } from './share-styles.ts';
 import { favoriters, opponentOf, type FavoriteRow } from './favorites.ts';
 
 // ─── Preferences ──────────────────────────────────────────────────────────────────────────────
+// A device's settings are read on every alert it could get, so PUT /me/prefs checks the shape before storing
+// (`prefsProblem`), a row stored before that check reads as defaults where it is wrong (`readPrefs`), and publish()
+// logs and skips a device whose turn throws instead of losing the alert for the devices after it.
 export interface Prefs {
   pushEnabled: boolean;
   sound: boolean;
@@ -61,17 +64,54 @@ export const DEFAULT_PREFS: Prefs = {
 
 const prefsCache = new Map<string, Prefs>();
 
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+/** The maps in Prefs, and quietHours: each must be a plain object. */
+const PREFS_OBJECTS = ['leagues', 'types', 'pushTypes', 'targetTypes', 'targetPushTypes', 'playerTeams', 'quietHours'] as const;
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** A zone `inQuietHours` can format: the same call it makes, since an allowlist (`Intl.supportedValuesOf`) lacks "UTC" and the aliases phones report. */
+const validTimeZone = (tz: unknown) => { try { new Intl.DateTimeFormat('en-GB', { timeZone: tz as string }); return typeof tz === 'string'; } catch { return false; } };
+
+/**
+ * Why a PUT /me/prefs body can't be stored, or null. Settings are read on every alert (`pushAllowed`, `inQuietHours`),
+ * so a wrong shape would throw inside `publish()` for every alert that device's targets make.
+ */
+export function prefsProblem(patch: unknown): string | null {
+  if (patch == null) return null;
+  if (!isObject(patch)) return 'settings must be an object';
+  for (const k of ['pushEnabled', 'sound'] as const) if (patch[k] !== undefined && typeof patch[k] !== 'boolean') return `${k} must be true or false`;
+  const { muted, quietHours: q } = patch;
+  if (muted !== undefined && !(Array.isArray(muted) && muted.every((k) => typeof k === 'string'))) return 'muted must be a list of target keys';
+  for (const k of PREFS_OBJECTS) if (patch[k] !== undefined && !isObject(patch[k])) return `${k} must be an object`;
+  if (isObject(q)) {
+    if (q.enabled !== undefined && typeof q.enabled !== 'boolean') return 'quietHours.enabled must be true or false';
+    for (const k of ['start', 'end']) if (q[k] !== undefined && !(typeof q[k] === 'string' && HH_MM.test(q[k]))) return `quietHours.${k} must be HH:MM`;
+    if (q.tz !== undefined && !validTimeZone(q.tz)) return 'quietHours.tz must be a time zone';
+  }
+  return null;
+}
+
+/** A device's stored settings over the defaults. A row stored before `prefsProblem` can have the wrong shape: that part reads as its default, so one bad row can't break an alert. */
+function readPrefs(raw: string | undefined): Prefs {
+  let stored: Record<string, unknown> = {};
+  try { const v = raw ? JSON.parse(raw) : {}; if (isObject(v)) stored = v; } catch { /* unreadable: defaults */ }
+  const p = { ...DEFAULT_PREFS, ...stored, quietHours: { ...DEFAULT_PREFS.quietHours, ...(isObject(stored.quietHours) ? stored.quietHours : {}) } } as Prefs;
+  if (!Array.isArray(p.muted)) p.muted = [];
+  for (const k of PREFS_OBJECTS) if (!isObject(p[k])) Object.assign(p, { [k]: DEFAULT_PREFS[k] });
+  if (!validTimeZone(p.quietHours.tz)) p.quietHours.tz = DEFAULT_PREFS.quietHours.tz;
+  return p;
+}
+
 export function getPrefs(deviceId: string): Prefs {
   let p = prefsCache.get(deviceId);
   if (!p) {
     const row = db.prepare('SELECT prefs FROM devices WHERE id = ?').get(deviceId) as { prefs: string } | undefined;
-    const stored = row ? JSON.parse(row.prefs) : {};
-    p = { ...DEFAULT_PREFS, ...stored, quietHours: { ...DEFAULT_PREFS.quietHours, ...stored.quietHours } } as Prefs;
+    p = readPrefs(row?.prefs);
     prefsCache.set(deviceId, p);
   }
   return p;
 }
 
+/** Callers pass a body `prefsProblem` has passed (the route does). */
 export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
   const cur = getPrefs(deviceId);
   const next: Prefs = {
@@ -481,6 +521,8 @@ const delivered = new Map<string, { at: number; devices: Map<string, { eventId: 
 function pruneDelivered(now: number) {
   for (const [m, d] of delivered) { if (now - d.at < LATE_FOLD_MS) break; delivered.delete(m); } // oldest first
 }
+/** One device failed on one alert (a settings row `prefsProblem` never saw, a database error). The alert is already stored, so nothing would retry it: log the device and go on to the others. */
+const skipped = (deviceId: string, e: Detected, err: unknown) => console.error(`[publish] device ${deviceId} skipped for ${e.id}:`, err);
 
 /**
  * Store each new alert once, then send it to every follower who wants it. Alerts that share a moment are
@@ -504,10 +546,10 @@ export function publish(events: Detected[], league: League) {
   for (const e of events) {
     if (!e.firstFollowed || !e.moment) continue;
     const mine = firstFollowed.get(e.moment) ?? firstFollowed.set(e.moment, new Map()).get(e.moment)!;
-    for (const f of followers().all(e.targetKey) as { device_id: string; created_at: number }[]) {
+    for (const f of followers().all(e.targetKey) as { device_id: string; created_at: number }[]) try {
       const had = mine.get(f.device_id);
       if ((!had || f.created_at < had.at) && shouldDeliver(getPrefs(f.device_id), e, league)) mine.set(f.device_id, { key: e.targetKey, at: f.created_at });
-    }
+    } catch (err) { skipped(f.device_id, e, err); }
   }
   for (const e of events) {
     recordMisery(e, league); // Recent misery is the same for everyone, so it keeps what nobody tracks (misery.ts); it never changes what is sent
@@ -520,7 +562,7 @@ export function publish(events: Detected[], league: League) {
     const hateWatch = isHateWatch(e);
     // Who gets it, first: a Successful Hate Watch says how many others got it too, from the first frame.
     const deliver: Delivery[] = [];
-    for (const f of fols) {
+    for (const f of fols) try {
       // A Successful Hate Watch counts for everyone tracking the team (or a player on it), whatever their alert settings.
       // A favorite (f.fav) roots against the team, so its loss is not a hate watch for them.
       if (!f.fav && hateWatch && recordHateWatch(f.device_id, e)) {
@@ -575,7 +617,7 @@ export function publish(events: Detected[], league: League) {
         mine.set(f.device_id, d);
       }
       deliver.push(d);
-    }
+    } catch (err) { skipped(f.device_id, e, err); }
     planned.push({ e, gameId, deliver, followers: fols.length });
   }
   const perMoment = new Map<string, number>();
@@ -586,7 +628,7 @@ export function publish(events: Detected[], league: League) {
     const item = feedItem({ id: e.id, type: e.type, league, target_key: e.targetKey, title: e.title, body: e.body, occurred_at: e.at, detected_at: detectedAt, meta: JSON.stringify(e.meta ?? null), game_id: gameId, recipients });
     const frame = JSON.stringify({ kind: 'event', item });
     const moment = e.moment ? events.filter((x) => x.moment === e.moment) : [];
-    for (const { f, prefs, folded } of deliver) {
+    for (const { f, prefs, folded } of deliver) try {
       const streak = f.fav ? [] : streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line; a favorite has no hate watch streak
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
@@ -601,7 +643,7 @@ export function publish(events: Detected[], league: League) {
         data: { eventId: e.id, targetKey: e.targetKey, type: e.type },
         ...(league === 'f1' && gameId ? { bundle: `${f.push_token}\u0000${gameId}`, label: String(e.meta?.label ?? '') } : {}),
       });
-    }
+    } catch (err) { skipped(f.device_id, e, err); }
     console.log(`[event] ${e.type} → ${e.targetKey}: ${e.title} (lag ${((detectedAt - e.at) / 1000).toFixed(1)}s, ${followers} followers${deliver.some((d) => d.folded.length) ? ', with folded facts' : ''})`);
     // Remember who got this moment's alert, for facts that come in a later publish.
     if (e.moment) {

@@ -163,6 +163,12 @@ a 4-digit type that changes from "Confirmed" to "Overturned" (`pitchSlot`), so t
    settings allow (README "Notifications", "How a push is decided"). Pushes are sent once, after every alert in the
    publish has been planned (`pushSender(bundled(pushes))`).
 
+Steps 4 to 6 run once per follower inside a `try`: if one device's turn throws (a settings row of the wrong shape, a
+socket that fails on send), `publish()` logs the device and event id (`[publish] device <id> skipped for <event id>`)
+and goes on to the next follower. The ids, the insert and `ON CONFLICT` are untouched, so a failure can't make a
+second alert for anyone; the skipped device's copy is simply not sent, as the event is already stored (see
+docs/notifications.md, "What `PUT /me/prefs` accepts").
+
 `publishTo(deviceId, e, league)` (one device's weekly recap, `recap.ts`) does the same for one device: it returns
 `false`, and sends nothing, if the id was stored before.
 
