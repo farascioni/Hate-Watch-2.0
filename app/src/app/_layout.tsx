@@ -49,6 +49,8 @@ export default function RootLayout() {
   const t = useT();
   // The web page's language (screen readers, translation prompts); `t` changes with the picked language.
   useEffect(() => { if (Platform.OS === 'web') document.documentElement.lang = currentLang(); }, [t]);
+  // The guide is a full-screen modal narrower than a wide window; nothing paints the page beside it, so it shows white.
+  useEffect(() => { if (Platform.OS === 'web') document.documentElement.style.backgroundColor = colors.bg; }, []);
   const { wide } = useWebLayout();
   // A game, player or alert reads best narrow: centred in the room the sidebar leaves (the tabs fill it).
   const detail: ViewStyle | undefined = wide ? { width: '100%', maxWidth: DETAIL_MAX, marginHorizontal: 'auto' as unknown as number } : undefined;
