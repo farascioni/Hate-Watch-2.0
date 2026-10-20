@@ -56,6 +56,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
+- **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
 - **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 642 tests in 84 files, offline, in about 10 seconds, all passing on October 20, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
@@ -170,6 +171,12 @@ The full detail: [docs/favorites.md](docs/favorites.md).
 **In short:** with the switch on in Settings (on until switched off), an iOS Live Activity on the lock screen lists the live games of the teams the device tracks, and the ones starting within the hour (the board turns on by itself while the app is open; an eye on each score card adds or removes any game): a favorite's games first, then most hated, then the rest, four lines and "+N more" (four layouts to pick in Settings: Compact; Detailed, three two-line games; Grid, four cells two across; Hero, the top game big and two lines). The server builds each device's board and pushes it to Apple itself (`server/src/live-activity.ts`, `apns.ts`; inert until the APNs key and the `liveActivity` switch are set); the app starts it and sends its push token, its most hated list and the games picked by hand, so those leave the device while the board is on. Needs a native build once (the widget extension); after it, the board's wording, colors and rows change with a server deploy, and the widget's layout code (`ScoreboardActivity.tsx`) ships over the air with an EAS Update, using only the components and modifiers that build already has.
 
 The full detail: [docs/live-activity.md](docs/live-activity.md).
+
+## Motion
+
+**In short:** the app moves a little where something just happened: a live alert drops in with a red wash, the Successful Hate Watch counter and a game's score roll up, a series cell fills, the heart, the red X and the share check pop. It is only React Native's `Animated` on the native driver (opacity and transform) with the phone's reduce-motion setting honoured, so it ships over the air; each animation fires only on a real change in the session, never on load, and none depends on a haptic.
+
+The full detail: [docs/motion.md](docs/motion.md).
 
 ## Tests
 

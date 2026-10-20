@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
+import { RollingNumber } from './RollingNumber';
+import { usePop, useOnChange } from '../lib/motion';
 import { LeagueTag } from './ui';
 import { api } from '../lib/api';
 import { shareSeason } from '../lib/share';
@@ -35,8 +38,13 @@ export function HateWatchCounter() {
       setNote(tx((e as { status?: number }).status === 400 ? 'counter.shareNone' : 'counter.shareFailed'));
     } finally { setBusy(false); }
   };
-  const total = hateWatches?.total;
-  const teams = hateWatches?.teams ?? [];
+  // Tabs stay mounted, so a count that grew while you were elsewhere is shown (and rolls) when Settings comes back into view.
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  const [shown, setShown] = useState(hateWatches);
+  useEffect(() => { if (focused) setShown(hateWatches); }, [focused, hateWatches]);
+  const total = shown?.total;
+  const teams = shown?.teams ?? [];
   const label = tx('counter.title', { n: total ?? 0 });
   const more = teams.length > SHOWN;
   const toggle = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setOpen((o) => !o); };
@@ -45,7 +53,7 @@ export function HateWatchCounter() {
     <View style={styles.card}>
       <View style={styles.head} accessible accessibilityRole="summary"
         accessibilityLabel={total == null ? tx('counter.loading') : `${total} ${label}`}>
-        <Text style={styles.count}>{total == null ? '–' : total.toLocaleString(currentLocale())}</Text>
+        <RollingNumber value={total ?? null} text={total == null ? '–' : total.toLocaleString(currentLocale())} style={styles.count} lineHeight={52} />
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{label}</Text>
           <Text style={styles.sub}>{total ? tx('counter.sub') : tx('counter.subNone')}</Text>
@@ -62,7 +70,7 @@ export function HateWatchCounter() {
             <View key={t.target.key} style={styles.chip} accessible accessibilityLabel={`${short(t.target)}, ${t.count}`}>
               <Avatar target={t.target} size={22} />
               <Text style={styles.chipName} numberOfLines={1}>{short(t.target)}</Text>
-              <Text style={styles.chipCount}>{t.count}</Text>
+              <ChipCount count={t.count} />
             </View>
           ))}
           {more ? (
@@ -91,6 +99,13 @@ export function HateWatchCounter() {
       {note ? <Text style={styles.note} accessibilityLiveRegion="polite">{note}</Text> : null}
     </View>
   );
+}
+
+/** A chip's count; it pops when it goes up. */
+function ChipCount({ count }: { count: number }) {
+  const { scale, pop } = usePop(1.4);
+  useOnChange(count, (p, n) => { if (n > p) pop(); });
+  return <Animated.Text style={[styles.chipCount, { transform: [{ scale }] }]}>{count}</Animated.Text>;
 }
 
 /** One team in the full list: logo, name, league, and how many times they lost on you. */

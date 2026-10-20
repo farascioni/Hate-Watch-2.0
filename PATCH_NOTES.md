@@ -7,9 +7,10 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Motion: alerts drop in, counts roll, series fill, hearts pop. Off under Reduce Motion.
 - Server: bad requests get a clear 400 or 413 instead of an error, new devices are limited per address, and share links use our own address.
 - Server: saving alert settings rejects a malformed body (bad time zone, muted list, quiet hours time) and keeps the old settings; one failing device no longer stops the others' alerts.
-- Server: pushes check Expo's delivery receipts 15 minutes after each send, so a phone that deleted the app stops being sent to.
+- Server: pushes check Expo's delivery receipts 15 minutes after each send, so a deleted app stops being sent to.
 - Server: shared alert web pages are marked noindex and carry a link to hatewatch.dev's "how rival alerts work" page.
 - Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the line score while it is on, the series line ("Series tied 2 - 2") and each game's score and winner. Red border for a most hated team, gold for a favorite. No Live now / Later today / Final headers: a Final over a series still under way read as the series being over.
 - Scores: under those games, "Coming up" lists the playoff games and series starting in the next 7 days with "Who do you want to lose?". Vote for either team, see each team's share of the vote, and change yours until the first game starts; a started series keeps the vote under its scoreboard until it is won. The view hides when empty and is named for the league: Playoffs for MLB, NBA, NFL, NHL and WNBA, Bowl Games for college football, Special Events for All.
@@ -21,7 +22,6 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your follows and settings if that fails. A live frame that is not JSON is ignored, not a crash.
 - Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update.)
 - Settings: "Reset alerts to defaults" now resets every alert setting and asks first; tracked teams and your tally stay. (Update, after the server update)
-- Server: a device can reset its alert settings.
 - Settings: "Share your season" shares a picture of your whole run (over the air, after the server update).
 - Server: a season card, a picture of a device's run with its own link (POST /me/share/season).
 

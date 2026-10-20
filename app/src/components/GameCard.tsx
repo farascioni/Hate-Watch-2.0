@@ -1,8 +1,10 @@
 import { memo, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Avatar } from './Avatar';
+import { RollingNumber } from './RollingNumber';
 import { SeriesStrip } from './SeriesStrip';
 import { AlsoGot, LeagueTag, ago } from './ui';
 import { useStore } from '../lib/store';
@@ -133,8 +135,12 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
   const split = side === 'home' ? pv?.records?.homeSplit : pv?.records?.awaySplit;
   const chance = pv?.chance?.[side];
   const open = () => openTeam(s.team.key);
+  // A run scores: the number rolls up and the row flashes red for a moment (an overlay, so only opacity animates).
+  const wash = useRef(new Animated.Value(0)).current;
+  const flash = () => { wash.setValue(1); Animated.timing(wash, { toValue: 0, duration: 700, useNativeDriver: true }).start(); };
   return (
     <View style={styles.team}>
+      <Animated.View pointerEvents="none" style={[styles.wash, { opacity: wash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.22] }) }]} />
       {/* The logo and the name (as wide as it is) open the team's page; the rest of the card, the game. */}
       <Pressable onPress={open} accessible={false} style={({ pressed }) => pressed && { opacity: 0.6 }}>
         <Avatar target={s.team} size={big ? 40 : 30} />
@@ -152,7 +158,8 @@ function TeamRow({ game, side, tracked, big }: { game: GameCard; side: Side; tra
       </View>
       {chance != null
         ? <Text style={[styles.chance, big && { fontSize: 20 }]} accessibilityLabel={tx('gc.chanceWin', { n: chance })}>{chance}%</Text>
-        : <Text style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]}>{s.score ?? ''}</Text>}
+        : <RollingNumber value={s.score} text={s.score == null ? '' : String(s.score)} onRoll={flash} lineHeight={big ? 36 : 24}
+          style={[styles.score, big && { fontSize: 30 }, (!tracked || lost) && { color: colors.textDim }]} />}
     </View>
   );
 }
@@ -310,6 +317,7 @@ const styles = StyleSheet.create({
   teamName: { color: colors.text, fontSize: 15, fontWeight: '800', flexShrink: 1 },
   tracking: { color: colors.hate, fontSize: 10, fontWeight: '800', borderWidth: 1, borderColor: colors.hate, borderRadius: 6, paddingHorizontal: 5, overflow: 'hidden', flexShrink: 0 },
   players: { color: colors.textFaint, fontSize: 12, marginTop: 1 },
+  wash: { position: 'absolute', top: -2, bottom: -2, left: -6, right: -6, borderRadius: radius.md, backgroundColor: HATE_RED, opacity: 0 },
   score: { color: colors.text, fontSize: 20, fontWeight: '900', minWidth: 28, textAlign: 'right' },
   // Before the start: the team's record under its name, and its chance to win where the score will be.
   record: { color: colors.textFaint, fontSize: 12, marginTop: 1 },

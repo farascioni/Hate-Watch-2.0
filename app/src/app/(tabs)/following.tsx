@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -21,12 +21,18 @@ import { FilterBar, byWeightClass, describeFilter, groupByWeightClass, matchesFi
 import { HATE_RED, colors, radius, space } from '../../theme';
 import type { Player, Target, Team } from '../../lib/types';
 import { useT } from '../../lib/i18n';
+import { useOnChange, usePop } from '../../lib/motion';
 
 /** Hate Watch Plus: marks one of your trackers as a most hated (a red border on their alerts in the Feed). Only drawn for subscribers. */
 function MostHatedStar({ target, compact }: { target: Target; compact?: boolean }) {
   const t = useT();
   const on = useIsMostHated(target.key);
+  // The X stamps down when you turn it on, not when the list finishes loading (only a press arms it).
+  const pressed = useRef(false);
+  const { scale, pop } = usePop(1.6);
+  useOnChange(on, (_, n) => { if (pressed.current && n) pop(); pressed.current = false; });
   const press = () => {
+    pressed.current = true;
     Haptics.selectionAsync().catch(() => {});
     toggleMostHated(target.key);
   };
@@ -34,7 +40,7 @@ function MostHatedStar({ target, compact }: { target: Target; compact?: boolean 
     <Pressable onPress={press} hitSlop={8} style={[styles.icon, compact && styles.iconSm, on && styles.iconStar]} accessibilityRole="button" accessibilityState={{ selected: on }}
       accessibilityLabel={t(on ? 'tracking.removeHated' : 'tracking.addHated', { name: target.name })}>
       {/* Off is the same X dimmed, so it never reads as the plain − that unfollows. */}
-      <Text style={{ fontSize: compact ? 13 : 17, lineHeight: compact ? 17 : 20, opacity: on ? 1 : 0.4 }}>❌</Text>
+      <Animated.Text style={{ fontSize: compact ? 13 : 17, lineHeight: compact ? 17 : 20, opacity: on ? 1 : 0.4, transform: [{ scale }] }}>❌</Animated.Text>
     </Pressable>
   );
 }

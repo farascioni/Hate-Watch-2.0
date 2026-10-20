@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useStore } from '../lib/store';
 import { startLabel, trackedSides } from '../lib/scores';
 import { GOLD, HATE_RED, colors, space } from '../theme';
 import { useT } from '../lib/i18n';
+import { reduceMotion, useOnChange } from '../lib/motion';
 import type { GameCard, SeriesGame } from '../lib/types';
 
 /**
@@ -41,7 +43,7 @@ export function SeriesStrip({ game, games, title }: { game: GameCard; games: Ser
               <Text style={styles.cellN}>{t('event.gameShort', { n: g.n })}</Text>
               <Text style={styles.cellW} numberOfLines={1}>{g.state === 'in' ? t('ui.state.live').toUpperCase() : g.winner ? abbrevOf(g.winner) : ' '}</Text>
               <Text style={styles.cellS} numberOfLines={1}>{score || (g.state === 'pre' && !g.ifNeeded ? startLabel(g.startsAt).split(' ')[0] : ' ')}</Text>
-              <View style={[styles.cellMark, { backgroundColor: mark(g) }]} />
+              <Mark color={mark(g)} state={g.state} />
             </Pressable>
           );
         })}
@@ -49,6 +51,17 @@ export function SeriesStrip({ game, games, title }: { game: GameCard; games: Ser
       {nextGame && game.state === 'post' ? <Text style={styles.small} numberOfLines={1}>{`G${nextGame.n} · ${startLabel(nextGame.startsAt)}`}</Text> : null}
     </View>
   );
+}
+
+/** A cell's coloured bar; when its game begins or ends it draws out from the left. A recolour from favoriting or tracking doesn't (the state is unchanged). */
+function Mark({ color, state }: { color: string; state: string }) {
+  const grow = useRef(new Animated.Value(1)).current;
+  useOnChange(state, () => {
+    if (reduceMotion()) return;
+    grow.setValue(0);
+    Animated.timing(grow, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  });
+  return <Animated.View style={[styles.cellMark, { backgroundColor: color, transformOrigin: 'left center', transform: [{ scaleX: grow }] }]} />;
 }
 
 const styles = StyleSheet.create({

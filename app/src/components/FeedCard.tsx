@@ -1,5 +1,5 @@
-import { memo, useId, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { memo, useEffect, useId, useRef, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppAvatar, Avatar } from './Avatar';
@@ -11,11 +11,30 @@ import { useIsMostHated } from '../lib/mostHated';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 import { useT } from '../lib/i18n';
+import { reduceMotion, useOnChange, usePop } from '../lib/motion';
+
+/** Alerts that already played their entrance, so scrolling one out of the list and back never replays it. */
+const entered = new Set<string>();
 
 export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: { item: FeedItem; now: number; fresh?: boolean; highlight?: boolean }) {
   const tx = useT();
   const [pressed, setPressed] = useState(false);
   const { share, copied, sheet } = useShare(item);
+  const check = usePop(1.4);
+  useOnChange(copied, (_, n) => { if (n) check.pop(); });
+  // A live alert lands: the card drops in, and a red wash fades over it (the static red border stays for the minute).
+  // Decided once, so the first painted frame is already the start state (no flash of the finished card).
+  const plays = useRef(!!fresh && !entered.has(item.id) && !reduceMotion()).current;
+  const enter = useRef(new Animated.Value(plays ? 0 : 1)).current;
+  const pulse = useRef(new Animated.Value(plays ? 1 : 0)).current;
+  useEffect(() => {
+    if (!plays) return;
+    entered.add(item.id);
+    Animated.parallel([
+      Animated.spring(enter, { toValue: 1, friction: 7, tension: 90, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+  }, [plays, item.id, enter, pulse]);
   // Only the Feed tab passes `highlight`: the same card on a game, a target page or a shared alert stays plain.
   const mostHated = useIsMostHated(item.target.key) && !!highlight;
   const favorite = !!item.fav && !!highlight && !mostHated; // a favorite's game: the opponent's alert, edged gold (a most hated target stays red)
@@ -25,7 +44,8 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
   // A developer notice is from Hate Watch itself: the app's icon, no page to open, no league, nothing to share.
   const notice = isNotice(item);
   return (
-    <View style={[styles.card, notice && (item.urgent ? styles.urgent : styles.notice), fresh && styles.fresh, mostHated && styles.mostHated, favorite && styles.favorite, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <Animated.View style={[styles.card, { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }, { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }] }, notice && (item.urgent ? styles.urgent : styles.notice), fresh && styles.fresh, mostHated && styles.mostHated, favorite && styles.favorite, pressed && { backgroundColor: colors.surfaceHi }]}>
+      <Animated.View pointerEvents="none" style={[styles.pulse, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.18] }) }]} />
       <Pressable
         onPress={() => openAlert(item)}
         onPressIn={() => setPressed(true)} onPressOut={() => setPressed(false)}
@@ -56,13 +76,15 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
         </View>
         {/* Its own tap target: sharing doesn't open the alert behind it. */}
         {notice ? null : <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
-          <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
+          <Animated.View style={{ transform: [{ scale: check.scale }] }}>
+            <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
+          </Animated.View>
           {copied ? <Text style={styles.copied}>{tx('alert.copied')}</Text> : null}
         </Pressable>}
       </Pressable>
       {sheet}
       {item.clip ? <AlertClip clip={item.clip} /> : null}
-    </View>
+    </Animated.View>
   );
 });
 
@@ -97,6 +119,7 @@ const styles = StyleSheet.create({
   notice: { borderColor: colors.hateDim },
   urgent: { borderColor: colors.warn },
   noticeLabel: { color: colors.textDim, fontWeight: '800' },
+  pulse: { ...StyleSheet.absoluteFill, borderRadius: radius.lg, backgroundColor: HATE_RED },
   fresh: { borderColor: colors.hate, shadowColor: colors.hate, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
   // A subscriber's most hated (the red X on the Tracking tab): a red edge, and a favorite's (the heart) a gold one, as on the lock screen scoreboard.
   mostHated: { borderColor: HATE_RED, borderWidth: 2 },
