@@ -54,6 +54,8 @@ interface Store {
 
   prefs: Prefs | null;
   updatePrefs: (patch: PrefsPatch) => Promise<void>;
+  /** Every alert setting back to a new install's (the server's defaults); follows and the tally stay. */
+  resetPrefs: () => Promise<void>;
   eventTypes: EventType[];
   leagues: LeagueInfo[];
   /** A league's info from the server (name, sport), for leagues this build may not know. */
@@ -320,6 +322,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         playerTeams: mergePlayerTeams(p.playerTeams, patch.playerTeams),
       } : p));
       setPrefs(await api.setPrefs(patch));
+    },
+    resetPrefs: async () => {
+      setPrefs(await api.resetPrefs());
     },
     enablePush: async () => {
       const r = await registerForPush();

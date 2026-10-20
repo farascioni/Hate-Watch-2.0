@@ -53,6 +53,8 @@ export const fr: Record<Key, string> = {
   'settings.shows': 'Affiche ces alertes',
   'settings.showGroup': 'Afficher {total} · {title}, {summary}',
   'settings.reset': 'Rétablir les alertes par défaut',
+  'settings.resetAlertsBody': 'Tous les interrupteurs, cloches, sourdines, choix par équipe et par joueur, heures de silence et le son reviennent aux valeurs par défaut. Les équipes et joueurs que vous suivez et votre compteur de Successful Hate Watch restent.',
+  'settings.resetAlertsConfirm': 'Réinitialiser',
   'settings.clearFeed': 'Vider le fil',
   'settings.clearFeedTitle': 'Vider le fil?',
   'settings.clearFeedBody': 'Cela retire tous les éléments de votre fil.',

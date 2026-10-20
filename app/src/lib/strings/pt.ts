@@ -53,6 +53,8 @@ export const pt: Record<Key, string> = {
   'settings.shows': 'Mostra estes alertas',
   'settings.showGroup': 'Mostrar {total} · {title}, {summary}',
   'settings.reset': 'Restaurar alertas padrão',
+  'settings.resetAlertsBody': 'Todos os interruptores, sinos, silenciamentos, escolhas por time e por jogador, horário silencioso e som voltam ao padrão. Os times e jogadores que você acompanha e a sua contagem de Successful Hate Watch continuam.',
+  'settings.resetAlertsConfirm': 'Redefinir',
   'settings.clearFeed': 'Limpar o feed',
   'settings.clearFeedTitle': 'Limpar o feed?',
   'settings.clearFeedBody': 'Isso remove todos os itens do seu feed.',

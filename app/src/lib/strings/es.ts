@@ -57,6 +57,8 @@ export const es: Record<Key, string> = {
   'settings.showGroup': 'Mostrar {total} · {title}, {summary}',
 
   'settings.reset': 'Restablecer alertas',
+  'settings.resetAlertsBody': 'Todos los interruptores, campanas, silencios, ajustes por equipo y por jugador, las horas de silencio y el sonido vuelven a los valores por defecto. Los equipos y jugadores que sigues y tu contador de Successful Hate Watch se quedan.',
+  'settings.resetAlertsConfirm': 'Restablecer',
   'settings.clearFeed': 'Vaciar el feed',
   'settings.clearFeedTitle': '¿Vaciar el feed?',
   'settings.clearFeedBody': 'Se quitarán todos los elementos de tu feed.',

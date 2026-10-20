@@ -12,7 +12,7 @@ import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, GAME_LEAGUES, TEAMS_ONLY, type League } from './leagues.ts';
 import { addFavorite, favoriteOf, favoritesOf, removeFavorite, updateFavorite, registerGame, type FavoriteRow } from './favorites.ts';
-import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, watchingCount, DEFAULT_PREFS, PUBLIC_URL, prefsProblem } from './fanout.ts';
+import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, watchingCount, DEFAULT_PREFS, PUBLIC_URL, prefsProblem, resetPrefs } from './fanout.ts';
 import { engine } from './live.ts';
 import { callStats } from './calls.ts';
 import { privacyPage, supportPage } from './pages.ts';
@@ -319,6 +319,12 @@ route('PUT', '/me/prefs', true, (req, _u, _p, body) => {
   if (problem) throw new HttpError(400, problem);
   const p = prefsDto(setPrefs(req.deviceId!, body ?? {}));
   if (body?.playerTeams) forgetDeviceTeams(req.deviceId!); // a player's team on or off the Scores tab, now
+  return p;
+});
+
+route('DELETE', '/me/prefs', true, (req) => {
+  const p = prefsDto(resetPrefs(req.deviceId!));
+  forgetDeviceTeams(req.deviceId!); // the player teams are gone with the rest
   return p;
 });
 

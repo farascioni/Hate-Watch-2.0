@@ -102,6 +102,7 @@ export const api = {
 
   prefs: () => request<Prefs>('GET', '/me/prefs'),
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),
+  resetPrefs: () => request<Prefs>('DELETE', '/me/prefs'),
   setPushToken: (pushToken: string | null) => request('PUT', '/me/push-token', { pushToken }),
 
   /** One player's or team's alerts to this device since a time: Recent misery's fallback for a server without /misery. */

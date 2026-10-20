@@ -53,6 +53,8 @@ export const ja: Record<Key, string> = {
   'settings.shows': 'これらのアラートを表示します',
   'settings.showGroup': '{total}件を表示・{title}、{summary}',
   'settings.reset': 'アラートを初期設定に戻す',
+  'settings.resetAlertsBody': 'スイッチ、ベル、ミュート、チームや選手ごとの設定、おやすみ時間、サウンドがすべて初期設定に戻ります。追跡中のチームと選手、Successful Hate Watch のカウントはそのままです。',
+  'settings.resetAlertsConfirm': 'リセット',
   'settings.clearFeed': 'フィードを消去',
   'settings.clearFeedTitle': 'フィードを消去しますか?',
   'settings.clearFeedBody': 'フィードのすべての項目が削除されます。',

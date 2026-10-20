@@ -20,6 +20,8 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Tracking: press and hold a bell to snooze a player or team for 1 day, 3 days or a week; a snoozed target counts as muted until it ends, so no push. (Update, after the server deploy.)
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your follows and settings if that fails. A live frame that is not JSON is ignored, not a crash.
 - Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update, which adds `watching` to a game's data.)
+- Settings: "Reset alerts to defaults" now resets every alert setting and asks first; tracked teams and your tally stay. (Update, after the server update)
+- Server: a device can reset its alert settings.
 
 ## Build 20 (October 18, 2026)
 

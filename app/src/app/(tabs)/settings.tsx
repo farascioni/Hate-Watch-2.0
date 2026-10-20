@@ -43,7 +43,7 @@ export default function SettingsScreen() {
   const liveLayout = useLiveLayout();
   const t = useT();
   const langPref = useLangPref();
-  const { prefs, updatePrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
+  const { prefs, updatePrefs, resetPrefs, eventTypes, leagues, push, enablePush, clearFeed, deleteAllData } = useStore();
   // Each alert group folds up (all start folded, so the page isn't 69 rows long). The tab stays mounted, so this survives switching tabs.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const devPlus = useDevPlus();
@@ -170,7 +170,12 @@ export default function SettingsScreen() {
 
       <SectionHeader>{t('settings.data')}</SectionHeader>
       <View style={styles.card}>
-        <Pressable style={styles.action} onPress={() => updatePrefs({ types: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultOn])), pushTypes: Object.fromEntries(eventTypes.map((t) => [t.id, t.defaultPush ?? true])), leagues: Object.fromEntries(leagues.map((l) => [l.id, true])) })}>
+        <Pressable style={styles.action} onPress={() => {
+          const go = () => resetPrefs();
+          const msg = t('settings.resetAlertsBody');
+          if (Platform.OS === 'web') { if (window.confirm(msg)) go(); }
+          else Alert.alert(t('settings.reset'), msg, [{ text: t('settings.cancel'), style: 'cancel' }, { text: t('settings.resetAlertsConfirm'), onPress: go }]);
+        }}>
           <Text style={styles.actionText}>{t('settings.reset')}</Text>
         </Pressable>
         <Pressable style={styles.action} onPress={() => {
