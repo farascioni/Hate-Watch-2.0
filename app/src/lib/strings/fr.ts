@@ -406,6 +406,8 @@ export const fr: Record<Key, string> = {
   'game.boxPre': 'La feuille de match apparaîtra ici dès le début.',
   'game.boxNone': 'Pas encore de feuille de match.',
   'game.loading': 'Chargement…',
+  'game.watching': '{n} le regardent avec haine en ce moment',
+  'game.watching_one': '{n} le regarde avec haine en ce moment',
   'game.highPre': 'Les faits saillants apparaîtront ici dès le début.',
   'game.highNone': 'Pas encore de faits saillants.',
   'game.alertsHide': 'Réduit vos alertes',

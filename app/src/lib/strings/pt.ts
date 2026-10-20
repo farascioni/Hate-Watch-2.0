@@ -406,6 +406,8 @@ export const pt: Record<Key, string> = {
   'game.boxPre': 'As estatísticas aparecem aqui quando começar.',
   'game.boxNone': 'Ainda não há estatísticas.',
   'game.loading': 'Carregando…',
+  'game.watching': '{n} assistindo com ódio agora',
+  'game.watching_one': '{n} assistindo com ódio agora',
   'game.highPre': 'Os melhores momentos aparecem aqui quando começar.',
   'game.highNone': 'Ainda não há melhores momentos.',
   'game.alertsHide': 'Recolher seus alertas',

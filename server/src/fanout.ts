@@ -375,6 +375,26 @@ function recipients(targetKey: string, league: League, gameId?: string): Recipie
   return out;
 }
 
+/**
+ * How many different devices `recipients()` would address an alert about either side of a game to, `exceptDeviceId` not counted
+ * (the game screen's "N hate-watching now"): the sides' trackers, trackers of their players with "Get their team's alerts" on, and
+ * devices favoriting either side (a favorite is sent the opponent's alerts). One query, no per-device work; it reads, it never publishes.
+ * It counts who the game is addressed to, not whose alert settings would let one through, but only devices that can be reached: a push
+ * token, or a feed (at least one row in it), so a device that never allowed push and never got an alert is not counted. No sides (an F1 session) is 0.
+ */
+export function watchingCount(sides: string[], exceptDeviceId: string): number {
+  if (!sides.length) return 0;
+  const pair = sides.length === 2 ? sides : [sides[0], sides[0]]; // the query always has two slots
+  return (db.prepare(`SELECT COUNT(*) AS n FROM (
+      SELECT device_id FROM follows WHERE target_key IN (?, ?)
+      UNION SELECT f.device_id FROM follows f JOIN players p ON p.key = f.target_key JOIN devices d ON d.id = f.device_id
+        WHERE p.team_key IN (?, ?) AND CASE WHEN json_valid(d.prefs) THEN json_extract(d.prefs, '$.playerTeams."' || f.target_key || '".alerts') END = 1
+      UNION SELECT device_id FROM favorites WHERE team_key IN (?, ?)
+    ) AS w WHERE w.device_id <> ? AND EXISTS (
+      SELECT 1 FROM devices r WHERE r.id = w.device_id AND (r.push_token IS NOT NULL OR EXISTS (SELECT 1 FROM feed x WHERE x.device_id = r.id))
+    )`).get(...pair, ...pair, ...pair, exceptDeviceId) as { n: number }).n;
+}
+
 /** A favorite's choices as the device's settings for the team it roots against: its alert types and push switch beat the global ones, quiet hours and the rest still apply. */
 function favoritePrefs(p: Prefs, targetKey: string, fav: FavoriteRow): Prefs {
   return {

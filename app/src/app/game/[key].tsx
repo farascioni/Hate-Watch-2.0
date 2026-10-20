@@ -77,6 +77,7 @@ export default function GameScreen() {
       <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ paddingBottom: space(12) }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await Promise.all([load(), loadPreview()]); setRefreshing(false); }} tintColor={colors.hate} />}>
         <GameCardView game={game} now={now} big />
+        {detail?.watching ? <Text style={styles.watching}>{tx('game.watching', { n: detail.watching })}</Text> : null}
 
         {game.league === 'f1' && game.state === 'pre' && preview ? (
           <F1PreviewView preview={preview} current={game.key} />
@@ -119,6 +120,8 @@ export default function GameScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  // Other devices hate-watching this game (the server's `watching`); not shown at 0.
+  watching: { color: colors.textDim, fontSize: 13, fontWeight: '700', paddingHorizontal: space(4), paddingTop: space(2) },
   none: { color: colors.textFaint, fontSize: 14, paddingHorizontal: space(4), paddingVertical: space(2) },
   // Your alerts: the section's title and a chevron, the whole row a button that minimizes it.
   alertsHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: space(2) },

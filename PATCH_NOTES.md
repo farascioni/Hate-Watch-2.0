@@ -19,6 +19,8 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Server: MLB regular-season cards carry `series`, the series' games read from the home team's schedule (every 2 minutes while a game is on, else every 6 hours), and their finals are saved with box scores until 3 days after the series.
 - Server: cards carry the event, the series and each game's result from ESPN's postseason schedule; a new vote table. Until the server update, the Special Events view stays hidden.
 - Server: the MLB "Opponent has runners in scoring position" alert now sends a second alert in the same half-inning when a runner steals third (or reaches it on a wild pitch or passed ball) after the first one went out. TB at CLE, October 18: Simpson doubled, then stole third, and the steal got nothing because the half-inning's one alert was used.
+- Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update.)
+- Server: a game's data carries `watching`, that count.
 
 ## Build 20 (October 18, 2026)
 

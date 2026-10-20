@@ -415,6 +415,8 @@ export const en = {
   'game.boxPre': 'The box score shows up here once it starts.',
   'game.boxNone': 'No box score yet.',
   'game.loading': 'Loading…',
+  'game.watching': '{n} hate-watching now',
+  'game.watching_one': '{n} hate-watching now',
   'game.highPre': 'Highlights show up here once it starts.',
   'game.highNone': 'No highlights yet.',
   'game.alertsHide': 'Minimizes your alerts',
