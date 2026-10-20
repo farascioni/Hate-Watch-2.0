@@ -22,12 +22,15 @@ let token: string | null = null;
 export async function ensureToken(): Promise<string> {
   if (token) return token;
   token = await storage.get(TOKEN_KEY);
-  if (!token) {
-    const res = await request<{ token: string }>('POST', '/devices', { platform: Platform.OS }, false);
-    token = res.token;
-    await storage.set(TOKEN_KEY, token);
-  }
-  return token;
+  if (!token) await register();
+  return token!;
+}
+
+/** Mint a device on the server and keep its token; an old token is replaced only once this succeeds. */
+async function register() {
+  const res = await request<{ token: string }>('POST', '/devices', { platform: Platform.OS }, false);
+  token = res.token;
+  await storage.set(TOKEN_KEY, token);
 }
 
 /** Drop the stored identity; the next request registers a fresh anonymous device. */
@@ -36,15 +39,21 @@ export async function forgetToken() {
   await storage.del(TOKEN_KEY);
 }
 
-async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
+/** `oldToken` is set only on the one retry after a 401, so a request retries once. */
+async function request<T>(method: string, path: string, body?: unknown, auth = true, oldToken?: string): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (auth) headers.authorization = `Bearer ${await ensureToken()}`;
   const res = await fetch(API_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (res.status === 401 && auth) {
-    // Server lost our device (fresh DB). Re-register once.
-    token = null;
-    await storage.del(TOKEN_KEY);
-    return request(method, path, body, auth);
+    if (oldToken === undefined) {
+      // Server lost our device (fresh DB): register a new one and retry once. If registering fails, the old token stays and the 401 below is the error.
+      const old = token!;
+      if (await register().then(() => true, () => false)) return request(method, path, body, auth, old);
+    } else {
+      // The new device got a 401 too, so the server is broken, not missing us: give the old identity back.
+      token = oldToken;
+      await storage.set(TOKEN_KEY, oldToken).catch(() => {});
+    }
   }
   if (!res.ok) throw new Error(`${method} ${path} failed (${res.status})`);
   return res.json() as Promise<T>;

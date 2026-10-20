@@ -23,6 +23,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Server: the MLB "Opponent has runners in scoring position" alert now sends a second alert in the same half-inning when a runner steals third (or reaches it on a wild pitch or passed ball) after the first one went out. TB at CLE, October 18: Simpson doubled, then stole third, and the steal got nothing because the half-inning's one alert was used.
 - Tracking: press and hold a bell to snooze a player or team for 1 day, 3 days or a week (an over-the-air update, after the server deploy).
 - Server: a snoozed target counts as muted until it ends, so no push.
+- App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your follows and settings if that fails. A live frame that is not JSON is ignored, not a crash.
 
 ## Build 20 (October 18, 2026)
 
