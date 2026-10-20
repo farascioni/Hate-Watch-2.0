@@ -30,6 +30,7 @@ The README's "Deploy" has the summary; this is the full detail. Read this index 
 |---|---|---|
 | Anything in `server/` (alerts, wording the server writes, how each league is shown) | `fly deploy --remote-only` from `server/` | Every install, every build, within seconds |
 | Turning off ESPN's clips or images | A server switch (`server/src/flag-cli.ts`), no deploy | Every install, within seconds; a clip already in a feed goes at its next feed load |
+| Turning on a way to read ESPN less (`savings.*`, off until turned on) | The same `flag-cli.ts`, no deploy | The server, within seconds; docs/real-time.md, "Reading ESPN less" |
 | A message to everyone | A developer notice (`server/src/notice-cli.ts`) | Every install's feed, never pushed |
 | JavaScript or assets in `app/` (screens, wording, styles) | `npm run update` from `app/` | Builds after build 12 with the same native code, from their next launch |
 | JavaScript in `app/` (the web version) | A push to `main`; Cloudflare rebuilds it | Everyone on the site, within minutes of the push |
@@ -85,7 +86,7 @@ Why it's configured the way it is (`fly.toml`):
 - **One `shared-cpu-1x` VM with 512 MB** in `iad` (US East), the region closest to ESPN's API and most US users.
 - **The contact email** on `/privacy` and `/support` is `HW_CONTACT_EMAIL` in `[env]` (`hatewatchfeedback@gmail.com`). `server/src/pages.ts` falls back to the same address when it's unset (it was `support@example.com` before October 11, 2026), so a local server's pages are right too.
 
-**Secrets and switches on the running app:** `fly secrets set -a hate-watch-api NAME=value` sets a secret and restarts the app. `HW_FLAGS_OFF` (a comma-separated list) keeps server switches off for good. A switch flipped live with `flag-cli.ts` needs no restart (`CLAUDE.md`, "Release flow").
+**Secrets and switches on the running app:** `fly secrets set -a hate-watch-api NAME=value` sets a secret and restarts the app. `HW_FLAGS_OFF` (a comma-separated list) keeps server switches off for good, and `HW_SAVINGS_ON` keeps the `savings.*` ones on for good. A switch flipped live with `flag-cli.ts` needs no restart (`CLAUDE.md`, "Release flow").
 
 **Backups:** before anything that changes production data, the database is copied with SQLite's `VACUUM INTO` into a new file under `/data` (`CLAUDE.md`, "Release flow", which shows one way to run it). That copy stays on the same volume, so it does not help if the volume is lost. **Replication:** with `LITESTREAM_REPLICA_URL` set, Litestream also streams the database to a Tigris bucket every second or so, and an empty volume restores from it on boot; setup, the monitor on `GET /health/deep` and the runbooks are in [docs/redundancy.md](redundancy.md). The image with Litestream is live (release v81, October 13, 2026); it has replicated to Tigris since October 13, 2026.
 

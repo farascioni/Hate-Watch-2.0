@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 642 tests in 84 files, offline, in about 10 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 642 tests in 84 files, offline, in about 10 seconds, all passing on October 20, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 642 tests in 84 files, offline, in about 10 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 642 tests, offline, ~10s
+npm test                      # every test/*.test.ts: 653 tests, offline, ~9s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -96,6 +96,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
 | `push-receipts.test.ts` | Expo's push receipts (`push.ts`), with a stubbed `fetch` and mock timers: a `DeviceNotRegistered` receipt clears the device's token 15 minutes after the send and an `ok` one leaves it, another receipt error is logged once and the token stays, an id with no receipt (or a failed request) is asked about once more, then dropped, and a `DeviceNotRegistered` ticket still clears at once |
 | `reset-prefs.test.ts` | `DELETE /me/prefs` (Settings → Data → "Reset alerts to defaults"): with every kind of choice changed (switches, bells, leagues, per-target choices, mutes, quiet hours, sound, the push switch, a player's team switches), the reset answers the defaults like `GET`, the stored row and cache agree, follows stay, another device's settings stay, and a change afterwards never reaches the shared defaults; no token gets a 401 |
+| `savings.test.ts` | The savings (`flags.ts` `SAVINGS`, off until turned on): the kill switch, each saving's read counts off against on (photo checks, the scoreboard's sleep and a follow waking it, injuries near a game, standings after a final, news), and for the two that touch live games that a game with a held ABS challenge makes the same alerts, with the summary read at once for a failed core read or an End play, and that a halftime or delay slows the poll only with nothing held |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `season.test.ts` | The "season in misery" share card (`POST /me/share/season`): a device with no alerts gets a 400 and a message; a season of losses and alerts gets a link whose page and 1200×630 picture say its totals, top teams, low point and most-alerted team, with the Open Graph tags and `noindex`, no feed row and no rating; one more loss is a new card while the old link keeps its numbers; "Delete all my data" takes the cards with it; alerts without a loss make a card without a low point |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |

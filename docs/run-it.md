@@ -53,7 +53,8 @@ To check it's up, run `curl localhost:8787/health`. It answers `{ ok: true, cata
 | `HW_DB` | `data/hatewatch.db` | The SQLite file (`db.ts`). `flag-cli.ts` and `notice-cli.ts` use `/data/hatewatch.db` when it exists, otherwise `data/hatewatch.db`. |
 | `HW_DEV` | unset | `1` adds `POST /dev/simulate` (below). It must stay unset in production (`fly.toml`). |
 | `EXPO_ACCESS_TOKEN` | unset | Sent as a Bearer token with every push, for Expo's enhanced push security (`push.ts`). |
-| `HW_FLAGS_OFF` | unset | A comma-separated list of server switches to keep off, such as `clips.feed` (`flags.ts`, CLAUDE.md). |
+| `HW_FLAGS_OFF` | unset | A comma-separated list of server switches to keep off, such as `clips.feed` (`flags.ts`, CLAUDE.md). `savings` here turns off every saving. |
+| `HW_SAVINGS_ON` | unset | A comma-separated list of the `savings.*` switches to keep on, such as `savings.injuries,savings.news`; each is off until turned on (`flags.ts`, docs/real-time.md "Reading ESPN less"). |
 | `HW_PUBLIC_URL` | `https://hate-watch-api.fly.dev` | Where share links point (`fanout.ts`). |
 | `HW_CONTACT_EMAIL` | `hatewatchfeedback@gmail.com` | The address on `/privacy` and `/support` (`pages.ts`). Set in `fly.toml`'s `[env]` too, the same address. |
 | `HW_APP_STORE_URL` | `https://apps.apple.com/app/id6819054268` | The App Store link on share pages (`share.ts`). |
