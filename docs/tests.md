@@ -93,6 +93,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
 | `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
+| `push-receipts.test.ts` | Expo's push receipts (`push.ts`), with a stubbed `fetch` and mock timers: a `DeviceNotRegistered` receipt clears the device's token 15 minutes after the send and an `ok` one leaves it, another receipt error is logged once and the token stays, an id with no receipt (or a failed request) is asked about once more, then dropped, and a `DeviceNotRegistered` ticket still clears at once |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
 | `snooze.test.ts` | Snoozing a tracked target: a running snooze keeps the alert in the feed without a push, an ended one or another team's changes nothing, a favorite isn't muted by one, an old row with no `snoozed` reads as none, and `PUT /me/prefs` rejects a bad `snoozed` (400), merges a good one and drops an entry set to 0 or null |
