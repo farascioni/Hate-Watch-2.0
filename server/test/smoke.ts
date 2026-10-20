@@ -9,7 +9,7 @@ const call = async (method: string, path: string, token?: string, body?: unknown
 };
 const check = (label: string, cond: unknown) => { console.log(`${cond ? 'PASS' : 'FAIL'} ${label}`); if (!cond) process.exitCode = 1; };
 
-const { token } = await call('POST', '/devices', undefined, { platform: 'test' });
+const { token } = await call('POST', '/devices', undefined, { platform: 'ios' });
 const types = await call('GET', '/catalog/event-types');
 check(`catalog exposes ${types.types.length} notification types`, types.types.length > 20);
 

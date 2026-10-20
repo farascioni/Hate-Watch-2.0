@@ -21,7 +21,7 @@ test('each tracked player and team says how many people track it', async () => {
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const call = async (method: string, path: string, token?: string) =>
-    (await fetch(base + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: method === 'POST' ? '{}' : undefined })).json();
+    (await fetch(base + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: method === 'POST' ? '{"platform":"ios"}' : undefined })).json();
   const [a, b, c] = await Promise.all([1, 2, 3].map(async () => (await call('POST', '/devices')).token as string));
   const follows = async (token: string) => Object.fromEntries((await call('GET', '/me/follows', token)).follows.map((f: any) => [f.key, f.trackers]));
   const falcons = encodeURIComponent('team:nfl:1'), penix = encodeURIComponent('player:nfl:9');
@@ -44,7 +44,7 @@ test('the leaderboard: most hated first, ties share a rank, filtered like the Fe
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const get = async (q = '') => { const r = await fetch(`${base}/leaderboard${q}`); return r.ok ? (await r.json()).entries.map((e: any) => `${e.tied ? 'T-' : ''}${e.rank}. ${e.target.name} ${e.haters}`) : r.status; };
-  const device = async () => (await (await fetch(`${base}/devices`, { method: 'POST', body: '{}' })).json()).token as string;
+  const device = async () => (await (await fetch(`${base}/devices`, { method: 'POST', body: '{"platform":"ios"}' })).json()).token as string;
   const follow = async (key: string, n: number) => { for (let i = 0; i < n; i++) await fetch(`${base}/me/follows/${encodeURIComponent(key)}`, { method: 'PUT', headers: { authorization: `Bearer ${await device()}` } }); };
   // From the first test: the Falcons and Penix have 1 each.
   await follow('team:nfl:18', 3);
@@ -81,7 +81,7 @@ test("a player or team page's recent alerts: only theirs, only since a time", as
   const server = startApi(0);
   await new Promise((r) => server.once('listening', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const token = (await (await fetch(`${base}/devices`, { method: 'POST', body: '{}' })).json()).token as string;
+  const token = (await (await fetch(`${base}/devices`, { method: 'POST', body: '{"platform":"ios"}' })).json()).token as string;
   const me = token.split('.')[0], now = Date.now(), h = 3600_000;
   const ev = db.prepare(`INSERT INTO events (id, type, league, target_key, title, body, occurred_at, detected_at) VALUES (?, 'team.lost', 'nfl', ?, ?, '', ?, ?)`);
   const feed = db.prepare('INSERT INTO feed (device_id, event_id, occurred_at) VALUES (?, ?, ?)');
