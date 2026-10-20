@@ -5,7 +5,7 @@ import type { FeedItem } from './types';
 /**
  * Hate Watch Plus: the alert vault. The star on a feed card or an alert's own screen saves the alert; the Feed's Saved
  * chip lists them. Each alert is kept whole (a snapshot), so it stays after the server's feed has paged past it. Kept on
- * this device only; a lapsed subscription clears it (lapsePlus) and so does deleting the device's data.
+ * this device only; a lapsed subscription only hides it (it is back on resubscribing); deleting the device's data clears it.
  * A saved alert's clip is not kept: it follows the server's `clips.*` switches (server/src/flags.ts), which a copy on the
  * phone would outlive. The live feed's copy of an alert (its clip, a fact added later) wins when the feed still has it.
  */
@@ -49,7 +49,5 @@ export const clearSavedAlerts = () => { if (saved.size) publish(new Map()); };
 export const savedAlert = (id: string) => saved.get(id);
 
 export const useIsSaved = (id: string) => useSyncExternalStore(subscribe, () => saved.has(id));
-/** Whether anything is saved: the star stays for someone whose subscription can't be confirmed (offline). Flips only at 0 and 1, so a save never re-renders every card. */
-export const useHasSaved = () => useSyncExternalStore(subscribe, () => saved.size > 0);
 /** The whole vault, replaced (never changed in place) on every save. */
 export const useSavedMap = () => useSyncExternalStore(subscribe, () => saved);

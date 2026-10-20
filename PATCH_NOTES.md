@@ -7,7 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
-- Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only. (Update)
+- Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only; if the subscription lapses the list is kept, hidden, and returns on resubscribing. (Update)
 - Tabs: quick tab swaps no longer leave a blank screen. (Update)
 - Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes; the clock and quarter sit between the two teams; Hero shows it big. (Update)
 - Guide: the drawings now move, replaying on each page. The web guide's page background is dark.

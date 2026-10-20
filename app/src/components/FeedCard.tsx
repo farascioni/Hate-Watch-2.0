@@ -8,7 +8,7 @@ import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { isNotice, openAlert, targetHref } from '../lib/alerts';
 import { useShare } from './ShareStyleSheet';
 import { useIsMostHated } from '../lib/mostHated';
-import { toggleSavedAlert, useHasSaved, useIsSaved } from '../lib/savedAlerts';
+import { toggleSavedAlert, useIsSaved } from '../lib/savedAlerts';
 import { usePlus } from '../lib/plus';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
@@ -27,8 +27,6 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
   // Hate Watch Plus's alert vault: the star saves the alert. It pops when you tap it, not when the saved list finishes loading.
   const { active: plus } = usePlus();
   const saved = useIsSaved(item.id);
-  const hasSaved = useHasSaved();
-  const starAllowed = plus || hasSaved; // a lapsed subscriber's offline blip never hides the star on what's saved
   const starTapped = useRef(false);
   const star = usePop(1.5);
   useOnChange(saved, (_, n) => { if (starTapped.current && n) star.pop(); starTapped.current = false; });
@@ -86,7 +84,7 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
         </View>
         {/* Their own tap targets: starring or sharing doesn't open the alert behind it. */}
         {notice ? null : <View style={styles.actions}>
-          {starAllowed ? <Pressable onPress={() => { starTapped.current = true; toggleSavedAlert(item); }} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]}
+          {plus ? <Pressable onPress={() => { starTapped.current = true; toggleSavedAlert(item); }} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]}
             accessibilityRole="button" accessibilityState={{ selected: saved }} accessibilityLabel={tx(saved ? 'alert.unsaveA11y' : 'alert.saveA11y')}>
             <Animated.View style={{ transform: [{ scale: star.scale }] }}>
               <Ionicons name={saved ? 'star' : 'star-outline'} size={20} color={saved ? GOLD : colors.textDim} />

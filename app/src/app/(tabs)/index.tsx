@@ -36,12 +36,11 @@ export default function FeedScreen() {
   useFocusEffect(useCallback(() => { markSeen(); setOpenedAt(Date.now()); }, [feed.length]));
 
   // Hate Watch Plus's alert vault: the Saved chip swaps the feed for the alerts you starred, newest first. The feed's own
-  // copy of a saved alert wins while the feed still has it. Someone whose subscription lapsed offline keeps the chip while they still have some.
+  // copy of a saved alert wins while the feed still has it. A lapsed subscriber's list is kept but hidden (chip and vault view) until they subscribe again.
   const { active: plus } = usePlus();
   const saved = useSavedMap();
   const [vault, setVault] = useState(false);
-  const savedAllowed = plus || saved.size > 0;
-  const showVault = vault && savedAllowed;
+  const showVault = vault && plus;
   const source = useMemo(() => {
     if (!showVault) return feed;
     const live = new Map(feed.map((i) => [i.id, i]));
@@ -70,8 +69,8 @@ export default function FeedScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-    {feed.length || saved.size ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
-    {savedAllowed ? <View style={styles.savedRow}><Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} /></View> : null}
+    {feed.length || (plus && saved.size) ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
+    {plus ? <View style={styles.savedRow}><Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} /></View> : null}
     <SectionList
       sections={rows}
       keyExtractor={(row) => row.map((i) => i.id).join('|')}

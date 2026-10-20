@@ -7,7 +7,7 @@ import { AppAvatar, Avatar } from '../../components/Avatar';
 import { AlertClip } from '../../components/FeedCard';
 import { AlsoGot, LeagueTag, ago, subtitle, useNow } from '../../components/ui';
 import { useShare } from '../../components/ShareStyleSheet';
-import { toggleSavedAlert, savedAlert, useHasSaved, useIsSaved } from '../../lib/savedAlerts';
+import { toggleSavedAlert, savedAlert, useIsSaved } from '../../lib/savedAlerts';
 import { usePlus } from '../../lib/plus';
 import { GOLD, colors, radius, space } from '../../theme';
 import { currentLocale, useT } from '../../lib/i18n';
@@ -29,7 +29,6 @@ export default function AlertScreen() {
   const { share, copied, sheet } = useShare(item);
   const { active: plus } = usePlus();
   const saved = useIsSaved(alertId);
-  const hasSaved = useHasSaved();
   const header = <Stack.Screen options={{ title: tx('alert.title'), headerBackTitle: tx('guide.back') }} />;
 
   if (!item) {
@@ -86,7 +85,7 @@ export default function AlertScreen() {
       {item.clip ? <AlertClip clip={item.clip} style={styles.clip} /> : null}
       {notice ? null : (
         <View style={styles.actions}>
-          {plus || hasSaved ? (
+          {plus ? (
             <Pressable onPress={() => toggleSavedAlert(item)} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityState={{ selected: saved }}
               accessibilityLabel={tx(saved ? 'alert.unsaveA11y' : 'alert.saveA11y')}>
               <Ionicons name={saved ? 'star' : 'star-outline'} size={18} color={saved ? GOLD : colors.text} />
