@@ -6,6 +6,9 @@ import { FeedCard } from '../../components/FeedCard';
 import { Chip, Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
 import { usePlus } from '../../lib/plus';
 import { useSavedMap } from '../../lib/savedAlerts';
+import { setActiveProfile, useProfileScope } from '../../lib/profiles';
+import { inProfile } from '../../lib/profileLogic';
+import { ProfileChips } from '../../components/ProfileChips';
 import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
 import { GridRow } from '../../components/GridRow';
 import { Skeleton } from '../../components/Skeleton';
@@ -47,11 +50,15 @@ export default function FeedScreen() {
     return [...saved.values()].map((i) => live.get(i.id) ?? i).sort((a, b) => b.occurredAt - a.occurredAt);
   }, [showVault, feed, saved]);
 
+  // Hate Watch Plus's tracking profile narrows the feed to its players and teams; the saved list ignores it.
+  const { scope, profile } = useProfileScope(follows);
+  const profiled = !showVault && !!scope;
+
   // Filters what's loaded; scrolling down keeps paging in older alerts, which are filtered too.
-  const visible = useMemo(
-    () => (active ? source.filter((i) => matchesFilter(filter, { kind: i.target.kind, league: i.league })) : source),
-    [source, filter, active],
-  );
+  const visible = useMemo(() => {
+    const inScope = profiled ? source.filter((i) => inProfile(scope, i)) : source;
+    return active ? inScope.filter((i) => matchesFilter(filter, { kind: i.target.kind, league: i.league })) : inScope;
+  }, [source, filter, active, profiled, scope]);
 
   const sections = useMemo(() => {
     const out: { title: string; data: FeedItem[] }[] = [];
@@ -70,6 +77,7 @@ export default function FeedScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
     {feed.length || (plus && saved.size) ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
+    {!showVault ? <ProfileChips follows={follows} /> : null}
     {plus ? <View style={styles.savedRow}><Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} /></View> : null}
     <SectionList
       sections={rows}
@@ -85,7 +93,9 @@ export default function FeedScreen() {
       onEndReachedThreshold={0.4}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.hate} onRefresh={async () => { setRefreshing(true); await refreshFeed().catch(() => {}); setRefreshing(false); }} />}
       ListEmptyComponent={
-        source.length && active ? (
+        profiled && !visible.length && !active ? (
+          <Empty emoji="🎯" title={tx('profile.feedTitle', { name: profile!.name })} body={tx('profile.feedBody')} action={<PrimaryButton label={tx('profile.showEveryone')} onPress={() => setActiveProfile(null)} />} />
+        ) : source.length && active ? (
           <Empty emoji="🔎" title={tx('feed.nothingFor', { what: describeFilter(filter) })} body={tx('feed.nothingBody')} action={<PrimaryButton label={tx('tracking.showEverything')} onPress={reset} />} />
         ) : showVault ? (
           <Empty emoji="⭐" title={tx('feed.savedEmpty')} body={tx('feed.savedEmptyBody')} action={<PrimaryButton label={tx('feed.savedBack')} onPress={() => setVault(false)} />} />

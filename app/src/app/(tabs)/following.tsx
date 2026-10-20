@@ -8,6 +8,8 @@ import { api } from '../../lib/api';
 import { leagueUi } from '../../lib/leagueUi';
 import { toggleMostHated, useIsMostHated, useMostHatedCount, useMostHatedSet } from '../../lib/mostHated';
 import { usePlus } from '../../lib/plus';
+import { setActiveProfile, useProfileScope } from '../../lib/profiles';
+import { ProfileChips } from '../../components/ProfileChips';
 import { Chip, Empty, PrimaryButton, SectionHeader } from '../../components/ui';
 import { TrackingCard } from '../../components/TrackingCard';
 import { LayoutSheet } from '../../components/LayoutSheet';
@@ -102,18 +104,21 @@ export default function FollowingScreen() {
   const showHated = hatedOnly && starAllowed; // the filter goes with the ❌
   const active = filtered || showHated;
   const reset = () => { resetFilter(); setHatedOnly(false); };
+  // Hate Watch Plus: the active profile narrows the list to the players and teams picked for it (not a player's team, as the Feed does).
+  const { profile } = useProfileScope(follows);
+  const members = useMemo(() => (profile ? new Set(profile.keys) : null), [profile]);
 
   // Rows of cards: one each, two in the tiles layout (the section's count is of the cards, not the rows).
   const { cols } = useWebLayout(); // the web's card grid: as many across as fit, never fewer than the layout's own
   const per = Math.max(layout === 'tiles' ? 2 : 1, cols);
   const sections = useMemo((): { title: string; count: number; data: Target[][] }[] => {
-    const all = [...follows.values()].filter((t) => matchesFilter(filter, t) && (!showHated || hated.has(t.key))).sort((a, b) => a.name.localeCompare(b.name));
+    const all = [...follows.values()].filter((t) => matchesFilter(filter, t) && (!showHated || hated.has(t.key)) && (!members || members.has(t.key))).sort((a, b) => a.name.localeCompare(b.name));
     const groups = byWeightClass(filter) ? groupByWeightClass(all) : [
       { title: t('filter.teams'), data: all.filter((x) => x.kind === 'team') },
       { title: playersTitle(filter.league), data: all.filter((x) => x.kind === 'player') },
     ].filter((s) => s.data.length);
     return groups.map((g) => ({ title: g.title, count: g.data.length, data: Array.from({ length: Math.ceil(g.data.length / per) }, (_, i) => g.data.slice(i * per, i * per + per)) }));
-  }, [follows, filter, per, showHated, hated, t]);
+  }, [follows, filter, per, showHated, hated, members, t]);
 
   const confirmUnfollow = (tg: Target) => Alert.alert(t('tracking.unfollowTitle', { name: tg.name }), t('tracking.unfollowBody'), [
     { text: t('settings.cancel'), style: 'cancel' },
@@ -141,6 +146,7 @@ export default function FollowingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <ProfileChips follows={follows} editable />
     <View style={styles.filters}>
       <FilterBar filter={filter} onChange={setFilter} />
       {starAllowed ? <View style={styles.hatedRow}><Chip label={t('tracking.mostHated')} active={showHated} onPress={() => setHatedOnly(!showHated)} /></View> : null}
@@ -201,7 +207,7 @@ export default function FollowingScreen() {
           </View>
         );
       }}
-      ListEmptyComponent={active ? <Empty emoji="🔎" title={showHated ? t('tracking.noneHated', { what: filtered ? describeFilter(filter) : t('tracking.trackers') }) : t('tracking.noneWhat', { what: describeFilter(filter) })} body={t(showHated ? 'tracking.noneHatedBody' : 'tracking.noneFilterBody')} action={<PrimaryButton label={t('tracking.showEverything')} onPress={reset} />} /> : null}
+      ListEmptyComponent={profile && !active ? <Empty emoji="🎯" title={t('profile.emptyTitle', { name: profile.name })} body={t('profile.emptyBody')} action={<PrimaryButton label={t('profile.showEveryone')} onPress={() => setActiveProfile(null)} />} /> : active ? <Empty emoji="🔎" title={showHated ? t('tracking.noneHated', { what: filtered ? describeFilter(filter) : t('tracking.trackers') }) : t('tracking.noneWhat', { what: describeFilter(filter) })} body={t(showHated ? 'tracking.noneHatedBody' : 'tracking.noneFilterBody')} action={<PrimaryButton label={t('tracking.showEverything')} onPress={reset} />} /> : null}
       contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />
     <LayoutSheet open={menu} onClose={() => setMenu(false)} />

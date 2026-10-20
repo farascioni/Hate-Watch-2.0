@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
 import { LeagueTag, SectionHeader, subtitle } from '../../components/ui';
-import { colors, radius, space } from '../../theme';
+import { GOLD, colors, radius, space } from '../../theme';
+import { PresetSheet } from '../../components/PresetSheet';
+import { usePlus } from '../../lib/plus';
+import { presetPatch, snapshotChoices, type Choices } from '../../lib/profileLogic';
 import { bySection, type EventType } from '../../lib/types';
 import { fitsPosition, positionsOf } from '../../lib/positions';
 import { leagueColor } from '../../lib/leagueUi';
@@ -26,6 +29,8 @@ export default function TargetAlertsScreen() {
   const { follows, favorites, updateFavorite, prefs, updatePrefs, eventTypes, refreshScores } = useStore();
   const favorite = isFav ? favorites.get(targetKey) : undefined;
   const target = isFav ? favorite?.target ?? undefined : follows.get(targetKey);
+  const { active: plus } = usePlus();
+  const [presets, setPresets] = useState(false);
 
   // Only the alerts that can actually fire for this kind of target in this league, and for a player, at
   // their positions: a pitcher has no hitting alerts, a skater no goalie ones (lib/positions.ts).
@@ -60,6 +65,15 @@ export default function TargetAlertsScreen() {
   const muted = isFav ? favorite?.push === false : prefs.muted.includes(targetKey);
   const name = target.kind === 'player' ? target.shortName ?? target.name : target.name;
   const customCount = customIds.length;
+  // Hate Watch Plus's presets (a followed target only): one updatePrefs call replaces this target's custom choices, as rapid calls race.
+  const ids = types.map((e) => e.id);
+  const only = (map: Record<string, boolean>) => Object.fromEntries(Object.entries(map).filter(([id]) => ids.includes(id)));
+  const typeById = new Map(types.map((e) => [e.id, e]));
+  const current = snapshotChoices(only(own), only(ownPush), (id) => globalOn(typeById.get(id)!), (id) => globalPush(typeById.get(id)!));
+  const applyPreset = (choices: Choices) => {
+    const patch = presetPatch(choices, ids, own, ownPush);
+    updatePrefs({ targetTypes: { [targetKey]: patch.types }, targetPushTypes: { [targetKey]: patch.push } });
+  };
   // A player's team: its games on the Scores tab (shown by default), its own alerts (off by default).
   // Tracking the team itself already gets both.
   const team = target.kind === 'player' ? { key: target.teamKey, name: target.teamName ?? 'their team' } : null;
@@ -120,6 +134,12 @@ export default function TargetAlertsScreen() {
           </>
         ) : null}
 
+        {plus && !isFav ? (
+          <Pressable onPress={() => setPresets(true)} style={({ pressed }) => [styles.presets, pressed && { opacity: 0.8 }]} accessibilityRole="button">
+            <Text style={styles.presetsTitle}>{t('preset.row')}</Text>
+            <Text style={styles.presetsBody}>{t('preset.rowBody')}</Text>
+          </Pressable>
+        ) : null}
         <SectionHeader>{isFav ? t('alerts.inGames', { name }) : t('alerts.for', { name })}</SectionHeader>
         {hidden && target.kind === 'player' ? (
           <Text style={styles.positionNote}>
@@ -161,6 +181,7 @@ export default function TargetAlertsScreen() {
           <Text style={styles.resetAllText}>{customCount ? t('alerts.resetAll', { n: customCount }) : t('alerts.allGlobal')}</Text>
         </Pressable>
       </ScrollView>
+      {presets ? <PresetSheet name={name} applicable={ids} current={current} onApply={applyPreset} onClose={() => setPresets(false)} /> : null}
     </>
   );
 }
@@ -177,6 +198,9 @@ const styles = StyleSheet.create({
   custom: { color: colors.hate, fontSize: 12, fontWeight: '800' },
   reset: { color: colors.text, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
   global: { color: colors.textFaint, fontSize: 12, marginTop: 4 },
+  presets: { marginHorizontal: space(3), marginTop: space(3), padding: space(3), borderRadius: radius.lg, borderWidth: 1, borderColor: GOLD, backgroundColor: colors.surface },
+  presetsTitle: { color: GOLD, fontSize: 15, fontWeight: '800' },
+  presetsBody: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   resetAll: { margin: space(4), paddingVertical: space(3), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
   resetAllText: { color: colors.textDim, fontWeight: '800', fontSize: 14 },
 });

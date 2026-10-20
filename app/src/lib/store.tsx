@@ -8,6 +8,8 @@ import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
 import { clearSavedAlerts } from './savedAlerts';
+import { clearProfiles } from './profiles';
+import { clearAlertPresets } from './alertPresets';
 import { onLapse } from './plus';
 import { setLiveBoard } from './liveScoreboard';
 import { snoozeEnd } from './snooze';
@@ -340,6 +342,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await forgetToken();
       clearMostHated();
       clearSavedAlerts();
+      clearProfiles();
+      clearAlertPresets();
       setFollows(new Map());
       setFavorites(new Map());
       setTrackers(new Map());

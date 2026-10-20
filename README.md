@@ -52,6 +52,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Languages (in-app text)** ([docs/i18n.md](docs/i18n.md)): the app's own words come from `app/src/lib/strings/<language>.ts` through `useT()` / `tr()` in `app/src/lib/i18n.ts`; English is the source and the fallback.
 - **Startup guide** ([docs/startup-guide.md](docs/startup-guide.md)): On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, Hate Watch Plus, and "You're all set".
 - **An alert on its own screen** ([docs/alert-screen.md](docs/alert-screen.md)): A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
+- **Tracking profiles and alert presets** ([docs/profiles-and-presets.md](docs/profiles-and-presets.md)): Two Hate Watch Plus extras kept on the device: a profile narrows the Feed and the Tracking tab to a named group of what you track (never your push notifications), and a preset saves one target's alert choices to apply to another.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
@@ -148,6 +149,12 @@ The full detail: [docs/startup-guide.md](docs/startup-guide.md).
 **In short:** A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the copy that was tapped. A developer notice opens the same way, from Hate Watch, with no page to open and nothing to share. A Hate Watch Plus subscriber can star an alert (on its card or this screen) to keep it in the alert vault, the Feed's Saved chip.
 
 The full detail: [docs/alert-screen.md](docs/alert-screen.md).
+
+## Tracking profiles and alert presets
+
+**In short:** A Hate Watch Plus subscriber can group the players and teams they track into named **profiles** (chips on the Tracking tab; the Feed shows them once one exists) and the active profile narrows the Feed and the Tracking tab to that group. Developer notices and favorite-team alerts always show, and a tracked player's team alerts show too. It never changes push notifications. A **preset** saves one player's or team's alert choices (off, in the feed only, pushed) from its alerts screen and applies them to another target in one `updatePrefs` call. Both are kept on the device only; a lapse hides them and keeps them, and only Delete all data clears them. Push narrowing, a profile schedule, apply-to-many and a built-in preset are not built.
+
+The full detail: [docs/profiles-and-presets.md](docs/profiles-and-presets.md).
 
 ## Developer notices
 
