@@ -183,7 +183,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         refreshFeed().catch(() => {}); refreshScores().catch(() => {}); api.hateWatches().then(setHateWatches, () => {});
       };
       sock.onmessage = (m) => {
-        const frame = JSON.parse(String(m.data));
+        // A proxy's error text or a frame this build doesn't know must not throw: an uncaught error in a handler ends a release build.
+        let frame;
+        try { frame = JSON.parse(String(m.data)); } catch (e) { if (__DEV__) console.warn('ignoring a socket frame that is not JSON', e); return; }
+        if (!frame) return; // JSON "null"
         // Score frames are everyone's copy of the card: keep this device's own Successful Hate Watch count on it.
         if (frame.kind === 'score') { setGames((cur) => { const had = cur.get(frame.game.key)?.hateWatch; return new Map(cur).set(frame.game.key, had ? { ...frame.game, hateWatch: had } : frame.game); }); return; }
         if (frame.kind === 'hateWatches') { setHateWatches(frame.tally); return; }
