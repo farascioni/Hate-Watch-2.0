@@ -669,7 +669,6 @@ export const ja: Record<Key, string> = {
   'f1.noPreviewBody': 'ESPNにまだ情報がありません。週末が近づいてからもう一度お試しください。',
   'stats.loadFailed': '成績を読み込めませんでした',
   'stats.loadFailedBody': 'ESPNから応答がありませんでした。接続を確認して、もう一度お試しください。',
-  'profile.everyone': 'すべて',
   'profile.new': '新しいプロフィール',
   'profile.edit': 'プロフィールを編集',
   'profile.editA11y': 'プロフィール「{name}」を編集',

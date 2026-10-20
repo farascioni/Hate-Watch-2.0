@@ -678,7 +678,6 @@ export const en = {
   'f1.noPreviewBody': 'ESPN doesn\'t have it yet. Try again closer to the weekend.',
   'stats.loadFailed': 'Couldn\'t load the stats',
   'stats.loadFailedBody': 'ESPN didn\'t answer. Check your connection and try again.',
-  'profile.everyone': 'Everyone',
   'profile.new': 'New profile',
   'profile.edit': 'Edit profile',
   'profile.editA11y': 'Edit the profile {name}',

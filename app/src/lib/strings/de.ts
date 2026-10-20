@@ -669,7 +669,6 @@ export const de: Record<Key, string> = {
   'f1.noPreviewBody': 'ESPN hat sie noch nicht. Versuche es näher am Wochenende erneut.',
   'stats.loadFailed': 'Statistiken konnten nicht geladen werden',
   'stats.loadFailedBody': 'ESPN hat nicht geantwortet. Prüfe deine Verbindung und versuche es erneut.',
-  'profile.everyone': 'Alle',
   'profile.new': 'Neues Profil',
   'profile.edit': 'Profil bearbeiten',
   'profile.editA11y': 'Profil {name} bearbeiten',

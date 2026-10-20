@@ -15,8 +15,8 @@
 
 ## Tracking profiles
 
-- **What it is:** a named group (24 characters at most, 12 profiles at most) of players and teams you already track. The active profile narrows what the **Feed** and the **Tracking tab** show. **Everyone** (the first chip) is no narrowing.
-- **The chips** (`ProfileChips`, `app/src/components/ProfileChips.tsx`): on the Tracking tab, a row of Everyone, one chip per profile and a **+** chip to make one (`ProfileSheet`: a name and a checklist of everyone you track); tapping the active chip edits or deletes it. On the Feed the row is only there once a profile exists, and tapping the active chip goes back to Everyone.
+- **What it is:** a named group (24 characters at most, 12 profiles at most) of players and teams you already track. The active profile narrows what the **Feed** and the **Tracking tab** show; no profile active is no narrowing (there is no Everyone chip).
+- **The chips** (`ProfileChips`, `app/src/components/ProfileChips.tsx`): each profile is a toggle chip, tap to narrow, tap again to go back to everyone. On the Tracking tab they sit in the **Most hated** row: Most hated, a **+** chip to make a profile (`ProfileSheet`: a name and a checklist of everyone you track), then one chip per profile, with an **Edit profile** chip right after the active one (edit or delete). On the Feed they sit in the **Saved** row, after Saved, and are hidden while Saved is open (the vault ignores profiles). Without Plus only Most hated and Saved show.
 - **Feed rule** (`inProfile` in `app/src/lib/profileLogic.ts`, one predicate): an alert shows when its target is in the profile, **or** it is a developer notice, **or** it is a favorite team's opponent alert (`fav`). A tracked player brings their team's key, so an alert about the team that concerns the player still shows (`profileScope`). Someone you unfollowed since drops out of the scope but stays listed in the profile.
 - **Tracking tab rule:** only the profile's own members are listed (not a player's team).
 - **Empty profile:** the Feed and the Tracking tab say so and offer **Show everyone**. The **Saved** vault ignores profiles.

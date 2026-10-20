@@ -77,8 +77,7 @@ export default function FeedScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
     {feed.length || (plus && saved.size) ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
-    {!showVault ? <ProfileChips follows={follows} /> : null}
-    {plus ? <View style={styles.savedRow}><Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} /></View> : null}
+    {plus ? <ProfileChips follows={follows} hidden={showVault} style={styles.savedRow} lead={<Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} />} /> : null}
     <SectionList
       sections={rows}
       keyExtractor={(row) => row.map((i) => i.id).join('|')}
@@ -112,6 +111,6 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  savedRow: { flexDirection: 'row', paddingHorizontal: space(3), paddingVertical: space(2), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  savedRow: { paddingVertical: space(2), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   day: { color: colors.textFaint, backgroundColor: colors.bg, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(4), paddingBottom: space(2) },
 });

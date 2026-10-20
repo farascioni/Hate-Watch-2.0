@@ -146,10 +146,10 @@ export default function FollowingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-    <ProfileChips follows={follows} editable />
     <View style={styles.filters}>
       <FilterBar filter={filter} onChange={setFilter} />
-      {starAllowed ? <View style={styles.hatedRow}><Chip label={t('tracking.mostHated')} active={showHated} onPress={() => setHatedOnly(!showHated)} /></View> : null}
+      <ProfileChips follows={follows} editable style={styles.hatedRow}
+        lead={starAllowed ? <Chip label={t('tracking.mostHated')} active={showHated} onPress={() => setHatedOnly(!showHated)} /> : null} />
     </View>
     <SectionList
       sections={sections}
@@ -218,7 +218,7 @@ export default function FollowingScreen() {
 
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  hatedRow: { flexDirection: 'row', paddingHorizontal: space(3), paddingBottom: space(2) },
+  hatedRow: { paddingBottom: space(2) },
   hint: { color: colors.textFaint, fontSize: 13, paddingHorizontal: space(4), paddingTop: space(3), lineHeight: 18 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space(1.5) },
   tiles: { flexDirection: 'row', gap: space(2), marginHorizontal: space(3), marginVertical: space(1) },

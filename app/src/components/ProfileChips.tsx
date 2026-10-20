@@ -1,32 +1,36 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Chip } from './ui';
 import { ProfileSheet } from './ProfileSheet';
 import { setActiveProfile, useProfiles } from '../lib/profiles';
 import type { Profile } from '../lib/profileLogic';
 import { usePlus } from '../lib/plus';
 import type { Target } from '../lib/types';
-import { GOLD, colors, space } from '../theme';
+import { GOLD, space } from '../theme';
 import { useT } from '../lib/i18n';
 
 /**
- * Hate Watch Plus: the row of profile chips (Everyone, then your profiles) above the Feed and the Tracking tab. On the
- * Tracking tab (`editable`) there is a + chip to make one and a tap on the active chip edits it; on the Feed a profile
- * can only be picked (and the row isn't there until one exists). Hidden for anyone not subscribed.
+ * Hate Watch Plus: a profile's chips in the row of a screen's own chip (`lead`: Most hated on the Tracking tab, Saved on
+ * the Feed). Each profile is a toggle: tap to narrow, tap again for everyone (there is no Everyone chip). On the Tracking
+ * tab (`editable`) a + chip, next to `lead`, makes a profile and an Edit chip follows the active one. `hidden` keeps only
+ * `lead` (the Feed's Saved list ignores profiles). Without Plus only `lead` shows, or nothing when there is none.
  */
-export function ProfileChips({ follows, editable }: { follows: ReadonlyMap<string, Target>; editable?: boolean }) {
+export function ProfileChips({ follows, editable, lead, hidden, style }: { follows: ReadonlyMap<string, Target>; editable?: boolean; lead?: ReactNode; hidden?: boolean; style?: StyleProp<ViewStyle> }) {
   const t = useT();
   const { active: plus } = usePlus();
   const { list, active } = useProfiles();
   const [editing, setEditing] = useState<Profile | 'new' | null>(null);
-  if (!plus || (!list.length && !editable)) return null;
-  const pick = (p: Profile) => (active === p.id ? (editable ? setEditing(p) : setActiveProfile(null)) : setActiveProfile(p.id));
+  const chips = plus && !hidden;
+  if (!lead && !chips) return null;
   return (
     <>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.row}>
-        <Chip label={t('profile.everyone')} active={!active || !list.some((p) => p.id === active)} color={GOLD} onPress={() => setActiveProfile(null)} />
-        {list.map((p) => <Chip key={p.id} label={p.name} active={active === p.id} color={GOLD} onPress={() => pick(p)} accessibilityLabel={active === p.id && editable ? t('profile.editA11y', { name: p.name }) : undefined} />)}
-        {editable ? <Chip label="+" color={GOLD} onPress={() => setEditing('new')} accessibilityLabel={t('profile.new')} /> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.scroll, style]} contentContainerStyle={styles.row}>
+        {lead}
+        {chips && editable ? <Chip label="+" color={GOLD} onPress={() => setEditing('new')} accessibilityLabel={t('profile.new')} /> : null}
+        {chips ? list.flatMap((p) => [
+          <Chip key={p.id} label={p.name} active={active === p.id} color={GOLD} onPress={() => setActiveProfile(active === p.id ? null : p.id)} />,
+          ...(editable && active === p.id ? [<Chip key={`${p.id}-edit`} label={t('profile.edit')} color={GOLD} onPress={() => setEditing(p)} accessibilityLabel={t('profile.editA11y', { name: p.name })} />] : []),
+        ]) : null}
       </ScrollView>
       {editing ? <ProfileSheet profile={editing === 'new' ? null : editing} follows={follows} onClose={() => setEditing(null)} /> : null}
     </>
@@ -34,6 +38,6 @@ export function ProfileChips({ follows, editable }: { follows: ReadonlyMap<strin
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0, flexShrink: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  row: { flexDirection: 'row', gap: space(1.5), paddingHorizontal: space(3), paddingVertical: space(2) },
+  scroll: { flexGrow: 0, flexShrink: 0 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), paddingHorizontal: space(3) },
 });
