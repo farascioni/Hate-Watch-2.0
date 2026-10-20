@@ -416,6 +416,8 @@ export const de: Record<Key, string> = {
   'game.boxPre': 'Die Statistik erscheint hier, sobald es losgeht.',
   'game.boxNone': 'Noch keine Statistik.',
   'game.loading': 'Wird geladen …',
+  'game.watching': '{n} schauen gerade hasserfüllt zu',
+  'game.watching_one': '{n} schaut gerade hasserfüllt zu',
   'game.highPre': 'Die Highlights erscheinen hier, sobald es losgeht.',
   'game.highNone': 'Noch keine Highlights.',
   'game.alertsHide': 'Deine Alerts einklappen',

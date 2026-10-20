@@ -12,7 +12,7 @@ import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, GAME_LEAGUES, TEAMS_ONLY, type League } from './leagues.ts';
 import { addFavorite, favoriteOf, favoritesOf, removeFavorite, updateFavorite, registerGame, type FavoriteRow } from './favorites.ts';
-import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
+import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, watchingCount, DEFAULT_PREFS, PUBLIC_URL } from './fanout.ts';
 import { engine } from './live.ts';
 import { callStats } from './calls.ts';
 import { privacyPage, supportPage } from './pages.ts';
@@ -291,6 +291,7 @@ route('GET', '/me/games/:key', true, async (req, _u, [key]) => {
   return {
     game: withHateWatch(req.deviceId!, [game])[0], alerts: rows.map(feedItem), plays: detail?.plays ?? [], box: detail?.box ?? saved?.box ?? null,
     clips: flagOn('clips.highlights') ? detail?.clips ?? [] : [], keyPlays: detail ? forDevice(detail.highlights, mine) : [], // clips: a switch (flags.ts)
+    watching: watchingCount([game.home?.team.key, game.away?.team.key].filter((k): k is string => !!k), req.deviceId!), // other devices hate-watching this game (fanout.ts)
   };
 });
 

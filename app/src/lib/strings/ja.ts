@@ -416,6 +416,8 @@ export const ja: Record<Key, string> = {
   'game.boxPre': '開始するとここにボックススコアが表示されます。',
   'game.boxNone': 'ボックススコアはまだありません。',
   'game.loading': '読み込み中…',
+  'game.watching': '今{n}人がヘイトウォッチ中',
+  'game.watching_one': '今{n}人がヘイトウォッチ中',
   'game.highPre': '開始するとここにハイライトが表示されます。',
   'game.highNone': 'ハイライトはまだありません。',
   'game.alertsHide': 'アラートを折りたたむ',

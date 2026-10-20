@@ -4,7 +4,7 @@
 
 ## Index
 
-**Summary:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
+**Summary:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"), and a game's screen says how many other people it is addressed to ("4 hate-watching now"). Clearing the feed keeps the count; "Delete all my data" removes it.
 
 **Sections:**
 - **Successful Hate Watch counter**: The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most.
@@ -13,7 +13,7 @@ The README's "Successful Hate Watch counter" has the summary; this is the full d
 
 ## Successful Hate Watch counter
 
-**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
+**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"), and a game's screen says how many other people it is addressed to ("4 hate-watching now"). Clearing the feed keeps the count; "Delete all my data" removes it.
 
 **What you see** (`app/src/components/HateWatchCounter.tsx`, the first card in Settings):
 
@@ -46,6 +46,12 @@ The README's "Successful Hate Watch counter" has the summary; this is the full d
 - On the Scores tab, `withHateWatch` adds `hateWatch: { alsoGot }` to this device's copy of a final that gave it a Successful Hate Watch, and the app keeps it on the card when everyone's score frames update the game.
 - People with the loss alert off don't get the alert, so they don't count in it and don't see a number (though their counter still went up).
 - Example (`server/test/hate-watches.test.ts`): three devices track an NFL team and one has "Loses a game" off. The loss counts for all three; the two that got it each see "1 other hate watcher"; the one with it off sees no number on the final.
+
+**"4 hate-watching now" on the game screen.** The game screen (`docs/scores-tab.md`) shows how many other devices the game is addressed to, before anything has happened: `watching` in `GET /me/games/:key`, from `watchingCount(sides, deviceId)` in `fanout.ts`, next to `recipients()`.
+
+- It's one query over the same three rules as `recipients()` for either side's team: the devices following the team, the devices following one of its players with "Get their team's alerts" on, and the devices favoriting the team (a favorite is sent the opponent's alerts, so the other side's favorites are this game's too). Each device counts once, and the device asking is left out.
+- Only devices that can be reached count: one with a push token (`devices.push_token`), or a feed (at least one row in `feed`). A device that never allowed push and has never received an alert is left out. It does not look at alert settings: like the counter above ("whatever its alert settings") it counts who the game is addressed to, so it can be higher than the "other hate watchers" of one alert, which counts only the devices that got that alert.
+- It's computed on every read of the game screen (no cache; indexed lookups), and `publish()` and `recipients()` are not involved.
 
 **Losses from before the counter.** On the first start with it, the server counted the `team.lost`, `f1.team.no_points` and `f1.team.double_dnf` alerts already in each feed, plus the ones that happened while a device tracked the team (followed before the loss was detected) but never reached its feed because the alert was off. A `kv` flag (`hate_watches_backfilled`) makes this run once. Players' "their team lost" came later and is only counted as it happens.
 
