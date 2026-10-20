@@ -295,6 +295,14 @@ export function forgetDevice(deviceId: string) {
   sockets.delete(deviceId);
 }
 
+/** DELETE /me/prefs: back to a new install's settings. Every choice is dropped, so each type's own default decides again. */
+export function resetPrefs(deviceId: string): Prefs {
+  const next = structuredClone(DEFAULT_PREFS);
+  db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify(next), deviceId);
+  prefsCache.set(deviceId, next);
+  return next;
+}
+
 // ─── Feed item shape (shared by REST + websocket) ─────────────────────────────────────────────
 /** Where links that leave the app point (an alert's share link). */
 export const PUBLIC_URL = process.env.HW_PUBLIC_URL ?? 'https://hate-watch-api.fly.dev';

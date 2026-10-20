@@ -60,6 +60,8 @@ export const en = {
 
   // Settings: data
   'settings.reset': 'Reset alerts to defaults',
+  'settings.resetAlertsBody': 'Every switch, bell, mute, per-team and per-player choice, quiet hours and sound go back to the defaults. The teams and players you track and your Successful Hate Watch tally stay.',
+  'settings.resetAlertsConfirm': 'Reset',
   'settings.clearFeed': 'Clear feed',
   'settings.clearFeedTitle': 'Clear feed?',
   'settings.clearFeedBody': 'This removes every item from your feed.',

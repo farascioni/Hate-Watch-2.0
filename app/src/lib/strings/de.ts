@@ -53,6 +53,8 @@ export const de: Record<Key, string> = {
   'settings.shows': 'Zeigt diese Alerts',
   'settings.showGroup': '{total} anzeigen · {title}, {summary}',
   'settings.reset': 'Alerts auf Standard zurücksetzen',
+  'settings.resetAlertsBody': 'Alle Schalter, Glocken, Stummschaltungen, Team- und Spielerauswahlen, Ruhezeiten und der Ton gehen zurück auf Standard. Die Teams und Spieler, denen du folgst, und dein Successful-Hate-Watch-Zähler bleiben.',
+  'settings.resetAlertsConfirm': 'Zurücksetzen',
   'settings.clearFeed': 'Feed leeren',
   'settings.clearFeedTitle': 'Feed leeren?',
   'settings.clearFeedBody': 'Das entfernt alle Einträge aus deinem Feed.',
