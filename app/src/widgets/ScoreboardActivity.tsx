@@ -22,13 +22,25 @@ import { createLiveActivity } from 'expo-widgets';
  * a favorite gold with a heart, a most hated red with a star, the rest white. Without them (an older server) a row is one
  * string `l` in one color `lc`, as before.
  */
-type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; ac?: string; hc?: string; am?: string; hm?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string };
+type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; ac?: string; hc?: string; am?: string; hm?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string; ts?: number };
 type Props = { v?: number; lay?: number; games: Game[]; more: number; mt?: string };
 
 const ScoreboardActivity = (props: Props) => {
   'widget';
   const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '❌ ' : '');
-  const score = (n: number | null) => (n === null ? '-' : String(n));
+  const score = (n: number | null) => (n === null ? '' : String(n)); // nothing before the start, not a dash
+  // A game not yet started says when, in this device's time ("7:00 PM", "Wed 7:00 PM" another day), not "Starts soon" / "Upcoming".
+  const status = (g: Game) => {
+    const text = g.r ?? g.st;
+    if (g.ts === undefined || g.live) return text;
+    try {
+      const d = new Date(g.ts);
+      const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+    } catch {
+      return text;
+    }
+  };
   const base = (g: Game) => g.lc ?? (g.t === 2 ? '#FFFFFF' : '#F5C451');
   const awayColor = (g: Game) => g.ac ?? base(g);
   const homeColor = (g: Game) => g.hc ?? base(g);
@@ -56,7 +68,7 @@ const ScoreboardActivity = (props: Props) => {
     <HStack key={g.k}>
       {teams(g)}
       <Spacer />
-      <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
+      <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
     </HStack>
   );
   const more = props.mt ?? (props.more > 0 ? `+${props.more} more` : '');
@@ -85,7 +97,7 @@ const ScoreboardActivity = (props: Props) => {
       <HStack>
         {teams(g)}
         <Spacer />
-        <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
+        <Text modifiers={[font({ size: 13 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
       </HStack>
       <HStack spacing={6}>
         {g.bs ? diamond(g.bs) : null}
@@ -108,7 +120,7 @@ const ScoreboardActivity = (props: Props) => {
         <Spacer />
         <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(homeColor(g))]}>{score(g.hs)}</Text>
       </HStack>
-      <Text modifiers={[font({ size: 11 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{g.r ?? g.st}</Text>
+      <Text modifiers={[font({ size: 11 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
     </VStack>
   );
   const pairs: Game[][] = [];
@@ -142,7 +154,7 @@ const ScoreboardActivity = (props: Props) => {
       expandedTrailing: <Text modifiers={[font({ size: 17, weight: 'semibold' })]}>{lead ? `${score(lead.hs)} ${lead.h}` : ''}</Text>,
       expandedCenter: lead ? (
         <VStack spacing={2}>
-          <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{lead.r ?? lead.st}</Text>
+          <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
           {lead.bs ? diamond(lead.bs) : null}
         </VStack>
       ) : (
@@ -213,7 +225,7 @@ const ScoreboardActivity = (props: Props) => {
             {heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false)}
             <Spacer />
             <VStack spacing={2}>
-              <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{lead.r ?? lead.st}</Text>
+              <Text modifiers={[font({ size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
               {lead.bs ? diamond(lead.bs) : null}
               {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
             </VStack>

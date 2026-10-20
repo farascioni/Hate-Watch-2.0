@@ -225,17 +225,20 @@ test('the sub line by sport, and three detailed rows stay far under Apple\'s lim
 test('a game about to start is on the board with no score; hand-picked games are added and removed', () => {
   db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev5', 's', 'ios', '{}');
   follow.run('dev5', T.NYM);
-  const soon = game('SF', 'NYM', 'pre', { startsAt: Date.now() + 20 * 60_000 });
+  const soonAt = Date.now() + 20 * 60_000;
+  const soon = game('SF', 'NYM', 'pre', { startsAt: soonAt });
   const late = game('NYM', 'SF', 'pre', { startsAt: Date.now() + 2 * HOUR });
   const stale = game('NYM', 'LAD', 'pre', { startsAt: Date.now() - 4 * HOUR }); // ESPN never moved it on
   const b = buildBoard('dev5')!;
   assert.deepEqual(b.games.filter((g) => !g.live).map((g) => g.k), [soon], 'only the one within the hour');
   const row = b.games.find((g) => g.k === soon)!;
   assert.deepEqual([row.st, row.as, row.hs, row.live], ['Starts soon', null, null, false]);
+  assert.equal(row.ts, soonAt, 'a game not started carries its start, for the widget to draw as a time');
   assert.ok(![late, stale].some((k) => b.games.some((g) => g.k === k)));
 
   const picked = putLiveActivity('dev5', { pins: [late, stale] })!; // a pick brings a game in early, but not one ESPN never moved on
   assert.deepEqual([picked.games.find((g) => g.k === late)?.st, picked.games.some((g) => g.k === stale)], ['Upcoming', false]);
+  assert.ok(picked.games.find((g) => g.k === late)?.ts, 'a picked upcoming game carries its start too');
 
   const lad = game('LAD', 'SF', 'in'); // nobody's
   for (const lay of ['compact', 'detailed', 'grid', 'hero']) {
@@ -247,6 +250,7 @@ test('a game about to start is on the board with no score; hand-picked games are
   assert.equal(JSON.parse((db.prepare('SELECT picks FROM live_activities WHERE device_id = ?').get('dev5') as any).picks).off.length, 1, 'invalid keys dropped');
 
   assert.ok(buildBoard('dev')!.games.some((g) => g.k === 'mlb:1'), 'another device is unaffected');
+  assert.equal(buildBoard('dev')!.games.find((g) => g.k === 'mlb:1')!.ts, undefined, 'a live game has no start time');
   putLiveActivity('dev', { hides: ['mlb:1'] });
   assert.ok(!buildBoard('dev')?.games.some((g) => g.k === 'mlb:1'), 'a tracked live game can be taken off');
   putLiveActivity('dev', { hides: [] });

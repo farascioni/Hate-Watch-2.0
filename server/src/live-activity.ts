@@ -28,6 +28,8 @@ export type BoardGame = {
    *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%").
    *  The hero layout (`lay` 3) gives its first row `sub` (the count and outs, the down, the shots: the middle of the big game) and `bs` too. */
   sub?: string; sc?: string; bs?: string; wp?: number; wl?: string;
+  /** A game not yet started: its start (epoch ms). The widget draws it as the device's local time instead of "Starts soon" / "Upcoming". */
+  ts?: number;
 };
 /** v: the props' version. Only ever add fields (an installed widget draws the ones it knows); mt: the "+N more" line, '' for none;
  *  lay: 0 the compact layout (one line a game), 1 the detailed one (two lines, a base diamond, a win chance bar), 2 the grid (two
@@ -122,8 +124,9 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
     const own = [g.away, g.home].find((x) => (t === 0 ? favs : t === 1 ? hated : tracked).has(x!.team.key)) ?? g.away; // a game added by hand may have none
     const chance = live && g.winProb ? Math.round(100 * (own === g.home ? g.winProb.home : g.winProb.away)) : null;
     rows.push({
-      k: g.key, a, as, h, hs, st, live, t,
-      l: `${MARKS[t]}${a} ${score(as)}  ${h} ${score(hs)}`, r: live ? statusLine(g) : st, lc: TIER_COLORS[t], rc: live ? RED : GREY,
+      k: g.key, a, as, h, hs, st, live, t, ...(soon && { ts: g.startsAt }),
+      // no dashes before the start
+      l: `${MARKS[t]}${a}${soon ? '' : ` ${score(as)}`}  ${h}${soon ? '' : ` ${score(hs)}`}`, r: live ? statusLine(g) : st, lc: TIER_COLORS[t], rc: live ? RED : GREY,
       ac: TIER_COLORS[ta], hc: TIER_COLORS[th], am: MARKS[ta], hm: MARKS[th],
       ...(lay === 1 && {
         r: st, sub: live ? subLine(g) : '', sc: GREY, bs: g.bases ? [g.bases.first, g.bases.second, g.bases.third].map(Number).join('') : '',
