@@ -27,6 +27,7 @@ import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
+import { forgetSeasonCards, seasonCard } from './season.ts';
 import { divisionsOf, f1DriverStandings } from './divisions.ts';
 import { deepHealth, liveDeps } from './health.ts';
 
@@ -281,6 +282,7 @@ route('DELETE', '/me/feed', true, (req) => {
 // "Delete all my data": the device row cascades to follows + feed (see db.ts foreign keys).
 route('DELETE', '/me', true, (req) => {
   db.prepare('DELETE FROM devices WHERE id = ?').run(req.deviceId!);
+  forgetSeasonCards(req.deviceId!);
   forgetDevice(req.deviceId!);
   engine.kick();
   return { ok: true };
@@ -306,6 +308,12 @@ route('GET', '/shared/:code', false, (_r, _u, [code]) => {
   const item = sharedAlert(code);
   if (!item) throw new HttpError(404, 'no such alert');
   return { item };
+});
+// "Share your season": the link to this device's season-in-misery card (season.ts). Not an alert: no feed row, no push.
+route('POST', '/me/share/season', true, (req) => {
+  const card = seasonCard(req.deviceId!);
+  if (!card) throw new HttpError(400, 'No alerts yet');
+  return card;
 });
 
 // ─── Dev only: inject a fake event to test push + feed end to end ─────────────────────────────

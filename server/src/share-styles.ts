@@ -6,6 +6,7 @@
 // misery row work the same. A style applies only when every number it prints can be read from the alert:
 // its builder returns null otherwise. The server tells the app which apply (`shareStyles` on a feed item,
 // fanout.ts); share.ts draws them. This file must not import share.ts or fanout.ts (they import it).
+// The "season in misery" card (season.ts) is drawn here too (seasonSheet): not an alert, one look, not in STYLES.
 import { targetDto } from './catalog.ts';
 import { LEAGUES, type League } from './leagues.ts';
 
@@ -157,6 +158,39 @@ function torn(e: EventRow): El | null {
         small('THEN', { opacity: 1 }), big('BLEW IT', 84), small(sc ? `FINAL ${sc.lose}–${sc.win}` : 'LEAD GONE', { opacity: 1 })))));
 }
 
+// ─── The season card (season.ts): a device's whole run, not an alert, so not one of STYLES ──────────
+export const SEASON_TYPE = 'app.season_card';
+
+/** A team's (or fighter's) name, badge and colour: team colours and initials, as on the classic card. F1's short names are junk (Ferrari is "JK"), so a constructor is its full name. */
+export function who(key: string) {
+  const t = targetDto(key);
+  const name = t?.kind === 'team' ? (key.split(':')[1] === 'f1' ? t.name : t.shortName) : t?.name ?? key;
+  const c = color(t?.kind === 'team' ? t.color : t?.kind === 'player' ? t.teamColor : null);
+  return { name, c, badge: t?.kind === 'team' ? t.abbrev : initials(name) };
+}
+
+/** A device's season as a stat sheet. It prints only the numbers season.ts stored in the meta (never a loss rating); null if they aren't all there. */
+function seasonSheet(e: EventRow): El | null {
+  const m = metaOf(e);
+  if (!Number.isFinite(m.watches) || !Number.isFinite(m.alerts) || typeof m.range !== 'string') return null;
+  const stat = (n: number, label: string, c: string) => h('div', { flexDirection: 'column', gap: 10 }, big(String(n), 136, { color: c }), small(label));
+  const chip = (t: { key: string; n: number }) => {
+    const w = who(t.key);
+    return h('div', { alignItems: 'center', gap: 12, padding: '10px 22px 10px 10px', borderRadius: 40, backgroundColor: '#16161A', border: '2px solid #2A2A31' },
+      h('div', { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: w.c, color: readableOn(w.c), fontSize: 17, fontWeight: 900 }, w.badge),
+      h('div', { fontSize: 30, fontWeight: 800 }, clip(w.name, 16)),
+      h('div', { fontSize: 30, fontWeight: 900, color: '#FF3B44' }, String(t.n)));
+  };
+  const teams: { key: string; n: number }[] = Array.isArray(m.teams) ? m.teams.slice(0, 3) : [];
+  const most = typeof m.most?.key === 'string' ? who(m.most.key) : null;
+  return frame(h('div', { width: 1080, flexDirection: 'column', gap: 26, marginTop: 40 },
+    small(`MY SEASON IN MISERY · ${m.range.toUpperCase()}`, { color: '#FF3B44', opacity: 1 }),
+    h('div', { gap: 96 }, stat(m.watches, m.watches === 1 ? 'SUCCESSFUL HATE WATCH' : 'SUCCESSFUL HATE WATCHES', '#FF3B44'), stat(m.alerts, m.alerts === 1 ? 'ALERT' : 'ALERTS', '#FAFAFA')),
+    ...(teams.length ? [h('div', { gap: 16 }, ...teams.map(chip))] : []),
+    ...(m.low ? [h('div', { flexDirection: 'column', gap: 6 }, small('LOW POINT'), h('div', { fontSize: 30, fontWeight: 800 }, clip(String(m.low), 80)))] : []),
+    ...(most ? [small(`MOST ALERTS FROM ${most.name.toUpperCase()}`)] : [])));
+}
+
 // ─── Which styles apply, and their trees ──────────────────────────────────────────────────────────
 const STYLES = {
   ticket: { label: 'Ticket stub', make: ticket },
@@ -175,5 +209,6 @@ export function shareStyles(e: EventRow): { id: StyleId; label: string }[] {
   return out;
 }
 
-/** An alert's tree in a style, or null for classic and for a style that doesn't apply (the caller draws the classic card). */
-export const styleTree = (id: string, e: EventRow): El | null => (id in STYLES ? STYLES[id as keyof typeof STYLES].make(e) : null);
+/** An alert's tree in a style, or null for classic and for a style that doesn't apply (the caller draws the classic card). A season card has the one look. */
+export const styleTree = (id: string, e: EventRow): El | null =>
+  (e.type === SEASON_TYPE ? seasonSheet(e) : id in STYLES ? STYLES[id as keyof typeof STYLES].make(e) : null);

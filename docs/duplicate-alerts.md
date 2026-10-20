@@ -103,6 +103,7 @@ from the tests):
 | F1 championship drop | `f1st:${targetKey}:${day}:${from}->${to}`, made twice for one race: when the results go out (`projectStandings`) and when ESPN's table changes (`scanF1Standings`), the same id, so the second stores nothing | `f1st:player:f1:5498:2026-10-11:4->5`, "Charles Leclerc dropped to 5th in the drivers' championship" |
 | AP poll (`cfb-poll.ts`) | `cfbap:${week}:${type}:${teamId}` | |
 | Weekly recap (`recap.ts`) | `recap:${first 16 characters of a base64url SHA-256 of the device id}:${week}` | `recap:Vf3jywfTfArsGwqS:2026-10-05` |
+| Season card (`season.ts`; not an alert: no feed row, no push, never through `publish()`; it is an `events` row only so it has a share link) | `season:${the same 16 characters}:${the device's local day}:${alerts}-${Successful Hate Watches}`, one row per device, day and tally (`INSERT OR IGNORE`) | `season:Vf3jywfTfArsGwqS:2026-10-19:20-7` |
 | Developer notice (`notices.ts`) | `notice:${time sent, in ms}` | |
 | A test alert (`POST /dev/simulate`, `api.ts`) | `sim:${random uuid}`: new every time on purpose, so each test sends | |
 | A revision's line (`linesOn` in `revisions.ts`) | `${the alert's id}:changed:${hash}`, `hash` the first 10 characters of a base64url SHA-256 of the line's words: the same line on the same alert is the same id in any tracker | `401858481:401858481541:cfb.team.interception:158:changed:` and the hash of "Wiped out by a penalty on Indiana: Roughing The Passer." |

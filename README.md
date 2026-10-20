@@ -56,7 +56,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 610 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
@@ -119,7 +119,7 @@ The full detail: [docs/recent-misery.md](docs/recent-misery.md).
 
 ## Successful Hate Watch counter
 
-**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
+**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it. A "Share your season" button at the bottom of the card shares the device's whole run as a picture (`docs/sharing.md`, "The season card").
 
 The full detail: [docs/hate-watch-counter.md](docs/hate-watch-counter.md).
 
@@ -155,7 +155,7 @@ The full detail: [docs/developer-notices.md](docs/developer-notices.md).
 
 ## Sharing an alert
 
-**In short:** Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a 1200×630 picture of the alert that the server draws from its own data, so it looks like a screenshot. On an iPhone with Hate Watch installed, tapping it opens the app on that alert (a universal link); without the app it goes to the App Store; anywhere else it's a web page with the card and a download button. The code is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `server/src/db.ts`), and the server side is `server/src/share.ts`. An alert that has other looks (a ticket stub, a boarding pass, a parking ticket, a scratch-off, a torn ticket, a void stamp) asks which one to share first; each look is its own link, `/a/<code>?s=<style>`, and its own picture (`server/src/share-styles.ts`).
+**In short:** Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text. In Messages, WhatsApp, Discord, X and Slack the link previews as a 1200×630 picture of the alert that the server draws from its own data, so it looks like a screenshot. On an iPhone with Hate Watch installed, tapping it opens the app on that alert (a universal link); without the app it goes to the App Store; anywhere else it's a web page with the card and a download button. The code is the first 11 characters of a SHA-256 of the alert's id (`shareCode()` in `server/src/db.ts`), and the server side is `server/src/share.ts`. An alert that has other looks (a ticket stub, a boarding pass, a parking ticket, a scratch-off, a torn ticket, a void stamp) asks which one to share first; each look is its own link, `/a/<code>?s=<style>`, and its own picture (`server/src/share-styles.ts`). Settings' tally card also has "Share your season": a card of the device's whole run so far, with the same kind of link (`server/src/season.ts`; the card is "The season card" in [docs/sharing.md](docs/sharing.md)).
 
 The full detail: [docs/sharing.md](docs/sharing.md).
 
@@ -173,7 +173,7 @@ The full detail: [docs/live-activity.md](docs/live-activity.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 610 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

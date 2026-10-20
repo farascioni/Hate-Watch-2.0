@@ -4,7 +4,7 @@
 
 ## Index
 
-**Summary:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
+**Summary:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it. A "Share your season" button at the bottom of the card shares the device's whole run as a picture (`docs/sharing.md`, "The season card").
 
 **Sections:**
 - **Successful Hate Watch counter**: The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most.
@@ -13,13 +13,14 @@ The README's "Successful Hate Watch counter" has the summary; this is the full d
 
 ## Successful Hate Watch counter
 
-**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it.
+**In short:** The top of Settings counts the device's Successful Hate Watches, each time a team it tracks loses (or the team of a player it tracks), or a UFC fighter it tracks loses, with the teams and fighters that gave it the most. The server counts them in `publish()` (`server/src/hate-watches.ts`) for every device the loss is addressed to, whatever its alert settings, once per device and loss, and sends the new tally over the WebSocket. Every Successful Hate Watch alert also says how many other people got it ("23 other hate watchers"). Clearing the feed keeps the count; "Delete all my data" removes it. A "Share your season" button at the bottom of the card shares the device's whole run as a picture (`docs/sharing.md`, "The season card").
 
 **What you see** (`app/src/components/HateWatchCounter.tsx`, the first card in Settings):
 
 - The total, large and red, then "Successful Hate Watch" or "Successful Hate Watches", and under it "Each time a team or fighter you track lost." (or, at 0, "Your first one lands when a team or fighter you track loses."). While it's loading the number is "–".
 - Up to three chips for the teams that gave it the most, each with the logo, the short name and the count: "Falcons 4 · Hawks 3 · Guardians 2". F1 constructors show their full names there, since ESPN's F1 short names are junk (Ferrari is "JK").
 - With more than three teams, a "+2 more" chip. Tapping it expands the card into every team it has hate watched, most first, one row each with the logo, full name, league tag and count; "Show less" folds it back. The change animates.
+- **"Share your season"**, a button at the bottom of the card: asks the server for the link to the device's season card (`api.shareSeason`, `POST /me/share/season`) and opens the share sheet with it (`shareSeason` in `app/src/lib/share.ts`). The button dims while it works. A browser with no share sheet copies the text and the note under the button says "Copied"; a device with no alerts yet gets "No alerts yet, so there is no season to share."; any other failure says "Couldn't make your season card. Try again." The card, its counting and its page are in `docs/sharing.md`, "The season card".
 
 **What counts** (`HATE_WATCH_TYPES` and `isHateWatch`):
 

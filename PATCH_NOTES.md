@@ -7,6 +7,8 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Settings: "Share your season" shares a picture of your whole run (over the air, after the server update).
+- Server: a season card, a picture of a device's run with its own link (POST /me/share/season).
 - Server: shared alert web pages are marked noindex, so search engines leave them out, and carry a link to hatewatch.dev's "how rival alerts work" page.
 - Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): the event and game, both teams with their scores, the inning-by-inning line score while it is on, the series line ("Series tied 2 - 2") and the series game by game, with each game's score and winner. The border is red when a most hated team is in it, gold for a favorite. The list has no Live now / Later today / Final headers, because a Final over a series still under way looked like the series was over.
 - Scores: under those games, "Coming up" lists the playoff games and series starting in the next 7 days, with "Who do you want to lose?". Vote for either team; then you see what share of fans voted for each, and you can change your vote until the first game starts. A series that has started keeps the vote (and the share of fans) under its scoreboard until it is won. The Special Events view hides when there is nothing to show, and is named for the league picked: Playoffs for MLB, NBA, NFL, NHL and WNBA, Bowl Games for college football, Special Events for All.
