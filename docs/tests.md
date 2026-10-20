@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 614 tests in 78 files, offline, in about 9 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 631 tests in 81 files, offline, in about 8 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 614 tests in 78 files, offline, in about 9 seconds, all passing on October 19, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 631 tests in 81 files, offline, in about 8 seconds, all passing on October 19, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 614 tests in 78 files, offline, in about 9 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 631 tests in 81 files, offline, in about 8 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 614 tests, offline, ~9s
+npm test                      # every test/*.test.ts: 631 tests, offline, ~8s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -110,6 +110,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `ufc-preview.test.ts` | A UFC card's preview, before (Allen vs. Duncan, October 10 2026) and after (UFC 332), the calendar, the routes |
 | `ufc.test.ts` | The UFC: fighters as players, a card watched poll by poll, and what a fighter's haters get (UFC 332 and a Fight Night, 2026-10-03 and 09-26) |
 | `upnext.test.ts` | "Up next" from each tracked team's and each Plus favorite's ESPN schedule, including "If Necessary" games and a season that's over |
+| `watching.test.ts` | A game's `watching` count, the "hate-watching now" line: other devices that would get an alert for either side, the asking device left out, a device counted once however many ways it tracks a side, no push token and an empty feed left out until it has a feed, a player follower with team alerts off left out, 0 with no tracked side or nobody watching |
 | `wnba.test.ts` | The WNBA: every NBA alert under its own switches, from the same detectors (NY @ ATL, 2026-10-04) |
 
 **Scripts that read live ESPN.** These aren't run by `npm test`, and they need the network:
