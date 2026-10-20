@@ -9,6 +9,7 @@ import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
 import { onLapse } from './plus';
 import { setLiveBoard } from './liveScoreboard';
+import { snoozeEnd } from './snooze';
 import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, HateWatchTally, League, Prefs, PrefsPatch, Target, Team, LeagueInfo, NextGame } from './types';
 
 type LiveState = 'connecting' | 'live' | 'offline';
@@ -81,6 +82,14 @@ function mergeTargetTypes(cur: Prefs['targetTypes'] = {}, patch?: PrefsPatch['ta
   return out;
 }
 
+/** Snoozes, merged like the server's: an end time sets one, null (or 0) ends it. */
+function mergeSnoozed(cur: NonNullable<Prefs['snoozed']> = {}, patch?: PrefsPatch['snoozed']): Prefs['snoozed'] {
+  if (!patch) return cur;
+  const out = { ...cur };
+  for (const [target, until] of Object.entries(patch)) { if (until) out[target] = until; else delete out[target]; }
+  return out;
+}
+
 /** A player's team choices, merged like the server's: true/false sets one, null removes it. */
 function mergePlayerTeams(cur: NonNullable<Prefs['playerTeams']> = {}, patch?: PrefsPatch['playerTeams']): Prefs['playerTeams'] {
   if (!patch) return cur;
@@ -143,8 +152,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [push, setPush] = useState<Store['push']>({ status: 'unknown' });
   const ws = useRef<WebSocket | null>(null);
   // Read inside the socket handler (which outlives renders), so it must be a ref, not state.
-  const mutedRef = useRef<Set<string>>(new Set());
-  useEffect(() => { mutedRef.current = new Set(prefs?.muted ?? []); }, [prefs]);
+  const prefsRef = useRef<Prefs | null>(null);
+  useEffect(() => { prefsRef.current = prefs; }, [prefs]);
 
   const refreshFeed = useCallback(async () => {
     const { items } = await api.feed();
@@ -197,8 +206,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         setFeed((cur) => mergeFeed(cur, [frame.item]));
         setUnseen((n) => n + 1);
-        // Muted (🔕) targets still land in the feed, just silently.
-        if (!mutedRef.current.has(frame.item.target.key)) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        // Muted (🔕) and snoozed targets still land in the feed, just silently.
+        const p = prefsRef.current, tk = frame.item.target.key;
+        if (!p?.muted.includes(tk) && !snoozeEnd(p, tk)) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       };
       sock.onclose = () => {
         if (ws.current === sock) ws.current = null;
@@ -302,7 +312,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPrefs((p) => (p ? {
         ...p, ...patch,
         types: { ...p.types, ...patch.types }, leagues: { ...p.leagues, ...patch.leagues },
-        quietHours: { ...p.quietHours, ...patch.quietHours }, targetTypes: mergeTargetTypes(p.targetTypes, patch.targetTypes),
+        quietHours: { ...p.quietHours, ...patch.quietHours }, snoozed: mergeSnoozed(p.snoozed, patch.snoozed), targetTypes: mergeTargetTypes(p.targetTypes, patch.targetTypes),
         pushTypes: { ...p.pushTypes, ...patch.pushTypes }, targetPushTypes: mergeTargetTypes(p.targetPushTypes, patch.targetPushTypes),
         playerTeams: mergePlayerTeams(p.playerTeams, patch.playerTeams),
       } : p));

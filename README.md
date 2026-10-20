@@ -18,7 +18,7 @@ ESPN (core plays + site summary, polled in parallel every 2s per live game; coll
    │
    ▼
 GameTracker ─► league detectors ─► publish() ─┬─► events table (deduped by deterministic id)
-scoreboard (10s) / standings (60s) /           ├─► per-follower prefs filter (type, league); push also skips muted + quiet hours
+scoreboard (10s) / standings (60s) /           ├─► per-follower prefs filter (type, league); push also skips muted or snoozed + quiet hours
 injuries (30s)                                 ├─► feed rows ─► WebSocket frame to open apps (≈ms)
 college football: scoreboard (20s, 5 min       └─► Expo Push ─► APNs / FCM (app closed)
   when no game is near) / standings (10 min),
@@ -30,7 +30,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Each live game is read every 2 seconds** (`HW_LIVE_POLL_MS`, default 2000). Each read fetches ESPN's core play-by-play and the site summary at the same time (`Promise.allSettled`) and merges their plays (`mergePlays`). Soccer reads the summary and the touch-by-touch feed (its newest page each poll); college football reads the summary alone. A college football game is read every 5 seconds (`HW_TEAMS_ONLY_POLL_MS`).
 - **Slower loops:** the scoreboard every 10 seconds (`HW_SCOREBOARD_MS`), to find games going live or final. Standings every 60 seconds (`HW_STANDINGS_MS`). Injury reports every 30 seconds (`HW_INJURIES_MS`).
 - **`publish()` stores each alert once** in the `events` table. Its primary key is a deterministic id built from what happened (for example game, play, type and athlete), so reading the same play again never alerts twice.
-- **Each follower's settings decide what they get.** An alert type or league they switched off is skipped, unless they set that target's alerts on their own (a per-target setting beats the global switches, `typeEnabledFor`). Push also skips a target they muted (it still reaches their feed) and their quiet hours (default off, 23:00 to 08:00 America/New_York, `DEFAULT_PREFS` in `fanout.ts`).
+- **Each follower's settings decide what they get.** An alert type or league they switched off is skipped, unless they set that target's alerts on their own (a per-target setting beats the global switches, `typeEnabledFor`). Push also skips a target they muted or snoozed (it still reaches their feed) and their quiet hours (default off, 23:00 to 08:00 America/New_York, `DEFAULT_PREFS` in `fanout.ts`).
 - **Open apps** get the alert as a WebSocket frame within milliseconds. **A closed app** gets it as a push.
 
 ## Index
@@ -56,7 +56,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 613 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
@@ -89,7 +89,7 @@ The full detail: [docs/real-time.md](docs/real-time.md).
 
 ## Notifications (every alert type, all user-controllable)
 
-**In short:** every alert type a user can switch is one entry in `EVENT_TYPES` (`server/src/event-types.ts`): 152 types today, 99 of them pushed by default, 37 feed only (on, in the feed, no notification) and 16 off. The table below says what each league's alerts are and how they're detected. Under the table: the defaults new installs get, what older installs kept, and every control in Settings, on a player's or team's own alert screen and on the Tracking tab. A game, news or standings alert goes through `publish()` in `server/src/fanout.ts` (the weekly recap through `publishTo`; developer notices, which are never pushed, through neither). It is stored once by its id. If it's a loss, it counts on the Successful Hate Watch tally. It reaches the feed of each device that tracks its target (or one of the team's players, with "Get their team's alerts" on) and has the alert switched on, as one alert per thing that happened. It's pushed only when push is on, the target isn't muted, it isn't quiet hours in the device's stored time zone, and the bell of the alert (or of a fact folded into it) says notify. "How a push is decided", below, goes through it step by step; [docs/duplicate-alerts.md](docs/duplicate-alerts.md) covers how one thing happening stays one alert.
+**In short:** every alert type a user can switch is one entry in `EVENT_TYPES` (`server/src/event-types.ts`): 152 types today, 99 of them pushed by default, 37 feed only (on, in the feed, no notification) and 16 off. The table below says what each league's alerts are and how they're detected. Under the table: the defaults new installs get, what older installs kept, and every control in Settings, on a player's or team's own alert screen and on the Tracking tab. A game, news or standings alert goes through `publish()` in `server/src/fanout.ts` (the weekly recap through `publishTo`; developer notices, which are never pushed, through neither). It is stored once by its id. If it's a loss, it counts on the Successful Hate Watch tally. It reaches the feed of each device that tracks its target (or one of the team's players, with "Get their team's alerts" on) and has the alert switched on, as one alert per thing that happened. It's pushed only when push is on, the target isn't muted or snoozed, it isn't quiet hours in the device's stored time zone, and the bell of the alert (or of a fact folded into it) says notify. "How a push is decided", below, goes through it step by step; [docs/duplicate-alerts.md](docs/duplicate-alerts.md) covers how one thing happening stays one alert.
 
 The full detail: [docs/notifications.md](docs/notifications.md).
 
@@ -173,7 +173,7 @@ The full detail: [docs/live-activity.md](docs/live-activity.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 613 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

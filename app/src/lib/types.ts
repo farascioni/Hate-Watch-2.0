@@ -273,6 +273,8 @@ export interface Prefs {
   leagues: Partial<Record<League, boolean>>;
   types: Record<string, boolean>;
   muted: string[];
+  /** Snoozed targets: key → Unix ms the snooze ends. Until then the push is off, as with `muted`; afterwards the entry counts for nothing. Missing from older servers. */
+  snoozed?: Record<string, number>;
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
   /** Per-player/team alert choices (⚙️ on the Tracking tab). They beat the global settings for that target. */
   targetTypes: Record<string, Record<string, boolean>>;
@@ -285,7 +287,9 @@ export interface Prefs {
 }
 
 /** A prefs update. In targetTypes and targetPushTypes, null means "back to the global setting" for that alert. */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
+export type PrefsPatch = Partial<Omit<Prefs, 'snoozed' | 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
+  /** null (or 0): end that target's snooze. */
+  snoozed?: Record<string, number | null>;
   targetTypes?: Record<string, Record<string, boolean | null>>;
   targetPushTypes?: Record<string, Record<string, boolean | null>>;
   /** null: back to the default (games shown, alerts off). */

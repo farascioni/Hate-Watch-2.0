@@ -11,6 +11,8 @@ import { usePlus } from '../../lib/plus';
 import { Chip, Empty, PrimaryButton, SectionHeader } from '../../components/ui';
 import { TrackingCard } from '../../components/TrackingCard';
 import { LayoutSheet } from '../../components/LayoutSheet';
+import { SnoozeSheet } from '../../components/SnoozeSheet';
+import { DAY_MS, snoozeDay, snoozeEnd } from '../../lib/snooze';
 import { useTrackingLayout } from '../../lib/trackingLayout';
 import { useWebLayout } from '../../lib/webLayout';
 import { GridRow } from '../../components/GridRow';
@@ -63,6 +65,7 @@ export default function FollowingScreen() {
   const { leagueInfo, games, upNext } = useStore();
   const layout = useTrackingLayout();
   const [menu, setMenu] = useState(false);
+  const [snoozing, setSnoozing] = useState<Target | null>(null); // whose snooze menu is open (a long press on the bell)
   // The layout picker lives in the top right of the page (the header), beside nothing else: the leaderboard is on the left.
   const navigation = useNavigation();
   const hasFollows = follows.size > 0;
@@ -111,9 +114,19 @@ export default function FollowingScreen() {
     { text: t('tracking.unfollow'), style: 'destructive', onPress: () => toggleFollow(tg) },
   ]);
 
+  // A tap on a snoozed bell ends the snooze, so every tap changes what's on screen; otherwise it flips the plain mute.
   const toggleMute = (tg: Target) => {
-    const next = muted.has(tg.key) ? [...muted].filter((k) => k !== tg.key) : [...muted, tg.key];
-    updatePrefs({ muted: next });
+    if (snoozeEnd(prefs, tg.key)) updatePrefs({ snoozed: { [tg.key]: null } });
+    else updatePrefs({ muted: muted.has(tg.key) ? [...muted].filter((k) => k !== tg.key) : [...muted, tg.key] });
+  };
+  // Snoozing replaces a plain mute: the bell is off either way, and the pushes only come back by themselves if nothing else keeps it muted.
+  const snooze = (tg: Target, days: number) => {
+    updatePrefs({ snoozed: { [tg.key]: Date.now() + days * DAY_MS }, muted: [...muted].filter((k) => k !== tg.key) });
+    setSnoozing(null);
+  };
+  const endSnooze = (tg: Target) => {
+    updatePrefs({ snoozed: { [tg.key]: null } });
+    setSnoozing(null);
   };
 
   if (!follows.size) {
@@ -133,16 +146,21 @@ export default function FollowingScreen() {
       stickySectionHeadersEnabled // "Teams · 3" / "Players · 6" stay on top while scrolling, on every platform
       ListHeaderComponent={<Text style={styles.hint}>{t('tracking.hint')}{starAllowed ? ` ${t('tracking.hintHated')}` : ''}</Text>}
       renderItem={({ item: row }) => {
-        const card = (item: Target) => (
+        const card = (item: Target) => {
+        const until = snoozeEnd(prefs, item.key), off = until > 0 || muted.has(item.key); // a snooze reads as a mute, with its end on the line under the name
+        return (
         <TrackingCard
           target={item}
           layout={layout}
-          info={{ division: divisionOf(item), record: formOf(item)?.record, streak: formOf(item)?.streak, standing: formOf(item)?.standing, game: gameInfo(item, games, upNext) }}
+          info={{ division: divisionOf(item), record: formOf(item)?.record, streak: formOf(item)?.streak, standing: formOf(item)?.standing, game: gameInfo(item, games, upNext), note: until ? t('tracking.snoozedUntil', { date: snoozeDay(until) }) : undefined }}
           actions={(compact) => (
             <View style={styles.actions}>
               {starAllowed && <MostHatedStar target={item} compact={compact} />}
-              <Pressable onPress={() => toggleMute(item)} hitSlop={8} style={[styles.icon, compact && styles.iconSm]} accessibilityLabel={t(muted.has(item.key) ? 'tracking.unmute' : 'tracking.mute', { name: item.name })}>
-                <Ionicons name={muted.has(item.key) ? 'notifications-off' : 'notifications'} size={compact ? 17 : 20} color={muted.has(item.key) ? colors.textFaint : colors.text} />
+              {/* A tap flips the mute (or ends a snooze); a long press opens the snooze menu. */}
+              <Pressable onPress={() => toggleMute(item)} onLongPress={() => { Haptics.selectionAsync().catch(() => {}); setSnoozing(item); }} hitSlop={8} style={[styles.icon, compact && styles.iconSm]}
+                accessibilityRole="button" accessibilityHint={t('tracking.snoozeHint')}
+                accessibilityLabel={until ? t('tracking.unsnooze', { name: item.name, date: snoozeDay(until) }) : t(off ? 'tracking.unmute' : 'tracking.mute', { name: item.name })}>
+                <Ionicons name={off ? 'notifications-off' : 'notifications'} size={compact ? 17 : 20} color={off ? colors.textFaint : colors.text} />
               </Pressable>
               {/* Per-player/team alert choices. Red when this target has any that differ from the global settings. */}
               <Pressable
@@ -167,6 +185,7 @@ export default function FollowingScreen() {
           )}
         />
         );
+        };
         // The web's card grid puts the other layouts' cards in cells too; the tiles lay themselves out.
         if (per > 1 && layout !== 'tiles') return <GridRow row={row} cols={per} render={card} />;
         return (
@@ -180,6 +199,7 @@ export default function FollowingScreen() {
       contentContainerStyle={{ paddingBottom: space(8), flexGrow: 1 }}
     />
     <LayoutSheet open={menu} onClose={() => setMenu(false)} />
+    <SnoozeSheet target={snoozing} until={snoozing ? snoozeEnd(prefs, snoozing.key) : 0} onPick={(days) => snoozing && snooze(snoozing, days)} onEnd={() => snoozing && endSnooze(snoozing)} onClose={() => setSnoozing(null)} />
     </View>
   );
 }

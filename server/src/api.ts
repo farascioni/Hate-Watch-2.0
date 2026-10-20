@@ -256,6 +256,11 @@ route('GET', '/me/hate-watches', true, (req) => hateWatchTally(req.deviceId!));
 // ─── Prefs ────────────────────────────────────────────────────────────────────────────────────
 route('GET', '/me/prefs', true, (req) => prefsDto(getPrefs(req.deviceId!)));
 route('PUT', '/me/prefs', true, (req, _u, _p, body) => {
+  const snoozed = body?.snoozed; // target key → end time (Unix ms); 0 or null ends a snooze
+  if (snoozed !== undefined && (!snoozed || typeof snoozed !== 'object' || Array.isArray(snoozed)
+    || Object.values(snoozed).some((v) => v !== null && !(typeof v === 'number' && Number.isFinite(v) && v >= 0)))) {
+    throw new HttpError(400, 'snoozed is an object of target keys to end times in Unix ms (0 or null ends one)');
+  }
   const p = prefsDto(setPrefs(req.deviceId!, body ?? {}));
   if (body?.playerTeams) forgetDeviceTeams(req.deviceId!); // a player's team on or off the Scores tab, now
   return p;
