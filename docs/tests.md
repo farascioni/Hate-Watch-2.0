@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 613 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 613 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 603 tests in 77 files, offline, in about 4 seconds, all passing on October 18, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 613 tests in 78 files, offline, in about 4 seconds, all passing on October 19, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 603 tests, offline, ~4s
+npm test                      # every test/*.test.ts: 613 tests, offline, ~4s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -91,6 +91,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `restart-backfill.test.ts` | A restart and the plays nobody read: a game live at boot takes 5 minutes of plays as news (a 3-minute-old strikeout alerts, a 10-minute-old one is history), a game followed later keeps 90 seconds, a second restart sends nothing twice; a follow during a scoreboard scan runs it again right after (`every`); a revision line has the same id from a new tracker. |
 | `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
 | `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |
+| `prefs-validation.test.ts` | `PUT /me/prefs` (`prefsProblem`, `fanout.ts`): about 40 bad bodies (a `muted` that isn't a list of strings, a time zone `Intl` can't format, a time that isn't HH:MM, a non-boolean switch, a settings map that isn't an object, a body that isn't an object) each answer 400 naming the field and leave the stored settings as they were, a body that mixes a good change with a bad one stores neither, valid bodies still merge ("UTC", "Asia/Calcutta" and "Asia/Kolkata" zones, nested nulls resetting a choice); a row stored before the check (a `muted` number, a bad zone, wrong-typed maps, non-JSON) reads as defaults for the part that is wrong and nothing in the alert path throws on it; with one follower's row corrupted, or one follower's socket throwing, `publish()` still gives the others their feed row and push once, logs the device and event, and a re-poll adds nothing |
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
