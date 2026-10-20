@@ -10,8 +10,8 @@ import { colors, radius, space } from '../theme';
 import type { Target } from '../lib/types';
 import { tr, useT } from '../lib/i18n';
 
-/** What the Tracking tab knows about a card beyond the target: its division, its team's record and streak, its game. */
-export interface CardInfo { division?: string; record?: string; streak?: string; standing?: string; game?: GameInfo | null }
+/** What the Tracking tab knows about a card beyond the target: its division, its team's record and streak, its game, and a note ("Snoozed until Tue, Oct 20") that leads the line under the name. */
+export interface CardInfo { division?: string; record?: string; streak?: string; standing?: string; game?: GameInfo | null; note?: string }
 
 const GREEN = colors.live, RED = '#F87171';
 const labelColor = (g: GameInfo) => (g.label === 'LIVE' ? colors.hate : g.label === 'NEXT' ? colors.textDim : colors.textFaint);
@@ -32,7 +32,7 @@ function Form({ info, short }: { info: CardInfo; short?: boolean }) {
 
 const open = (t: Target) => router.push(`/target/${encodeURIComponent(t.key)}`);
 const tintOf = (t: Target) => (t.kind === 'team' ? t.color : t.teamColor) ?? colors.border;
-const sub = (t: Target, info: CardInfo) => [subtitle(t), info.division].filter(Boolean).join(' · ');
+const sub = (t: Target, info: CardInfo) => [info.note, subtitle(t), info.division].filter(Boolean).join(' · ');
 
 /**
  * The Tracking tab's card in the layout picked in its menu (lib/trackingLayout.ts). `actions(compact)` draws the
@@ -41,7 +41,7 @@ const sub = (t: Target, info: CardInfo) => [subtitle(t), info.division].filter(B
 export function TrackingCard({ target, layout, info, actions }: { target: Target; layout: TrackingLayout; info: CardInfo; actions: (compact: boolean) => ReactNode }) {
   const t = useT();
   const { leagueInfo } = useStore();
-  if (layout === 'classic') return <TargetCard target={target} division={info.division} actions={actions(true)} />;
+  if (layout === 'classic') return <TargetCard target={target} division={info.division} note={info.note} actions={actions(true)} />;
   const tint = tintOf(target), ink = readableOn(tint), g = info.game;
   const press = ({ pressed }: { pressed: boolean }) => pressed && { backgroundColor: colors.surfaceHi };
 
@@ -97,6 +97,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
           </View>
         </View>
         <View style={styles.row}><Form info={info} short />{!info.record && !info.streak ? <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text> : null}</View>
+        {info.note && (info.record || info.streak) ? <Text style={styles.sub} numberOfLines={1}>{info.note}</Text> : null}
         <Text style={[styles.sub, g?.label === 'LIVE' && { color: colors.hate, fontWeight: '700' }]} numberOfLines={1}>{g ? `${labelText(g)} ${gameLine(g)}` : t('tracking.noGame')}</Text>
         <View style={styles.tileActions}>{actions(true)}</View>
       </Pressable>

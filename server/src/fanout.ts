@@ -18,6 +18,7 @@ export interface Prefs {
   leagues: Partial<Record<League, boolean>>;
   types: Record<string, boolean>;          // overrides of each type's defaultOn
   muted: string[];                         // followed targets with push off: alerts still go to the feed
+  snoozed: Record<string, number>;         // followed targets muted until this Unix ms; an ended one counts for nothing (never cleaned up)
   quietHours: { enabled: boolean; start: string; end: string; tz: string };
   /**
    * Per-player/per-team alert choices (the ⚙️ on the Tracking tab): targetKey → typeId → on/off.
@@ -37,7 +38,8 @@ export interface Prefs {
 }
 
 /** A PUT /me/prefs patch: like Prefs, but a per-target value of null means "back to the global setting". */
-export type PrefsPatch = Partial<Omit<Prefs, 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
+export type PrefsPatch = Partial<Omit<Prefs, 'snoozed' | 'targetTypes' | 'targetPushTypes' | 'playerTeams'>> & {
+  snoozed?: Record<string, number | null>; // 0 or null ends a snooze
   targetTypes?: Record<string, Record<string, boolean | null>>;
   targetPushTypes?: Record<string, Record<string, boolean | null>>;
   playerTeams?: Record<string, { scores?: boolean | null; alerts?: boolean | null }>;
@@ -49,6 +51,7 @@ export const DEFAULT_PREFS: Prefs = {
   leagues: {},
   types: {},
   muted: [],
+  snoozed: {},
   quietHours: { enabled: false, start: '23:00', end: '08:00', tz: 'America/New_York' },
   targetTypes: {},
   pushTypes: {},
@@ -77,6 +80,7 @@ export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
     types: { ...cur.types, ...patch.types },
     quietHours: { ...cur.quietHours, ...patch.quietHours },
     muted: patch.muted ?? cur.muted,
+    snoozed: mergeSnoozed(cur.snoozed, patch.snoozed),
     targetTypes: mergeTargetTypes(cur.targetTypes, patch.targetTypes),
     pushTypes: { ...cur.pushTypes, ...patch.pushTypes },
     targetPushTypes: mergeTargetTypes(cur.targetPushTypes, patch.targetPushTypes),
@@ -85,6 +89,16 @@ export function setPrefs(deviceId: string, patch: PrefsPatch): Prefs {
   db.prepare('UPDATE devices SET prefs = ? WHERE id = ?').run(JSON.stringify(next), deviceId);
   prefsCache.set(deviceId, next);
   return next;
+}
+
+/** Merge snoozes: an end time sets one, 0 or null removes it. Always a new map (an old row shares DEFAULT_PREFS's). */
+export function mergeSnoozed(cur: Prefs['snoozed'] = {}, patch?: PrefsPatch['snoozed']): Prefs['snoozed'] {
+  if (!patch) return cur;
+  const out = { ...cur };
+  for (const [target, until] of Object.entries(patch)) {
+    if (until) out[target] = until; else delete out[target];
+  }
+  return out;
 }
 
 const TARGET_KEY = /^(player|team):[a-z0-9]+:[\w-]+$/;
@@ -142,9 +156,12 @@ export function wants(p: Prefs, e: Pick<Detected, 'type' | 'aliases' | 'targetKe
   return [e.type, ...(e.aliases ?? [])].some((t) => typeEnabledFor(p, e.targetKey, t, league));
 }
 
-/** Should an alert they want also be pushed? Muted targets (🔕 on the Tracking tab) are feed-only. */
+/** Is this target 🔕 on the Tracking tab, or snoozed until a time still ahead? Either keeps its alerts feed-only. */
+export const isMuted = (p: Prefs, targetKey: string, now = new Date()) => p.muted.includes(targetKey) || (p.snoozed?.[targetKey] ?? 0) > now.getTime();
+
+/** Should an alert they want also be pushed? Muted or snoozed targets are feed-only. */
 export function pushAllowed(p: Prefs, targetKey: string, now = new Date()) {
-  return p.pushEnabled && !p.muted.includes(targetKey) && !inQuietHours(p, now);
+  return p.pushEnabled && !isMuted(p, targetKey, now) && !inQuietHours(p, now);
 }
 
 /**
@@ -382,6 +399,7 @@ function favoritePrefs(p: Prefs, targetKey: string, fav: FavoriteRow): Prefs {
     targetTypes: { ...p.targetTypes, [targetKey]: fav.types },
     targetPushTypes: { ...p.targetPushTypes, [targetKey]: fav.push_types },
     muted: fav.push ? p.muted.filter((k) => k !== targetKey) : [...p.muted, targetKey],
+    snoozed: Object.fromEntries(Object.entries(p.snoozed ?? {}).filter(([k]) => k !== targetKey)), // a snooze left from tracking the team doesn't mute the favorite
   };
 }
 
@@ -552,7 +570,7 @@ export function publish(events: Detected[], league: League) {
       const streak = f.fav ? [] : streakLines(f.device_id, prefs, e, folded, moment, league); // may rewrite a folded streak line; a favorite has no hate watch streak
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
-      const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && prefs.muted.includes(f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
+      const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && isMuted(prefs, f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
       insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null, f.fav ? 1 : 0);
       const body = withLines(e.body, lines);
       const own = f.fav ? { ...item, fav: true } : item;
