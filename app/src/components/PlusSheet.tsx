@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, space } from '../theme';
+import { GOLD, colors, space } from '../theme';
 import { useT } from '../lib/i18n';
 
-/** The bottom sheet the Hate Watch Plus profile and preset editors share (the same shell as LeagueSheet): a title, Done, and a scrolling body. */
-export function PlusSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/**
+ * The bottom sheet the Hate Watch Plus profile and preset editors share (the same shell as LeagueSheet): a title, a header
+ * button, and a scrolling body. An editor passes `onSave` so the header button is a gold Save (dimmed while `canSave` is
+ * false), not a Done that closes without saving: the editors' own Save button is far down a long list.
+ */
+export function PlusSheet({ title, onClose, onSave, canSave = true, children }: { title: string; onClose: () => void; onSave?: () => void; canSave?: boolean; children: ReactNode }) {
   const t = useT();
   const insets = useSafeAreaInsets();
   return (
@@ -16,7 +20,11 @@ export function PlusSheet({ title, onClose, children }: { title: string; onClose
           <View style={styles.grab} />
           <View style={styles.head}>
             <Text style={styles.title} accessibilityRole="header">{title}</Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>{t('guide.done')}</Text></Pressable>
+            {onSave ? (
+              <Pressable onPress={onSave} disabled={!canSave} hitSlop={10} accessibilityRole="button" style={!canSave && { opacity: 0.4 }}><Text style={[styles.done, { color: GOLD }]}>{t('profile.save')}</Text></Pressable>
+            ) : (
+              <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button"><Text style={styles.done}>{t('guide.done')}</Text></Pressable>
+            )}
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body} style={{ flexShrink: 1 }}>{children}</ScrollView>
         </View>

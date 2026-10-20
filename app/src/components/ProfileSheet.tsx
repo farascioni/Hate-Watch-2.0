@@ -26,7 +26,7 @@ export function ProfileSheet({ profile, follows, onClose }: { profile: Profile |
   const save = () => { if (ok && saveProfile({ id: profile?.id, name, keys: [...picked] })) onClose(); };
 
   return (
-    <PlusSheet title={t(profile ? 'profile.edit' : 'profile.new')} onClose={onClose}>
+    <PlusSheet title={t(profile ? 'profile.edit' : 'profile.new')} onClose={onClose} onSave={save} canSave={ok}>
       <TextInput value={name} onChangeText={setName} placeholder={t('profile.name')} placeholderTextColor={colors.textFaint} maxLength={MAX_NAME}
         style={styles.input} autoCorrect={false} returnKeyType="done" accessibilityLabel={t('profile.name')} />
       <Text style={styles.note}>{t('profile.note')}</Text>

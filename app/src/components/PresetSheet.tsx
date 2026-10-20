@@ -86,7 +86,7 @@ function PresetEditor({ preset, types, onBack }: { preset: AlertPreset | null; t
   const ok = !!label.trim() && Object.keys(choices).length > 0;
   const save = () => { if (preset ? updateAlertPreset(preset.id, label, choices) : saveAlertPreset(label, choices)) onBack(); };
   return (
-    <PlusSheet title={t(preset ? 'preset.editTitle' : 'preset.new')} onClose={onBack}>
+    <PlusSheet title={t(preset ? 'preset.editTitle' : 'preset.new')} onClose={onBack} onSave={save} canSave={ok}>
       <TextInput value={label} onChangeText={setLabel} placeholder={t('preset.name')} placeholderTextColor={colors.textFaint} maxLength={MAX_PRESET_NAME}
         style={styles.input} autoCorrect={false} returnKeyType="done" accessibilityLabel={t('preset.name')} />
       <Text style={styles.note}>{t('preset.editHint')}</Text>
