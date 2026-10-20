@@ -7,9 +7,10 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Tabs: quick tab swaps no longer leave a blank screen. (Update)
 - Guide: the drawings now move, replaying on each page. The web guide's page background is dark.
 - Motion: alerts drop in, counts roll, series fill, hearts pop and break, live dots pulse, first cards wave in, a loss glints gold, the F1 order slides, the Plus upsell glows, scores swell, odds glide, switches slide a thumb, the Feed shimmers, team names fold into the title, the Feed badge swells, tabs settle in under a gliding line. Off under Reduce Motion. (Update)
-- Server: bad requests get a clear 400 or 413 instead of an error, new devices are limited per address, and share links use our own address.
+- Server: bad requests get a 400 or 413, new devices are limited per address, share links use our own address.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts 15 minutes after sending, so deleted apps stop getting them.
 - Server: shared alert web pages are marked noindex and carry a link to hatewatch.dev's "how rival alerts work" page.

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View, type ColorValue } from 'react-native';
 import { Tabs, router } from 'expo-router';
-import { BottomTabBar, type BottomTabBarProps, type BottomTabNavigationOptions } from 'expo-router/js-tabs';
+import { BottomTabBar, type BottomTabBarProps } from 'expo-router/js-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
 import { DetailPlaceholder } from '../../components/WebShell';
@@ -43,6 +43,17 @@ function GlideTabBar(props: BottomTabBarProps) {
     a.start();
     return () => a.stop();
   }, [props.state.index, x]);
+  const focused = props.state.routes[props.state.index].name;
+  const first = useRef(true);
+  // Before paint, so the first screen never shows at 0.
+  useLayoutEffect(() => {
+    for (const r of props.state.routes) {
+      const to = r.name === focused ? 1 : 0;
+      if (first.current || reduceMotion()) fade(r.name).setValue(to);
+      else Animated.timing(fade(r.name), { toValue: to, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }
+    first.current = false;
+  }, [focused]);
   if (wide) return <BottomTabBar {...props} />;
   const slot = w / n;
   return (
@@ -55,12 +66,22 @@ function GlideTabBar(props: BottomTabBarProps) {
   );
 }
 
-type SceneProps = Parameters<NonNullable<BottomTabNavigationOptions['sceneStyleInterpolator']>>[0];
-/** The old screen fades out fast, the new one fades up from 10 px low (progress is 0 on the focused tab, ±1 on the rest). */
-const settle = ({ current }: SceneProps) => ({
+/**
+ * One fade value per tab, 1 on the focused tab and 0 on the rest, driven by GlideTabBar. The navigator's own per-tab progress
+ * is not used for the look: overlapping taps start new timings on values the previous tap's Animated.parallel is still
+ * stopping, so the focused tab's progress could be left at its inactive end and the screen stayed blank.
+ */
+const fades = new Map<string, Animated.Value>();
+const fade = (name: string) => {
+  let v = fades.get(name);
+  if (!v) fades.set(name, (v = new Animated.Value(0)));
+  return v;
+};
+/** The old screen fades out fast, the new one fades up from 10 px low. */
+const settle = (name: string) => () => ({
   sceneStyle: {
-    opacity: current.progress.interpolate({ inputRange: [-1, -0.5, 0, 0.5, 1], outputRange: [0, 0, 1, 0, 0] }),
-    transform: [{ translateY: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [10, 0, 10] }) }],
+    opacity: fade(name).interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
+    transform: [{ translateY: fade(name).interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
   },
 });
 const SETTLE = { animation: 'timing' as const, config: { duration: 240, easing: Easing.out(Easing.cubic) } };
@@ -80,8 +101,8 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(p) => <GlideTabBar {...p} />}
-      screenOptions={{
-        ...(still ? {} : { sceneStyleInterpolator: settle, transitionSpec: SETTLE }),
+      screenOptions={({ route }) => ({
+        ...(still ? {} : { sceneStyleInterpolator: settle(route.name), transitionSpec: SETTLE }),
         headerStyle: { backgroundColor: colors.bg, borderBottomColor: colors.border },
         headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '900' },
@@ -90,7 +111,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.textFaint,
         sceneStyle: { backgroundColor: colors.bg },
         headerLeft: wide ? undefined : () => <LeaderboardButton />,
-      }}
+      })}
     >
       <Tabs.Screen
         name="index"
