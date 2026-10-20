@@ -16,7 +16,7 @@ import {
 import { eventChanged, publish, reviseEvent } from './fanout.ts';
 import { PlayLedger, againLine } from './revisions.ts';
 import { attachClips, clipFromVideo, isRecap, playIdsIn } from './clips.ts';
-import { flagOn } from './flags.ts';
+import { flagOn, savingOn, type Saving } from './flags.ts';
 import type { Clip } from './highlights.ts';
 import { soccerType } from './event-types.ts';
 import { boxGoalies, boxPassers, boxPitchCounts, gameCard, getGame, oddsChance, patchGame, pruneGames, upsertGame, winProb } from './scores.ts';
@@ -60,6 +60,23 @@ const TEAMS_ONLY_QUIET_MS = 5 * 60_000; // college football's scoreboard with no
 const INJURIES_MS = Number(process.env.HW_INJURIES_MS ?? 30000);
 const YESTERDAY_MS = Number(process.env.HW_YESTERDAY_MS ?? 10 * 60_000); // yesterday's finals, for the Scores tab
 const NEWS_MS = Number(process.env.HW_NEWS_MS ?? 3 * 60_000); // off-field trouble, fines and suspensions (news.ts)
+// The savings (flags.ts SAVINGS, all off until turned on): the slower pace each one switches to. docs/real-time.md, "Reading ESPN less".
+const INJURIES_IDLE_MS = 5 * 60_000;       // injury reports with no game of the league live or soon
+const INJURIES_SOON_MS = 3 * 3600_000;     // "soon": a game starting within this (inactive lists and game-time decisions come ahead of kickoff)
+const NEWS_IDLE_MS = 20 * 60_000;
+const STANDINGS_IDLE_MS = 30 * 60_000;
+const STANDINGS_HOT_MS = 15 * 60_000;      // after a game ends: the usual 60 s, for as long as ESPN's table can take to move
+const SUMMARY_EVERY_MS = 10_000;           // summary-on-demand: a live game's summary at most this often (its plays are still read every poll)
+const SUMMARY_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']);
+const BREAK_POLL_MS = 6000;                // slow-breaks: halftime, between periods, a delay
+const BREAK_STATUSES = new Set(['STATUS_HALFTIME', 'STATUS_DELAYED', 'STATUS_RAIN_DELAY']);
+// STATUS_END_PERIOD is a break too, except after a league's last regulation period (the final, or overtime, follows it at once).
+const LAST_PERIOD: Partial<Record<League, number>> = { nba: 4, wnba: 4, nhl: 3, nfl: 4, cfb: 4 };
+// summary-on-demand: a core play that ends a game, period, inning or half needs a fresh summary now (not MLB's "End Batter/Pitcher", after every at-bat).
+/** savings.slow-breaks: whether ESPN's status (its name and period) is a break in play, for a league. */
+export const isBreak = (league: League, status: string, period: number) =>
+  BREAK_STATUSES.has(status) || (status === 'STATUS_END_PERIOD' && period < (LAST_PERIOD[league] ?? 0));
+const END_PLAY = /^End (Game|Period|Inning|Half|Quarter|Regular Time|of\b)/i;
 /** Plays older than this when we first attach to a game are treated as history, not news. */
 const BACKFILL_WINDOW_MS = 90_000;
 /**
@@ -219,6 +236,10 @@ export class GameTracker {
   private newAlerts = false;
   private clipsBusy = false;
   lastPollMs = 0;
+  /** savings.summary-on-demand: the last summary read, reused by the polls that skip it. */
+  private summaryCache: { at: number; value: any } | null = null;
+  /** savings.slow-breaks: the summary says the game is at halftime, between periods or in a delay. */
+  private onBreak = false;
   // Football: ESPN's changes to plays and drives after it posts them (revisions.ts), and the score's: reads in a row
   // that had a side's score lower than announced, the score each side had taken back (and where, for 10 minutes: the
   // same side scoring on that drive is that score again), the header's score ahead of the plays (since when, and the
@@ -355,8 +376,33 @@ export class GameTracker {
       this.lastPollMs = Date.now() - t0;
       // Next poll starts LIVE_POLL_MS after the previous one *started* (never overlapping); a teams-only league's
       // (college football: its summary is big, and a Saturday has dozens of games) every TEAMS_ONLY_POLL_MS.
-      await new Promise((r) => setTimeout(r, Math.max(250, (TEAMS_ONLY.has(this.ctx.league) ? TEAMS_ONLY_POLL_MS : LIVE_POLL_MS) - this.lastPollMs)));
+      const gap = TEAMS_ONLY.has(this.ctx.league) ? TEAMS_ONLY_POLL_MS : this.slowBreak() ? BREAK_POLL_MS : LIVE_POLL_MS;
+      await new Promise((r) => setTimeout(r, Math.max(250, gap - this.lastPollMs)));
     }
+  }
+
+  /** Something is being held until a later read (a lost ABS challenge, a half-inning's end, an at-bat's batter, the final): the usual pace. */
+  private holding() {
+    return this.absHeld.size > 0 || this.halfEnds.size > 0 || this.heldFinal !== null || [...this.noBatter.keys()].some((id) => !this.seen.has(id));
+  }
+
+  /** savings.slow-breaks: at halftime, between periods or in a delay, with nothing held, read every BREAK_POLL_MS. */
+  private slowBreak() {
+    return this.onBreak && !this.holding() && savingOn('savings.slow-breaks');
+  }
+
+  /**
+   * savings.summary-on-demand: the last summary, when this poll can do without a new one (MLB, NBA, WNBA, NHL: the core feed
+   * has the plays 15-20 s before the summary does, and is still read every poll). Never on the first poll, for a game that
+   * isn't live, with anything held, or once SUMMARY_EVERY_MS have passed. poll() reads a new one anyway when the core read
+   * failed or brings an "End …" play (the end of a period or the game). The cached summary goes through exactly what a fresh
+   * one does, so the merged plays, and with them the ledger's view of which plays are missing, don't change between reads.
+   */
+  private cachedSummary(): any | null {
+    const c = this.summaryCache;
+    if (!c || this.first || !SUMMARY_LEAGUES.has(this.ctx.league) || Date.now() - c.at >= SUMMARY_EVERY_MS) return null;
+    if (c.value?.header?.competitions?.[0]?.status?.type?.state !== 'in' || this.holding() || !savingOn('savings.summary-on-demand')) return null;
+    return c.value;
   }
 
   /**
@@ -545,14 +591,19 @@ export class GameTracker {
     };
     // Soccer's plays are its summary's key events; a teams-only league's (college football) its drives': one read.
     // Soccer also reads its touch feed (refreshTouches: the newest page each poll, never a reason for the poll to fail).
-    const [core, summary] = await Promise.allSettled([
+    const reuse = this.cachedSummary();
+    let [core, summary] = await Promise.allSettled([
       soccer || teamsOnly ? Promise.resolve({ items: [] }) : read('plays', urls.corePlays(league, gameId)),
-      read('summary', urls.summary(league, gameId)),
+      reuse ? Promise.resolve(reuse) : read('summary', urls.summary(league, gameId)),
       soccer ? this.refreshTouches() : Promise.resolve(),
     ]);
-    if (summary.status === 'rejected' && (soccer || teamsOnly || core.status === 'rejected')) throw summary.reason;
-
     const corePlays: NPlay[] = core.status === 'fulfilled' ? (core.value.items ?? []).map(fromCorePlay) : [];
+    // A reused summary is the fallback for a failed core read, and the end of a period or the game is not to wait for the next one.
+    if (reuse && (core.status === 'rejected' || corePlays.some((p) => !this.seen.has(p.id) && END_PLAY.test(p.type)))) {
+      [summary] = await Promise.allSettled([read('summary', urls.summary(league, gameId))]);
+    }
+    if (summary.status === 'fulfilled' && summary.value !== reuse) this.summaryCache = { at: Date.now(), value: summary.value };
+    if (summary.status === 'rejected' && (soccer || teamsOnly || core.status === 'rejected')) throw summary.reason;
     // NFL summary has no flat plays list (drives only, without participants); core covers it.
     const sitePlays: NPlay[] = summary.status !== 'fulfilled' || league === 'nfl' ? []
       : teamsOnly ? fromDrivePlays(summary.value)
@@ -593,6 +644,7 @@ export class GameTracker {
       // "Hate Watch Starting" goes out once, on the pre → in flip. A game first seen already under
       // way (a follow in the 3rd quarter, a server restart) never gets a late "starting" alert.
       const state = comp?.status?.type?.state;
+      this.onBreak = state === 'in' && isBreak(league, String(comp?.status?.type?.name), Number(comp?.status?.period ?? 0));
       if (state === 'pre') this.sawPre = true;
       else if (state === 'in' && this.sawPre && !this.started) {
         this.started = true;
@@ -1034,22 +1086,61 @@ class LiveEngine {
       // 10 minutes (they move after games), and no injuries or news (player and off-field alerts it doesn't have).
       const teamsOnly = TEAMS_ONLY.has(lg);
       this.kickers[lg] = every(teamsOnly ? TEAMS_ONLY_SCOREBOARD_MS : SCOREBOARD_MS, () => this.scanScoreboard(lg));
-      this.standingsKick[lg] = every(teamsOnly ? TEAMS_ONLY_STANDINGS_MS : STANDINGS_MS, () => scanStandings(lg));
-      if (!teamsOnly) every(INJURIES_MS, () => scanInjuries(lg));
+      this.standingsKick[lg] = every(teamsOnly ? TEAMS_ONLY_STANDINGS_MS : STANDINGS_MS, () => this.standingsTurn(lg, teamsOnly));
+      if (!teamsOnly) every(INJURIES_MS, () => this.injuriesTurn(lg));
       every(YESTERDAY_MS, () => scanYesterday(lg));
     }
     this.kickers.f1 = startF1(every); // races, not games: see f1.ts
     this.kickers.ufc = startUfc(every); // fight cards, not games: see ufc.ts
     every(CFB_POLL_MS, () => scanCfbPoll()); // college football's AP Top 25: see cfb-poll.ts
     every(RECAP_MS, async () => weeklyRecaps());
-    for (const lg of LEAGUE_IDS) if (!TEAMS_ONLY.has(lg)) every(NEWS_MS, () => scanNews(lg));
+    for (const lg of LEAGUE_IDS) if (!TEAMS_ONLY.has(lg)) every(NEWS_MS, () => this.newsTurn(lg));
     this.upNextKick = startUpNext(watchedTeamKeys); // the Scores tab's "Up next"
   }
 
   /** Called when someone follows something, so a game already in progress starts tracking immediately. */
-  kick() { invalidateWatched(); for (const k of Object.values(this.kickers)) k?.(); this.upNextKick?.(); }
+  kick() {
+    invalidateWatched();
+    for (const lg of Object.keys(this.quietUntil) as League[]) if (!TEAMS_ONLY.has(lg)) delete this.quietUntil[lg]; // scoreboard-sleep: a new follow reads at once
+    for (const k of Object.values(this.kickers)) k?.();
+    this.upNextKick?.();
+  }
 
-  onGameFinal(lg: League) { setTimeout(() => this.standingsKick[lg]?.(), 15_000).unref(); }
+  onGameFinal(lg: League) {
+    this.standingsHotUntil[lg] = Date.now() + STANDINGS_HOT_MS;
+    setTimeout(() => this.standingsKick[lg]?.(), 15_000).unref();
+  }
+
+  // ─── The savings' turns (flags.ts SAVINGS): each scan keeps its usual interval and skips a turn, so switching one on or off works at once ───
+  private ranAt = new Map<string, number>();
+  /** Whether to skip this turn: `saving` is on, `idleMs` haven't passed since the scan last ran, and nothing asks for the usual pace (`fast`). */
+  private skipTurn(key: string, saving: Saving, idleMs: number, fast: boolean): boolean {
+    const now = Date.now();
+    if (!fast && savingOn(saving) && now - (this.ranAt.get(key) ?? 0) < idleMs) return true;
+    this.ranAt.set(key, now);
+    return false;
+  }
+  /** What each league's last scoreboard read showed, for the injury reports' pace (none yet: assume a game is near). */
+  private gameDay: Partial<Record<League, { live: boolean; nextStart: number }>> = {};
+  /** After any game of the league ends (its tracker's final, or a new final on the scoreboard), until when standings are read every 60 s. */
+  private standingsHotUntil: Partial<Record<League, number>> = {};
+  private finalsSeen = new Set<string>();
+  private gameSoon(lg: League) {
+    const g = this.gameDay[lg];
+    return !g || g.live || g.nextStart - Date.now() < INJURIES_SOON_MS || [...this.trackers.values()].some((t) => t.ctx.league === lg && !t.finished);
+  }
+  private async standingsTurn(lg: League, teamsOnly: boolean) {
+    if (this.skipTurn(`standings:${lg}`, 'savings.standings', STANDINGS_IDLE_MS, teamsOnly || Date.now() < (this.standingsHotUntil[lg] ?? 0))) return;
+    await scanStandings(lg);
+  }
+  private async injuriesTurn(lg: League) {
+    if (this.skipTurn(`injuries:${lg}`, 'savings.injuries', INJURIES_IDLE_MS, this.gameSoon(lg))) return;
+    await scanInjuries(lg);
+  }
+  private async newsTurn(lg: League) {
+    if (this.skipTurn(`news:${lg}`, 'savings.news', NEWS_IDLE_MS, false)) return;
+    await scanNews(lg);
+  }
 
   status() {
     return [
@@ -1063,12 +1154,22 @@ class LiveEngine {
   private quietUntil: Partial<Record<League, number>> = {};
 
   private async scanScoreboard(lg: League) {
-    if (Date.now() < (this.quietUntil[lg] ?? 0)) return;
+    // College football always sleeps while quiet; the other leagues only with the scoreboard-sleep saving on.
+    const sleepy = TEAMS_ONLY.has(lg) || savingOn('savings.scoreboard-sleep');
+    if (sleepy && Date.now() < (this.quietUntil[lg] ?? 0)) return;
     const sb = await liveDeps.getJson(urls.scoreboard(lg), { timeoutMs: 6000, bust: true });
-    // College football with no game live or starting within 20 minutes: quiet (a game's tracker reads its own final).
-    if (TEAMS_ONLY.has(lg)) {
-      const near = (sb.events ?? []).some((ev: any) => ev.status?.type?.state === 'in' || (ev.status?.type?.state === 'pre' && Date.parse(ev.date) - Date.now() < 20 * 60_000));
-      this.quietUntil[lg] = near ? 0 : Date.now() + TEAMS_ONLY_QUIET_MS;
+    // No game live or starting within 20 minutes: quiet (a game's tracker reads its own final). Not while a tracker of the
+    // league hasn't finished (the other leagues), nor when a game ended that standings must follow (below).
+    const evs: any[] = sb.events ?? [];
+    const near = evs.some((ev) => ev.status?.type?.state === 'in' || (ev.status?.type?.state === 'pre' && Date.parse(ev.date) - Date.now() < 20 * 60_000));
+    if (sleepy) this.quietUntil[lg] = near || (!TEAMS_ONLY.has(lg) && [...this.trackers.values()].some((t) => t.ctx.league === lg && !t.finished)) ? 0 : Date.now() + TEAMS_ONLY_QUIET_MS;
+    this.gameDay[lg] = { live: evs.some((ev) => ev.status?.type?.state === 'in'), nextStart: Math.min(Infinity, ...evs.filter((ev) => ev.status?.type?.state === 'pre').map((ev) => Date.parse(ev.date))) };
+    // A game newly final on the board (any game, followed or not) moves the standings: read them every 60 s for a while (savings.standings).
+    for (const ev of evs) {
+      if (ev.status?.type?.state !== 'post' || !ev.status?.type?.completed || this.finalsSeen.has(`${lg}:${ev.id}`)) continue;
+      if (this.finalsSeen.size > 5000) this.finalsSeen.clear();
+      this.finalsSeen.add(`${lg}:${ev.id}`);
+      this.standingsHotUntil[lg] = Date.now() + STANDINGS_HOT_MS;
     }
     const watched = watchedTeamKeys();
     // Every game on the board gets a Scores-tab card (they're pushed only to devices that track a side).

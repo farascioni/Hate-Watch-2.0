@@ -28,6 +28,7 @@ The README's "Deploy" has the summary; this is the full detail. Read this index 
 |---|---|---|
 | Anything in `server/` (alerts, wording the server writes, how each league is shown) | `fly deploy --remote-only` from `server/` | Every install, every build, within seconds |
 | Turning off ESPN's clips or images | A server switch (`server/src/flag-cli.ts`), no deploy | Every install, within seconds; a clip already in a feed goes at its next feed load |
+| Turning on a way to read ESPN less (`savings.*`, off until turned on) | The same `flag-cli.ts`, no deploy | The server, within seconds; docs/real-time.md, "Reading ESPN less" |
 | A message to everyone | A developer notice (`server/src/notice-cli.ts`) | Every install's feed, never pushed |
 | JavaScript or assets in `app/` (screens, wording, styles) | `npm run update` from `app/` | Builds after build 12 with the same native code, from their next launch |
 | Native code (a new native module, permissions, entitlements, an SDK upgrade) | A new EAS build, then TestFlight or the stores | Whoever installs the new build |
@@ -82,7 +83,7 @@ Why it's configured the way it is (`fly.toml`):
 - **One `shared-cpu-1x` VM with 512 MB** in `iad` (US East), the region closest to ESPN's API and most US users.
 - **The contact email** on `/privacy` and `/support` is `HW_CONTACT_EMAIL` in `[env]` (`hatewatchfeedback@gmail.com`). `server/src/pages.ts` falls back to the same address when it's unset (it was `support@example.com` before October 11, 2026), so a local server's pages are right too.
 
-**Secrets and switches on the running app:** `fly secrets set -a hate-watch-api NAME=value` sets a secret and restarts the app. `HW_FLAGS_OFF` (a comma-separated list) keeps server switches off for good. A switch flipped live with `flag-cli.ts` needs no restart (`CLAUDE.md`, "Release flow").
+**Secrets and switches on the running app:** `fly secrets set -a hate-watch-api NAME=value` sets a secret and restarts the app. `HW_FLAGS_OFF` (a comma-separated list) keeps server switches off for good, and `HW_SAVINGS_ON` keeps the `savings.*` ones on for good. A switch flipped live with `flag-cli.ts` needs no restart (`CLAUDE.md`, "Release flow").
 
 **Backups:** before anything that changes production data, the database is copied with SQLite's `VACUUM INTO` into a new file under `/data` (`CLAUDE.md`, "Release flow", which shows one way to run it).
 

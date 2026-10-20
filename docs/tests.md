@@ -4,16 +4,16 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 376 tests in 56 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 394 tests in 58 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 376 tests in 56 files, offline, in about 4 seconds, all passing on October 12, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 394 tests in 58 files, offline, in about 4 seconds, all passing on October 12, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 376 tests in 56 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 394 tests in 58 files, offline, in about 4 seconds, all passing on October 12, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
@@ -77,6 +77,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `player-team.test.ts` | A tracked player's team: its games on the Scores tab (on by default) and its own alerts (off by default) |
 | `positions.test.ts` | Which alerts fit a player by the positions they've played, and the order on a player's settings screen |
 | `quiet-defaults.test.ts` | New installs' defaults (push, feed only, off) and older installs keeping what they had (`keepOldDefaults`) |
+| `savings.test.ts` | The savings (`flags.ts` `SAVINGS`, off until turned on): the kill switch, each saving's read counts off against on (photo checks, the scoreboard's sleep and a follow waking it, injuries near a game, standings after a final, news), and for the two that touch live games that a game with a held ABS challenge makes the same alerts, with the summary read at once for a failed core read or an End play, and that a halftime or delay slows the poll only with nothing held |
 | `scores.test.ts` | The Scores tab: cards from scoreboard events, scores that never go backwards mid-game, live pushes only to devices tracking a side, each device's games, F1 running order, play-by-play |
 | `sections.test.ts` | The alerts' order under section headings in Settings and on a target's screen |
 | `share.test.ts` | Share links: the `/a/<code>` page, its preview picture, the iPhone redirect to the App Store, codes for old alerts |

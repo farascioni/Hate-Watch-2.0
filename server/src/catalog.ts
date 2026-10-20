@@ -1,6 +1,7 @@
 import { db, tx, kvGet, kvSet } from './db.ts';
 import { fiveRoundFights, rankFighters, titleOf, type Belts, type WeightClass } from './ufc-classes.ts';
 import { getJson, probePng, mapLimit } from './espn.ts';
+import { savingOn } from './flags.ts';
 import { LEAGUE_IDS, LEAGUES, urls, playerKey, teamKey, type League } from './leagues.ts';
 
 export interface Team {
@@ -114,6 +115,19 @@ export function injuredOffRoster(report: any, teams: Team[], onRoster: Set<strin
   return out;
 }
 
+/**
+ * savings.photo-checks: an image the last refresh verified (same URL, a size on record) isn't fetched again. A player who
+ * had no photo (a badge) is checked every time, since one may have come. To verify everything again, refresh with it off.
+ */
+export const knownLogo = async (team: Team) => {
+  const was = savingOn('savings.photo-checks') ? teams.get(team.key) : undefined;
+  return was && was.logo === team.logo && was.logoW > 0 ? { width: was.logoW, height: was.logoH } : null;
+};
+export const knownHeadshot = (key: string, url: string) => {
+  const was = savingOn('savings.photo-checks') ? players.get(key) : undefined;
+  return was && was.imageKind === 'headshot' && was.image === url && was.imageW > 0 ? { width: was.imageW, height: was.imageH } : null;
+};
+
 export async function ingest(log: (m: string) => void = console.log): Promise<IngestReport> {
   const report: IngestReport = { at: new Date().toISOString(), version: INGEST_VERSION, leagues: {}, problems: [] };
   const newTeams: Team[] = [];
@@ -179,7 +193,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
       });
     }
     await mapLimit(lgTeams, 8, async (team) => {
-      const dims = await probePng(team.logo);
+      const dims = await knownLogo(team) ?? await probePng(team.logo);
       if (!dims) throw new Error(`${lg}: logo missing for ${team.name} (${team.logo}) — refusing to ingest a team without an image`);
       team.logoW = dims.width; team.logoH = dims.height;
     });
@@ -231,7 +245,7 @@ export async function ingest(log: (m: string) => void = console.log): Promise<In
         stats.headshotAltMismatch++;
         report.problems.push(`${lg}: headshot alt "${a.headshot.alt}" ≠ "${p.name}"`);
       }
-      const dims = await probePng(candidate);
+      const dims = knownHeadshot(p.key, candidate) ?? await probePng(candidate);
       if (dims) {
         Object.assign(p, { image: candidate, imageW: dims.width, imageH: dims.height, imageKind: 'headshot' });
         stats.headshotsVerified++;
@@ -375,7 +389,7 @@ async function ingestF1(stats: IngestReport['leagues'][string], report: IngestRe
     const candidate: string = a.headshot?.href ?? urls.headshot('f1', a.id);
     if (!candidate.includes(`/${a.id}.png`)) report.problems.push(`f1: headshot URL for ${p.name} not keyed by id (${candidate})`);
     if (a.headshot?.alt && normalize(a.headshot.alt) !== normalize(p.name)) { stats.headshotAltMismatch++; report.problems.push(`f1: headshot alt "${a.headshot.alt}" ≠ "${p.name}"`); }
-    const dims = await probePng(candidate);
+    const dims = knownHeadshot(p.key, candidate) ?? await probePng(candidate);
     if (dims) { Object.assign(p, { image: candidate, imageW: dims.width, imageH: dims.height }); stats.headshotsVerified++; }
     else { Object.assign(p, { image: team.logo, imageW: team.logoW, imageH: team.logoH, imageKind: 'team_logo' }); stats.headshotFallbackToLogo++; }
     return p;
