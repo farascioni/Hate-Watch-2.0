@@ -138,7 +138,7 @@ The full detail: [docs/i18n.md](docs/i18n.md).
 
 ## Startup guide
 
-**In short:** On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, Hate Watch Plus, and "You're all set". It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed.
+**In short:** On a device's first launch the app opens a ten-page guide over the Feed (`app/src/app/guide.tsx`, a full-screen modal): what the app does, tracking, the Feed and sharing, the Scores tab, the leaderboard, alert settings, the counter, the Tracking tab's controls, Hate Watch Plus, and "You're all set". It shows once per install (`hatewatch.guideSeen` in AsyncStorage) and can be watched again from Settings → About → Show the guide. The notification permission prompt waits until the guide is closed. The drawings on each page animate (typing, counting up, switches flipping) every time a page is shown, in the style of the marketing guide video, and stand still under Reduce Motion.
 
 The full detail: [docs/startup-guide.md](docs/startup-guide.md).
 

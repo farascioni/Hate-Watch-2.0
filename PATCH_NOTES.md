@@ -7,6 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Guide: the drawings now move (typing, counting, flipping switches), replaying on each page; still under Reduce Motion.
 - Motion: alerts drop in, counts roll, series fill, hearts pop. Off under Reduce Motion.
 - Server: bad requests get a clear 400 or 413 instead of an error, new devices are limited per address, and share links use our own address.
 - Server: saving alert settings rejects a malformed body (bad time zone, muted list, quiet hours time) and keeps the old settings; one failing device no longer stops the others' alerts.
