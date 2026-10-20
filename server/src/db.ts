@@ -116,7 +116,7 @@ if (!(db.prepare('PRAGMA table_info(events)').all() as { name: string }[]).some(
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'extra')) {
   db.exec('ALTER TABLE feed ADD COLUMN extra TEXT');
 }
-// 1 on a favorite's row (favorites.ts): the device roots against this team's opponent, so it isn't a Successful Hate Watch and isn't counted in "N others got it" (RECIPIENTS).
+// 1 on a favorite's row (favorites.ts): the device roots against this team's opponent, so it isn't a Successful Hate Watch and isn't counted in "N others got it" (RECIPIENTS). 2 on a tracker's row whose device also favorites the opponent: still a hate watch, but the feed draws the gold edge.
 if (!(db.prepare('PRAGMA table_info(feed)').all() as { name: string }[]).some((c) => c.name === 'fav')) {
   db.exec('ALTER TABLE feed ADD COLUMN fav INTEGER NOT NULL DEFAULT 0');
 }

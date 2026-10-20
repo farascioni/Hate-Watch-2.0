@@ -416,11 +416,12 @@ const followers = () => db.prepare('SELECT f.device_id, d.push_token, f.created_
 /** Devices tracking a player on a team, with which player (`via`). */
 const playerFollowers = () => db.prepare(`SELECT f.device_id, d.push_token, f.created_at, f.target_key AS via FROM follows f
   JOIN devices d ON d.id = f.device_id JOIN players p ON p.key = f.target_key WHERE p.team_key = ?`);
-type Recipient = { device_id: string; push_token: string | null; via?: string; fav?: FavoriteRow };
+type Recipient = { device_id: string; push_token: string | null; via?: string; fav?: FavoriteRow; gold?: boolean };
 /**
  * Who an alert goes to: everyone tracking its target, and for a team's alert, everyone tracking one of the
  * team's players with "Get their team's alerts" on (playerTeams), and everyone who favorites the team's
- * opponent in this game (`fav`: favorites.ts; their own choices decide, they're not hate watchers). Once per device.
+ * opponent in this game (`fav`: favorites.ts; their own choices decide, they're not hate watchers). Once per device:
+ * a tracker who also favorites the opponent keeps the tracker's copy, marked `gold` so the feed draws the gold edge.
  */
 function recipients(targetKey: string, league: League, gameId?: string): Recipient[] {
   const out = followers().all(targetKey) as unknown as Recipient[];
@@ -432,8 +433,11 @@ function recipients(targetKey: string, league: League, gameId?: string): Recipie
     out.push(f);
   }
   const rooted = gameId ? opponentOf(league, gameId, targetKey) : undefined;
-  if (rooted) for (const f of favoriters(rooted)) {
-    if (have.has(f.device_id)) continue; // tracking the team wins over rooting against it
+  const rooters = rooted ? favoriters(rooted) : [];
+  const rooting = new Set(rooters.map((f) => f.device_id));
+  for (const r of out) if (rooting.has(r.device_id)) r.gold = true; // tracking the team wins over rooting against it, but the copy still gets the gold edge
+  for (const f of rooters) {
+    if (have.has(f.device_id)) continue;
     have.add(f.device_id);
     out.push({ device_id: f.device_id, push_token: f.push_token, fav: f.fav });
   }
@@ -641,10 +645,11 @@ export function publish(events: Detected[], league: League) {
       const lines = [...listLines([e, ...folded]), ...folded.filter((x) => x.fold).map((x) => x.fold!), ...streak];
       // Through a player: that player's 🔕 keeps their team's alerts quiet too.
       const willPush = !e.noPush && !!f.push_token && pushAllowed(prefs, e.targetKey) && !(f.via && isMuted(prefs, f.via)) && [e, ...folded].some((x) => pushWanted(prefs, x, league));
-      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null, f.fav ? 1 : 0);
+      insFeed().run(f.device_id, e.id, e.at, willPush ? 1 : 0, lines.length ? JSON.stringify(lines) : null, f.fav ? 1 : f.gold ? 2 : 0); // 2: a tracker's copy that also favorites the opponent (gold edge, still a hate watch)
       const body = withLines(e.body, lines);
-      const own = f.fav ? { ...item, fav: true } : item;
-      for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length || f.fav ? JSON.stringify({ kind: 'event', item: lines.length ? { ...own, body } : own }) : frame);
+      const gilt = !!(f.fav || f.gold);
+      const own = gilt ? { ...item, fav: true } : item;
+      for (const ws of sockets.get(f.device_id) ?? []) ws.send(lines.length || gilt ? JSON.stringify({ kind: 'event', item: lines.length ? { ...own, body } : own }) : frame);
       if (willPush) pushes.push({
         to: f.push_token!, title: `${item.emoji} ${e.title}`, body, sound: prefs.sound ? 'default' : null,
         priority: 'high', channelId: 'hate-events', interruptionLevel: 'time-sensitive', threadId: pushThread(e.targetKey),

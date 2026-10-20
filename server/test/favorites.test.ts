@@ -49,15 +49,15 @@ test("the Rays' favorite gets the Guardians' alert in tonight's game, pushed unl
   assert.ok(pushes.includes('tok-fan|G1:p1:team.opponent_scored:5') && !pushes.some((p) => p.startsWith('tok-quiet-fan')));
 });
 
-test('tracking the team wins: one row, a hate watcher’s, not a favorite’s', () => {
-  assert.deepEqual(feed('both').map((r) => r.fav), [0]);
+test('tracking the team wins: one row, a hate watcher’s (fav 2: counted and with a hate watch, but gold-edged), not a favorite’s', () => {
+  assert.deepEqual(feed('both').map((r) => r.fav), [2]);
   assert.equal(feed('tracker').length, 1);
 });
 
-test('a favorite’s feed item carries fav (the app draws it with the gold edge); a tracker’s does not', () => {
+test('a favorite’s feed item carries fav (the app draws it with the gold edge), and so does a tracker’s who favorites the opponent; a plain tracker’s does not', () => {
   const item = (dev: string) => feedItem(db.prepare(`SELECT e.*, f.extra, f.fav, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id WHERE f.device_id = ? AND f.event_id = ?`).get(dev, 'G1:p1:team.opponent_scored:5') as any) as { fav?: boolean };
   assert.equal(item('fan').fav, true);
-  assert.equal(item('both').fav, undefined);
+  assert.equal(item('both').fav, true);
   assert.equal(item('tracker').fav, undefined);
 });
 
@@ -80,6 +80,7 @@ test('the loss reaches the favorite as the game ends, is not a hate watch for th
   assert.deepEqual(feed('quiet-fan').map((r) => [r.event_id, r.fav]), [['G1:final:team.lost:5', 1], ['G1:p1:team.opponent_scored:5', 1], ['G1:p2:team.opponent_scored:5', 1]]);
   assert.equal(hateWatchTally('quiet-fan').total, 0, 'a favorite roots against them');
   assert.equal(hateWatchTally('tracker').total, 1);
+  assert.equal(hateWatchTally('both').total, 1, 'a tracker who also favorites the opponent still has the hate watch (fav 2)');
   const row = db.prepare(`SELECT ${RECIPIENTS} FROM events e WHERE e.id = ?`).get('G1:final:team.lost:5') as { recipients: number };
   assert.equal(row.recipients, 2, 'the two trackers; favorites are not counted');
 });
@@ -92,7 +93,7 @@ test('a tracked team’s own settings beat the favorite’s: its bell off means 
   setPrefs('both', { muted: ['team:mlb:5'] });
   publish([scored('G1', 'p9')], 'mlb');
   const row = feed('both').find((r) => r.event_id.includes(':p9:'))!;
-  assert.deepEqual([row.pushed, row.fav], [0, 0]);
+  assert.deepEqual([row.pushed, row.fav], [0, 2]); // still the tracker's copy (fav 2), with the gold edge
   assert.ok(!pushes.includes('tok-both|G1:p9:team.opponent_scored:5'));
 });
 

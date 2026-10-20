@@ -600,7 +600,7 @@ This is one reason for the decision **"No production restarts during live games"
 
 ## Known gaps
 
-- **A favorite team's copy** (`recipients()` adds `favoriters(opponentOf(...))`, `docs/favorites.md`) goes through the same moment rules, once per device: a device that tracks the team gets the ordinary alert, not a second copy for the favorite. The game registry (`registerGame`) is in memory, so after a restart a favorite gets nothing for a game until its tracker attaches again and registers it.
+- **A favorite team's copy** (`recipients()` adds `favoriters(opponentOf(...))`, `docs/favorites.md`) goes through the same moment rules, once per device: a device that tracks the team gets the ordinary alert (stored with `feed.fav` = 2, so it keeps the gold edge), not a second copy for the favorite. The game registry (`registerGame`) is in memory, so after a restart a favorite gets nothing for a game until its tracker attaches again and registers it.
 - **A team's error alert is not moved with the error.** When ESPN moves an error to another fielder (`revisedResult`), the fielder's alert gets its line and the new fielder an alert, but the team alert made on the first read stays as sent; if the new fielder is on the other team, that team gets no error alert and the first one keeps a wrong team.
 - **Pushes have no collapse id.** Only the database rows keep a push single. A second `publish` of an id sends
   nothing, but code that pushed without going through `publish` would not be caught by anything.

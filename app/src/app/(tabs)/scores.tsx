@@ -41,7 +41,7 @@ interface SessionAhead { kind: 'session'; key: string; name: string; at: number;
  * games (for the filter), that list is the screen, under "No games today" (UFC: fights; All: events).
  * All games: every game live now, then every one starting within a day, tracked or not, each by league,
  * re-read every 15s while it's showing (the socket only carries games you track; those use its fresher copy).
- * Special Events (between the two): the postseason games (`game.event`) as EventBanners, live, then later today, then finals, under no section headers.
+ * Special Events (between the two): the postseason games (`game.event`) as EventBanners, live, then later today, then finals, under no section headers. My and All show those same games as the same EventBanner (a game with `event` is one wherever it is listed).
  * F1's chip on: Live races (live now, then today's finished) and Upcoming races (the weekend's sprint,
  * qualifying and race still to come: a card once it's on the tab, else a row that opens the weekend preview).
  * The UFC's chip on: the next card and the one after (UfcScores).
@@ -247,7 +247,7 @@ export default function ScoresScreen() {
           ? <UpNextRow game={item as NextGame} now={now} />
           : 'kind' in item && item.kind === 'session' ? <>{<SessionAheadRow session={item} />}{f1Only ? gridUnder(item.key) : null}</>
           : section.upcoming ? (() => { const u = upcomingByGame.get(item.key); return u ? <UpcomingCard item={u} now={now} failed={voteFailed === u.voteKey} onVote={(team) => vote(u, team)} onAlert={(on) => setEventAlert(u, on)} /> : null; })()
-          : mode === 'events' ? (() => { const g = item as GameCard, u = g.event?.seriesKey && voteCard.get(g.event.seriesKey) === g ? startedBySeries.get(g.event.seriesKey) : undefined; return <EventBanner game={g} now={now} vote={u ? { item: u, failed: voteFailed === u.voteKey, onVote: (team) => vote(u, team), onAlert: (on) => setEventAlert(u, on) } : undefined} />; })()
+          : 'event' in item && item.event ? (() => { const g = item as GameCard, k = g.event?.seriesKey, u = k && (mode !== 'events' || voteCard.get(k) === g) ? startedBySeries.get(k) : undefined; return <EventBanner game={g} now={now} vote={u ? { item: u, failed: voteFailed === u.voteKey, onVote: (team) => vote(u, team), onAlert: (on) => setEventAlert(u, on) } : undefined} />; })()
           : <>{<GameCardView game={item as GameCard} latest={latest.get((item as GameCard).id)} now={now} />}{f1Only && f1Mode === 'upcoming' ? gridUnder(item.key) : null}</>)} />}
         stickySectionHeadersEnabled={false}
         ListFooterComponent={mode === 'events' && eventSections.length ? <Text style={styles.footnote}>{t('event.footer')}</Text> : null}

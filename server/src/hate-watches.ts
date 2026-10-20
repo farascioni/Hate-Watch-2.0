@@ -50,12 +50,13 @@ export const recordHateWatch = (deviceId: string, e: Pick<Detected, 'id' | 'type
 /**
  * SQL column for a feed query over `events e`: how many devices got that alert (feedItem's `recipients`).
  * A team's loss counts everyone who got any alert about it, the team's or a player's (a device gets one).
- * A favorite's copy (feed.fav, favorites.ts) isn't a hate watcher and isn't counted.
+ * A favorite's copy (feed.fav = 1, favorites.ts) isn't a hate watcher and isn't counted; a tracker's copy that is
+ * also gold-edged (fav = 2: it favorites the opponent too) is both, and counts.
  */
 export const RECIPIENTS = `(CASE WHEN ${LOSS_ROW('e')} AND e.game_id IS NOT NULL
   THEN (SELECT COUNT(DISTINCT x.device_id) FROM events y JOIN feed x ON x.event_id = y.id
-    WHERE y.game_id = e.game_id AND y.league = e.league AND ${LOSS_ROW('y')} AND x.fav = 0)
-  ELSE (SELECT COUNT(*) FROM feed x WHERE x.event_id = e.id AND x.fav = 0) END) AS recipients`;
+    WHERE y.game_id = e.game_id AND y.league = e.league AND ${LOSS_ROW('y')} AND x.fav <> 1)
+  ELSE (SELECT COUNT(*) FROM feed x WHERE x.event_id = e.id AND x.fav <> 1) END) AS recipients`;
 
 /**
  * Scores tab: finals that gave this device a Successful Hate Watch carry how many others got it too
@@ -65,7 +66,7 @@ export function withHateWatch<G extends { id: string; state: string }>(deviceId:
   const ids = games.filter((g) => g.state === 'post').map((g) => g.id);
   if (!ids.length) return games;
   const rows = db.prepare(`SELECT e.game_id, ${RECIPIENTS} FROM feed f JOIN events e ON e.id = f.event_id
-    WHERE f.device_id = ? AND f.fav = 0 AND (e.type IN (${[...HATE_WATCH_TYPES].map(() => '?').join(',')}) OR json_extract(e.meta, '$.lostId') IS NOT NULL)
+    WHERE f.device_id = ? AND f.fav <> 1 AND (e.type IN (${[...HATE_WATCH_TYPES].map(() => '?').join(',')}) OR json_extract(e.meta, '$.lostId') IS NOT NULL)
       AND e.game_id IN (${ids.map(() => '?').join(',')})`)
     .all(deviceId, ...HATE_WATCH_TYPES, ...ids) as { game_id: string; recipients: number }[];
   const others = new Map(rows.map((r) => [r.game_id, Math.max(0, r.recipients - 1)]));
