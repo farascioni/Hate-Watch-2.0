@@ -8,6 +8,7 @@
 
 **Sections:**
 - **An alert on its own screen**: A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button.
+- **The alert vault**: a Hate Watch Plus star on the card and a Save button here keep an alert on this device; the Feed's Saved chip lists them.
 
 The README's "An alert on its own screen" has the summary; this is the full detail. Read this index first, then only the part you need.
 
@@ -28,3 +29,13 @@ The README's "An alert on its own screen" has the summary; this is the full deta
 - **"Share this alert"** (not on a notice): the same share as the card's button (see Sharing an alert). Where the link can only be copied (a browser without a share sheet) it says "Copied" with a check for 2 seconds.
 
 **Which copy it shows:** the feed's copy of that alert when the feed has it, so a fact that comes later (an `eventUpdate` frame that adds a line) shows up live on the open screen; otherwise the one that was tapped (`openedAlert`), which covers alerts from a game screen, a player's page or a share link that aren't in the loaded feed. An alert in neither (a link to an alert that was cleared, after the app restarted) says "This alert isn't in your feed anymore." with "Go to your feed"; while the app is still loading it shows a spinner instead.
+
+## The alert vault
+
+**In short:** a Hate Watch Plus subscriber can save an alert with the star on its feed card (`FeedCard`) or the Save button at the bottom of its screen, and list them with the **Saved** chip at the top of the Feed. Kept on the device only.
+
+- **Where:** `app/src/lib/savedAlerts.ts` (the store: AsyncStorage key `hw.savedAlerts`, a Map of whole `FeedItem`s, oldest saved first), the star in `app/src/components/FeedCard.tsx`, the Save button next to Share in `app/src/app/alert/[id].tsx`, the Saved chip and vault view in `app/src/app/(tabs)/index.tsx`.
+- **Who sees the star:** a subscriber, or anyone with something already saved (a lapse seen offline never hides the star on what is saved). A developer notice has no star.
+- **Why a snapshot:** the alert is kept whole so it stays after the server's feed has paged past it. Its `clip` is dropped, so the server's `clips.*` switches (`server/src/flags.ts`) still govern video. The alert's screen finds it with `feed`, then `openedAlert`, then the vault.
+- **The Saved chip:** swaps the Feed for the saved alerts, newest first, still filtered by the league and Teams/Players bar and grouped by day. The feed's own copy of a saved alert wins while the feed still has it (a fact added later shows). The feed stops paging in vault mode; pull to refresh still refreshes the feed. Empty: "Nothing saved yet".
+- **Limits:** at most 300 (the oldest saved is dropped); not restored on a new phone; a retracted alert stays saved. A lapse (`lapsePlus`) and "Delete all my data" (`deleteAllData` in `app/src/lib/store.tsx`) clear it. The vault does not touch the feed merge (`mergeFeed`), so `docs/duplicate-alerts.md` is unaffected.

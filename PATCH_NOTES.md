@@ -7,10 +7,11 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only. (Update)
 - Tabs: quick tab swaps no longer leave a blank screen. (Update)
 - Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes or "Starts soon". (Update, after the server deploy)
 - Guide: the drawings now move, replaying on each page. The web guide's page background is dark.
-- Motion: alerts drop in, counts roll, series fill, hearts pop and break, live dots pulse, first cards wave in, a loss glints gold, the F1 order slides, the Plus upsell glows, scores swell, odds glide, switches slide a thumb, the Feed shimmers, team names fold into the title, the Feed badge swells, tabs settle in under a gliding line. Off under Reduce Motion. (Update)
+- Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, scores swell, tabs settle in under a gliding line, and more. Off under Reduce Motion. (Update)
 - Server: bad requests get a 400 or 413, new devices are limited per address, share links use our own address.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts 15 minutes after sending, so deleted apps stop getting them.

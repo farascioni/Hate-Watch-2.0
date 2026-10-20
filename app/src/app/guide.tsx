@@ -558,6 +558,7 @@ function PlusDemo({ t }: { t: T }) {
         <Pop at={700} from="right"><Explain icon="apps" color={GOLD} text={t('guide.plus.icon')} /></Pop>
         <Pop at={1100} from="right"><Explain mark="❌" text={t('guide.plus.mostHated')} /></Pop>
         <Pop at={1500} from="right"><Explain icon="heart" color={GOLD} text={t('guide.plus.favorites')} /></Pop>
+        <Pop at={1900} from="right"><Explain icon="star" color={GOLD} text={t('guide.plus.vault')} /></Pop>
       </View>
     </Pop>
   );

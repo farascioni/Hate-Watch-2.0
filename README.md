@@ -145,7 +145,7 @@ The full detail: [docs/startup-guide.md](docs/startup-guide.md).
 
 ## An alert on its own screen
 
-**In short:** A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the copy that was tapped. A developer notice opens the same way, from Hate Watch, with no page to open and nothing to share.
+**In short:** A card in a list shows three lines of an alert's text; tapping it opens the alert on its own screen (`app/src/app/alert/[id].tsx`) with all of its text, its clip, how many other hate watchers got it, when it happened, who it's about and a Share button. The screen shows the feed's copy when there is one, so a line added later appears live, and otherwise the copy that was tapped. A developer notice opens the same way, from Hate Watch, with no page to open and nothing to share. A Hate Watch Plus subscriber can star an alert (on its card or this screen) to keep it in the alert vault, the Feed's Saved chip.
 
 The full detail: [docs/alert-screen.md](docs/alert-screen.md).
 

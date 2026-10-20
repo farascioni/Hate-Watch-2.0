@@ -3,7 +3,9 @@ import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-nativ
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { useStore } from '../../lib/store';
 import { FeedCard } from '../../components/FeedCard';
-import { Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
+import { Chip, Empty, LiveBadge, PrimaryButton, useNow } from '../../components/ui';
+import { usePlus } from '../../lib/plus';
+import { useSavedMap } from '../../lib/savedAlerts';
 import { FilterBar, describeFilter, matchesFilter, useFilter } from '../../components/FilterBar';
 import { GridRow } from '../../components/GridRow';
 import { Skeleton } from '../../components/Skeleton';
@@ -33,10 +35,23 @@ export default function FeedScreen() {
   useEffect(() => { nav.setOptions({ headerRight: () => <LiveBadge /> }); }, [nav]);
   useFocusEffect(useCallback(() => { markSeen(); setOpenedAt(Date.now()); }, [feed.length]));
 
+  // Hate Watch Plus's alert vault: the Saved chip swaps the feed for the alerts you starred, newest first. The feed's own
+  // copy of a saved alert wins while the feed still has it. Someone whose subscription lapsed offline keeps the chip while they still have some.
+  const { active: plus } = usePlus();
+  const saved = useSavedMap();
+  const [vault, setVault] = useState(false);
+  const savedAllowed = plus || saved.size > 0;
+  const showVault = vault && savedAllowed;
+  const source = useMemo(() => {
+    if (!showVault) return feed;
+    const live = new Map(feed.map((i) => [i.id, i]));
+    return [...saved.values()].map((i) => live.get(i.id) ?? i).sort((a, b) => b.occurredAt - a.occurredAt);
+  }, [showVault, feed, saved]);
+
   // Filters what's loaded; scrolling down keeps paging in older alerts, which are filtered too.
   const visible = useMemo(
-    () => (active ? feed.filter((i) => matchesFilter(filter, { kind: i.target.kind, league: i.league })) : feed),
-    [feed, filter, active],
+    () => (active ? source.filter((i) => matchesFilter(filter, { kind: i.target.kind, league: i.league })) : source),
+    [source, filter, active],
   );
 
   const sections = useMemo(() => {
@@ -55,7 +70,8 @@ export default function FeedScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-    {feed.length ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
+    {feed.length || saved.size ? <View style={styles.filters}><FilterBar filter={filter} onChange={setFilter} /></View> : null}
+    {savedAllowed ? <View style={styles.savedRow}><Chip label={tx('feed.saved')} active={showVault} onPress={() => setVault(!showVault)} /></View> : null}
     <SectionList
       sections={rows}
       keyExtractor={(row) => row.map((i) => i.id).join('|')}
@@ -66,12 +82,14 @@ export default function FeedScreen() {
       renderSectionHeader={({ section }) => <Text style={styles.day}>{section.title}</Text>}
       stickySectionHeadersEnabled
       contentContainerStyle={{ paddingBottom: space(6), flexGrow: 1 }}
-      onEndReached={() => loadMore().catch(() => {})}
+      onEndReached={showVault ? undefined : () => loadMore().catch(() => {})}
       onEndReachedThreshold={0.4}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.hate} onRefresh={async () => { setRefreshing(true); await refreshFeed().catch(() => {}); setRefreshing(false); }} />}
       ListEmptyComponent={
-        feed.length && active ? (
+        source.length && active ? (
           <Empty emoji="🔎" title={tx('feed.nothingFor', { what: describeFilter(filter) })} body={tx('feed.nothingBody')} action={<PrimaryButton label={tx('tracking.showEverything')} onPress={reset} />} />
+        ) : showVault ? (
+          <Empty emoji="⭐" title={tx('feed.savedEmpty')} body={tx('feed.savedEmptyBody')} action={<PrimaryButton label={tx('feed.savedBack')} onPress={() => setVault(false)} />} />
         ) : follows.size === 0 ? (
           <Empty emoji="😈" title={tx('feed.nobody')} body={tx('feed.nobodyBody')} action={<PrimaryButton label={tx('common.findSomeone')} onPress={() => router.navigate('/search')} />} />
         ) : (
@@ -85,5 +103,6 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   filters: { paddingTop: space(3), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  savedRow: { flexDirection: 'row', paddingHorizontal: space(3), paddingVertical: space(2), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   day: { color: colors.textFaint, backgroundColor: colors.bg, fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: space(4), paddingTop: space(4), paddingBottom: space(2) },
 });

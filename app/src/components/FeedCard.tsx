@@ -8,6 +8,8 @@ import { ClipPlayer, ClipThumb, duration, useNowPlaying } from './Clip';
 import { isNotice, openAlert, targetHref } from '../lib/alerts';
 import { useShare } from './ShareStyleSheet';
 import { useIsMostHated } from '../lib/mostHated';
+import { toggleSavedAlert, useHasSaved, useIsSaved } from '../lib/savedAlerts';
+import { usePlus } from '../lib/plus';
 import { GOLD, HATE_RED, colors, radius, space } from '../theme';
 import type { Clip, FeedItem } from '../lib/types';
 import { useT } from '../lib/i18n';
@@ -22,6 +24,14 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
   const { share, copied, sheet } = useShare(item);
   const check = usePop(1.4);
   useOnChange(copied, (_, n) => { if (n) check.pop(); });
+  // Hate Watch Plus's alert vault: the star saves the alert. It pops when you tap it, not when the saved list finishes loading.
+  const { active: plus } = usePlus();
+  const saved = useIsSaved(item.id);
+  const hasSaved = useHasSaved();
+  const starAllowed = plus || hasSaved; // a lapsed subscriber's offline blip never hides the star on what's saved
+  const starTapped = useRef(false);
+  const star = usePop(1.5);
+  useOnChange(saved, (_, n) => { if (starTapped.current && n) star.pop(); starTapped.current = false; });
   // A live alert lands: the card drops in, and a red wash fades over it (the static red border stays for the minute).
   // Decided once, so the first painted frame is already the start state (no flash of the finished card).
   const plays = useRef(!!fresh && !entered.has(item.id) && !reduceMotion()).current;
@@ -74,13 +84,21 @@ export const FeedCard = memo(function FeedCard({ item, now, fresh, highlight }: 
             <Text style={styles.metaText}>{ago(item.occurredAt, now)}</Text>
           </View>
         </View>
-        {/* Its own tap target: sharing doesn't open the alert behind it. */}
-        {notice ? null : <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
-          <Animated.View style={{ transform: [{ scale: check.scale }] }}>
-            <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
-          </Animated.View>
-          {copied ? <Text style={styles.copied}>{tx('alert.copied')}</Text> : null}
-        </Pressable>}
+        {/* Their own tap targets: starring or sharing doesn't open the alert behind it. */}
+        {notice ? null : <View style={styles.actions}>
+          {starAllowed ? <Pressable onPress={() => { starTapped.current = true; toggleSavedAlert(item); }} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]}
+            accessibilityRole="button" accessibilityState={{ selected: saved }} accessibilityLabel={tx(saved ? 'alert.unsaveA11y' : 'alert.saveA11y')}>
+            <Animated.View style={{ transform: [{ scale: star.scale }] }}>
+              <Ionicons name={saved ? 'star' : 'star-outline'} size={20} color={saved ? GOLD : colors.textDim} />
+            </Animated.View>
+          </Pressable> : null}
+          <Pressable onPress={share} hitSlop={10} style={({ pressed }) => [styles.share, pressed && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
+            <Animated.View style={{ transform: [{ scale: check.scale }] }}>
+              <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={20} color={copied ? colors.live : colors.textDim} />
+            </Animated.View>
+            {copied ? <Text style={styles.copied}>{tx('alert.copied')}</Text> : null}
+          </Pressable>
+        </View>}
       </Pressable>
       {sheet}
       {item.clip ? <AlertClip clip={item.clip} /> : null}
@@ -130,6 +148,7 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), marginTop: 2, flexWrap: 'wrap' },
   metaText: { color: colors.textFaint, fontSize: 12, fontWeight: '600' },
   metaDot: { color: colors.textFaint, fontSize: 12 },
-  share: { alignSelf: 'flex-start', alignItems: 'center', padding: space(1), marginTop: -space(1), marginRight: -space(1) },
+  actions: { alignSelf: 'flex-start', alignItems: 'center', marginTop: -space(1), marginRight: -space(1) },
+  share: { alignItems: 'center', padding: space(1) },
   copied: { color: colors.live, fontSize: 10, fontWeight: '800', marginTop: 2 },
 });

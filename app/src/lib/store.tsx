@@ -7,6 +7,7 @@ import { guideSettled } from './guide';
 import { trackedEasterEgg } from './easterEggs';
 import { setLeagueUi } from './leagueUi';
 import { clearMostHated } from './mostHated';
+import { clearSavedAlerts } from './savedAlerts';
 import { onLapse } from './plus';
 import { setLiveBoard } from './liveScoreboard';
 import { snoozeEnd } from './snooze';
@@ -338,6 +339,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await api.deleteMe();
       await forgetToken();
       clearMostHated();
+      clearSavedAlerts();
       setFollows(new Map());
       setFavorites(new Map());
       setTrackers(new Map());

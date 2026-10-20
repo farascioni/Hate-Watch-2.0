@@ -7,7 +7,9 @@ import { AppAvatar, Avatar } from '../../components/Avatar';
 import { AlertClip } from '../../components/FeedCard';
 import { AlsoGot, LeagueTag, ago, subtitle, useNow } from '../../components/ui';
 import { useShare } from '../../components/ShareStyleSheet';
-import { colors, radius, space } from '../../theme';
+import { toggleSavedAlert, savedAlert, useHasSaved, useIsSaved } from '../../lib/savedAlerts';
+import { usePlus } from '../../lib/plus';
+import { GOLD, colors, radius, space } from '../../theme';
 import { currentLocale, useT } from '../../lib/i18n';
 
 const DAY = 24 * 3600_000;
@@ -23,8 +25,11 @@ export default function AlertScreen() {
   const { feed, ready } = useStore();
   const now = useNow();
   // The feed's copy when it has one (a fact that comes later is added to it live), else the one tapped.
-  const item = feed.find((f) => f.id === alertId) ?? openedAlert(alertId);
+  const item = feed.find((f) => f.id === alertId) ?? openedAlert(alertId) ?? savedAlert(alertId);
   const { share, copied, sheet } = useShare(item);
+  const { active: plus } = usePlus();
+  const saved = useIsSaved(alertId);
+  const hasSaved = useHasSaved();
   const header = <Stack.Screen options={{ title: tx('alert.title'), headerBackTitle: tx('guide.back') }} />;
 
   if (!item) {
@@ -80,11 +85,20 @@ export default function AlertScreen() {
       </View>
       {item.clip ? <AlertClip clip={item.clip} style={styles.clip} /> : null}
       {notice ? null : (
-        <Pressable onPress={share} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button"
-          accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
-          <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={copied ? colors.live : colors.text} />
-          <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? tx('alert.copied') : tx('alert.share')}</Text>
-        </Pressable>
+        <View style={styles.actions}>
+          {plus || hasSaved ? (
+            <Pressable onPress={() => toggleSavedAlert(item)} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityState={{ selected: saved }}
+              accessibilityLabel={tx(saved ? 'alert.unsaveA11y' : 'alert.saveA11y')}>
+              <Ionicons name={saved ? 'star' : 'star-outline'} size={18} color={saved ? GOLD : colors.text} />
+              <Text style={styles.shareText}>{tx(saved ? 'alert.saved' : 'alert.save')}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={share} style={({ pressed }) => [styles.share, pressed && { opacity: 0.7 }]} accessibilityRole="button"
+            accessibilityLabel={copied ? tx('alert.copiedA11y') : tx('alert.share')}>
+            <Ionicons name={copied ? 'checkmark' : Platform.OS === 'ios' ? 'share-outline' : 'share-social-outline'} size={18} color={copied ? colors.live : colors.text} />
+            <Text style={[styles.shareText, copied && { color: colors.live }]}>{copied ? tx('alert.copied') : tx('alert.share')}</Text>
+          </Pressable>
+        </View>
       )}
     </ScrollView>
   );
@@ -104,6 +118,7 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: space(1.5), flexWrap: 'wrap' },
   metaText: { color: colors.textFaint, fontSize: 13, fontWeight: '600' },
   clip: { marginTop: 0, marginLeft: 0 },
-  share: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(2), alignSelf: 'flex-start', marginTop: space(2), paddingHorizontal: space(4), paddingVertical: space(2.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), marginTop: space(2) },
+  share: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(2), paddingHorizontal: space(4), paddingVertical: space(2.5), borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   shareText: { color: colors.text, fontSize: 14, fontWeight: '800' },
 });

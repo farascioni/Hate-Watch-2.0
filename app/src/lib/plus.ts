@@ -5,9 +5,10 @@ import { requireOptionalNativeModule } from 'expo';
 import { gold, setGold } from '../theme';
 import { api } from './api';
 import { clearMostHated } from './mostHated';
+import { clearSavedAlerts } from './savedAlerts';
 
 /**
- * Hate Watch Plus: a $5/month auto-renewing subscription whose only perk is switching the red accent to gold.
+ * Hate Watch Plus: a $5/month auto-renewing subscription: the gold accent, most hated, favorites and the alert vault (saved alerts).
  * Create this exact product ID in App Store Connect (auto-renewable subscription, 1 month) and in
  * Google Play Console (a subscription with one monthly base plan). The app shows the store's localized price.
  */
@@ -84,6 +85,7 @@ export async function lapsePlus() {
   await devLoaded;
   if (__DEV__ && devOn) return;
   clearMostHated();
+  clearSavedAlerts();
   lapseListeners.forEach((l) => l());
   // The server stops sending their opponents' alerts. A failed call (offline) is retried at the next launch or return to the app, while still lapsed.
   api.clearFavorites().catch(() => {});
