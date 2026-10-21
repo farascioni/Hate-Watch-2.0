@@ -11,7 +11,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab; tap again to turn off. They sit by Most hated (+ makes one) and Saved. Alert presets (save, edit, or build from scratch) set a target's alerts in one tap. Kept on this phone; hidden, not deleted, on a lapse. (Update)
 - Tabs: quick swaps no longer leave a blank screen, and the Feed no longer freezes (no scrolling or taps) after a switch from another tab. (Update)
 - Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes; the clock and quarter sit between the two teams; Hero shows it big. (Update)
-- Lock screen: A one-game Hero adds a live dot, bigger score, who leads ("PHI up 3") and venue (after server update). Teams lose the heart and X. Tap a game for its box score, a push for its alert.
+- Lock screen: One-game Hero adds a live dot, bigger score, who leads ("PHI up 3") and venue (after server update). No heart or X on teams. Tap a game for its box score, a push for its alert. (Update)
 - Guide: the drawings now move on each page; the web guide is dark.
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, scores swell, tabs settle in, and more. Off under Reduce Motion. (Update)
 - Server: bad requests get a 400 or 413, new devices are limited per address, share links use our address.
