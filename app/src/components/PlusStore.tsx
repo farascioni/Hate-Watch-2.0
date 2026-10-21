@@ -6,6 +6,14 @@ import { isUserCancelledError, useIAP } from 'expo-iap';
 import { LEGACY_TIP_SKUS, PLUS_SKU, PlusContext, lapsePlus, type Plus } from '../lib/plus';
 import { tr } from '../lib/i18n';
 
+/** The store's message plus its raw code, response code and debug text, so a tester's screenshot says what Apple or Google returned. */
+function withDetail(e: unknown): string {
+  const err = e as { message?: string; code?: string; responseCode?: number | null; debugMessage?: string | null } | null;
+  const detail = [err?.code, err?.responseCode, err?.debugMessage].filter((x) => x != null && x !== '').join(' · ');
+  const message = err?.message ?? (typeof e === 'string' ? e : '');
+  return detail ? `${message}\n\n${detail}` : message;
+}
+
 /**
  * The one owner of the store connection: Settings reads the subscription from here (usePlus).
  * The entitlement is the store's own answer on this device; there is no server-side receipt check.
@@ -32,7 +40,7 @@ export function PlusStore({ children }: { children: ReactNode }) {
     onPurchaseError: (error) => {
       setBusy(false);
       if (isUserCancelledError(error)) return;
-      Alert.alert(tr('plus.failed'), error.message || tr('plus.tryAgain'));
+      Alert.alert(tr('plus.failed'), withDetail(error) || tr('plus.tryAgain'));
     },
   });
 
@@ -89,7 +97,7 @@ export function PlusStore({ children }: { children: ReactNode }) {
       });
     } catch (e) {
       setBusy(false);
-      if (!isUserCancelledError(e)) Alert.alert(tr('plus.failed'), String((e as Error)?.message ?? e));
+      if (!isUserCancelledError(e)) Alert.alert(tr('plus.failed'), withDetail(e) || String(e));
     }
   }, [product, connected, requestPurchase]);
 
