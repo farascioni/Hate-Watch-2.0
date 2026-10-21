@@ -7,6 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Injury alerts: a player reinstated or activated from the injured list no longer sends an injury alert (player or team).
 - Hate Watch Plus: when a subscription doesn't go through, the alert also shows the store's error code and details, so a screenshot says what Apple returned. (Update)
 - Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only; if the subscription lapses the list is kept, hidden, and returns on resubscribing. (Update)
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab; tap again to turn off. They sit by Most hated (+ makes one) and Saved. Alert presets (save, edit, or build from scratch) set a target's alerts in one tap. Kept on this phone; hidden, not deleted, on a lapse. (Update)

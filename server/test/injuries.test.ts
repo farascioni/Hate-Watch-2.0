@@ -32,6 +32,18 @@ test("ESPN's report: NFL game-day Active and MLB paternity leave aren't injuries
   });
 });
 
+test("ESPN's report: a player reinstated from the injured list isn't an injury, even under a stale 'Out'", () => {
+  const res = { injuries: [{ id: '1', injuries: [
+    { athlete: { id: '101' }, status: 'Out', shortComment: 'The Dodgers reinstated Rushing (elbow) from the injured list Friday.' },
+    { athlete: { id: '102' }, status: '15-Day-IL', shortComment: 'The Angels reinstated Natera (back) from the 15-day injured list Tuesday.' },
+    { athlete: { id: '103' }, status: 'Injured Reserve', shortComment: "Thornton (hamstring) won't be activated from injured reserve for Sunday's game." },
+    { athlete: { id: '104' }, status: '10-Day-IL', shortComment: 'The Marlins placed Caissie on the 10-day injured list Sunday.' },
+    { athlete: { id: '105' }, status: 'Injured Reserve', shortComment: 'The Commanders activated Magee (hamstring) from injured reserve Monday.' },
+    { athlete: { id: '106' }, status: '10-Day-IL', shortComment: 'The Dodgers placed Rushing on the 10-day IL Friday, a day after they activated him from the injured list.' },
+  ] }] };
+  assert.deepEqual(Object.keys(parseInjuryReport(res)).sort(), ['103', '104', '106']);
+});
+
 test('six Falcons ruled out at once: six player alerts, ONE team alert', () => {
   const prev = report([[101, 'Questionable'], [102, 'Questionable'], [103, 'Questionable'], [104, 'Questionable'], [105, 'Questionable'], [106, 'Questionable']]);
   const now = report([[101, 'Out'], [102, 'Out'], [103, 'Out'], [104, 'Out'], [105, 'Out'], [106, 'Out']]);

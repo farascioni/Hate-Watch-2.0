@@ -1850,6 +1850,10 @@ const severity = (s: string) => SEVERITY.find(([re]) => re.test(s))?.[1] ?? 1;
 /** On ESPN's injury reports but not hurt: NFL game-day "Active" (cleared to play), MLB paternity/bereavement leave. */
 const NOT_INJURED = /^(active|paternity|bereavement)\b/i;
 
+/** ESPN's note for a player just taken off the injured list ("The Dodgers reinstated Rushing (elbow) from the injured list Friday."), which it can still file under a status like "Out". */
+// shortcut: only the "The <team> reinstated|activated X from the injured list|IL|injured reserve" form (all ESPN sent live); "was activated…" or "off the list" wordings pass through, widen if one shows up under a stale status.
+const REINSTATED = /^The (?:\S+ ){1,3}(?:reinstated|activated) [^.]+? from (?:the )?(?:[\w-]+ )?(?:injured list|IL|injured reserve)\b/i;
+
 export type InjuryReport = Record<string, { status: string; teamId: string; detail: string }>;
 
 /** athleteId → status, team and note from ESPN's injuries endpoint, leaving out players who aren't injured. */
@@ -1860,7 +1864,7 @@ export function parseInjuryReport(res: any): InjuryReport {
       const a = inj.athlete ?? {};
       const id = a.id ?? athleteIdFromRef(a.$ref) ?? a.links?.map((l: any) => l.href?.match(/\/id\/(\d+)/)?.[1]).find(Boolean);
       const status = String(inj.status ?? inj.type?.description ?? 'Injured');
-      if (id && !NOT_INJURED.test(status)) now[id] = { status, teamId: String(team.id), detail: String(inj.shortComment ?? inj.details?.type ?? '') };
+      if (id && !NOT_INJURED.test(status) && !REINSTATED.test(String(inj.shortComment ?? ''))) now[id] = { status, teamId: String(team.id), detail: String(inj.shortComment ?? inj.details?.type ?? '') };
     }
   }
   return now;
