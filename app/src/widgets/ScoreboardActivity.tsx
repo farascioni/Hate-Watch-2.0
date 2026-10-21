@@ -1,4 +1,4 @@
-import { Capsule, HStack, Image, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
+import { Capsule, HStack, Image, Link, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, offset, padding } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity } from 'expo-widgets';
 
@@ -16,18 +16,22 @@ import { createLiveActivity } from 'expo-widgets';
  * across, each with the away and home score on two lines and one short status (`r`); 3 is the hero: the first game big (each
  * team's code and score either side, its clock `r`, bases `bs` and `sub` in the middle), the others as compact rows. Only the
  * banner differs: the Dynamic Island and the small banner are the compact ones in layouts 0, 2 and 3. The compact layout draws
- * exactly as it did before `lay` existed.
+ * exactly as it did before `lay` existed. When the hero is the only game on the board it is the big card: a 44pt score, the clock
+ * stacked under a live dot and its period (`pd`, white: red means "hated", not "live"), a hate-watch line `hl` in `hlc` and a
+ * footer `ft` (venue and broadcaster) under a thin divider; the server sends `hl` and `ft` for a one-game board only.
  *
- * Each team has its own look when the server sends it (`ac`/`hc` the away and home color, `am`/`hm` the mark before its code):
+ * Each team has its own look when the server sends it (`ac`/`hc` the away and home color, `am`/`hm` the mark before its code, always empty now):
  * a favorite gold with a heart, a most hated red with a star, the rest white. Without them (an older server) a row is one
  * string `l` in one color `lc`, as before.
  */
-type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; ac?: string; hc?: string; am?: string; hm?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string; ts?: number };
+type Game = { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; ac?: string; hc?: string; am?: string; hm?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string; ts?: number; pd?: string; hl?: string; hlc?: string; ft?: string };
 type Props = { v?: number; lay?: number; games: Game[]; more: number; mt?: string };
 
 const ScoreboardActivity = (props: Props) => {
   'widget';
-  const mark = (t: number) => (t === 0 ? '♥ ' : t === 1 ? '❌ ' : '');
+  const mark = (_t: number) => ''; // no heart or X before a code; the color says the tier
+  // Tapping a game opens its box score: the app's own link (scheme hatewatch, route game/[key]), a Link around the game's block.
+  const go = (g: Game, view: React.ReactElement) => <Link key={g.k} destination={`hatewatch://game/${encodeURIComponent(g.k)}`}>{view}</Link>;
   const score = (n: number | null) => (n === null ? '' : String(n)); // nothing before the start, not a dash
   // A game not yet started says when, in this device's time ("7:00 PM", "Wed 7:00 PM" another day), not "Starts soon" / "Upcoming".
   const status = (g: Game) => {
@@ -81,7 +85,7 @@ const ScoreboardActivity = (props: Props) => {
       </HStack>
     );
   };
-  const row = (g: Game) => <VStack key={g.k}>{line(g)}</VStack>;
+  const row = (g: Game) => go(g, <VStack>{line(g)}</VStack>);
   const more = props.mt ?? (props.more > 0 ? `+${props.more} more` : '');
   const moreLine = more ? <Text modifiers={[font({ size: 12 }), foregroundStyle('#9A9AA2')]}>{more}</Text> : null;
   const lead = props.games[0];
@@ -103,8 +107,8 @@ const ScoreboardActivity = (props: Props) => {
         </ZStack>
       </HStack>
     );
-  const detailRow = (g: Game) => (
-    <VStack key={g.k} alignment="leading" spacing={2}>
+  const detailRow = (g: Game) => go(g, (
+    <VStack alignment="leading" spacing={2}>
       {line(g)}
       <HStack spacing={6}>
         {g.bs ? diamond(g.bs) : null}
@@ -113,10 +117,10 @@ const ScoreboardActivity = (props: Props) => {
         {bar(g)}
       </HStack>
     </VStack>
-  );
+  ));
   // Grid layout: a cell is the away and home team on two lines, with the status under them.
-  const cell = (g: Game) => (
-    <VStack key={g.k} alignment="leading" spacing={1}>
+  const cell = (g: Game) => go(g, (
+    <VStack alignment="leading" spacing={1}>
       <HStack>
         <Text modifiers={[font({ size: 15, weight: 'semibold' }), foregroundStyle(awayColor(g))]}>{`${awayMark(g)}${g.a}`}</Text>
         <Spacer />
@@ -129,14 +133,14 @@ const ScoreboardActivity = (props: Props) => {
       </HStack>
       <Text modifiers={[font({ size: 11 }), foregroundStyle(g.rc ?? (g.live ? '#E5232B' : '#9A9AA2'))]}>{status(g)}</Text>
     </VStack>
-  );
+  ));
   const pairs: Game[][] = [];
   for (let i = 0; i < props.games.length; i += 2) pairs.push(props.games.slice(i, i + 2));
   // Hero layout: the first game's team and score either side, its clock, bases and `sub` in the middle.
-  const heroSide = (name: string, n: number | null, color: string, trailing: boolean) => (
+  const heroSide = (name: string, n: number | null, color: string, trailing: boolean, size = 34) => (
     <VStack alignment={trailing ? 'trailing' : 'leading'} spacing={0}>
       <Text modifiers={[font({ size: 13 }), foregroundStyle(color)]}>{name}</Text>
-      <Text modifiers={[font({ size: 34, weight: 'bold' }), foregroundStyle(color)]}>{score(n)}</Text>
+      <Text modifiers={[font({ size, weight: 'bold' }), foregroundStyle(color)]}>{score(n)}</Text>
     </VStack>
   );
   // A game not yet started has no scores: the team names go big at the sides and the start time big in the middle.
@@ -229,21 +233,55 @@ const ScoreboardActivity = (props: Props) => {
   }
   if (props.lay === 3 && lead) {
     const pre = !lead.live && lead.as == null && lead.hs == null;
+    // The big card (one game on the board): a bigger score, the hate-watch line and a footer. `pd` (the period) marks a server that stacks the clock: a live dot and the period over a white clock, red kept for "hated".
+    const solo = props.games.length === 1, stacked = lead.live && lead.pd !== undefined;
+    const clock = stacked ? (
+      <VStack spacing={1}>
+        <HStack spacing={4}>
+          <Image systemName="circle.fill" size={6} color="#E5232B" />
+          <Text modifiers={[font({ size: 12, weight: 'semibold' }), foregroundStyle('#9A9AA2')]}>{lead.pd}</Text>
+        </HStack>
+        <Text modifiers={[font({ size: 22, weight: 'bold' }), foregroundStyle('#FFFFFF')]}>{status(lead)}</Text>
+        {lead.bs ? diamond(lead.bs) : null}
+        {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
+      </VStack>
+    ) : (
+      <VStack spacing={2}>
+        <Text modifiers={[font(pre ? { size: 22, weight: 'bold' } : { size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
+        {lead.bs ? diamond(lead.bs) : null}
+        {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
+      </VStack>
+    );
     return {
       ...compact,
       banner: (
-        <VStack alignment="leading" spacing={6} modifiers={[padding({ all: 12 })]}>
+        <VStack alignment="leading" spacing={solo ? 8 : 6} modifiers={[padding({ all: solo ? 14 : 12 })]}>
+          {go(lead, (
+          <VStack spacing={solo ? 8 : 6}>
           <HStack>
-            {pre ? heroPre(`${awayMark(lead)}${lead.a}`, awayColor(lead)) : heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false)}
+            {pre ? heroPre(`${awayMark(lead)}${lead.a}`, awayColor(lead)) : heroSide(`${awayMark(lead)}${lead.a}`, lead.as, awayColor(lead), false, solo ? 44 : 34)}
             <Spacer />
-            <VStack spacing={2}>
-              <Text modifiers={[font(pre ? { size: 22, weight: 'bold' } : { size: 13 }), foregroundStyle(lead.rc ?? (lead.live ? '#E5232B' : '#9A9AA2'))]}>{status(lead)}</Text>
-              {lead.bs ? diamond(lead.bs) : null}
-              {lead.sub ? <Text modifiers={[font({ size: 11 }), foregroundStyle(lead.sc ?? '#9A9AA2')]}>{lead.sub}</Text> : null}
-            </VStack>
+            {clock}
             <Spacer />
-            {pre ? heroPre(`${lead.hm ?? ''}${lead.h}`, homeColor(lead)) : heroSide(`${lead.hm ?? ''}${lead.h}`, lead.hs, homeColor(lead), true)}
+            {pre ? heroPre(`${lead.hm ?? ''}${lead.h}`, homeColor(lead)) : heroSide(`${lead.hm ?? ''}${lead.h}`, lead.hs, homeColor(lead), true, solo ? 44 : 34)}
           </HStack>
+          {lead.hl ? (
+            <HStack>
+              <Spacer />
+              <Text modifiers={[font({ size: 13, weight: 'semibold' }), foregroundStyle(lead.hlc ?? '#9A9AA2')]}>{lead.hl}</Text>
+              <Spacer />
+            </HStack>
+          ) : null}
+          {lead.ft ? <Capsule modifiers={[frame({ height: 1 }), foregroundStyle('#3A3A40')]} /> : null}
+          {lead.ft ? (
+            <HStack>
+              <Spacer />
+              <Text modifiers={[font({ size: 11 }), foregroundStyle('#9A9AA2')]}>{lead.ft}</Text>
+              <Spacer />
+            </HStack>
+          ) : null}
+          </VStack>
+          ))}
           {props.games.slice(1).map(row)}
           {moreLine}
         </VStack>

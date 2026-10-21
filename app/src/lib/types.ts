@@ -296,11 +296,11 @@ export type PrefsPatch = Partial<Omit<Prefs, 'snoozed' | 'targetTypes' | 'target
   playerTeams?: Record<string, { scores?: boolean | null; alerts?: boolean | null }>;
 };
 
-/** The lock screen scoreboard; t: 0 a favorite's game, 1 most hated, 2 tracked only; l/r/lc/rc the line already written and colored, and in the detailed layout (lay 1; the hero, lay 3, gives its first row sub and bs too; the grid, lay 2, a shorter r) sub/sc the second line and its color, bs the bases, wp/wl the win chance (server/src/live-activity.ts). */
+/** The lock screen scoreboard; t: 0 a favorite's game, 1 most hated, 2 tracked only; l/r/lc/rc the line already written and colored, and in the detailed layout (lay 1; the hero, lay 3, gives its first row sub and bs too; the grid, lay 2, a shorter r) sub/sc the second line and its color, bs the bases, wp/wl the win chance; with one game on a hero board (lay 3), pd the period over the clock r, hl/hlc the hate-watch line and its color, ft the venue and channel (server/src/live-activity.ts). */
 export type LiveBoard = {
   v?: number;
   lay?: 0 | 1 | 2 | 3;
-  games: { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string }[];
+  games: { k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l?: string; r?: string; lc?: string; rc?: string; sub?: string; sc?: string; bs?: string; wp?: number; wl?: string; ts?: number; pd?: string; hl?: string; hlc?: string; ft?: string }[];
   more: number;
   mt?: string;
 };

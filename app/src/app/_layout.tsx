@@ -16,11 +16,14 @@ import { currentLang, useT } from '../lib/i18n';
 /** A screen opened straight from a link (a shared alert) still has the tabs underneath to go back to. */
 export const unstable_settings = { anchor: '(tabs)' };
 
-/** Tapping a push opens the Feed tab (works from cold start too). */
+/** Tapping a push opens that alert on its own screen (works from cold start too; the screen waits for the feed if it hasn't loaded). */
 function NotificationRouter() {
   const last = Notifications.useLastNotificationResponse();
   useEffect(() => {
-    if (last?.notification.request.content.data?.eventId) router.navigate('/');
+    const id = last?.notification.request.content.data?.eventId;
+    if (typeof id !== 'string' || last?.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+    router.push(`/alert/${encodeURIComponent(id)}`);
+    Notifications.clearLastNotificationResponse(); // else a reload or remount would open it again
   }, [last]);
   return null;
 }

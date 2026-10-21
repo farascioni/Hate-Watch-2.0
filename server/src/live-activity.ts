@@ -10,7 +10,7 @@
 // Imports scores.ts for the games (which notifies `onGameChange`) and favorites.ts for the teams; neither imports this.
 import { db } from './db.ts';
 import { sendApns, apnsConfigured, tokenGone } from './apns.ts';
-import { cardList, deviceTeams, onGameChange, type GameCard } from './scores.ts';
+import { cardList, deviceTeams, onGameChange, type GameCard, type Side } from './scores.ts';
 import { favoritesOf } from './favorites.ts';
 import { catalog } from './catalog.ts';
 import { flagOn } from './flags.ts';
@@ -22,7 +22,7 @@ import { GAME_LEAGUES, type League } from './leagues.ts';
 export type BoardGame = {
   k: string; a: string; as: number | null; h: string; hs: number | null; st: string; live: boolean; t: 0 | 1 | 2; l: string; r: string; lc: string; rc: string;
   /** Each team's own look (builds after 19): the color of the away and home team (gold a favorite, red a most hated, white the rest)
-   *  and the mark before its code ('♥ ', '❌ ' or ''). An older build ignores them and draws `l` in `lc`. */
+   *  and the mark before its code (always '' now). An older build ignores them and draws `l` in `lc`. */
   ac?: string; hc?: string; am?: string; hm?: string;
   /** The detailed layout (`lay` 1): the second line (count and pitcher, down and distance, shots, the latest play) and its color,
    *  baseball's runners on first, second and third as "101", and the chance the row's own team wins, as a percent and as a label ("TB 62%").
@@ -30,6 +30,9 @@ export type BoardGame = {
   sub?: string; sc?: string; bs?: string; wp?: number; wl?: string;
   /** A game not yet started: its start (epoch ms). The widget draws it as the device's local time instead of "Starts soon" / "Upcoming". */
   ts?: number;
+  /** The hero layout's first row: `pd` the period over the clock ("Q1" over `r` "8:29", else "LIVE" over "Top 3rd"; set for a live game only, the widget then draws a live dot and a white clock instead of a red one).
+   *  When the board is that one game alone (the big card): `hl` the hate-watch line ("PHI up 3", "Tied") in `hlc` (green when it is going the way the device wants, grey otherwise), and `ft` the footer ("Madison Square Garden · NBC"). */
+  pd?: string; hl?: string; hlc?: string; ft?: string;
 };
 /** v: the props' version. Only ever add fields (an installed widget draws the ones it knows); mt: the "+N more" line, '' for none;
  *  lay: 0 the compact layout (one line a game), 1 the detailed one (two lines, a base diamond, a win chance bar), 2 the grid (two
@@ -47,8 +50,8 @@ const FINAL_KEEP_MS = 10 * 60_000;
 const SOON_MS = 60 * 60_000;
 const DELAYED_MS = 3 * 3600_000;
 const MAX_PICKS = 100;
-const MARKS = ['♥ ', '❌ ', ''];
-const GOLD = '#F5C451', WHITE = '#FFFFFF', RED = '#E5232B', GREY = '#9A9AA2';
+const MARKS = ['', '', '']; // no heart or X: the color alone says favorite or most hated; kept as fields so installed builds draw nothing
+const GOLD = '#F5C451', WHITE = '#FFFFFF', RED = '#E5232B', GREY = '#9A9AA2', GREEN = '#34C759';
 /** By tier: a favorite gold, a most hated red, the rest white. */
 const TIER_COLORS = [GOLD, RED, WHITE];
 const DEBOUNCE_MS = 1000;
@@ -95,6 +98,25 @@ export function heroLine(g: GameCard): string {
   return g.shots ? `Shots ${g.shots.away}-${g.shots.home}` : '';
 }
 
+/** The hero card's clock split the way a scoreboard stacks it: ESPN's "8:29 - 1st" is `pd` "Q1" over `r` "8:29" (hockey "P1"); a status with no clock ("Top 3rd", "Halftime", "57'") has no `pd` and keeps the plain hero middle. */
+export function clockLines(g: GameCard): { pd?: string; r: string } {
+  const m = g.detail.match(/^(\d{1,2}:\d{2}|\d+\.\d) - (.+)$/);
+  if (!m) return { r: g.detail };
+  const n = m[2].match(/^(\d)(?:st|nd|rd|th)(?: (?:Quarter|Period))?$/)?.[1];
+  return { pd: n ? `${g.league === 'nhl' ? 'P' : 'Q'}${n}` : m[2], r: m[1] };
+}
+
+/** The hero card's hate-watch line: who leads and by how much, green when that is the way the device wants it (the hated team trailing, a favorite leading), grey otherwise.
+ *  `own` is the team that put the game on the board; null for a tracked-only game or before the start. */
+export function hateLine(g: GameCard, own: Side, t: 0 | 1 | 2): { hl: string; hlc: string } | null {
+  const a = g.away?.score, h = g.home?.score;
+  if (t === 2 || g.state === 'pre' || a == null || h == null) return null;
+  if (a === h) return { hl: 'Tied', hlc: GREY };
+  const lead = a > h ? g.away! : g.home!;
+  const good = t === 0 ? lead.team.key === own.team.key : lead.team.key !== own.team.key;
+  return { hl: `${lead.team.abbrev} ${g.state === 'post' ? 'won by' : 'up'} ${Math.abs(a - h)}`, hlc: good ? GREEN : GREY };
+}
+
 /** The device's board now, or null when no game of its teams is live, about to start or just ended (and none was added by hand). */
 export function buildBoard(deviceId: string, now = Date.now()): BoardProps | null {
   const favs = new Set(favoritesOf(deviceId).map((f) => f.team_key));
@@ -105,7 +127,7 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
   const lay = (row?.layout ?? 0) as BoardProps['lay'];
   const picks = { on: new Set(picksOf(row).on), off: new Set(picksOf(row).off) };
   const gridCell = lay === 2, heroRow = (i: number) => lay === 3 && i === 0;
-  const rows: (BoardGame & { startsAt: number; card: GameCard })[] = [];
+  const rows: (BoardGame & { startsAt: number; card: GameCard; own: Side })[] = [];
   for (const g of cardList()) {
     if (!g.home || !g.away || !(GAME_LEAGUES as League[]).includes(g.league)) continue;
     const live = g.state === 'in';
@@ -133,7 +155,7 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
         ...(chance !== null && { wp: chance, wl: `${own.team.abbrev} ${chance}%` }),
       }),
       ...(gridCell && live && { r: statusLine(g, false) }), // a half-width cell has no room for the count
-      startsAt: g.startsAt, card: g,
+      startsAt: g.startsAt, card: g, own: own!,
     });
   }
   if (!rows.length) return null;
@@ -141,9 +163,18 @@ export function buildBoard(deviceId: string, now = Date.now()): BoardProps | nul
   rows.sort((x, y) => x.t - y.t || rank(x.card) - rank(y.card) || x.startsAt - y.startsAt);
   const max = MAX_GAMES[lay];
   const more = Math.max(0, rows.length - max);
-  const games = rows.slice(0, max).map(({ startsAt, card, ...r }, i) =>
-    // The hero's first row: the plain clock, the count/outs/down/shots under it and the bases; the others stay compact rows.
-    heroRow(i) ? { ...r, r: r.st, sub: r.live ? heroLine(card) : '', bs: card.bases ? [card.bases.first, card.bases.second, card.bases.third].map(Number).join('') : '' } : r);
+  const solo = rows.length === 1; // the big card is for a board of one game: its hate-watch line and footer need the room
+  const games = rows.slice(0, max).map(({ startsAt, card, own, ...r }, i) => {
+    if (!heroRow(i)) return r;
+    // The hero's first row: the clock stacked under its period, the count/outs/down/shots under it and the bases; the others stay compact rows.
+    const clock = r.live ? clockLines(card) : { pd: undefined, r: r.st };
+    const hate = solo ? hateLine(card, own, r.t) : null;
+    const ft = solo ? [card.venue, card.tv].filter(Boolean).join(' · ') : '';
+    return {
+      ...r, ...clock, sub: r.live ? heroLine(card) : '', bs: card.bases ? [card.bases.first, card.bases.second, card.bases.third].map(Number).join('') : '',
+      ...hate, ...(ft && { ft }),
+    };
+  });
   return { v: 1, lay, games, more, mt: more ? `+${more} more` : '' };
 }
 

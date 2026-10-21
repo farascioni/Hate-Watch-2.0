@@ -11,24 +11,25 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab; tap again to turn off. They sit by Most hated (+ makes one) and Saved. Alert presets (save, edit, or build from scratch) set a target's alerts in one tap. Kept on this phone; hidden, not deleted, on a lapse. (Update)
 - Tabs: quick swaps no longer leave a blank screen, and the Feed no longer freezes (no scrolling or taps) after a switch from another tab. (Update)
 - Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes; the clock and quarter sit between the two teams; Hero shows it big. (Update)
-- Guide: the drawings now move, replaying on each page. The web guide's page background is dark.
+- Lock screen: A one-game Hero adds a live dot, bigger score, who leads ("PHI up 3") and venue (after server update). Teams lose the heart and X. Tap a game for its box score, a push for its alert.
+- Guide: the drawings now move on each page; the web guide is dark.
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, scores swell, tabs settle in, and more. Off under Reduce Motion. (Update)
-- Server: bad requests get a 400 or 413, new devices are limited per address, share links use our own address.
+- Server: bad requests get a 400 or 413, new devices are limited per address, share links use our address.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
-- Server: pushes check Expo's delivery receipts 15 minutes after sending, so deleted apps stop getting them.
-- Server: shared alert pages are noindex and link to the rival-alerts page.
-- Scores: a new "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the series line ("Series tied 2 - 2") and each game's winner.
+- Server: pushes check Expo's delivery receipts after 15 minutes, so deleted apps stop getting them.
+- Server: shared alert pages are noindex and link to rival alerts.
+- Scores: a "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the series line ("Series tied 2 - 2") and each game's winner.
 - Scores: under those games, "Coming up" lists playoff games and series starting in the next 7 days with "Who do you want to lose?". Vote for either team, see each team's share, change yours until the first game starts. The view is named for the league.
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. On, the team you voted to lose is tracked for you and shows in Tracking. A series ends it once won; a one-off game covers that game only.
-- Scores: a playoff series is the same ledger card (with the vote) in My, All and Special Events, one per series, so a doubleheader or yesterday's final no longer shows twice. The strip under it shows the series line, a cell per game (tap a played one for its box score) and the next game's time. A favorite's win is gold even when you track the other team (Update; the strip needs the server update.)
-- Server: cards carry the event, the series and each game's result from ESPN's postseason schedule; regular-season MLB cards carry `series` from the home team's schedule. Finished games keep their box scores until 3 days after the series. Until the server update, Special Events stays hidden.
+- Scores: a playoff series is the same ledger card (with the vote) in My, All and Special Events, one per series, so a doubleheader or yesterday's final no longer shows twice. The strip under it shows the series line, a cell per game (tap a played one for its box score) and the next game's time. A favorite's win is gold even when you track the other team (Update; the strip needs the server update).
+- Server: cards carry the event, series and each game's result from ESPN's postseason schedule; box scores stay 3 days after the series. Special Events stays hidden until then.
 - Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first one went out.
 - Tracking: press and hold a bell to snooze a player or team for 1 day, 3 days or a week; a snoozed target counts as muted until it ends. (Update, after the server deploy.)
-- App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your follows and settings if that fails. A live frame that is not JSON is ignored, not a crash.
-- Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update.)
+- App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your data if that fails. A live frame that is not JSON is ignored, not a crash.
+- Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update)
 - Settings: "Reset alerts to defaults" now resets every alert setting and asks first; tracked teams and your tally stay. (Update, after the server update)
 - Settings: "Share your season" shares a picture of your whole run (over the air, after the server update).
-- Server: a season card, a picture of a device's run with its own link (POST /me/share/season).
+- Server: a season card, a picture of a device's run with its own link.
 
 ## Build 20 (October 18, 2026)
 

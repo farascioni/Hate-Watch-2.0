@@ -47,6 +47,9 @@ export interface GameCard {
   /** Finals: when it ended (when we saw it go final; estimated for one already over when first seen). */
   endedAt?: number;
   detail: string;         // ESPN's short status: "Q4 - 2:14", "Bot 8th", "Final/OT" ('' before the start)
+  /** Where it is played and who shows it (ESPN's scoreboard: the venue's name, the national broadcaster else the first); the lock screen card's footer. */
+  venue?: string;
+  tv?: string;
   /** Doubleheaders: "Game 1" / "Game 2", from ESPN's note ("Doubleheader - Game 1 - Makeup from May 23"). */
   note?: string;
   /** Postseason: ESPN's note split into the event ("ALCS", "Super Bowl LXI") and its game ("Game 5"), with the series score when it is a series. */
@@ -157,6 +160,9 @@ export function gameCard(lg: League, ev: any): GameCard | null {
     detail: state === 'pre' ? '' : String(ev.status?.type?.shortDetail ?? ''),
     home: side(home), away: side(away),
   };
+  const venue = c.venue?.fullName, tv = c.broadcasts?.find((b: any) => b.market === 'national')?.names?.[0] ?? c.broadcasts?.[0]?.names?.[0];
+  if (venue) card.venue = String(venue);
+  if (tv) card.tv = String(tv);
   if (state === 'pre') {
     const preview = gamePreview(lg, c, home, away);
     if (Object.keys(preview).length) card.preview = preview;

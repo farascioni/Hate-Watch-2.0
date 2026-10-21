@@ -9,14 +9,14 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
 
 const team = db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, color, logo, logo_w, logo_h, updated_at) VALUES (?, ?, ?, ?, ?, ?, '#000', 'x', 1, 1, 0)`);
-const CODES = ['NYY', 'BOS', 'TB', 'MIA', 'CLE', 'DET', 'LAD', 'SF', 'SEA', 'HOU', 'ATL', 'NYM'];
+const CODES = ['NYY', 'BOS', 'TB', 'MIA', 'CLE', 'DET', 'LAD', 'SF', 'SEA', 'HOU', 'ATL', 'NYM', 'WSH', 'OAK', 'PIT', 'KC'];
 CODES.forEach((c, i) => team.run(`team:mlb:${i + 1}`, 'mlb', String(i + 1), c, c, c));
 const T = Object.fromEntries(CODES.map((c, i) => [c, `team:mlb:${i + 1}`]));
 loadCatalog();
 
 const { upsertGame, forgetDeviceTeams } = await import('../src/scores.ts');
 const { addFavorite } = await import('../src/favorites.ts');
-const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine, subLine, heroLine } = await import('../src/live-activity.ts');
+const { buildBoard, putLiveActivity, getLiveActivity, flush, statusLine, subLine, heroLine, clockLines, hateLine } = await import('../src/live-activity.ts');
 const { setApnsSender, apnsJwt, apnsConfigured, tokenGone } = await import('../src/apns.ts');
 const { setFlag } = await import('../src/flags.ts');
 
@@ -48,9 +48,9 @@ test('favorites first, then most hated, then tracked; finals for 10 minutes; gam
   const b = buildBoard('dev')!;
   assert.deepEqual(b.games.map((g) => [`${g.a}@${g.h}`, g.t]), [['MIA@TB', 0], ['DET@CLE', 1], ['BOS@NYY', 2], ['HOU@LAD', 2]]);
   assert.equal(b.more, 0);
-  assert.deepEqual(b.games[0], { k: rays, a: 'MIA', as: 1, h: 'TB', hs: 2, st: 'Top 3rd', live: true, t: 0, l: '♥ MIA 1  TB 2', r: 'Top 3rd', lc: '#F5C451', rc: '#E5232B', ac: '#FFFFFF', hc: '#F5C451', am: '', hm: '♥ ' });
+  assert.deepEqual(b.games[0], { k: rays, a: 'MIA', as: 1, h: 'TB', hs: 2, st: 'Top 3rd', live: true, t: 0, l: 'MIA 1  TB 2', r: 'Top 3rd', lc: '#F5C451', rc: '#E5232B', ac: '#FFFFFF', hc: '#F5C451', am: '', hm: '' });
   assert.deepEqual([b.v, b.mt], [1, ''], 'the version, and no "+N more" line');
-  assert.deepEqual([b.games[1].l, b.games[1].lc], ['❌ DET 0  CLE 0', '#E5232B']);
+  assert.deepEqual([b.games[1].l, b.games[1].lc], ['DET 0  CLE 0', '#E5232B']);
   assert.deepEqual([b.games[2].l, b.games[2].lc], ['BOS 0  NYY 0', '#FFFFFF']);
   assert.equal(b.games[3].st, 'Final');
 });
@@ -62,19 +62,19 @@ test('a starred player stands for his team', () => {
   assert.deepEqual(buildBoard('dev')!.games.map((g) => g.t), [0, 1, 2, 2], 'the Yankees game moves up to most hated');
   assert.equal(buildBoard('dev')!.games[1].a, 'BOS');
   const g1 = buildBoard('dev')!.games[1];
-  assert.deepEqual([g1.ac, g1.am, g1.hc, g1.hm], ['#FFFFFF', '', '#E5232B', '❌ '], "BOS@NYY: the player's team gets the red X");
+  assert.deepEqual([g1.ac, g1.am, g1.hc, g1.hm], ['#FFFFFF', '', '#E5232B', ''], "BOS@NYY: the player's team is red, no mark");
   putLiveActivity('dev', { mostHated: [T.CLE] });
 });
 
-test('each team has its own color and mark: favorite gold with a heart, most hated red with a star, the rest white', () => {
+test('each team has its own color and no mark: favorite gold, most hated red, the rest white', () => {
   const b = buildBoard('dev')!;
   const look = (g: (typeof b.games)[number]) => [g.ac, g.am, g.hc, g.hm];
-  assert.deepEqual(look(b.games[1]), ['#FFFFFF', '', '#E5232B', '❌ '], 'DET@CLE: only the most hated side is red, the other white');
+  assert.deepEqual(look(b.games[1]), ['#FFFFFF', '', '#E5232B', ''], 'DET@CLE: only the most hated side is red, the other white');
   assert.deepEqual(look(b.games[2]), ['#FFFFFF', '', '#FFFFFF', ''], 'a game of tracked teams has no mark');
   db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('dev3', 's', 'ios', '{}');
   addFavorite('dev3', T.TB);
   putLiveActivity('dev3', { mostHated: [T.MIA, T.TB] }); // TB is both: red wins, as on the cards
-  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '❌ ', '#E5232B', '❌ '], 'MIA@TB: each team its own, a favorite that is also hated is red');
+  assert.deepEqual(look(buildBoard('dev3')!.games[0]), ['#E5232B', '', '#E5232B', ''], 'MIA@TB: each team its own, a favorite that is also hated is red');
 });
 
 test('past four games the rest are counted, and the payload stays small', () => {
@@ -217,7 +217,7 @@ test('the sub line by sport, and three detailed rows stay far under Apple\'s lim
   assert.equal(subLine(t({ shots: { away: 24, home: 19 } })), 'Shots 24-19');
   assert.equal(subLine(t({ lastPlay: 'x'.repeat(100) })).length, 40);
   assert.equal(subLine(t({})), '');
-  const game3 = { k: 'mlb:123456', a: 'BOS', as: 10, h: 'NYY', hs: 12, st: 'Bot 12th', live: true, t: 0, l: '♥ BOS 10  NYY 12', r: 'Bot 12th', lc: '#F5C451', rc: '#E5232B', sub: 'x'.repeat(40), sc: '#9A9AA2', bs: '111', wp: 100, wl: 'NYY 100%' };
+  const game3 = { k: 'mlb:123456', a: 'BOS', as: 10, h: 'NYY', hs: 12, st: 'Bot 12th', live: true, t: 0, l: 'BOS 10  NYY 12', r: 'Bot 12th', lc: '#F5C451', rc: '#E5232B', sub: 'x'.repeat(40), sc: '#9A9AA2', bs: '111', wp: 100, wl: 'NYY 100%' };
   const props = { v: 1, lay: 1, games: [game3, game3, game3], more: 99, mt: '+99 more' };
   assert.ok(JSON.stringify({ aps: { 'content-state': { name: 'ScoreboardActivity', props: JSON.stringify(props) } } }).length < 1500);
 });
@@ -254,4 +254,47 @@ test('a game about to start is on the board with no score; hand-picked games are
   putLiveActivity('dev', { hides: ['mlb:1'] });
   assert.ok(!buildBoard('dev')?.games.some((g) => g.k === 'mlb:1'), 'a tracked live game can be taken off');
   putLiveActivity('dev', { hides: [] });
+});
+
+test('clockLines stacks the period over the clock; a status with no clock has no period', () => {
+  const c = (detail: string, league = 'nba') => ({ detail, league }) as any;
+  assert.deepEqual(clockLines(c('8:29 - 1st')), { pd: 'Q1', r: '8:29' });
+  assert.deepEqual(clockLines(c('8:29 - 1st Quarter')), { pd: 'Q1', r: '8:29' });
+  assert.deepEqual(clockLines(c('2:39 - 2nd Quarter')), { pd: 'Q2', r: '2:39' });
+  assert.deepEqual(clockLines(c('0.8 - 4th Quarter')), { pd: 'Q4', r: '0.8' });
+  assert.deepEqual(clockLines(c('12:00 - 1st Period', 'nhl')), { pd: 'P1', r: '12:00' });
+  assert.deepEqual(clockLines(c('5:00 - OT', 'nhl')), { pd: 'OT', r: '5:00' });
+  assert.deepEqual(clockLines(c('Top 3rd', 'mlb')), { r: 'Top 3rd' });
+});
+
+test('hateLine: green when the hated team trails or a favorite leads, grey otherwise, none for tracked or pre-game', () => {
+  const g = (as: number | null, hs: number | null, state = 'in') => ({ state, away: side('BOS', as as any), home: side('NYY', hs as any) }) as any;
+  const bos = side('BOS', 0), nyy = side('NYY', 0);
+  assert.deepEqual(hateLine(g(3, 5), bos, 1), { hl: 'NYY up 2', hlc: '#34C759' }, 'most hated BOS trails');
+  assert.deepEqual(hateLine(g(5, 3), bos, 1), { hl: 'BOS up 2', hlc: '#9A9AA2' }, 'most hated BOS leads');
+  assert.deepEqual(hateLine(g(3, 5), nyy, 0), { hl: 'NYY up 2', hlc: '#34C759' }, 'favorite NYY leads');
+  assert.equal(hateLine(g(5, 3), nyy, 0)!.hlc, '#9A9AA2', 'favorite NYY trails');
+  assert.deepEqual(hateLine(g(4, 4), bos, 1), { hl: 'Tied', hlc: '#9A9AA2' });
+  assert.equal(hateLine(g(3, 5, 'post'), bos, 1)!.hl, 'NYY won by 2');
+  assert.equal(hateLine(g(3, 5), bos, 2), null, 'a tracked game has no side to root for');
+  assert.equal(hateLine(g(null, null, 'pre'), bos, 1), null);
+});
+
+test('hero layout: a board of one game gets the clock, hate line and footer; several games stay compact rows', () => {
+  const win = game('WSH', 'OAK', 'in', { as: 2, hs: 4, detail: '8:29 - 1st Quarter' });
+  db.prepare('INSERT INTO devices (id, secret, platform, prefs, created_at) VALUES (?, ?, ?, ?, 0)').run('solo', 's', 'ios', '{}');
+  follow.run('solo', T.WSH);
+  putLiveActivity('solo', { layout: 'hero', mostHated: [T.WSH] });
+  const p = buildBoard('solo')!;
+  assert.equal(p.games.length, 1);
+  assert.equal(p.games[0].k, win);
+  assert.deepEqual([p.games[0].pd, p.games[0].r, p.games[0].hl, p.games[0].hlc], ['Q1', '8:29', 'OAK up 2', '#34C759']);
+  assert.equal(p.games[0].ft, undefined, 'no venue or broadcast, no footer');
+
+  game('PIT', 'KC', 'in', { as: 1, hs: 0, detail: 'Top 2nd' });
+  follow.run('solo', T.PIT);
+  forgetDeviceTeams('solo');
+  const two = buildBoard('solo')!;
+  assert.ok(two.games.length > 1);
+  assert.ok(two.games.every((x) => x.hl === undefined && x.ft === undefined), 'only a board of one gets the hate line and footer');
 });
