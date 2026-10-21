@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View, type ColorValue } from 'react-native';
-import { Tabs, router } from 'expo-router';
+import { Animated, Easing, PanResponder, Platform, Pressable, View, type ColorValue } from 'react-native';
+import { Tabs, router, usePathname } from 'expo-router';
 import { BottomTabBar, type BottomTabBarProps } from 'expo-router/js-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useStore } from '../../lib/store';
@@ -20,6 +20,9 @@ function LeaderboardButton() {
     </Pressable>
   );
 }
+
+/** The tabs left to right, for swiping between them. */
+const TAB_PATHS = ['/', '/scores', '/search', '/following', '/settings'] as const;
 
 type TabIconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -104,11 +107,27 @@ export default function TabLayout() {
   // The Feed badge swells when an alert lands while the app is open (unseen only ever rises live: store.tsx).
   const { scale, pop } = usePop(1.55);
   useOnChange(unseen, (p, n) => { if (n > p) pop(); });
+  const pathname = usePathname();
+  const swipe = useRef<(dir: 1 | -1) => void>(() => {});
+  swipe.current = (dir) => {
+    const i = TAB_PATHS.indexOf(pathname as (typeof TAB_PATHS)[number]);
+    const to = TAB_PATHS[i + dir];
+    if (i >= 0 && to) router.navigate(to);
+  };
+  // Claims a mostly horizontal drag only after it has started, so taps and vertical scrolls are untouched and a horizontal
+  // scroller inside a screen (native, so it cancels this) keeps its own swipes.
+  const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 16 && Math.abs(g.dx) > 2 * Math.abs(g.dy),
+    onPanResponderRelease: (_, g) => {
+      if (Math.abs(g.dx) > 60 || (Math.abs(g.dx) > 30 && Math.abs(g.vx) > 0.5)) swipe.current(g.dx < 0 ? 1 : -1);
+    },
+  })).current;
   // Panes draw the tab beside the router's stack (WebShell's ListPane), so the router's own tab screens would be a second copy.
   if (panes) return <DetailPlaceholder />;
   // A sidebar (WebShell) replaces the tab bar and the leaderboard button.
   // Under reduce motion GlideTabBar sets each fade value outright, so the screens swap with no animation.
   return (
+    <View style={{ flex: 1 }} {...(wide || Platform.OS === 'web' ? {} : pan.panHandlers)}>
     <Tabs
       tabBar={(p) => <GlideTabBar {...p} />}
       screenOptions={({ route }) => ({
@@ -153,5 +172,6 @@ export default function TabLayout() {
         options={{ title: t('tab.settings'), tabBarIcon: icon('options') }}
       />
     </Tabs>
+    </View>
   );
 }

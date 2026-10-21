@@ -9,7 +9,8 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 - Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only; if the subscription lapses the list is kept, hidden, and returns on resubscribing. (Update)
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab; tap again to turn off. They sit by Most hated (+ makes one) and Saved. Alert presets (save, edit, or build from scratch) set a target's alerts in one tap. Kept on this phone; hidden, not deleted, on a lapse. (Update)
-- Tabs: quick swaps no longer leave a blank screen, and the Feed no longer freezes (no scrolling or taps) after a switch from another tab. (Update)
+- Tabs: quick swaps no longer leave a blank screen, and the Feed no longer freezes after a switch. (Update)
+- Tabs: swipe sideways to switch tabs.
 - Lock screen scoreboard: a game not yet started shows its start time in your time zone, not dashes; the clock and quarter sit between the two teams; Hero shows it big. (Update)
 - Lock screen: One-game Hero adds a live dot, bigger score, who leads ("PHI up 3") and venue (after server update). No heart or X on teams. Tap a game for its box score, a push for its alert. (Update)
 - Guide: the drawings now move on each page; the web guide is dark.
