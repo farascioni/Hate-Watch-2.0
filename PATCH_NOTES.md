@@ -7,6 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Scores tab: switching the league chip (for example MLB to NBA) while a segment was picked no longer leaves the My / Playoffs / All highlight hanging off the right edge of the switch. (Update)
 - Injury alerts: a player reinstated or activated from the injured list no longer sends an injury alert (player or team).
 - Hate Watch Plus: when a subscription doesn't go through, the alert also shows the store's error code and details, so a screenshot says what Apple returned. (Update)
 - Hate Watch Plus: star an alert (on its card or its screen) to save it; the Feed's Saved chip lists them. This phone only; if the subscription lapses the list is kept, hidden, and returns on resubscribing. (Update)
@@ -17,6 +18,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Lock screen: One-game Hero adds a live dot, bigger score, who leads ("PHI up 3") and venue (after server update). No heart or X on teams. Tap a game for its box score, a push for its alert. (Update)
 - Guide: the drawings now move on each page; the web guide is dark.
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, scores swell, tabs settle in, and more. Off under Reduce Motion. (Update)
+- Server: new installs push only for losses and bad news (22 alerts: losses, blowing a lead, elimination, your Hate Watch streak, AP poll drops); every other alert is in the Feed with its bell off. Installs already out keep their pushes.
 - Server: bad requests get a 400 or 413, new devices are limited per address, share links use our address.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts after 15 minutes, so deleted apps stop getting them.
