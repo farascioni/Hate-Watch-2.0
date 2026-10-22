@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rival Loss Alerts for Sports Fans | Hate Watch</title>
 <meta name="description" content="Hate Watch sends a push the moment the team or athlete you can't stand loses, blows a lead or gets burned. Nine leagues, any team or player, no account.">
+<meta name="theme-color" content="#0b0b0d">
 <link rel="canonical" href="https://hatewatch.dev/about/">
 <link rel="icon" href="/favicon.ico">
 <meta property="og:type" content="website">
@@ -14,85 +15,466 @@
 <meta property="og:url" content="https://hatewatch.dev/about/">
 <meta name="twitter:card" content="summary">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is Hate Watch free?","acceptedAnswer":{"@type":"Answer","text":"Yes. Every alert and feature is free, with no ads and no account. Hate Watch Plus is an optional subscription."}},{"@type":"Question","name":"Which leagues does it cover?","acceptedAnswer":{"@type":"Answer","text":"The NFL, NBA, WNBA, MLB, NHL, college football, the English Premier League, Formula 1 and UFC."}},{"@type":"Question","name":"Do I need an account?","acceptedAnswer":{"@type":"Answer","text":"No. There is no sign-up or login. One tap in Settings deletes everything the app has stored about your device."}},{"@type":"Question","name":"Can I use it in a browser?","acceptedAnswer":{"@type":"Answer","text":"Yes. The web version at hatewatch.dev works in any browser. Push notifications need the iPhone or Android app."}},{"@type":"Question","name":"Where do the scores come from?","acceptedAnswer":{"@type":"Answer","text":"From public sources, so they can be delayed or contain errors. Hate Watch is not affiliated with or endorsed by any league, team or player."}}]}</script>
+<script>document.documentElement.classList.add('js')</script>
 <style>
-:root{--bg:#0b0b0d;--card:#16161a;--line:#2a2a31;--text:#f4f4f5;--muted:#b4b4bd;--red:#ff4a50;--redbg:#e5232b}
+:root{--bg:#0b0b0d;--card:#16161a;--card2:#1d1d22;--line:#2a2a31;--text:#f4f4f5;--muted:#b4b4bd;--red:#ff4a50;--redbg:#e5232b}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow-x:clip}
 a{color:var(--red)}
-main,header,footer{max-width:760px;margin:0 auto;padding:0 20px}
-header{padding-top:24px}
-.brand{font-weight:800;letter-spacing:.02em;color:var(--text);text-decoration:none}
-.brand b{color:var(--red)}
-h1{font-size:clamp(2rem,6vw,3rem);line-height:1.1;margin:48px 0 16px;font-weight:800}
-h1 em{font-style:normal;color:var(--red)}
-h2{font-size:1.5rem;margin:56px 0 12px}
 p{margin:0 0 16px}
-.lead{font-size:1.15rem;color:var(--muted)}
-.cta{display:inline-block;background:var(--redbg);color:#fff;font-weight:700;text-decoration:none;padding:14px 26px;border-radius:999px;margin:8px 0 4px}
-.cta:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #fff;outline-offset:3px}
-.note{font-size:.9rem;color:var(--muted)}
-ol,ul{padding-left:22px;margin:0 0 16px}
-li{margin-bottom:8px}
-.leagues{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}
-.leagues li{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 14px;margin:0;font-weight:600}
-.shots{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 16px}
-.shots figure{margin:0}
-.shots img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);display:block}
-.shots figcaption{font-size:.85rem;color:var(--muted);margin-top:6px}
-@media(max-width:520px){.shots{grid-template-columns:1fr 1fr 1fr;gap:8px}.shots figcaption{font-size:.75rem}}
-details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:10px}
+h1,h2,h3{margin:0;line-height:1.05;letter-spacing:-.02em}
+a:focus-visible,summary:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.skip{position:absolute;left:-999px}.skip:focus{left:12px;top:12px;background:#fff;color:#000;padding:8px 12px;z-index:99}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+/* nav */
+.top{position:sticky;top:0;z-index:20;background:rgba(11,11,13,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid transparent}
+.top .wrap{display:flex;align-items:center;gap:24px;height:64px}
+.brand{font-weight:800;letter-spacing:.04em;color:var(--text);text-decoration:none;margin-right:auto}
+.brand b{color:var(--red)}
+.top nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:.95rem;margin-left:22px}
+.top nav a:hover{color:var(--text)}
+.btn{display:inline-block;background:var(--redbg);color:#fff;font-weight:700;text-decoration:none;padding:10px 20px;border-radius:999px;transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(229,35,43,.4)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;padding:64px 0 40px}
+.glow{position:absolute;left:50%;top:-10%;width:900px;height:700px;margin-left:-450px;background:radial-gradient(closest-side,rgba(229,35,43,.38),transparent);filter:blur(30px);pointer-events:none;transform:translateY(calc(var(--sy,0)*.25px));animation:breathe 6s ease-in-out infinite}
+.hero .wrap{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.hero h1{font-size:clamp(2.8rem,7.4vw,5.4rem);font-weight:800}
+h1 em{font-style:normal;color:var(--red);background:linear-gradient(90deg,var(--red),#ff9a6b,var(--red));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:glint 4s linear infinite}
+.lead{font-size:1.2rem;color:var(--muted);max-width:30em;margin:22px 0 28px}
+.stores{display:flex;flex-wrap:wrap;gap:12px}
+/* shortcut: placeholders, swap each span for <a href="store URL"> once the listing is live (docs/seo-plan.md, Phase 1) */
+.store{display:flex;flex-direction:column;justify-content:center;min-width:176px;padding:10px 20px;border-radius:14px;background:#fff;color:#0b0b0d;line-height:1.15}
+.store small{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#55555e}
+.store b{font-size:1.2rem}
+.note{font-size:.9rem;color:var(--muted);margin:16px 0 0}
+.note a{color:var(--text)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
+.chips span{border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.8rem;font-weight:600;color:var(--muted)}
+.rise{opacity:0;transform:translateY(22px);animation:rise .8s cubic-bezier(.2,.8,.2,1) forwards}
+.rise:nth-child(2){animation-delay:.12s}.rise:nth-child(3){animation-delay:.24s}.rise:nth-child(4){animation-delay:.36s}.rise:nth-child(5){animation-delay:.48s}
+
+/* phone */
+.ph{position:relative;display:flex;justify-content:center}
+.phone{position:relative;width:min(290px,78vw);aspect-ratio:9/18.5;border-radius:44px;border:9px solid #202026;background:var(--bg);box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px #34343c,0 0 70px rgba(229,35,43,.18);overflow:hidden;transform:rotate(var(--r,0deg))}
+.phone::before{content:"";position:absolute;left:50%;top:8px;width:84px;height:22px;margin-left:-42px;border-radius:99px;background:#000;z-index:3}
+.scr{position:absolute;inset:0;padding:44px 12px 12px;overflow:hidden}
+.ttl{font-weight:800;font-size:1.1rem;margin:0 4px 12px;letter-spacing:-.01em}
+.float{position:absolute;padding:6px 12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-size:.8rem;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:fl 5s ease-in-out infinite;z-index:2}
+.float i{color:var(--red);font-style:normal}
+.cap{text-align:center;font-size:.75rem;color:var(--muted);margin-top:14px}
+.ph{flex-direction:column;align-items:center}
+
+/* app bits */
+.bd{display:inline-grid;place-items:center;min-width:38px;height:38px;padding:0 6px;border-radius:11px;font-size:.72rem;font-weight:800;letter-spacing:.02em;color:#fff;flex:none}
+.fc{display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:8px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.fc div{min-width:0;flex:1}
+.fc b{display:block;font-size:.85rem;line-height:1.2}
+.fc small{display:block;font-size:.72rem;color:var(--muted);line-height:1.25}
+.fc i{font-style:normal;font-size:.65rem;font-weight:700;color:var(--muted)}
+.fc.new{animation:pop .55s cubic-bezier(.2,1.4,.4,1)}
+.toast{position:absolute;left:10px;right:10px;top:40px;z-index:4;padding:10px 12px;border-radius:18px;background:rgba(40,40,46,.94);border:1px solid #3a3a43;box-shadow:0 12px 30px rgba(0,0,0,.5);font-size:.78rem;line-height:1.3;opacity:0;pointer-events:none}
+.toast b{display:block;font-size:.65rem;letter-spacing:.08em;color:var(--red)}
+.toast.show{animation:ring 2.4s ease both}
+.sbar{display:flex;align-items:center;height:38px;padding:0 14px;margin-bottom:10px;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-size:.9rem}
+.caret{display:inline-block;width:2px;height:1.1em;margin-left:2px;background:var(--red);animation:blink 1s steps(1) infinite}
+.sr{display:flex;align-items:center;gap:10px;padding:9px 8px;border-bottom:1px solid var(--line)}
+.sr div{flex:1;min-width:0}
+.sr b{display:block;font-size:.85rem}
+.sr small{font-size:.72rem;color:var(--muted)}
+.trk{padding:5px 12px;border-radius:99px;border:1px solid var(--redbg);color:var(--red);font-size:.72rem;font-weight:800;transition:background .3s,color .3s}
+.trk.on{background:var(--redbg);color:#fff;animation:pop .4s}
+.sin{transition:opacity .5s,transform .5s}
+.gm{padding:14px;border-radius:18px;background:var(--card);border:1px solid var(--line)}
+.lv{display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:800;color:var(--red);letter-spacing:.06em;margin-bottom:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1.2s ease-in-out infinite}
+.tm{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tm span:nth-child(2){flex:1;font-weight:700;font-size:.9rem}
+.tm b{font-size:1.9rem;font-variant-numeric:tabular-nums;transition:color .3s}
+.tm b.bump{animation:pop .4s}
+.odds{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;margin-top:14px;font-size:.72rem;color:var(--muted)}
+.odds .bar{grid-column:1/2;height:8px;border-radius:99px;background:#2a2a31;overflow:hidden}
+.odds .bar i{display:block;height:100%;width:31%;border-radius:99px;background:linear-gradient(90deg,var(--redbg),#ff8a5b);transition:width 1.1s cubic-bezier(.3,.8,.3,1)}
+.odds em{font-style:normal;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.loss{margin-top:14px;padding:10px;border-radius:12px;text-align:center;font-weight:800;font-size:.9rem;background:var(--redbg);opacity:0;transform:scale(.9);transition:opacity .3s,transform .4s cubic-bezier(.2,1.5,.4,1)}
+.loss.show{opacity:1;transform:none;animation:shake .5s .2s}
+.tk{display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:8px;border-radius:14px;background:var(--card);border:1px solid var(--line);transition:opacity .5s,transform .5s,border-color .3s,background .3s}
+.tk div{flex:1;min-width:0}
+.tk b{display:block;font-size:.85rem}
+.tk small{font-size:.72rem;color:var(--muted)}
+.tk em{font-style:normal;font-weight:800;font-size:.8rem;font-variant-numeric:tabular-nums}
+.tk.hit{border-color:var(--redbg);background:#2a1214}
+.pill{display:inline-block;margin-left:6px;padding:0 7px;border-radius:99px;background:var(--redbg);color:#fff;font-size:.62rem;font-weight:800;vertical-align:1px}
+.al{display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid var(--line);font-size:.85rem;font-weight:600}
+.al span:first-child{flex:1}
+.sw{position:relative;width:44px;height:26px;border-radius:99px;background:#33333b;transition:background .3s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.3,1.5,.5,1)}
+.sw.on{background:var(--redbg)}
+.sw.on::after{transform:translateX(18px)}
+.js .rs .sin,.js .rs .tk{opacity:0;transform:translateY(14px)}
+.js .rs.in .sin,.js .rs.in .tk{opacity:1;transform:none}
+
+/* ticker */
+.mq{overflow:hidden;border-block:1px solid var(--line);background:#101013;padding:14px 0;white-space:nowrap}
+.mq div{display:inline-flex;gap:28px;animation:mq 32s linear infinite;will-change:transform}
+.mq span{font-weight:800;letter-spacing:.14em;font-size:.85rem;color:var(--muted);text-transform:uppercase}
+.mq span::after{content:"/";margin-left:28px;color:var(--red)}
+
+/* feature sections */
+.sec{padding:96px 0}
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.feat.flip .ph{order:-1}
+.feat h2{font-size:clamp(2.1rem,5vw,3.6rem);font-weight:800}
+.feat h2 em{font-style:normal;color:var(--red)}
+.feat p{color:var(--muted);font-size:1.1rem;max-width:28em;margin-top:18px}
+.feat ul{padding:0;margin:20px 0 0;list-style:none}
+.feat li{position:relative;padding-left:26px;margin-bottom:8px;font-weight:600}
+.feat li::before{content:"";position:absolute;left:0;top:.55em;width:10px;height:10px;border-radius:3px;background:var(--red);transform:rotate(45deg)}
+.js .rv{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1)}
+.js .rv.in{opacity:1;transform:none}
+.kick{display:block;font-size:.8rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:14px}
+
+/* tiles */
+.h2{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:800}
+.grid4{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
+.grid4.four{grid-template-columns:repeat(4,1fr)}
+.tile{padding:26px 22px;border-radius:20px;background:var(--card);border:1px solid var(--line);transition:transform .3s,border-color .3s}
+.tile:hover{transform:translateY(-6px);border-color:var(--redbg)}
+.tile h3{font-size:1.15rem;letter-spacing:-.01em;margin:10px 0 8px}
+.tile p{margin:0;color:var(--muted);font-size:.95rem}
+.tile .n{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--redbg);font-weight:800}
+.leagues{display:flex;flex-wrap:wrap;gap:10px;padding:0;margin:30px 0 22px;list-style:none}
+.leagues li{opacity:1}
+.js #leagues li{opacity:0;transform:translateY(14px) scale(.96);transition:opacity .5s,transform .5s}
+.js #leagues.in li{opacity:1;transform:none}
+#leagues li:nth-child(2){transition-delay:.06s}#leagues li:nth-child(3){transition-delay:.12s}#leagues li:nth-child(4){transition-delay:.18s}#leagues li:nth-child(5){transition-delay:.24s}#leagues li:nth-child(6){transition-delay:.3s}#leagues li:nth-child(7){transition-delay:.36s}#leagues li:nth-child(8){transition-delay:.42s}#leagues li:nth-child(9){transition-delay:.48s}
+.leagues a{display:block;padding:8px 18px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--text);text-decoration:none;font-weight:700;transition:background .2s,border-color .2s}
+.leagues a:hover{background:var(--redbg);border-color:var(--redbg)}
+.small{color:var(--muted);max-width:44em}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin-bottom:10px;max-width:760px}
 summary{font-weight:700;cursor:pointer}
 details p{margin:10px 0 0;color:var(--muted)}
-footer{margin-top:64px;padding-top:24px;padding-bottom:48px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
+
+/* closing */
+.cta{position:relative;overflow:hidden;margin:40px 0 0;padding:72px 24px;border-radius:32px;text-align:center;background:linear-gradient(160deg,#2a0f11,#16161a 60%);border:1px solid var(--line)}
+.cta::before{content:"";position:absolute;left:50%;top:-40%;width:700px;height:500px;margin-left:-350px;background:radial-gradient(closest-side,rgba(229,35,43,.4),transparent);animation:breathe 6s ease-in-out infinite}
+.cta>*{position:relative}
+.cta h2{font-size:clamp(2.2rem,6vw,4rem);font-weight:800}
+.cta .stores{justify-content:center;margin-top:30px}
+.cta .note{margin-top:20px}
+footer{margin-top:72px;padding:24px 0 56px;border-top:1px solid var(--line);color:var(--muted);font-size:.9rem}
 footer a{margin-right:16px}
+
+@keyframes rise{to{opacity:1;transform:none}}
+@keyframes breathe{50%{opacity:.6}}
+@keyframes fl{50%{transform:translateY(-12px)}}
+@keyframes mq{to{transform:translateX(-50%)}}
+@keyframes ring{0%{opacity:0;transform:translateY(-26px) scale(.94)}10%{opacity:1;transform:none}82%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
+@keyframes pop{from{opacity:0;transform:translateY(-14px) scale(.95)}to{opacity:1;transform:none}}
+@keyframes blink{50%{opacity:.25}}
+@keyframes glint{to{background-position:200% 0}}
+@keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
+
+@media(max-width:900px){
+.hero{padding-top:36px}
+.hero .wrap,.feat{grid-template-columns:1fr;gap:36px}
+.feat.flip .ph{order:0}
+.sec{padding:64px 0}
+.grid4,.grid4.four{grid-template-columns:1fr 1fr}
+.top nav a:not(.btn){display:none}
+.float{display:none}
+}
+@media(max-width:520px){.grid4,.grid4.four{grid-template-columns:1fr}.store{min-width:0;flex:1}.cta{padding:56px 18px;border-radius:24px}}
+@media(prefers-reduced-motion:reduce){
+html{scroll-behavior:auto}
+*,*::before,*::after{animation:none!important;transition:none!important}
+.rise,.js .rv,.js .rs .sin,.js .rs .tk,.js #leagues li{opacity:1;transform:none}
+.mq{overflow-x:auto}
+.toast{display:none}
+}
 </style>
 </head>
 <body>
-<header><a class="brand" href="/about/">HATE<b>WATCH</b></a></header>
-<main>
-<h1>Get a push the moment the team you can't stand <em>loses</em></h1>
-<p class="lead">Hate Watch tracks the teams and athletes you root against and tells you the second something goes wrong for them: a strikeout, an interception, a blown lead, a lost game, a crash out of a race.</p>
-<a class="cta" href="/">Open Hate Watch on the web</a>
-<p class="note">Free. No account. Push alerts need the iPhone or Android app.</p>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+<a class="brand" href="/about/">HATE<b>WATCH</b></a>
+<nav><a href="#how">How it works</a><a href="#leagues">Leagues</a><a href="#faq">FAQ</a><a class="btn" href="#get">Get the app</a></nav>
+</div></header>
 
-<h2>How it works</h2>
-<ol>
-<li><strong>Pick who you can't stand.</strong> Search any team or athlete and tap Track.</li>
-<li><strong>Choose what you want to hear about.</strong> Alert types can be switched on or off per league and per player.</li>
-<li><strong>Get the alert as it happens.</strong> A notification on your phone, and a feed you can scroll back through.</li>
-</ol>
-
-<div class="shots">
-<figure><img src="/about/search.jpg" width="520" height="1127" alt="Hate Watch search screen listing four teams matching Boston, each with a Track button and a count of how many people root against them" loading="lazy"><figcaption>Search any team or athlete</figcaption></figure>
-<figure><img src="/about/tracking.jpg" width="520" height="1127" alt="Hate Watch Tracking screen showing six tracked teams across NBA, NHL, MLB and NFL, each with a hater count and alert controls" loading="lazy"><figcaption>Everyone you track</figcaption></figure>
-<figure><img src="/about/alert-settings.jpg" width="520" height="1127" alt="Hate Watch settings listing NBA alert types such as gets blocked, misses a free throw and technical foul, each with its own push toggle" loading="lazy"><figcaption>Pick the alerts per league</figcaption></figure>
+<main id="main">
+<section class="hero">
+<div class="glow" id="glow"></div>
+<div class="wrap">
+<div>
+<h1 class="rise">Know the second they <em>fail.</em></h1>
+<p class="lead rise">Hate Watch tracks the teams and athletes you root against and pings you the moment something goes wrong for them: a strikeout, an interception, a blown lead, a lost game, a crash out of a race.</p>
+<div class="stores rise" id="stores">
+<span class="store" role="img" aria-label="App Store, coming soon"><small>Coming soon to the</small><b>App Store</b></span>
+<span class="store" role="img" aria-label="Google Play, coming soon"><small>Coming soon to</small><b>Google Play</b></span>
 </div>
+<p class="note rise">Free. No account. Want a look now? <a href="/">Open the web version</a>.</p>
+<div class="chips rise"><span>NFL</span><span>NBA</span><span>WNBA</span><span>MLB</span><span>NHL</span><span>College football</span><span>Premier League</span><span>F1</span><span>UFC</span></div>
+</div>
+<div class="ph rise" id="hero">
+<span class="float" style="left:-6%;top:18%;--d:0s">Blown lead <i>-14</i></span>
+<span class="float" style="right:-4%;top:46%;animation-delay:-2s">Pick six</span>
+<span class="float" style="left:2%;bottom:12%;animation-delay:-3.5s">Own goal</span>
+<div class="phone" style="--r:-3deg">
+<div class="toast" id="toast"></div>
+<div class="scr"><div class="ttl">Feed</div><div id="heroFeed">
+<div class="fc"><span class="bd" style="background:#007a33">BOS</span><div><b>Blown lead</b><small>Gave up a 14 point lead in the 4th</small></div><i>NBA</i></div>
+<div class="fc"><span class="bd" style="background:#00538c">DAL</span><div><b>Fumble</b><small>Ball on the ground at their own 30</small></div><i>NFL</i></div>
+<div class="fc"><span class="bd" style="background:#552583">LAL</span><div><b>Missed free throw</b><small>Down one with four seconds left</small></div><i>NBA</i></div>
+</div></div>
+</div>
+<div class="cap">Example alerts, for illustration</div>
+</div>
+</div>
+</section>
 
-<h2>Nine leagues in one app</h2>
-<ul class="leagues">
+<div class="mq" aria-hidden="true"><div id="mq"><span>Blown lead</span><span>Fumble</span><span>Missed free throw</span><span>Strikeout</span><span>Interception</span><span>Own goal</span><span>Technical foul</span><span>Lost</span></div></div>
+
+<section class="sec" id="search"><div class="wrap feat">
+<div class="rv">
+<span class="kick">Search</span>
+<h2>Track teams you <em>can't stand.</em></h2>
+<p>Search any team or athlete across nine leagues and tap Track. See how many other people are rooting against them, too.</p>
+<ul><li>Teams, players, drivers and fighters</li><li>One tap to start tracking, one tap to stop</li></ul>
+</div>
+<div class="ph rv" id="se">
+<div class="phone" style="--r:2deg"><div class="scr">
+<div class="sbar"><span id="sq">Boston</span><u class="caret"></u></div>
+<div id="srows">
+<div class="sr sin"><span class="bd" style="background:#007a33">BOS</span><div><b>Boston Celtics</b><small>NBA, <span data-n="12480">12,480</span> haters</small></div><span class="trk">Track</span></div>
+<div class="sr sin"><span class="bd" style="background:#bd3039">BOS</span><div><b>Boston Red Sox</b><small>MLB, <span data-n="18207">18,207</span> haters</small></div><span class="trk">Track</span></div>
+<div class="sr sin"><span class="bd" style="background:#fcb514;color:#111">BOS</span><div><b>Boston Bruins</b><small>NHL, <span data-n="6931">6,931</span> haters</small></div><span class="trk">Track</span></div>
+<div class="sr sin"><span class="bd" style="background:#98002e">BC</span><div><b>Boston College Eagles</b><small>College football, <span data-n="1204">1,204</span> haters</small></div><span class="trk">Track</span></div>
+</div></div></div>
+<div class="cap">Example search, for illustration</div>
+</div>
+</div></section>
+
+<section class="sec" id="scores"><div class="wrap feat flip">
+<div class="rv">
+<span class="kick">Live scores</span>
+<h2>Watch them <em>lose live.</em></h2>
+<p>Follow every game your rivals play without watching a minute of it. Live scores, win chance and box scores, and the final-whistle alert when it is over.</p>
+<ul><li>Live score and clock for every tracked game</li><li>Box scores and play-by-play when you want the detail</li></ul>
+</div>
+<div class="ph rv" id="sc">
+<div class="phone" style="--r:-2deg"><div class="scr">
+<div class="ttl">Scores</div>
+<div class="gm">
+<div class="lv"><i class="dot"></i>LIVE <span id="clk">Q4 2:14</span></div>
+<div class="tm"><span class="bd" style="background:#007a33">BOS</span><span>Celtics</span><b id="sA">98</b></div>
+<div class="tm"><span class="bd" style="background:#006bb6">NYK</span><span>Knicks</span><b id="sB">101</b></div>
+<div class="odds"><span>BOS win chance</span><span></span><div class="bar"><i id="bar"></i></div><em id="pct">31%</em></div>
+<div class="loss" id="loss">BOS lost. Push sent.</div>
+</div>
+</div></div>
+<div class="cap">Example game, for illustration</div>
+</div>
+</div></section>
+
+<section class="sec" id="tracking"><div class="wrap feat">
+<div class="rv">
+<span class="kick">Tracking</span>
+<h2>Every rival. <em>One list.</em></h2>
+<p>The football team, the basketball team and the driver you can't stand, together in one place with the people who feel the same way.</p>
+<ul><li>All nine leagues in one list</li><li>No account, nothing to sign up for</li></ul>
+</div>
+<div class="ph rv" id="tkp">
+<div class="phone" style="--r:2deg"><div class="scr rs" id="tk">
+<div class="ttl">Tracking</div>
+<div class="tk"><span class="bd" style="background:#00538c">DAL</span><div><b>Dallas Cowboys</b><small>NFL</small></div><em data-n="31902">31,902</em></div>
+<div class="tk"><span class="bd" style="background:#0c2340">NYY</span><div><b>New York Yankees</b><small>MLB</small></div><em data-n="28117">28,117</em></div>
+<div class="tk" id="hitRow"><span class="bd" style="background:#552583">LAL</span><div><b>Los Angeles Lakers<span class="pill" hidden>LOST</span></b><small>NBA</small></div><em data-n="19544">19,544</em></div>
+<div class="tk"><span class="bd" style="background:#e31837">KC</span><div><b>Kansas City Chiefs</b><small>NFL</small></div><em data-n="22031">22,031</em></div>
+<div class="tk"><span class="bd" style="background:#007a33">BOS</span><div><b>Boston Celtics</b><small>NBA</small></div><em data-n="12480">12,480</em></div>
+</div></div>
+<div class="cap">Example list, for illustration</div>
+</div>
+</div></section>
+
+<section class="sec" id="control"><div class="wrap feat flip">
+<div class="rv">
+<span class="kick">Alert settings</span>
+<h2>Pick which failures <em>ping you.</em></h2>
+<p>Every alert type switches on or off per league and per player. Mute one alert for one player and keep it for everyone else.</p>
+<ul><li>Strikeouts, turnovers, blown leads, lost games and more</li><li>Quiet when you want it, loud when it matters</li></ul>
+</div>
+<div class="ph rv" id="ct">
+<div class="phone" style="--r:-2deg"><div class="scr">
+<div class="ttl">NBA alerts</div>
+<div class="al"><span>Blown lead</span><span class="sw on"></span></div>
+<div class="al"><span>Missed free throw</span><span class="sw on"></span></div>
+<div class="al"><span>Technical foul</span><span class="sw"></span></div>
+<div class="al"><span>Turnover</span><span class="sw on"></span></div>
+<div class="al"><span>Gets blocked</span><span class="sw"></span></div>
+<div class="al"><span>Lost game</span><span class="sw on"></span></div>
+</div></div>
+<div class="cap">Example settings, for illustration</div>
+</div>
+</div></section>
+
+<section class="sec" id="how" style="padding-top:24px"><div class="wrap">
+<h2 class="h2 rv">Three taps to your first alert</h2>
+<div class="grid4">
+<div class="tile rv"><span class="n">1</span><h3>Pick who you can't stand</h3><p>Search any team or athlete and tap Track.</p></div>
+<div class="tile rv"><span class="n">2</span><h3>Choose what you want to hear about</h3><p>Alert types switch on or off per league and per player.</p></div>
+<div class="tile rv"><span class="n">3</span><h3>Get the alert as it happens</h3><p>A notification on your phone, and a feed you can scroll back through.</p></div>
+</div>
+<div class="grid4 four">
+<div class="tile rv"><h3>Real-time alerts</h3><p>Strikeouts, turnovers, blown leads, lost games and more, the moment they happen.</p></div>
+<div class="tile rv"><h3>Your rules, player by player</h3><p>Turn off one alert for one player and keep it for everyone else.</p></div>
+<div class="tile rv"><h3>Follow without watching</h3><p>Live scores and box scores for every game your rivals play.</p></div>
+<div class="tile rv"><h3>Private by default</h3><p>No account, no ads, and one tap deletes what the app has stored about your device.</p></div>
+</div>
+</div></section>
+
+<section class="sec" style="padding-top:24px"><div class="wrap">
+<h2 class="h2 rv">Nine leagues in one app</h2>
+<ul class="leagues rv" id="leagues">
 <li><a href="/leagues/nfl/">NFL</a></li><li><a href="/leagues/nba/">NBA</a></li><li><a href="/leagues/wnba/">WNBA</a></li><li><a href="/leagues/mlb/">MLB</a></li><li><a href="/leagues/nhl/">NHL</a></li><li><a href="/leagues/college-football/">College football</a></li><li><a href="/leagues/premier-league/">Premier League</a></li><li><a href="/leagues/f1/">Formula 1</a></li><li><a href="/leagues/ufc/">UFC</a></li>
 </ul>
-<p>Rival-alert apps like OPPS and Score Losers cover a single sport. Hate Watch covers all nine, so one app handles the football team, the basketball team and the driver you can't stand. See <a href="/rival-alerts/">how rival alerts work</a>.</p>
+<p class="small">Rival-alert apps like OPPS and Score Losers cover a single sport. Hate Watch covers all nine, so one app handles the football team, the basketball team and the driver you can't stand. See <a href="/rival-alerts/">how rival alerts work</a>.</p>
+</div></section>
 
-<h2>What you get</h2>
-<ul>
-<li><strong>Real-time alerts:</strong> strikeouts, turnovers, blown leads, lost games and more, the moment they happen.</li>
-<li><strong>Your rules, player by player:</strong> turn off one alert for one player and keep it for everyone else.</li>
-<li><strong>Follow along without watching:</strong> live scores and box scores for every game your rivals play.</li>
-<li><strong>Private by default:</strong> no account, no ads, and one tap deletes what the app has stored about your device.</li>
-</ul>
-
-<h2>Questions</h2>
+<section class="sec" id="faq" style="padding-top:24px"><div class="wrap">
+<h2 class="h2 rv" style="margin-bottom:28px">Questions</h2>
 <details><summary>Is Hate Watch free?</summary><p>Yes. Every alert and feature is free, with no ads and no account. Hate Watch Plus is an optional subscription.</p></details>
 <details><summary>Which leagues does it cover?</summary><p>The NFL, NBA, WNBA, MLB, NHL, college football, the English Premier League, Formula 1 and UFC.</p></details>
 <details><summary>Do I need an account?</summary><p>No. There is no sign-up or login. One tap in Settings deletes everything the app has stored about your device.</p></details>
 <details><summary>Can I use it in a browser?</summary><p>Yes. The web version at <a href="/">hatewatch.dev</a> works in any browser. Push notifications need the iPhone or Android app.</p></details>
 <details><summary>Where do the scores come from?</summary><p>From public sources, so they can be delayed or contain errors. Hate Watch is not affiliated with or endorsed by any league, team or player.</p></details>
-<!-- Add the App Store and Google Play buttons here once both listings are live (docs/seo-plan.md, Phase 1). -->
+</div></section>
+
+<section id="get"><div class="wrap">
+<div class="cta rv">
+<h2>Never miss<br>the <em>L.</em></h2>
+<div class="stores">
+<span class="store" role="img" aria-label="App Store, coming soon"><small>Coming soon to the</small><b>App Store</b></span>
+<span class="store" role="img" aria-label="Google Play, coming soon"><small>Coming soon to</small><b>Google Play</b></span>
+</div>
+<p class="note">Free. No account. Push alerts need the iPhone or Android app. <a href="/">Try the web version</a>.</p>
+</div>
+</div></section>
 </main>
-<footer>
+
+<footer><div class="wrap">
 <p><a href="https://hate-watch-api.fly.dev/privacy">Privacy</a><a href="https://hate-watch-api.fly.dev/support">Support</a></p>
-<p>Hate Watch is not affiliated with or endorsed by any league, team or player. Scores and statistics come from public sources and may be delayed or contain errors.</p>
-</footer>
+<p>Hate Watch is not affiliated with or endorsed by any league, team or player. Scores and statistics come from public sources and may be delayed or contain errors. Example alerts, teams and numbers on this page are for illustration.</p>
+</div></footer>
+
+<script>
+(function(){
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function $(s,r){return (r||document).querySelector(s)}
+function $$(s,r){return [].slice.call((r||document).querySelectorAll(s))}
+
+// scroll reveal
+var rev=$$('.rv,.rs');
+if('IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.15});
+  rev.forEach(function(el){io.observe(el)});
+}else rev.forEach(function(el){el.classList.add('in')});
+if(RM||!('IntersectionObserver' in window))return;
+
+// glow parallax
+var tick=false;
+addEventListener('scroll',function(){if(tick)return;tick=true;requestAnimationFrame(function(){document.documentElement.style.setProperty('--sy',scrollY);tick=false})},{passive:true});
+
+// ticker: duplicate so the -50% loop is seamless
+var mq=$('#mq');mq.innerHTML+=mq.innerHTML;
+
+// counter
+function roll(el,to,dur){
+  var t0=performance.now();
+  (function f(now){var p=Math.min(1,(now-t0)/(dur||1200));el.textContent=Math.round(to*(1-Math.pow(1-p,3))).toLocaleString('en-US');if(p<1)requestAnimationFrame(f)})(t0);
+}
+
+// scene: runs while on screen, resets when it leaves, loops by rescheduling itself
+function scene(el,run,reset,every){
+  var ids=[];
+  function t(fn,ms){ids.push(setTimeout(fn,ms))}
+  function go(){run(t);if(every)t(function(){reset();t(go,500)},every)}
+  reset();
+  new IntersectionObserver(function(es){
+    if(es[0].isIntersecting){go()}
+    else{ids.forEach(clearTimeout);ids=[];reset()}
+  },{threshold:.4}).observe(el);
+}
+
+// hero feed + push toast
+var FEED=[
+['BOS','#007a33','Blown lead','Gave up a 14 point lead in the 4th','NBA'],
+['DAL','#00538c','Fumble','Ball on the ground at their own 30','NFL'],
+['LAL','#552583','Missed free throw','Down one with four seconds left','NBA'],
+['TOR','#134a8e','Strikeout','Bases loaded, nobody out, three straight Ks','MLB'],
+['KC','#e31837','Interception','Picked off in the red zone','NFL'],
+['MIA','#008e97','Lost','Final: 3-1. Season series gone','MLB'],
+['LIV','#c8102e','Own goal','Put it in their own net, 67 min','EPL'],
+['CHI','#c83803','Technical foul','Third of the night. Ejected','NBA']];
+var hf=$('#heroFeed'),toast=$('#toast'),fi=3;
+function card(a){var d=document.createElement('div');d.className='fc new';d.innerHTML='<span class="bd" style="background:'+a[1]+'">'+a[0]+'</span><div><b>'+a[2]+'</b><small>'+a[3]+'</small></div><i>'+a[4]+'</i>';return d}
+function push(){
+  var a=FEED[fi++%FEED.length];
+  hf.insertBefore(card(a),hf.firstChild);
+  while(hf.children.length>5)hf.removeChild(hf.lastChild);
+  toast.innerHTML='<b>HATE WATCH, NOW</b>'+a[0]+': '+a[2]+'. '+a[3];
+  toast.classList.remove('show');void toast.offsetWidth;toast.classList.add('show');
+}
+scene($('#hero'),function(t){(function loop(){push();t(loop,2600)})()},function(){});
+
+// search
+var sq=$('#sq'),srows=$('#srows'),sins=$$('.sin',srows),trks=$$('.trk',srows),scnt=$$('[data-n]',srows);
+scene($('#se'),function(t){
+  var w='Boston';
+  for(var i=1;i<=w.length;i++)(function(i){t(function(){sq.textContent=w.slice(0,i)},300+i*140)})(i);
+  sins.forEach(function(r,i){t(function(){r.style.opacity=1;r.style.transform='none';roll(scnt[i],+scnt[i].getAttribute('data-n'),1100)},1300+i*130)});
+  [0,2].forEach(function(i,k){t(function(){trks[i].classList.add('on');trks[i].textContent='Tracking'},2500+k*700)});
+},function(){
+  sq.textContent='';
+  sins.forEach(function(r){r.style.opacity=0;r.style.transform='translateY(14px)'});
+  trks.forEach(function(b){b.classList.remove('on');b.textContent='Track'});
+  scnt.forEach(function(c){c.textContent='0'});
+},8000);
+
+// scores
+var clk=$('#clk'),sA=$('#sA'),sB=$('#sB'),bar=$('#bar'),pct=$('#pct'),loss=$('#loss');
+function set(el,v){el.textContent=v;el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump')}
+function odds(p){bar.style.width=p+'%';pct.textContent=p+'%'}
+scene($('#sc'),function(t){
+  t(function(){clk.textContent='Q4 1:41';set(sB,103);odds(19)},1200);
+  t(function(){clk.textContent='Q4 0:52'},2400);
+  t(function(){clk.textContent='Q4 0:19';set(sB,105);odds(6)},3400);
+  t(function(){clk.textContent='FINAL';odds(0);loss.classList.add('show')},4600);
+},function(){
+  clk.textContent='Q4 2:14';sA.textContent='98';sB.textContent='101';odds(31);loss.classList.remove('show');
+},9000);
+
+// tracking
+var tk=$('#tk'),tkc=$$('[data-n]',tk),hit=$('#hitRow'),pill=$('.pill',hit);
+scene($('#tkp'),function(t){
+  tk.classList.add('in');
+  var rows=$$('.tk',tk);
+  rows.forEach(function(r,i){r.style.transitionDelay=i*.1+'s'});
+  tkc.forEach(function(c,i){t(function(){roll(c,+c.getAttribute('data-n'),1200)},300+i*100)});
+  t(function(){hit.classList.add('hit');pill.hidden=false},2600);
+},function(){
+  tk.classList.remove('in');hit.classList.remove('hit');pill.hidden=true;
+  tkc.forEach(function(c){c.textContent='0'});
+},7000);
+
+// control
+var sws=$$('.sw',$('#ct')),want=sws.map(function(s){return s.classList.contains('on')});
+scene($('#ct'),function(t){
+  sws.forEach(function(s,i){t(function(){s.classList.toggle('on',want[i])},500+i*320)});
+},function(){sws.forEach(function(s){s.classList.remove('on')})},6000);
+})();
+</script>
 </body>
 </html>
