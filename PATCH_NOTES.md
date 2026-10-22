@@ -23,7 +23,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts after 15 minutes, so deleted apps stop getting them.
 - Server: shared alert pages are noindex and link to rival alerts.
-- Website: hatewatch.dev/about is now an animated page promoting the apps.
+- Website: hatewatch.dev is now an animated page promoting the apps; the web version of the app moved to hatewatch.dev/app, and old app links redirect there.
 - Scores: a "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card): both teams and scores, the series line ("Series tied 2 - 2") and each game's winner.
 - Scores: under those games, "Coming up" lists playoff games and series starting in the next 7 days with "Who do you want to lose?". Vote for either team, see each team's share, change yours until the first game starts. The view is named for the league.
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. On, the team you voted to lose is tracked for you and shows in Tracking. A series ends it once won; a one-off game covers that game only.

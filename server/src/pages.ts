@@ -138,7 +138,7 @@ export function sharePage(o: { title: string; description: string; pageUrl: stri
   return layout(o.title, `
 ${o.imageUrl ? `<img class="shot" src="${esc(o.imageUrl)}" width="1200" height="630" alt="${esc(o.title)}">` : `<h1>${esc(o.title)}</h1>`}
 <p><a class="cta" href="${esc(o.storeUrl)}">Download Hate Watch on the App Store</a></p>
-<p>Hate Watch tracks the players and teams you can't stand and tells you the second something goes wrong for them. <a href="https://hatewatch.dev/about/">See how rival alerts work</a>.</p>`, head);
+<p>Hate Watch tracks the players and teams you can't stand and tells you the second something goes wrong for them. <a href="https://hatewatch.dev/">See how rival alerts work</a>.</p>`, head);
 }
 
 export function supportPage() {

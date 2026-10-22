@@ -1,10 +1,12 @@
 {
-  // The web version of the app: `npx expo export --platform web` writes ./dist,
-  // Cloudflare serves it. worker.js runs only for the app's own routes (one line per file in
-  // src/app/, below): it serves them the app shell so Expo Router's client routes (/game/...,
-  // /stats/...) work on reload, and adds the title, description and social tags to "/" (docs/seo-plan.md,
-  // Phase 0). Every other path is a plain file in ./dist or a real 404 (public/404.html).
-  // A NEW ROUTE FILE IN src/app/ MUST BE ADDED TO run_worker_first, or its address returns 404 on reload.
+  // hatewatch.dev: the marketing page at "/" (public/about/index.html) and the web version of the app at
+  // "/app". `npx expo export --platform web` writes ./dist (with baseUrl /app, set by app.config.js), Cloudflare
+  // serves it. worker.js runs only for the paths below: it serves "/" the marketing page, 301s "/about" to "/",
+  // serves /app/... the app shell (so Expo Router's client routes, /app/game/..., work on reload) and its files
+  // with the /app prefix stripped, and 301s the app's old root addresses (/game/..., /a/..., /scores ...) to /app/...
+  // Every other path is a plain file in ./dist or a real 404 (public/404.html).
+  // A NEW ROUTE FILE IN src/app/ NEEDS NOTHING HERE: it lives under /app/*. The old root list below
+  // exists only for the redirects; a new top-level page is a file in public/.
   "name": "hate-watch-2-0",
   "main": "./worker.js",
   "compatibility_date": "2026-10-01",
@@ -14,6 +16,10 @@
     "not_found_handling": "404-page",
     "run_worker_first": [
       "/",
+      "/about",
+      "/about/",
+      "/app",
+      "/app/*",
       "/following",
       "/scores",
       "/search",
