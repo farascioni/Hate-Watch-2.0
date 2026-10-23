@@ -60,6 +60,8 @@ h1 em{font-style:normal;color:var(--red);background:linear-gradient(90deg,var(--
 /* phone */
 .ph{position:relative;display:flex;justify-content:center}
 .phone{position:relative;width:min(290px,78vw);aspect-ratio:9/18.5;border-radius:44px;border:9px solid #202026;background:var(--bg);box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px #34343c,0 0 70px rgba(229,35,43,.18);overflow:hidden;transform:rotate(var(--r,0deg))}
+.phone{transition:transform .45s cubic-bezier(.2,.8,.2,1),box-shadow .45s}
+@media(hover:hover){.phone:hover{transform:rotate(0deg) scale(1.14);z-index:6;box-shadow:0 60px 110px rgba(0,0,0,.75),0 0 0 1px #4a4a54,0 0 110px rgba(229,35,43,.4)}}
 .phone::before{content:"";position:absolute;left:50%;top:8px;width:84px;height:22px;margin-left:-42px;border-radius:99px;background:#000;z-index:3}
 .scr{position:absolute;inset:0;padding:44px 12px 12px;overflow:hidden}
 .ttl{font-weight:800;font-size:1.1rem;margin:0 4px 12px;letter-spacing:-.01em}
