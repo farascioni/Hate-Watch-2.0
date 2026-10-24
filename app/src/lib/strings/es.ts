@@ -86,7 +86,7 @@ export const es: Record<Key, string> = {
   'guide.track.button': 'Seguir',
   'guide.feed.where': 'Pestaña Novedades',
   'guide.feed.title': 'Cada mal momento, en vivo',
-  'guide.feed.body': 'Las alertas llegan a tu feed en el instante en que ocurren, las más nuevas primero, y te llegan como notificaciones. Un Hate Watch exitoso (un equipo que sigues pierde) muestra cuántos otros haters lo recibieron también. Toca el ícono de compartir para enviar una a un amigo.',
+  'guide.feed.body': 'Las alertas llegan a tu feed en el instante en que ocurren, las más nuevas primero, Las derrotas y las malas noticias también llegan como notificaciones; cualquier otra alerta se queda en el feed hasta que actives su campana. Un Hate Watch exitoso (un equipo que sigues pierde) muestra cuántos otros haters lo recibieron también. Toca el ícono de compartir para enviar una a un amigo.',
   'guide.feed.demoTitle': '¡Hate Watch exitoso! Eagles perdió ante Bears',
   'guide.feed.demoSub': 'Marcador final: 24 a 17',
   'guide.scores.where': 'Pestaña Marcadores',

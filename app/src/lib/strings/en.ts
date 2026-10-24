@@ -90,7 +90,7 @@ export const en = {
   'guide.track.button': 'Track',
   'guide.feed.where': 'Feed tab',
   'guide.feed.title': 'Every bad moment, live',
-  'guide.feed.body': 'Alerts land in your feed the moment they happen, newest first, and arrive as notifications. A Successful Hate Watch (a team you track losing) shows how many other hate watchers got it too. Tap the share icon to send one to a friend.',
+  'guide.feed.body': 'Alerts land in your feed the moment they happen, newest first, Losses and bad news also arrive as notifications; every other alert waits in the feed until you turn its bell on. A Successful Hate Watch (a team you track losing) shows how many other hate watchers got it too. Tap the share icon to send one to a friend.',
   'guide.feed.demoTitle': 'Successful Hate Watch! Eagles lost to the Bears',
   'guide.feed.demoSub': 'Final Score: 24 to 17',
   'guide.scores.where': 'Scores tab',

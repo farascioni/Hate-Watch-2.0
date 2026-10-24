@@ -81,7 +81,7 @@ export const fr: Record<Key, string> = {
   'guide.track.button': 'Suivre',
   'guide.feed.where': 'Onglet Fil',
   'guide.feed.title': 'Chaque mauvais moment, en direct',
-  'guide.feed.body': 'Les alertes arrivent dans votre fil à l’instant où elles se produisent, les plus récentes d’abord, et vous parviennent en notifications. Un Hate Watch réussi (une équipe que vous suivez perd) indique combien d’autres amateurs de Hate Watch l’ont reçu aussi. Touchez l’icône de partage pour en envoyer une à un ami.',
+  'guide.feed.body': 'Les alertes arrivent dans votre fil à l’instant où elles se produisent, les plus récentes d’abord, Les défaites et les mauvaises nouvelles arrivent aussi en notifications ; toute autre alerte reste dans le fil jusqu’à ce que vous activiez sa cloche. Un Hate Watch réussi (une équipe que vous suivez perd) indique combien d’autres amateurs de Hate Watch l’ont reçu aussi. Touchez l’icône de partage pour en envoyer une à un ami.',
   'guide.feed.demoTitle': 'Hate Watch réussi! Les Eagles ont perdu contre les Bears',
   'guide.feed.demoSub': 'Pointage final : 24 à 17',
   'guide.scores.where': 'Onglet Pointages',

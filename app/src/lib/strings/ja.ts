@@ -81,7 +81,7 @@ export const ja: Record<Key, string> = {
   'guide.track.button': '追跡',
   'guide.feed.where': 'フィードタブ',
   'guide.feed.title': '惨めな瞬間を、リアルタイムで',
-  'guide.feed.body': 'アラートは起きた瞬間にフィードへ届き、新しいものが上に並び、通知としても届きます。「Hate Watch成功」(追跡中のチームが負ける)では、ほかに何人のHate Watcherが受け取ったかも表示されます。共有アイコンをタップすると友だちに送れます。',
+  'guide.feed.body': 'アラートは起きた瞬間にフィードへ届き、新しいものが上に並び、負けや悪いニュースは通知でも届きます。それ以外のアラートは、ベルをオンにするまでフィードにだけ表示されます。「Hate Watch成功」(追跡中のチームが負ける)では、ほかに何人のHate Watcherが受け取ったかも表示されます。共有アイコンをタップすると友だちに送れます。',
   'guide.feed.demoTitle': 'Hate Watch成功!イーグルスがベアーズに敗戦',
   'guide.feed.demoSub': '最終スコア:24対17',
   'guide.scores.where': 'スコアタブ',

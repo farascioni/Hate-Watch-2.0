@@ -81,7 +81,7 @@ export const de: Record<Key, string> = {
   'guide.track.button': 'Folgen',
   'guide.feed.where': 'Tab Feed',
   'guide.feed.title': 'Jeder schlechte Moment, live',
-  'guide.feed.body': 'Alerts landen in dem Moment in deinem Feed, in dem sie passieren, die neuesten zuerst, und kommen als Mitteilungen an. Ein erfolgreicher Hate Watch (ein Team, dem du folgst, verliert) zeigt, wie viele andere Hate Watcher ihn auch bekommen haben. Tippe auf das Teilen-Symbol, um einen an einen Freund zu schicken.',
+  'guide.feed.body': 'Alerts landen in dem Moment in deinem Feed, in dem sie passieren, die neuesten zuerst, Niederlagen und schlechte Nachrichten kommen auch als Mitteilungen; jeder andere Alert bleibt im Feed, bis du seine Glocke einschaltest. Ein erfolgreicher Hate Watch (ein Team, dem du folgst, verliert) zeigt, wie viele andere Hate Watcher ihn auch bekommen haben. Tippe auf das Teilen-Symbol, um einen an einen Freund zu schicken.',
   'guide.feed.demoTitle': 'Erfolgreicher Hate Watch! Die Eagles haben gegen die Bears verloren',
   'guide.feed.demoSub': 'Endstand: 24 zu 17',
   'guide.scores.where': 'Tab Ergebnisse',

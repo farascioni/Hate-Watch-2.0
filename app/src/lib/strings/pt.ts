@@ -81,7 +81,7 @@ export const pt: Record<Key, string> = {
   'guide.track.button': 'Acompanhar',
   'guide.feed.where': 'Aba Feed',
   'guide.feed.title': 'Cada momento ruim, ao vivo',
-  'guide.feed.body': 'Os alertas chegam ao seu feed no instante em que acontecem, os mais novos primeiro, e chegam como notificações. Um Hate Watch bem-sucedido (um time que você acompanha perde) mostra quantos outros hate watchers também o receberam. Toque no ícone de compartilhar para enviar um a um amigo.',
+  'guide.feed.body': 'Os alertas chegam ao seu feed no instante em que acontecem, os mais novos primeiro, Derrotas e más notícias também chegam como notificações; qualquer outro alerta fica no feed até você ligar o sino dele. Um Hate Watch bem-sucedido (um time que você acompanha perde) mostra quantos outros hate watchers também o receberam. Toque no ícone de compartilhar para enviar um a um amigo.',
   'guide.feed.demoTitle': 'Hate Watch bem-sucedido! Os Eagles perderam para os Bears',
   'guide.feed.demoSub': 'Placar final: 24 a 17',
   'guide.scores.where': 'Aba Placares',
