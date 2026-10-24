@@ -7,6 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Injury alerts: tracking a player and their team no longer shows one injury twice; you get the player's alert, and a team-only follower still gets the team's.
 - Scores tab: switching the league chip (for example MLB to NBA) while a segment was picked no longer leaves the My / Playoffs / All highlight hanging off the right edge of the switch. (Update)
 - Injury alerts: a player reinstated or activated from the injured list no longer sends an injury alert (player or team).
 - Hate Watch Plus: when a subscription doesn't go through, the alert also shows the store's error code and details, so a screenshot says what Apple returned. (Update)

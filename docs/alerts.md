@@ -919,7 +919,7 @@ The alerts every tracked player can get, whatever the league: getting injured, g
 - **What counts as worse** (`severity`): injured reserve, IR, 60-day or season (4); out or suspension (3); doubtful (2); questionable, day-to-day or probable (1); anything else (1). A player alerts when they're new on the report or their status is more severe than before. A recovery or the same status sends nothing.
 - **The player's alert:** "Cooper Rush is injured (Out)" when new, "Cooper Rush downgraded to Out" when worse (`test/injuries.test.ts`). **Body:** ESPN's short comment, else the details type, else "<Team> injury report". Id `inj:${league}:${athleteId}:${status}:${day}`: once a day per status.
 - **The team's alert, one per report update:** every player on a team who changed in that read is one `team.player_injured` alert for the team, not one per player.
-  - One player: "Falcons: Cooper Rush downgraded to Out", the same alert and id as before batching (`${playerId}:team`).
+  - One player: "Falcons: Cooper Rush downgraded to Out", the same alert and id as before batching (`${playerId}:team`). It shares the player's moment with no fold, so a device that tracks both the player and the team gets the player's alert only (`test/injuries.test.ts`); a team-only device gets this one.
   - Several, all downgraded to one status: "Falcons: 6 players downgraded to Out".
   - Otherwise: "Falcons: 3 players on the injury report (2 Out, 1 Questionable)", or "Falcons: 6 players on the injury report (6 Out)" when they're new names with one status.
   - **Body:** the first three by severity, then name ("Cooper Rush (Out), Jared Ivey (Out), Robert Longerbeam (Questionable)"; without statuses when they all share one), and "and 3 more".

@@ -1886,14 +1886,14 @@ export function injuryEvents(lg: League, prev: InjuryReport, now: InjuryReport, 
     const title = was ? `${name} downgraded to ${cur.status}` : `${name} is injured (${cur.status})`;
     const id = `inj:${lg}:${athleteId}:${cur.status}:${day}`;
     const body = cur.detail || `${team?.shortName ?? ''} injury report`;
-    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at, meta: { athleteId, status: cur.status } });
+    events.push({ id, type: 'player.injured', targetKey: playerKey(lg, athleteId), title, body, at, moment: id, meta: { athleteId, status: cur.status } }); // the id is also the moment: a device with the player and the team gets this one, not the team's copy
     if (team) byTeam.set(team.key, [...(byTeam.get(team.key) ?? []), { athleteId, name, status: cur.status, downgrade: !!was, title, body, id }]);
   }
   for (const [key, changes] of byTeam) {
     const team = catalog.team(key)!;
-    if (changes.length === 1) { // one player: the same alert (and id) as always
+    if (changes.length === 1) { // one player: the same alert (and id) as always, in the player's moment with no fold, so a device with both gets one
       const c = changes[0];
-      events.push({ id: `${c.id}:team`, type: 'team.player_injured', targetKey: key, title: `${team.shortName}: ${c.title}`, body: c.body, at, meta: { athleteId: c.athleteId } });
+      events.push({ id: `${c.id}:team`, type: 'team.player_injured', targetKey: key, title: `${team.shortName}: ${c.title}`, body: c.body, at, moment: c.id, meta: { athleteId: c.athleteId } });
       continue;
     }
     changes.sort((a, b) => severity(b.status) - severity(a.status) || a.name.localeCompare(b.name));

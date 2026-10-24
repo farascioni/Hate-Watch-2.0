@@ -86,3 +86,22 @@ test('delivery: one Falcons notification for the batch, stacked with the player 
   assert.deepEqual([...new Set(sent.map((m) => m.threadId))], ['team:nfl:1'], 'one iOS stack for the Falcons');
   setPushSender(() => {});
 });
+
+test('delivery: one injury is one alert for a device with the player and the team; either alone still gets theirs', () => {
+  const prefs = JSON.stringify({ ...DEFAULT_PREFS, pushTypes: { ...DEFAULT_PREFS.pushTypes, 'player.injured': true, 'team.player_injured': true } });
+  const add = (id: string, keys: string[]) => {
+    db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run(id, 's', 'ios', `ExponentPushToken[${id}]`, prefs);
+    for (const k of keys) db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run(id, k);
+  };
+  add('both', ['team:nfl:1', 'player:nfl:102']);
+  add('teamonly', ['team:nfl:1']);
+  add('playeronly', ['player:nfl:102']);
+  const sent: { to: string; title: string }[] = [];
+  setPushSender((msgs) => sent.push(...msgs));
+  publish(injuryEvents('nfl', {}, report([[102, 'Out']]), '2026-10-06', 0), 'nfl');
+  const titles = (id: string) => sent.filter((m) => m.to === `ExponentPushToken[${id}]`).map((m) => m.title);
+  assert.deepEqual(titles('both'), ['🤕 Robert Longerbeam is injured (Out)'], 'the player alert only, not the team copy too');
+  assert.deepEqual(titles('teamonly'), ['🚑 Falcons: Robert Longerbeam is injured (Out)']);
+  assert.deepEqual(titles('playeronly'), ['🤕 Robert Longerbeam is injured (Out)']);
+  setPushSender(() => {});
+});
