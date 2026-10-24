@@ -303,6 +303,47 @@ export function keepFlagsPushed() {
 keepFlagsPushed();
 
 /**
+ * October 22 2026: only loss alerts push by default now (`LOSS_PUSH`, event-types.ts); every other alert is on but feed
+ * only until its 🔔 is switched on. Installs from before keep their pushes, once, wherever they hadn't chosen: this is
+ * the frozen list of what pushed by default before (the types not in LOSS_PUSH), so it never follows EVENT_TYPES.
+ */
+export const NON_LOSS_WERE_PUSHED = [
+  'mlb.batter.strikeout', 'mlb.batter.multi_strikeout', 'mlb.batter.double_play', 'mlb.runner.caught_stealing', 'mlb.runner.out_on_bases',
+  'mlb.batter.popout', 'mlb.fielder.error', 'mlb.catcher.passed_ball', 'mlb.pitcher.blown_save', 'mlb.pitcher.home_run_allowed',
+  'mlb.pitcher.chased', 'mlb.pitcher.gift_run', 'mlb.pitcher.walk', 'mlb.team.no_hit', 'mlb.team.nobletiger', 'mlb.team.bases_loaded',
+  'mlb.team.opponent_risp', 'nfl.qb.interception', 'nfl.fumble_lost', 'nfl.safety', 'nfl.qb.delay_of_game', 'nfl.qb.pulled',
+  'nfl.qb.incompletion', 'nfl.fumble', 'nfl.td_wiped_out', 'nfl.kicker.miss', 'nfl.team.onside_recovered', 'nfl.team.turnover_on_downs',
+  'nfl.team.red_zone_empty', 'cfb.team.interception', 'cfb.team.fumble_lost', 'cfb.team.qb_pulled', 'cfb.team.fumble',
+  'cfb.team.incompletion', 'cfb.td_wiped_out', 'cfb.team.ejection', 'cfb.team.kick_missed', 'cfb.team.onside_recovered',
+  'cfb.team.turnover_on_downs', 'cfb.team.red_zone_empty', 'cfb.safety',
+  'nba.got_blocked', 'nba.missed_shot', 'nba.technical', 'nba.fouled_out', 'nba.foul', 'nba.team.star_went_off',
+  'wnba.got_blocked', 'wnba.missed_shot', 'wnba.technical', 'wnba.fouled_out', 'wnba.foul', 'wnba.team.star_went_off',
+  'nhl.shootout_miss', 'nhl.shot_blocked', 'nhl.shot_saved', 'nhl.giveaway', 'nhl.penalty', 'nhl.fight', 'nhl.goalie.goal_allowed',
+  'nhl.goalie.pulled', 'nhl.team.power_play_fail', 'epl.penalty_missed', 'epl.goal_disallowed', 'epl.lost_ball', 'epl.pass_given_away',
+  'epl.own_goal', 'epl.penalty_conceded', 'epl.red_card', 'epl.yellow_card', 'epl.goal_conceded', 'epl.subbed_off_early',
+  'epl.team.late_goal', 'epl.team.relegation_zone', 'f1.driver.dnf', 'f1.driver.out_of_points', 'f1.driver.lost_places',
+  'f1.driver.beaten_by_teammate', 'f1.driver.lapped', 'f1.driver.session_start', 'f1.driver.back_of_grid', 'f1.driver.quali_knockout',
+  'f1.driver.outqualified', 'ufc.knocked_down', 'ufc.fight_start', 'player.ejected', 'player.injured', 'off_field', 'fine_suspension',
+  'team.game_start', 'team.off_field', 'team.fine_suspension', 'app.weekly_recap',
+];
+export function keepNonLossPushes() {
+  if (kvGet('prefs:loss-only-push')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      p.pushTypes = { ...Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])), ...p.pushTypes };
+      save.run(JSON.stringify(p), id);
+    }
+    kvSet('prefs:loss-only-push', { at: Date.now(), devices: rows.length });
+  });
+  prefsCache.clear();
+  if (rows.length) console.log(`[prefs] kept the old pushes for ${rows.length} existing devices (new installs push losses only)`);
+}
+keepNonLossPushes();
+
+/**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
  * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
  * with home runs switched off, it arrives as a run and pushes.

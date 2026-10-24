@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 
 // The DB module opens its file on import, so point it at memory before loading app code.
 process.env.HW_DB = ':memory:';
-const { wants, shouldDeliver, pushAllowed, inQuietHours, DEFAULT_PREFS } = await import('../src/fanout.ts');
+const { wants, shouldDeliver, pushAllowed, inQuietHours, DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { parseStandings } = await import('../src/live.ts');
 const { nextScore, ordinal, mergePlays, observePlay, mlbFinalHalfInning, mlbHalfInningEnd, PLAYER_DETECTORS, teamScoreEvents } = await import('../src/detectors.ts');
 

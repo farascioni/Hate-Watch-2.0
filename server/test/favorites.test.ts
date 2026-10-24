@@ -13,7 +13,9 @@ team.run('team:mlb:5', 'mlb', '5', 'Cleveland Guardians', 'Guardians', 'CLE');
 team.run('team:mlb:10', 'mlb', '10', 'New York Yankees', 'Yankees', 'NYY');
 loadCatalog();
 
-const { DEFAULT_PREFS, publish, setPushSender, setPrefs, feedItem } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED, publish, setPushSender, setPrefs, feedItem } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { addFavorite, updateFavorite, registerGame, favoriteTeamKeys, removeFavorite } = await import('../src/favorites.ts');
 const { gameLostEvent, gameStartEvents } = await import('../src/detectors.ts');
 const { hateWatchTally, RECIPIENTS } = await import('../src/hate-watches.ts');

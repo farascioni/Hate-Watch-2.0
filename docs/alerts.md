@@ -6,7 +6,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 
 ## Index
 
-**Summary.** Hate Watch has 152 alert types (`EVENT_TYPES` in `server/src/event-types.ts`: the base list, a copy of each NBA-only type for the WNBA, and a copy of each soccer type for every soccer league). Each has a scope (a player or a team, some both), a section in the app's Settings, and a default in one of three tiers: **push**, **feed only** (on, no notification until its bell is tapped), or **off**. Live games are read by one game tracker per game every 2 seconds (`server/src/live.ts`), and each play goes through its league's detector once (`server/src/detectors.ts`). Losses and their facts are worked out at the final, standings every 60 seconds, injury reports every 30, news every 3 minutes, F1 and the UFC by their own watchers (`f1.ts`, `ufc.ts`). Every alert then goes through `publish()` (`server/src/fanout.ts`), which stores it once, decides per device whether it's wanted and whether it pushes, and makes alerts about one moment into one alert with lines. Each section starts with a table of its types (generated from `event-types.ts`): the type id, its label in Settings, who it's about (with the positions it fits, in ESPN's codes), its Settings section, and its default for a new install.
+**Summary.** Hate Watch has 153 alert types (`EVENT_TYPES` in `server/src/event-types.ts`: the base list, a copy of each NBA-only type for the WNBA, and a copy of each soccer type for every soccer league). Each has a scope (a player or a team, some both), a section in the app's Settings, and a default in one of three tiers: **push**, **feed only** (on, no notification until its bell is tapped), or **off**. Live games are read by one game tracker per game every 2 seconds (`server/src/live.ts`), and each play goes through its league's detector once (`server/src/detectors.ts`). Losses and their facts are worked out at the final, standings every 60 seconds, injury reports every 30, news every 3 minutes, F1 and the UFC by their own watchers (`f1.ts`, `ufc.ts`). Every alert then goes through `publish()` (`server/src/fanout.ts`), which stores it once, decides per device whether it's wanted and whether it pushes, and makes alerts about one moment into one alert with lines. Each section starts with a table of its types (generated from `event-types.ts`): the type id, its label in Settings, who it's about (with the positions it fits, in ESPN's codes), its Settings section, and its default for a new install.
 
 **Sections:**
 
@@ -44,7 +44,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 - [MLB pitchers: blown save, no quality start, loss](#mlb-pitchers-blown-save-no-quality-start-loss): from the box score: blown saves, no quality start, chased early, the loss as a line on the team's loss.
 - [MLB loses a challenge](#mlb-loses-a-challenge): ABS challenges (held until the review settles), replay challenges, crew chief reviews.
 - [MLB opponent in scoring position](#mlb-opponent-in-scoring-position): a runner on second or third against the tracked team, once a half-inning, and once more when a runner steals or runs up to third.
-- [MLB opponent loads the bases](#mlb-opponent-loads-the-bases): the bases loaded against the tracked team, pushed, with the pitcher's walk as a line.
+- [MLB opponent loads the bases](#mlb-opponent-loads-the-bases): the bases loaded against the tracked team, feed only, with the pitcher's walk as a line.
 - [College football](#college-football) (no table row): the NFL's alerts as a team's own `cfb.*` types, college flags, the AP poll, losing to an unranked team.
 - [UFC](#ufc) (no table row): fight starts, knockdowns, losses saying how and when, title fights, losing as the favorite, losing streaks.
 - [Your Hate Watch: the streak and the weekly recap](#your-hate-watch-the-streak-and-the-weekly-recap) (no table row): the device's own streak on a loss, and Monday's recap.
@@ -56,16 +56,16 @@ The MLB player alerts that come from a single play: strikeouts, outs, double pla
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `mlb.batter.strikeout` | Strikes out | player, not SP, RP, P | Offense | push |
-| `mlb.batter.multi_strikeout` | Strikes out 3+ times | player, not SP, RP, P | Offense | push |
-| `mlb.batter.double_play` | Hits into a double or triple play | player, not SP, RP, P | Offense | push |
+| `mlb.batter.strikeout` | Strikes out | player, not SP, RP, P | Offense | feed only |
+| `mlb.batter.multi_strikeout` | Strikes out 3+ times | player, not SP, RP, P | Offense | feed only |
+| `mlb.batter.double_play` | Hits into a double or triple play | player, not SP, RP, P | Offense | feed only |
 | `mlb.batter.popout` | Makes an out | player, not SP, RP, P | Offense | off |
-| `mlb.runner.out_on_bases` | Gets thrown out on the bases | player, not SP, RP, P | Offense | push |
+| `mlb.runner.out_on_bases` | Gets thrown out on the bases | player, not SP, RP, P | Offense | feed only |
 | `mlb.batter.hitless` | Goes hitless | player, not SP, RP, P | Offense | feed only |
-| `mlb.fielder.error` | Commits an error | player and team | Defense | push |
-| `mlb.catcher.passed_ball` | Lets a run score on a passed ball | player, only C | Defense | push |
-| `mlb.pitcher.home_run_allowed` | Gives up a home run | player, only SP, RP, P | Pitching | push |
-| `mlb.pitcher.gift_run` | Hands over a run | player, only SP, RP, P | Pitching | push |
+| `mlb.fielder.error` | Commits an error | player and team | Defense | feed only |
+| `mlb.catcher.passed_ball` | Lets a run score on a passed ball | player, only C | Defense | feed only |
+| `mlb.pitcher.home_run_allowed` | Gives up a home run | player, only SP, RP, P | Pitching | feed only |
+| `mlb.pitcher.gift_run` | Hands over a run | player, only SP, RP, P | Pitching | feed only |
 | `mlb.pitcher.runs_allowed` | Gives up runs | player, only SP, RP, P | Pitching | feed only |
 | `mlb.pitcher.walk` | Issues a walk / HBP | player, only SP, RP, P | Pitching | off |
 
@@ -177,20 +177,20 @@ The NFL's player alerts from single plays (interceptions, sacks, incompletions, 
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `nfl.qb.interception` | Throws an interception | player, only QB | Offense | push |
-| `nfl.fumble_lost` | Loses a fumble | player, not OT, G, C, OL, DE, DT, PK, LS | Offense | push |
-| `nfl.qb.pulled` | Gets pulled | player, only QB | Offense | push |
+| `nfl.qb.interception` | Throws an interception | player, only QB | Offense | feed only |
+| `nfl.fumble_lost` | Loses a fumble | player, not OT, G, C, OL, DE, DT, PK, LS | Offense | feed only |
+| `nfl.qb.pulled` | Gets pulled | player, only QB | Offense | feed only |
 | `nfl.qb.sacked` | Gets sacked | player, only QB | Offense | feed only |
 | `nfl.qb.incompletion` | Throws an incompletion | player, only QB | Offense | off |
 | `nfl.fumble` | Fumbles (any) | player, not OT, G, C, OL, DE, DT, PK, LS | Offense | off |
-| `nfl.td_wiped_out` | Touchdown wiped out by a penalty | team and player | Penalties | push |
+| `nfl.td_wiped_out` | Touchdown wiped out by a penalty | team and player | Penalties | feed only |
 | `nfl.penalty` | Commits a penalty | player and team | Penalties | feed only |
-| `nfl.kicker.miss` | Misses a kick | player, only PK | Special teams | push |
-| `nfl.team.turnover_on_downs` | Turns it over on downs | team | Team | push |
-| `nfl.team.red_zone_empty` | Comes away empty from the red zone | team | Team | push |
+| `nfl.kicker.miss` | Misses a kick | player, only PK | Special teams | feed only |
+| `nfl.team.turnover_on_downs` | Turns it over on downs | team | Team | feed only |
+| `nfl.team.red_zone_empty` | Comes away empty from the red zone | team | Team | feed only |
 | `nfl.team.three_and_out` | Goes three-and-out | team | Team | feed only |
 | `nfl.team.tied` | Ties a game | team | Team | feed only |
-| `player.ejected` | Gets ejected | player | Game | push |
+| `player.ejected` | Gets ejected | player | Game | feed only |
 
 **Where the plays come from.** The NFL's plays come from ESPN's core plays feed only: the site summary has drives without participants, so `GameTracker.poll` leaves its plays out for the NFL (`sitePlays` is empty for `nfl`). The summary is still read every 2 seconds, for the status, the header's score and the drives. The detector is `nfl()` in `detectors.ts`.
 
@@ -310,8 +310,8 @@ Alerts go out the moment a play is first seen; nothing waits for a review. ESPN 
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `nfl.qb.delay_of_game` | Delay of game | player, only QB | Offense | push |
-| `nfl.safety` | Gives up a safety | team and player, not DE, DT, LB, CB, S, DB, PK, LS | Offense | push |
+| `nfl.qb.delay_of_game` | Delay of game | player, only QB | Offense | feed only |
+| `nfl.safety` | Gives up a safety | team and player, not DE, DT, LB, CB, S, DB, PK, LS | Offense | feed only |
 
 ### Delay of game
 
@@ -319,7 +319,7 @@ Alerts go out the moment a play is first seen; nothing waits for a review. ESPN 
 - **Skipped when:** the flag is declined or offsetting (anywhere in the text), the formation in brackets is a punt, field goal or kick ("(Punt formation)", "(Field Goal formation)"), or the flagged team isn't the offense (the play's team, compared after mapping NFL codes with `NFL_CODE`: ARZ, BLT, CLV, HST, LA, WAS, JAC to ARI, BAL, CLE, HOU, LAR, WSH, JAX).
 - **The quarterback:** a penalized participant who is a QB, when ESPN names one; otherwise the offense's quarterback in the game right now (`g.qbs`, the latest passer the roster lists as a QB, set by `observePlay`; a trick-play pass by a non-QB doesn't change it).
 - **Title:** "Jordan Love took a delay of game penalty" (`test/sport-alerts.test.ts`). When ESPN named him as penalized, it replaces his "Commits a penalty" alert (`aliases: ['nfl.penalty']`); when he was only inferred, there was no penalty alert for him to replace.
-- Still pushed by default for new installs (README "Defaults").
+- Feed only by default for new installs since October 22, 2026 (only losses push by default; README "Defaults"). Existing installs keep the push (`keepNonLossPushes`).
 
 ### Gives up a safety
 
@@ -335,8 +335,8 @@ Alerts go out the moment a play is first seen; nothing waits for a review. ESPN 
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `nfl.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | push |
-| `cfb.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | push |
+| `nfl.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | feed only |
+| `cfb.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | feed only |
 
 - **Trigger** (`onsideRecovered()` in `detectors.ts`): a play whose text has "kicks onside" (NFL: "J.Slye kicks onside 9 yards from TEN 35 to TEN 44. …") or "onside kickoff" (college), and doesn't have "No Play" or "NULLIFIED".
 - **Kicking and receiving:** the kicking team is the play's team (`start.team`, `teamId`); the receiving team is the other side of the game.
@@ -351,16 +351,16 @@ The NBA's player alerts from plays, the box score at halftime and at the final, 
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `nba.got_blocked` | Gets blocked | player | Offense | push |
+| `nba.got_blocked` | Gets blocked | player | Offense | feed only |
 | `nba.missed_free_throw` | Misses a free throw | player | Offense | feed only |
 | `nba.turnover` | Turns it over | player | Offense | feed only |
 | `nba.brick_night` | Has a brick night | player | Offense | feed only |
 | `nba.scoreless_half` | Scoreless at the half | player | Offense | feed only |
 | `nba.missed_shot` | Misses a shot | player | Offense | off |
-| `nba.technical` | Technical foul / ejection | player | Fouls | push |
-| `nba.fouled_out` | Fouls out | player | Fouls | push |
+| `nba.technical` | Technical foul / ejection | player | Fouls | feed only |
+| `nba.fouled_out` | Fouls out | player | Fouls | feed only |
 | `nba.foul` | Commits a foul | player | Fouls | off |
-| `nba.team.star_went_off` | Opponent's star goes off | team | Team | push |
+| `nba.team.star_went_off` | Opponent's star goes off | team | Team | feed only |
 | `nba.team.opponent_run` | Opponent goes on a run | team | Team | feed only |
 
 **Where the plays come from.** Both ESPN feeds every 2 seconds, merged by id. The detector is `nba()` in `detectors.ts`, shared by the WNBA. The core feed labels its participants (shooter, blocker, fouler, offense, defender); the summary's plays don't. So the player is the participant whose catalog team is the play's team (`onTeam`), else the first participant. ESPN posts these plays half-finished and edits them: see [Revisions: ESPN changes a basketball play after its alert](#revisions-espn-changes-a-basketball-play-after-its-alert).
@@ -461,16 +461,16 @@ ESPN posts a basketball play before it has settled and edits it: in the October 
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `wnba.got_blocked` | Gets blocked | player | Offense | push |
+| `wnba.got_blocked` | Gets blocked | player | Offense | feed only |
 | `wnba.missed_free_throw` | Misses a free throw | player | Offense | feed only |
 | `wnba.turnover` | Turns it over | player | Offense | feed only |
 | `wnba.brick_night` | Has a brick night | player | Offense | feed only |
 | `wnba.scoreless_half` | Scoreless at the half | player | Offense | feed only |
 | `wnba.missed_shot` | Misses a shot | player | Offense | off |
-| `wnba.technical` | Technical foul / ejection | player | Fouls | push |
-| `wnba.fouled_out` | Fouls out | player | Fouls | push |
+| `wnba.technical` | Technical foul / ejection | player | Fouls | feed only |
+| `wnba.fouled_out` | Fouls out | player | Fouls | feed only |
 | `wnba.foul` | Commits a foul | player | Fouls | off |
-| `wnba.team.star_went_off` | Opponent's star goes off | team | Team | push |
+| `wnba.team.star_went_off` | Opponent's star goes off | team | Team | feed only |
 | `wnba.team.opponent_run` | Opponent goes on a run | team | Team | feed only |
 
 - **The copies are derived, not written:** `EVENT_TYPES` in `server/src/event-types.ts` takes every NBA-only type and adds a `wnba.*` copy with `leagues: ['wnba']`, and adds `wnba` to every shared type that has `nba` (`withWnba`). So the WNBA's list can't drift from the NBA's: same labels, sections, defaults and positions.
@@ -487,21 +487,21 @@ Every soccer alert, for every soccer league. The EPL is the only one today (`SOC
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `epl.penalty_missed` | Misses a penalty | player and team, not G | Attack | push |
-| `epl.goal_disallowed` | Has a goal ruled out by VAR | player and team, not G | Attack | push |
+| `epl.penalty_missed` | Misses a penalty | player and team, not G | Attack | feed only |
+| `epl.goal_disallowed` | Has a goal ruled out by VAR | player and team, not G | Attack | feed only |
 | `epl.hit_woodwork` | Hits the woodwork | player, not G | Attack | feed only |
 | `epl.lost_ball` | Loses the ball | player, not G | Attack | off |
 | `epl.pass_given_away` | Gives the ball away | player | Attack | off |
-| `epl.own_goal` | Scores an own goal | player | Defense | push |
-| `epl.penalty_conceded` | Gives away a penalty | player and team | Defense | push |
-| `epl.red_card` | Sent off | team and player | Cards & fouls | push |
-| `epl.yellow_card` | Gets booked | player | Cards & fouls | push |
+| `epl.own_goal` | Scores an own goal | player | Defense | feed only |
+| `epl.penalty_conceded` | Gives away a penalty | player and team | Defense | feed only |
+| `epl.red_card` | Sent off | team and player | Cards & fouls | feed only |
+| `epl.yellow_card` | Gets booked | player | Cards & fouls | feed only |
 | `epl.foul` | Commits a foul | player | Cards & fouls | feed only |
-| `epl.goal_conceded` | Keeper concedes a goal | player, only G | Goalkeeping | push |
-| `epl.subbed_off_early` | Taken off early | player | Lineup | push |
+| `epl.goal_conceded` | Keeper concedes a goal | player, only G | Goalkeeping | feed only |
+| `epl.subbed_off_early` | Taken off early | player | Lineup | feed only |
 | `epl.team.heavy_loss` | Loses by 3+ goals | team | Team | push |
-| `epl.team.late_goal` | Concedes a late goal | team | Team | push |
-| `epl.team.relegation_zone` | Drops into the relegation zone | team | Team | push |
+| `epl.team.late_goal` | Concedes a late goal | team | Team | feed only |
+| `epl.team.relegation_zone` | Drops into the relegation zone | team | Team | feed only |
 
 The detector for key events is `soccer()` in `server/src/detectors.ts`; the commentary's are `soccerFoul()` and `soccerCommentaryEvents()`; the touch feed's `soccerTouch()`; the late goal is in `teamScoreEvents()`; the relegation zone in `scanStandings()` (`server/src/live.ts`). Every play alert's body is the event's text with its minute in front, a dash and the score (`fromKeyEvents` puts the minute in front, "57' Alexander Isak (Liverpool) right footed shot…", and drops ESPN's own "Goal! Bournemouth 0, Liverpool 1." from the text; the score is added as `AWAY n, HOME n`).
 
@@ -589,7 +589,7 @@ How a soccer match is read, which every soccer alert depends on. The plays are t
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `epl.foul` | Commits a foul | player | Cards & fouls | feed only |
-| `epl.penalty_conceded` | Gives away a penalty | player and team | Defense | push |
+| `epl.penalty_conceded` | Gives away a penalty | player and team | Defense | feed only |
 
 - **Source, the touch feed first** (`fromTouchFoul`): a foul or handball touch has the fouler (`fouler`, then `fouled`; a handball names only its player) and the fouler's team, 12 to 27 seconds before the commentary line gets its play id (the commentary line appears without its `play` and ESPN attaches it 9 to 35 seconds later; the tracker skips a line without one). The play is written as the commentary's: "<minute> Foul by <Name> (<Club>).", from the touch's own text when it says so. A foul already alerted from either is skipped from the other (`fouls` in `GameTracker`).
 - **Source, the commentary** (`fromCommentary` in `detectors.ts`): the summary's commentary, already read every 2 seconds. ESPN writes each foul twice under one play id ("Foul by Kobbie Mainoo (Manchester United)." and "Josh King (Fulham) wins a free kick…"); they are grouped by play id, so a foul is one play.
@@ -599,7 +599,7 @@ How a soccer match is read, which every soccer alert depends on. The plays are t
 - **A foul in the box:** when any of the foul's lines says "Penalty conceded by …" or "… draws a foul in the penalty area", it's a penalty conceded: the fouler's "Bobby Thomas gave away a penalty 🤦" and the team's "Coventry gave away a penalty 🤦", one moment (`${gameId}:${playId}:penalty-conceded`), so tracking both is one alert. The player's counts as his foul too (`aliases: ['epl.foul']`): never two alerts for one foul.
 - **A penalty written a moment later:** the tracker remembers each foul's kind (`fouls` in `GameTracker`); a foul seen first as a plain foul and then as a penalty conceded is judged again as the penalty, once, and the penalty alerts go out then (the foul's alert, already sent, stays). Nothing is judged again after it's a penalty. Only the commentary says "Penalty conceded", so with the foul now alerting from the touch feed first, the plain foul usually goes out before the penalty is written: still two alerts about one foul ([duplicate-alerts.md](duplicate-alerts.md), "Known gaps").
 - **A card and the foul behind it are one alert** (`linkFoulsToCards`): a foul by the player carded in the same minute (the alerts carry the player and the minute: `withClock`) takes the card's moment, with no line of its own, when the card comes in the same poll or earlier; a device that gets the card doesn't get the foul too, and one with cards off still gets the foul. A foul that came first stays its own alert, because a card that joined it would become a line on a feed-only foul and lose its push. Five of the six cards in Man City 3-0 Liverpool had a foul; three arrived together (O'Reilly, Bouaddi, Gravenberch's red card).
-- **Default:** "Commits a foul" is feed only by default (installs from before October 2026 kept it pushed, `WERE_PUSHED`); "Gives away a penalty" pushes.
+- **Default:** "Commits a foul" is feed only by default (installs from before October 2026 kept it pushed, `WERE_PUSHED`); "Gives away a penalty" is feed only too since October 22, 2026 (existing installs keep its push).
 - **Checked:** against ESPN's own foulsCommitted for every player in five EPL and three La Liga matches: 159 fouls, every player's count matched (the README row; `fromCommentary`'s comment says five September 2026 matches).
 
 ## Soccer passes and dribbles
@@ -646,20 +646,20 @@ How the soccer alerts follow a new league without new alert code.
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `nhl.shootout_miss` | Misses in the shootout | player, not G | Offense | push |
+| `nhl.shootout_miss` | Misses in the shootout | player, not G | Offense | feed only |
 | `nhl.shot_missed` | Shoots and misses | player, not G | Offense | feed only |
 | `nhl.minus` | Finishes -3 or worse | player, not G | Offense | feed only |
 | `nhl.shot_blocked` | Gets a shot blocked | player, not G | Offense | off |
 | `nhl.shot_saved` | Shot gets saved | player, not G | Offense | off |
 | `nhl.giveaway` | Gives the puck away | player | Offense | off |
-| `nhl.penalty` | Takes a penalty | player | Penalties | push |
-| `nhl.fight` | Drops the gloves | player | Penalties | push |
-| `nhl.goalie.goal_allowed` | Goalie allows a goal | player, only G | Goaltending | push |
-| `nhl.goalie.pulled` | Gets pulled | player, only G | Goaltending | push |
-| `nhl.team.power_play_fail` | Power play goes 0-for-4+ | team | Team | push |
+| `nhl.penalty` | Takes a penalty | player | Penalties | feed only |
+| `nhl.fight` | Drops the gloves | player | Penalties | feed only |
+| `nhl.goalie.goal_allowed` | Goalie allows a goal | player, only G | Goaltending | feed only |
+| `nhl.goalie.pulled` | Gets pulled | player, only G | Goaltending | feed only |
+| `nhl.team.power_play_fail` | Power play goes 0-for-4+ | team | Team | feed only |
 | `nhl.team.empty_net_goal` | Gives up an empty-netter | team | Team | feed only |
 | `nhl.team.shorthanded_goal` | Gives up a short-handed goal | team | Team | feed only |
-| `player.ejected` | Gets ejected | player | Game | push |
+| `player.ejected` | Gets ejected | player | Game | feed only |
 
 **Where the plays come from.** Both ESPN feeds every 2 seconds, merged by id. The detector is `nhl()` in `detectors.ts`. Roles: `shooter` and `saver`. The play's `strength` is ESPN's ("Even Strength", "Power Play", "Shorthanded", "Empty Net", "Penalty Shot").
 
@@ -762,16 +762,16 @@ ESPN posts a hockey play before it has settled and edits it. In EDM at LA (314 p
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `f1.driver.dnf` | Doesn't finish | player | Race | push |
-| `f1.driver.out_of_points` | Finishes outside the points | player | Race | push |
-| `f1.driver.lost_places` | Loses places from the grid | player | Race | push |
-| `f1.driver.beaten_by_teammate` | Finishes behind teammate | player | Race | push |
-| `f1.driver.lapped` | Gets lapped | player | Race | push |
-| `f1.driver.session_start` | Race starts | player | Race | push |
-| `f1.driver.back_of_grid` | Starts from the back | player | Race | push |
+| `f1.driver.dnf` | Doesn't finish | player | Race | feed only |
+| `f1.driver.out_of_points` | Finishes outside the points | player | Race | feed only |
+| `f1.driver.lost_places` | Loses places from the grid | player | Race | feed only |
+| `f1.driver.beaten_by_teammate` | Finishes behind teammate | player | Race | feed only |
+| `f1.driver.lapped` | Gets lapped | player | Race | feed only |
+| `f1.driver.session_start` | Race starts | player | Race | feed only |
+| `f1.driver.back_of_grid` | Starts from the back | player | Race | feed only |
 | `f1.driver.pit_stop` | Pits | player | Race | feed only |
-| `f1.driver.quali_knockout` | Knocked out in qualifying | player | Qualifying | push |
-| `f1.driver.outqualified` | Out-qualified by teammate | player | Qualifying | push |
+| `f1.driver.quali_knockout` | Knocked out in qualifying | player | Qualifying | feed only |
+| `f1.driver.outqualified` | Out-qualified by teammate | player | Qualifying | feed only |
 | `f1.driver.standings_drop` | Drops in the drivers' championship | player | Championship | feed only |
 
 All of these come from `server/src/f1.ts`. How a race is read is in [F1 how](#f1-how).
@@ -844,7 +844,7 @@ When a race or sprint ends, each driver gets **one** alert with every fact that 
 | `f1.team.double_dnf` | Double DNF | team | Team | push |
 | `f1.team.no_points` | Scores no points | team | Team | push |
 | `team.standings_drop` | Drops in standings | team | Season | feed only |
-| `team.game_start` | Game starts | team | Game | push |
+| `team.game_start` | Game starts | team | Game | feed only |
 
 - **Double DNF (live):** the second car of a constructor out in a race or sprint (`RaceWatch.poll`): "Cadillac: double DNF" (`test/f1-merges.test.ts`), body "<session>: Sergio Pérez retired on lap 1; Valtteri Bottas retired on lap 6" (out first, by lap). It counts as "Scores no points" too (`aliases: ['f1.team.no_points']`), and it's a Successful Hate Watch (`HATE_WATCH_TYPES`). At the finish the classification makes the same alert (same id, `${compId}:f1.team.double_dnf:${team}`), so it isn't sent twice.
 - **Scores no points:** at the finish, every car of the constructor out or below the points: "Successful Hate Watch! Ferrari finished outside the points" with the body "<session>: <driver> P12, <driver> DNF" (each car with its driver's name, best first). It's F1's Successful Hate Watch: the counter goes up under the constructor.
@@ -875,10 +875,10 @@ The alerts every tracked player can get, whatever the league: getting injured, g
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `player.team_lost` | Their team loses | player | Game | push |
-| `player.ejected` | Gets ejected | player | Game | push |
-| `player.injured` | Gets injured | player | Injuries & news | push |
-| `off_field` | Off-field trouble | player | Injuries & news | push |
-| `fine_suspension` | Fined or suspended | player | Injuries & news | push |
+| `player.ejected` | Gets ejected | player | Game | feed only |
+| `player.injured` | Gets injured | player | Injuries & news | feed only |
+| `off_field` | Off-field trouble | player | Injuries & news | feed only |
+| `fine_suspension` | Fined or suspended | player | Injuries & news | feed only |
 
 - **Gets injured** (`player.injured`): NBA, WNBA, MLB, NFL, NHL. From the injury reports read every 30 seconds ([Injury reports](#injury-reports)): "Cooper Rush is injured (Out)", or "Cooper Rush downgraded to Out" when a player already listed gets worse. ESPN's EPL injury report is empty, F1 and the UFC have none, and college football isn't scanned (no players).
 - **Gets ejected** (`player.ejected`): the NFL ("Daron Payne got ejected") and the NHL ("Evgeni Malkin got ejected (game misconduct)"). It counts as the player's penalty alert too, so it's one alert. NBA ejections are its technical-foul alert ("got ejected 🚪"), soccer's "Sent off"; ESPN doesn't report MLB ejections. Details: [NFL](#gets-ejected-nfl), [NHL](#penalties-fights-and-ejections).
@@ -900,7 +900,7 @@ The alerts every tracked player can get, whatever the league: getting injured, g
 - **The loss's facts reach player trackers too:** `playerLossLines()` copies every fact with a `fold` (shut out, walk-off, lost as favorites, the last half-inning's lines…) onto each tracked player, `foldOnly`, so a device tracking only Ohtani gets "Successful Hate Watch! Shohei Ohtani and the Dodgers lost to the Giants" with "Lost as 64% favorites. Shut out. Lost to the 10-13 Giants. Lost 5 straight. Final Score: 3 to 0" (`test/loss-facts.test.ts`). Each copy is the fact's own type, so the device's switch for that fact decides.
 - **The losing pitcher's "took the loss"** shares the same moment, so it's a line on whichever loss alert the device got ([MLB pitchers](#mlb-pitchers-blown-save-no-quality-start-loss)).
 - **Counted for the team:** each one carries `lostId` (the team loss's id) and `teamKey`, so the Successful Hate Watch counter goes up under the team, once per device, never under the player (`hateWatchOf`, `recordHateWatch` in `hate-watches.ts`), and whether or not the device's alert is on.
-- **On by default,** pushed. One switch in Settings → All player alerts, and on each player's gear screen.
+- **On by default,** feed only since October 22, 2026 (pushed before; existing installs keep the push). One switch in Settings → All player alerts, and on each player's gear screen.
 - **Preseason basketball: only players who dressed.** In a preseason NBA or WNBA game (`seasonType === 1`) a tracked player the box score doesn't list gets no "their team lost" (`dressed` in `GameTracker.finish`): the starters sat, and 8 of the 21 Knicks players with one in Knicks at Raptors (October 13 2026, 148-98) weren't in the box score at all (Brunson, Towns, Bridges, Hart, Anunoby, Clarkson, Shamet, Drummond). A player listed with a DNP is skipped since October 14 (`didNotPlay`). Everyone gets it in the regular season, played or not. Without a box score every tracked player gets it.
 - **Ids:** `${gameId}:final:player.team_lost:${athleteId}`.
 - **Draws and ties aren't losses:** `gameLostEvent` returns nothing for a level final, so nothing here either.
@@ -911,7 +911,7 @@ The alerts every tracked player can get, whatever the league: getting injured, g
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `player.injured` | Gets injured | player | Injuries & news | push |
+| `player.injured` | Gets injured | player | Injuries & news | feed only |
 | `team.player_injured` | A player gets injured | team | Injuries & news | feed only |
 
 - **Read:** every 30 seconds per league (`scanInjuries` in `live.ts`, `INJURIES_MS`, `HW_INJURIES_MS`), for every game league but college football (`GAME_LEAGUES` less `TEAMS_ONLY`), with a conditional request. The report is saved in kv (`injuries:${league}`); the first read is a baseline, so nothing is sent for what was already on it.
@@ -925,7 +925,7 @@ The alerts every tracked player can get, whatever the league: getting injured, g
   - **Body:** the first three by severity, then name ("Cooper Rush (Out), Jared Ivey (Out), Robert Longerbeam (Questionable)"; without statuses when they all share one), and "and 3 more".
   - **Id:** `inj:${league}:team:${espnId}:${day}:${hash}`, the hash being of the exact set of changes, so a re-scan or a restart never sends the same batch again.
 - **Player and team alerts are separate:** they have no shared moment, so a device tracking Cooper Rush and the Falcons gets both his alert and the team's.
-- **Defaults:** "Gets injured" pushes; "A player gets injured" (the team's) is feed only by default (installs from before October 2026 kept it pushed, `WERE_PUSHED`).
+- **Defaults:** both are feed only by default since October 22, 2026 (installs from before kept the push they had: `WERE_PUSHED`, `NON_LOSS_WERE_PUSHED`).
 - **One stack on the lock screen:** the team's alerts and its players' all have the team's thread id ("one iOS stack for the Falcons", `test/injuries.test.ts`; [iOS notification stacks](#ios-notification-stacks)).
 - **Real numbers:** the README row records one NFL game day's report: 800 entries, 207 injuries, 30 team alerts where it used to be 104.
 
@@ -946,15 +946,15 @@ The team alerts every league shares, and the standings alerts. The loss and its 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `team.lost` | Loses a game | team | Game | push |
-| `team.game_start` | Game starts | team | Game | push |
+| `team.game_start` | Game starts | team | Game | feed only |
 | `team.fell_behind` | Falls behind | team | Game | feed only |
 | `team.opponent_scored` | Opponent scores | team | Game | feed only |
 | `team.eliminated` | Eliminated from playoffs | team | Season | push |
 | `team.losing_streak` | Losing streak | team | Season | feed only |
 | `team.rival_clinched` | Rival clinches the division | team | Season | feed only |
 | `team.standings_drop` | Drops in standings | team | Season | feed only |
-| `team.off_field` | Off-field trouble | team | Injuries & news | push |
-| `team.fine_suspension` | Fined or suspended | team | Injuries & news | push |
+| `team.off_field` | Off-field trouble | team | Injuries & news | feed only |
+| `team.fine_suspension` | Fined or suspended | team | Injuries & news | feed only |
 | `team.player_injured` | A player gets injured | team | Injuries & news | feed only |
 
 ### Drops in standings (feed only by default)
@@ -1012,9 +1012,9 @@ Two ways out.
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `team.game_start` | Game starts | team | Game | push |
-| `f1.driver.session_start` | Race starts | player | Race | push |
-| `ufc.fight_start` | Fight starts | player | Fight | push |
+| `team.game_start` | Game starts | team | Game | feed only |
+| `f1.driver.session_start` | Race starts | player | Race | feed only |
+| `ufc.fight_start` | Fight starts | player | Fight | feed only |
 
 - **Trigger:** the game's tracker sees ESPN's status go from "pre" to "in" (`GameTracker.poll` in `live.ts`, polled every 2 seconds; college football every 5). Once (`started`).
 - **Only for a game seen before it started** (`sawPre`): the scoreboard (every 10 seconds) noted it as "pre" while someone tracked a side (`preSeen` in `LiveEngine`), or the tracker itself read it as "pre". A tracker is created for a tracked game that's live or starts within 3 minutes. A game that's already under way when someone follows the team, or when the server restarts, never gets a late "starting" alert.
@@ -1113,11 +1113,11 @@ What a team gets when the other side scores (`teamScoreEvents` in `detectors.ts`
 | `team.opponent_scored` | Opponent scores | team | Game | feed only |
 | `team.fell_behind` | Falls behind | team | Game | feed only |
 | `team.blew_lead` | Blows a big lead | team | Game | push |
-| `epl.team.late_goal` | Concedes a late goal | team | Team | push |
+| `epl.team.late_goal` | Concedes a late goal | team | Team | feed only |
 | `nhl.team.empty_net_goal` | Gives up an empty-netter | team | Team | feed only |
 | `nhl.team.shorthanded_goal` | Gives up a short-handed goal | team | Team | feed only |
-| `nfl.safety` | Gives up a safety | team and player, not DE, DT, LB, CB, S, DB, PK, LS | Offense | push |
-| `cfb.safety` | Gives up a safety | team | Team | push |
+| `nfl.safety` | Gives up a safety | team and player, not DE, DT, LB, CB, S, DB, PK, LS | Offense | feed only |
+| `cfb.safety` | Gives up a safety | team | Team | feed only |
 
 - **Opponent scores (feed only by default)** (`team.opponent_scored`, every league but basketball): "Penguins scored on the Jets", "Vanderbilt scored 7 on Georgia", "Rays scored 1 run on the Yankees", soccer "Liverpool scored against Bournemouth", MLB with the play that batted it in ("Rays scored on Diaz's 2-run double against the Yankees", "Rays tied the Yankees on Diaz's RBI single"). Fold "<Opponent> scored." (MLB "scored N runs.", football "scored 7."), or "<Opponent> tied the game." when the score is level after it (soccer "equalized."; football carries the score, "Rams tied the game, 34-34.", and says it as a late line when the extra point is what levels it: see the NFL "Revisions"), as a go-ahead run's is "took the lead." (a pitcher's homer alert with the Brewers tying the Dodgers: "Brewers tied the game.", `test/nlcs-game1.test.ts`).
 - **Falls behind (feed only by default)** (`team.fell_behind`, every league): the team was tied or ahead before the play and is behind after it. "Rays scored 1 run to take the lead over the Yankees", "Penguins scored to take the lead over the Jets", "Liberty scored 2 to take the lead over the Dream", MLB "Guardians took the lead over the White Sox on Ramírez's 348-foot 2-run homer", a safety "<Team> gave up a safety and fell behind the <Opponent>" (only for a device that has the safety alert off: otherwise that is the safety's own alert). Fold "Rays took the lead.".
@@ -1136,7 +1136,7 @@ What a team gets when the other side scores (`teamScoreEvents` in `detectors.ts`
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `mlb.runner.caught_stealing` | Gets caught stealing or picked off | player, not SP, RP, P | Offense | push |
+| `mlb.runner.caught_stealing` | Gets caught stealing or picked off | player, not SP, RP, P | Offense | feed only |
 
 One alert type, one switch, for a runner thrown out stealing or picked off (`runnerOut()` in `detectors.ts`). 
 - **The plays, as ESPN writes them** (`PICKED_OFF` and `CAUGHT_STEALING` regexes, checked in that order because "picked off and caught stealing" has both):
@@ -1150,7 +1150,7 @@ One alert type, one switch, for a runner thrown out stealing or picked off (`run
 - **Twice from ESPN, one alert:** ESPN reports each one twice (a "Caught Stealing" or "Pick Off" play and a "Play Result" with the same text). The id is built from the text, not the play id: `${gameId}:cs:${half}:${normalized text}:${runnerId}`, so both copies are one alert ([docs/duplicate-alerts.md](duplicate-alerts.md)). That's also why a result ESPN rewrites later isn't judged again.
 - **On a strikeout:** "Smith struck out swinging and Acuña Jr. caught stealing second, catcher to shortstop." is Smith's strikeout and Acuña Jr.'s caught stealing (`test/logic.test.ts`).
 - **Not an alert:** "Bolte to second on pickoff error by pitcher." (`test/logic.test.ts`).
-- **Hitters only** on a player's settings screen (pitchers don't run the bases). Pushed by default.
+- **Hitters only** on a player's settings screen (pitchers don't run the bases). Feed only by default since October 22, 2026 (existing installs keep the push).
 
 **Tests:** `test/logic.test.ts`, `node test/replay.ts`.
 
@@ -1158,7 +1158,7 @@ One alert type, one switch, for a runner thrown out stealing or picked off (`run
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `mlb.team.nobletiger` | NOBLETIGER | team | Team | push |
+| `mlb.team.nobletiger` | NOBLETIGER | team | Team | feed only |
 | `mlb.team.stranded_risp` | Strands runners in scoring position | team | Team | feed only |
 
 **N**o **O**uts, **B**ases **L**oaded, **E**nding with **T**eam **I**ncapable of **G**etting **E**asy **R**un.
@@ -1204,7 +1204,7 @@ The other MLB team alerts: stranded runners, being no-hit, and a position player
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `mlb.team.stranded_risp` | Strands runners in scoring position | team | Team | feed only |
-| `mlb.team.no_hit` | Gets no-hit | team | Team | push |
+| `mlb.team.no_hit` | Gets no-hit | team | Team | feed only |
 | `mlb.team.position_player_pitching` | Has a position player pitching | team | Team | feed only |
 
 ### Strands runners in scoring position (feed only by default)
@@ -1233,10 +1233,10 @@ The other MLB team alerts: stranded runners, being no-hit, and a position player
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `off_field` | Off-field trouble | player | Injuries & news | push |
-| `fine_suspension` | Fined or suspended | player | Injuries & news | push |
-| `team.off_field` | Off-field trouble | team | Injuries & news | push |
-| `team.fine_suspension` | Fined or suspended | team | Injuries & news | push |
+| `off_field` | Off-field trouble | player | Injuries & news | feed only |
+| `fine_suspension` | Fined or suspended | player | Injuries & news | feed only |
+| `team.off_field` | Off-field trouble | team | Injuries & news | feed only |
+| `team.fine_suspension` | Fined or suspended | team | Injuries & news | feed only |
 
 All from ESPN's league news (`server/src/news.ts`).
 
@@ -1263,8 +1263,8 @@ All from ESPN's league news (`server/src/news.ts`).
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `mlb.pitcher.blown_save` | Blows a save | player, only SP, RP, P | Pitching | push |
-| `mlb.pitcher.chased` | Gets chased early | player, only SP, RP, P | Pitching | push |
+| `mlb.pitcher.blown_save` | Blows a save | player, only SP, RP, P | Pitching | feed only |
+| `mlb.pitcher.chased` | Gets chased early | player, only SP, RP, P | Pitching | feed only |
 | `mlb.pitcher.no_quality_start` | No quality start | player, only SP, RP, P | Pitching | feed only |
 | `mlb.pitcher.loss` | Takes the loss | player, only SP, RP, P | Pitching | push |
 
@@ -1349,13 +1349,13 @@ One type (`mlb.challenge_lost`, "Loses a challenge") for teams and players (`als
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `mlb.team.bases_loaded` | Opponent loads the bases | team | Team | push |
+| `mlb.team.bases_loaded` | Opponent loads the bases | team | Team | feed only |
 
 - **Trigger** (`basesLoaded()` in `detectors.ts`): an at-bat result after which the bases are loaded (`basesAfter` has three), when they weren't loaded before it (`g.bases`, which `observePlay` updates after the detectors). Once per half-inning (`loadedTold`).
 - **Who gets it:** the **fielding** team.
 - **Title:** "White Sox loaded the bases against the Guardians", "Rays loaded the bases against the Yankees". **Body:** the half and the outs, then the play: "Top 6th, 2 outs: Vargas walked, Teel to second, C. Montgomery to third. — CHW 0, CLE 2" (`test/alds-game5.test.ts`), "Top 7th, nobody out: Lowe walked, Diaz to second, Caminero to third. — TB 1, NYY 1" (`test/bundling.test.ts`).
 - **Ahead of the pitcher's alerts on that play** (`mlb()` pushes it before them), so a device tracking the pitcher too gets one alert, this one, with "Gavin Williams issued a walk." as a line.
-- **On and pushed by default.** Before October 11, 2026 it was only a silent line on the scoring-position alert, which is off by default, and Guardians fans heard nothing when Vargas loaded the bases with two out in ALDS Game 5.
+- **On by default, feed only** (pushed until October 22, 2026; existing installs keep the push). Before October 11, 2026 it was only a silent line on the scoring-position alert, which is off by default, and Guardians fans heard nothing when Vargas loaded the bases with two out in ALDS Game 5.
 - **The scoring-position alert** on the same play is `unless` this one.
 - **Id:** `${gameId}:${halfKey}:mlb.team.bases_loaded:${fieldingTeamId}`.
 
@@ -1367,20 +1367,20 @@ College football (FBS, ESPN's group 80) has teams only, no players (`TEAMS_ONLY`
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `cfb.team.interception` | Throws an interception | team | Offense | push |
-| `cfb.team.fumble_lost` | Loses a fumble | team | Offense | push |
-| `cfb.team.qb_pulled` | Pulls its quarterback | team | Offense | push |
+| `cfb.team.interception` | Throws an interception | team | Offense | feed only |
+| `cfb.team.fumble_lost` | Loses a fumble | team | Offense | feed only |
+| `cfb.team.qb_pulled` | Pulls its quarterback | team | Offense | feed only |
 | `cfb.team.sacked` | Gets sacked | team | Offense | feed only |
 | `cfb.team.fumble` | Fumbles (any) | team | Offense | off |
 | `cfb.team.incompletion` | Throws an incompletion | team | Offense | off |
-| `cfb.td_wiped_out` | Touchdown wiped out by a penalty | team | Penalties | push |
-| `cfb.team.ejection` | Has a player ejected | team | Penalties | push |
+| `cfb.td_wiped_out` | Touchdown wiped out by a penalty | team | Penalties | feed only |
+| `cfb.team.ejection` | Has a player ejected | team | Penalties | feed only |
 | `cfb.team.penalty` | Gets flagged | team | Penalties | feed only |
-| `cfb.team.kick_missed` | Misses a kick | team | Special teams | push |
-| `cfb.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | push |
-| `cfb.team.turnover_on_downs` | Turns it over on downs | team | Team | push |
-| `cfb.team.red_zone_empty` | Comes away empty from the red zone | team | Team | push |
-| `cfb.safety` | Gives up a safety | team | Team | push |
+| `cfb.team.kick_missed` | Misses a kick | team | Special teams | feed only |
+| `cfb.team.onside_recovered` | Opponent recovers an onside kick | team | Special teams | feed only |
+| `cfb.team.turnover_on_downs` | Turns it over on downs | team | Team | feed only |
+| `cfb.team.red_zone_empty` | Comes away empty from the red zone | team | Team | feed only |
+| `cfb.safety` | Gives up a safety | team | Team | feed only |
 | `cfb.upset_loss` | Loses to an unranked team | team | Team | push |
 | `cfb.team.three_and_out` | Goes three-and-out | team | Team | feed only |
 | `cfb.poll_drop` | Falls in the AP poll | team | AP poll | push |
@@ -1411,8 +1411,8 @@ Fighters only, no teams (`server/src/ufc.ts`; its header comment is the summary)
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `ufc.lost` | Loses a fight | player | Fight | push |
-| `ufc.knocked_down` | Gets knocked down | player | Fight | push |
-| `ufc.fight_start` | Fight starts | player | Fight | push |
+| `ufc.knocked_down` | Gets knocked down | player | Fight | feed only |
+| `ufc.fight_start` | Fight starts | player | Fight | feed only |
 | `ufc.lost_title` | Loses a title fight | player | Fight | push |
 | `ufc.lost_as_favorite` | Loses as the favorite | player | Fight | push |
 | `ufc.losing_streak` | Losing streak | player | Fight | push |
@@ -1435,7 +1435,7 @@ Two alerts about the device, not one team. The app lists them in Settings only. 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `team.hate_watch_streak` | Your Hate Watch streak | team and player | Your Hate Watch | push |
-| `app.weekly_recap` | Weekly misery recap | team | Your Hate Watch | push |
+| `app.weekly_recap` | Weekly misery recap | team | Your Hate Watch | feed only |
 
 ### Your Hate Watch streak
 
@@ -1464,6 +1464,6 @@ The rules every alert above goes through, in `publish()` in `server/src/fanout.t
 - **`lateOn`:** a line on the device's latest alert about a target since a time (a standings drop after a loss, an F1 championship drop after that day's result), read from the feed in the database, so it works after a restart. With no such alert, it's an alert of its own.
 - **Feed row:** one per device and alert (`ON CONFLICT DO NOTHING`), with its lines, and a live `event` frame to each open app.
 - **Push** if the device has a push token, push is on, the target isn't muted or snoozed (its bell-off switch or a snooze; through a player, that player's too), it's outside quiet hours (`pushAllowed`), and the alert's type wants a push (`pushWanted`). The type that decides is the most specific one the device has on: the alert's own type if on, else the first alias that's on. Its bell: the target's own bell (`targetPushTypes`), else the Settings bell (`pushTypes`), else the type's default (`defaultPush: false` means feed only), else push. A device's alert is pushed if anything it carries would be; its lines never add a push.
-- **Defaults:** each type's `defaultOn` and `defaultPush` in `event-types.ts`, in three tiers (push, feed only, off), shown in each section's table. Installs from before the October 2026 quieter defaults kept the old ones wherever they hadn't chosen (`keepOldDefaults`: `WERE_ON` and `WERE_PUSHED`, once, kv `prefs:quiet-defaults`); before October 11, 2026 NFL flags stay pushed (`keepFlagsPushed`). `GET` and `PUT /me/prefs` fill in each feed-only type's bell as off (`prefsDto`).
+- **Defaults:** each type's `defaultOn` and `defaultPush` in `event-types.ts`, in three tiers (push, feed only, off), shown in each section's table. Since October 22, 2026 only the 22 alerts in `LOSS_PUSH` (the losses, blowing a lead, elimination, the Hate Watch streak and the AP poll drops) push by default; every other alert that is on is feed only. Installs from before the October 2026 quieter defaults kept the old ones wherever they hadn't chosen (`keepOldDefaults`: `WERE_ON` and `WERE_PUSHED`, once, kv `prefs:quiet-defaults`); before October 11, 2026 NFL flags stay pushed (`keepFlagsPushed`); before October 22, 2026 every alert that pushed and is not a loss keeps its push (`keepNonLossPushes`, `NON_LOSS_WERE_PUSHED`, kv `prefs:loss-only-push`). `GET` and `PUT /me/prefs` fill in each feed-only type's bell as off (`prefsDto`).
 - **Changes after the fact:** `addLateLine`, `eventChanged` (a clip came) and `reviseEvent` (an F1 result changed) send an `eventUpdate` frame and never push.
 - **A clip** of the play goes on its alert when ESPN posts one (MLB, NBA, WNBA, NHL), with no second notification (`readClips` in `live.ts`, `server/src/clips.ts`), and can be switched off on the server (`clips.*` in `server/src/flags.ts`).

@@ -1,5 +1,5 @@
 // The app lists alerts in EVENT_TYPES' order under each one's section: offense, defense, pitching (or
-// goaltending), then the team's; within a section the headline ones first, then feed-only, then off.
+// goaltending), then the team's; within a section the ones on by default first, then the ones off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -33,8 +33,9 @@ test("each Settings group's sections, in order, each in one piece", () => {
   assert.ok(EVENT_TYPES.every((t) => t.section), 'every alert has a section');
 });
 
-test('within a section: the ones that push first, then feed-only, then the ones off by default', () => {
-  const tier = (t: (typeof EVENT_TYPES)[number]) => (!t.defaultOn ? 2 : t.defaultPush === false ? 1 : 0);
+// Only the loss alerts push by default now, so the order is no longer by bell: the ones on by default come first.
+test('within a section: the ones on by default first, then the ones off by default', () => {
+  const tier = (t: (typeof EVENT_TYPES)[number]) => (t.defaultOn ? 0 : 1);
   for (const [g, types] of GROUPS) for (const s of sectionsOf(types)) {
     const tiers = types.filter((t) => t.section === s).map(tier);
     assert.deepEqual(tiers, [...tiers].sort(), `${g} / ${s}`);

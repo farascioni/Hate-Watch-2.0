@@ -225,9 +225,23 @@ const BASE: EventTypeDef[] = [
  * under "WNBA alerts", fed by the same basketball detectors), and every multi-league alert the NBA is in.
  */
 const withWnba = (lgs: League[]): League[] => lgs.flatMap((lg) => (lg === 'nba' ? ['nba', 'wnba'] as League[] : [lg]));
-export const EVENT_TYPES: EventTypeDef[] = [
+const ALL_TYPES: EventTypeDef[] = [
   ...BASE.map((t) => (t.leagues.length > 1 && t.leagues.includes('nba') ? { ...t, leagues: withWnba(t.leagues) } : t)),
   ...BASE.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'nba').map((t) => ({ ...t, id: t.id.replace(/^nba\./, 'wnba.'), leagues: ['wnba'] as League[] })),
 ];
+
+/**
+ * The only alerts that push by default: a loss and what makes it a loss (its facts, a pitcher's loss, a UFC loss, an F1
+ * team with no points), plus blowing a lead, elimination, the Hate Watch streak and the AP poll drops. Every other alert
+ * is on but feed only until the user turns its bell on (`defaultPush: false`).
+ * Devices that existed before this was decided keep their old pushes (`keepNonLossPushes`, fanout.ts).
+ */
+export const LOSS_PUSH = new Set<string>([
+  'team.lost', 'player.team_lost', ...SOCCER_LEAGUES.map((lg) => soccerType(lg, 'team.heavy_loss')),
+  'team.last_second_loss', 'team.lost_as_favorite', 'team.shut_out', 'team.swept', 'team.lost_to_worse', 'team.below_500',
+  'cfb.upset_loss', 'mlb.pitcher.loss', 'ufc.lost', 'ufc.lost_title', 'ufc.lost_as_favorite', 'ufc.losing_streak', 'f1.team.no_points', 'f1.team.double_dnf',
+  'team.blew_lead', 'team.eliminated', 'team.hate_watch_streak', 'cfb.poll_drop', 'cfb.poll_out',
+]);
+export const EVENT_TYPES: EventTypeDef[] = ALL_TYPES.map((t) => (LOSS_PUSH.has(t.id) ? t : { ...t, defaultPush: false }));
 
 export const EVENT_TYPE_BY_ID = new Map(EVENT_TYPES.map((t) => [t.id, t]));

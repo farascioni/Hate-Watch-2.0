@@ -17,7 +17,9 @@ let NOW = Date.parse('2026-10-11T22:43:00Z');
 Date.now = () => NOW;
 const { db, kvGet } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { DEFAULT_PREFS, setPushSender } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED, setPushSender } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { EVENT_TYPES } = await import('../src/event-types.ts');
 const { GameTracker, liveDeps, scanStandings, standingsSeasonType } = await import('../src/live.ts');
 const { urls } = await import('../src/leagues.ts');

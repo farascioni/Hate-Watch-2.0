@@ -15,7 +15,9 @@ process.env.HW_HALF_END_WAIT_MS = '60000';
 process.env.HW_DECISION_RETRY_MS = '1';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { DEFAULT_PREFS, setPushSender, feedItem } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED, setPushSender, feedItem } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { boxPitchers, eliminationOf, pitcherEvents, summaryEvent } = await import('../src/detectors.ts');
 const { liveDeps, GameTracker } = await import('../src/live.ts');
 const { urls } = await import('../src/leagues.ts');

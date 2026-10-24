@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 process.env.HW_DB = ':memory:';
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { DEFAULT_PREFS, publish, setPushSender } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED, publish, setPushSender } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { injuryEvents, parseInjuryReport } = await import('../src/live.ts');
 
 db.prepare(`INSERT INTO teams (key, league, espn_id, name, short_name, abbrev, color, logo, logo_w, logo_h, updated_at) VALUES ('team:nfl:1', 'nfl', '1', 'Atlanta Falcons', 'Falcons', 'ATL', '#A71930', 'x', 1, 1, 0)`).run();
@@ -73,7 +75,7 @@ test('one player: the same alert and id as before batching', () => {
 });
 
 test('delivery: one Falcons notification for the batch, stacked with the player alerts on iOS', () => {
-  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('fan', 's', 'ios', 'ExponentPushToken[t]', JSON.stringify({ ...DEFAULT_PREFS, pushTypes: { 'team.player_injured': true } })); // feed only by default
+  db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run('fan', 's', 'ios', 'ExponentPushToken[t]', JSON.stringify({ ...DEFAULT_PREFS, pushTypes: { ...DEFAULT_PREFS.pushTypes, 'team.player_injured': true } })); // feed only by default
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('fan', 'team:nfl:1');
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?, ?, 0)').run('fan', 'player:nfl:101');
   const sent: { title: string; threadId: string }[] = [];

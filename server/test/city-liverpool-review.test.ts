@@ -7,7 +7,9 @@ process.env.HW_DB = ':memory:';
 process.env.HW_TOUCH_MS = '0'; // the deep read of the touch feed on every poll here (live: every 10s)
 const { db } = await import('../src/db.ts');
 const { loadCatalog } = await import('../src/catalog.ts');
-const { DEFAULT_PREFS, setPushSender } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED, setPushSender } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { urls } = await import('../src/leagues.ts');
 const { GameTracker, liveDeps } = await import('../src/live.ts');
 

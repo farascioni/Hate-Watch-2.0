@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 process.env.HW_DB = ':memory:';
 const { db, kvSet } = await import('../src/db.ts');
 const { loadCatalog, ingestCfb, cfbSeason } = await import('../src/catalog.ts');
-const { DEFAULT_PREFS } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS: NEW_INSTALL_PREFS, NON_LOSS_WERE_PUSHED } = await import('../src/fanout.ts');
+// An install from before the loss-only defaults: it keeps the pushes it had (what keepNonLossPushes pins).
+const DEFAULT_PREFS = { ...NEW_INSTALL_PREFS, pushTypes: Object.fromEntries(NON_LOSS_WERE_PUSHED.map((t) => [t, true])) };
 const { GameTracker, liveDeps } = await import('../src/live.ts');
 const { urls, LEAGUE_IDS, TEAMS_ONLY } = await import('../src/leagues.ts');
 const D = await import('../src/detectors.ts');

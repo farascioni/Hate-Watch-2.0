@@ -1,5 +1,6 @@
-// New installs' alert defaults (October 2026): the result and the rare headline failures push, the in-game
-// drip is feed only, the noisiest are off. Installs from before keep what they had.
+// New installs' alert defaults: only the loss alerts push (LOSS_PUSH, October 22 2026), the rest are feed only,
+// the noisiest are off. Installs from before keep what they had (the quiet-defaults, loss-facts, flags and
+// loss-only-push migrations).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
@@ -13,8 +14,8 @@ const install = (id: string, prefs: object) =>
 install('before', { pushEnabled: true, sound: true, leagues: {}, types: {}, muted: [], targetTypes: {}, pushTypes: {}, targetPushTypes: {} });
 install('ancient', {});
 install('chose', { types: { 'nba.missed_shot': false, 'mlb.batter.popout': true }, pushTypes: { 'team.opponent_scored': false, 'nfl.qb.interception': false } });
-const { EVENT_TYPES } = await import('../src/event-types.ts');
-const { DEFAULT_PREFS, getPrefs, keepOldDefaults, keepFlagsPushed, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED, FLAGS_WERE_PUSHED } = await import('../src/fanout.ts');
+const { EVENT_TYPES, LOSS_PUSH } = await import('../src/event-types.ts');
+const { DEFAULT_PREFS, getPrefs, keepOldDefaults, keepFlagsPushed, keepNonLossPushes, NON_LOSS_WERE_PUSHED, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED, FLAGS_WERE_PUSHED } = await import('../src/fanout.ts');
 const { startApi } = await import('../src/api.ts');
 
 type Prefs = typeof DEFAULT_PREFS;
@@ -40,18 +41,24 @@ const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.c
 const ADDED = ['mlb.team.down_in_order', 'team.rival_clinched', 'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nba.brick_night', 'nba.scoreless_half',
   'nba.team.opponent_run', 'wnba.brick_night', 'wnba.scoreless_half', 'wnba.team.opponent_run', 'nhl.minus', 'nhl.team.empty_net_goal', 'nhl.team.shorthanded_goal', 'epl.hit_woodwork',
   'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty', 'f1.driver.pit_stop', 'nfl.team.tied'];
-const NEW = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : FEED.includes(t.id) ? 'feed' : 'push']));
+// The defaults before October 22 2026 (what an install from before keeps), and the loss-only ones now.
+const BEFORE = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : FEED.includes(t.id) ? 'feed' : 'push']));
+const NEW = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : LOSS_PUSH.has(t.id) ? 'push' : 'feed']));
 
-test('a new install: the result and the rare headline failures push, the in-game drip is feed only, the noisiest are off', () => {
+test('a new install: only the loss alerts push, the rest are feed only, the noisiest are off', () => {
   assert.deepEqual(tiers(DEFAULT_PREFS), NEW);
-  for (const id of ['team.lost', 'team.game_start', 'player.team_lost', 'mlb.batter.strikeout', 'nfl.qb.interception', 'nhl.goalie.goal_allowed', 'epl.goal_conceded', 'f1.driver.dnf'])
-    assert.equal(NEW[id], 'push', id);
+  const pushed = Object.keys(NEW).filter((id) => NEW[id] === 'push').sort();
+  assert.deepEqual(pushed, [...LOSS_PUSH].sort(), 'exactly the loss alerts push, and each is on');
+  assert.equal(pushed.length, 22);
+  for (const id of ['team.lost', 'player.team_lost', 'team.shut_out', 'mlb.pitcher.loss', 'ufc.lost', 'epl.team.heavy_loss', 'team.blew_lead', 'team.eliminated', 'team.hate_watch_streak', 'cfb.poll_drop', 'cfb.poll_out']) assert.equal(NEW[id], 'push', id);
+  for (const id of ['team.game_start', 'mlb.batter.strikeout', 'nfl.qb.interception', 'nhl.goalie.goal_allowed', 'epl.goal_conceded', 'f1.driver.dnf', 'f1.driver.out_of_points', 'app.weekly_recap']) assert.equal(NEW[id], 'feed', id);
   assert.deepEqual([...WERE_PUSHED].sort(), FEED.filter((id) => !ADDED.includes(id) && !FLAGS_WERE_PUSHED.includes(id)).sort(), 'every feed-only alert pushed before');
   assert.deepEqual([...WERE_ON].sort(), ['epl.lost_ball', 'mlb.team.opponent_risp', 'nba.missed_shot', 'wnba.missed_shot'], 'the three that were on');
 });
 
 test('installs from before keep exactly what they had; their own choices stay theirs', () => {
-  const OLD = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, WERE_PUSHED.includes(t.id) || WERE_ON.includes(t.id) || FLAGS_WERE_PUSHED.includes(t.id) ? 'push' : NEW[t.id]]));
+  const OLD = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, WERE_PUSHED.includes(t.id) || WERE_ON.includes(t.id) || FLAGS_WERE_PUSHED.includes(t.id) ? 'push' : BEFORE[t.id]]));
+  assert.ok(Object.keys(NEW).filter((id) => NEW[id] !== 'push' && OLD[id] === 'push').every((id) => [...NON_LOSS_WERE_PUSHED, ...WERE_PUSHED, ...WERE_ON, ...FLAGS_WERE_PUSHED].includes(id)), 'every alert that stopped pushing is pinned for them, by this migration or an earlier one');
   assert.deepEqual(tiers(getPrefs('before')), OLD);
   assert.deepEqual(tiers(getPrefs('ancient')), OLD);
   assert.deepEqual(tiers(getPrefs('chose')), { ...OLD, 'nba.missed_shot': 'off', 'mlb.batter.popout': 'push', 'team.opponent_scored': 'feed', 'nfl.qb.interception': 'feed' });
@@ -60,6 +67,7 @@ test('installs from before keep exactly what they had; their own choices stay th
   install('after', DEFAULT_PREFS);
   keepOldDefaults();
   keepFlagsPushed();
+  keepNonLossPushes();
   assert.deepEqual(tiers(getPrefs('after')), NEW);
 });
 
