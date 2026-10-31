@@ -4,7 +4,7 @@
 //   node app-store/upload-listings.mjs [lang ...] [--apply] [--no-screenshots] [--replace-screenshots]
 // Needs for --apply: ASC_KEY_ID, ASC_ISSUER_ID and the key file (default ~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8).
 // Fills: app name + subtitle (appInfoLocalizations); description, keywords, promotional text (appStoreVersionLocalizations);
-// screenshots into APP_IPHONE_69 (screenshots/, 1320x2868) and APP_IPHONE_65 (screenshots-6.5in/, 1284x2778).
+// screenshots into APP_IPHONE_67 (screenshots/, 1320x2868) and APP_IPHONE_65 (screenshots-6.5in/, 1284x2778).
 // Not done: the Header and Search Results images (no known API, upload by hand), "What's new" (Apple wants it on an update
 // version: type it in App Store Connect), Google Play (needs its own service-account key, see docs/android-release.md).
 import { createSign, createHash } from 'node:crypto';
@@ -21,7 +21,7 @@ const picked = args.filter((a) => !a.startsWith('--'));
 const langs = (picked.length ? picked : Object.keys(LOCALES)).filter((l) => l !== 'en');
 for (const l of langs) if (!LOCALES[l]) throw new Error(`unknown language ${l}`);
 
-const SHOT_SETS = [['APP_IPHONE_69', 'screenshots'], ['APP_IPHONE_65', 'screenshots-6.5in']];
+const SHOT_SETS = [['APP_IPHONE_67', 'screenshots'], ['APP_IPHONE_65', 'screenshots-6.5in']];
 const EDITABLE = ['PREPARE_FOR_SUBMISSION', 'DEVELOPER_REJECTED', 'REJECTED', 'METADATA_REJECTED', 'INVALID_BINARY'];
 
 // The sections of listings/<lang>.md, as check-listings.mjs reads them.

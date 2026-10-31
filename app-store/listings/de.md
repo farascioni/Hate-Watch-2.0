@@ -9,7 +9,7 @@ Hate Watch
 Alerts, wenn Rivalen patzen
 
 ## Apple keywords
-Sport,Rivalen,Alerts,Ergebnisse,NBA,MLB,NFL,NHL,F1,UFC,Football,Baseball,Eishockey,Push,Live
+Sport,Rivalen,Alerts,Ergebnisse,Basketball,Baseball,Eishockey,Football,Motorsport,MMA,Push,Live
 
 ## Apple promotional text
 Folge den Spielern und Teams, die du nicht ausstehen kannst, und erfahre sofort, wenn es für sie schiefläuft. Echtzeit-Alerts und Live-Ergebnisse.
@@ -23,7 +23,7 @@ Erfahre sofort, wenn deine Rivalen scheitern.
 Hate Watch ist für Sportfans mit Rivalitäten. Folge den Spielern und Teams, gegen die du bist, und die App sagt dir im selben Moment Bescheid, wenn es für sie schiefläuft: ein Strikeout, eine Interception, ein Gegentor, eine verspielte Führung, eine Niederlage, ein Ausfall im Rennen. Sie passt für dich auf, schickt dir innerhalb von Sekunden eine Mitteilung und sammelt jeden Alert in einem Feed, in dem du zurückblättern kannst.
 
 FOLGE ALLEN, DIE DU GERN HASST
-Suche ein beliebiges Team oder einen Athleten und tippe auf Folgen. Deckt NBA, WNBA, MLB, NFL, NHL, College Football, die englische Premier League, Formel 1 und UFC ab.
+Suche ein beliebiges Team oder einen Athleten und tippe auf Folgen. Deckt Basketball, Baseball, Eishockey, Profi- und College-Football, Fußball, Motorsport und Mixed Martial Arts ab.
 
 ECHTZEIT-ALERTS
 Strikeouts, Ballverluste, verspielte Führungen, Strafen, Verletzungen, Niederlagen, Abstiege in der Tabelle, Ausfälle und vieles mehr. Jede Alert-Art lässt sich pro Liga ein- oder ausschalten.

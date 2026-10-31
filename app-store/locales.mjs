@@ -12,7 +12,7 @@ export const LOCALES = {
     searchSub: 'Real-time alerts when the players and teams you can’t stand mess up',
     shots: [
       ['Know the second', 'your rivals *fail*', 'Real-time alerts when the players', 'and teams you can’t stand mess up'],
-      ['Track anyone', 'you love to *hate*', 'Teams and athletes across the pros,', 'college football, F1 and UFC'],
+      ['Track anyone', 'you love to *hate*', 'Teams and athletes across the pros,', 'college football, motorsport and MMA'],
       ['Watch their games', 'as they *happen*', 'Live scores and win chances for every', 'game your rivals play'],
       ['Mute the pings,', 'keep the *misery*', 'Silence push for anyone and', 'still see their alerts in your feed'],
       ['Your rules,', '*player* by player', 'Turn off one alert for one player', 'and keep it for everyone else'],
@@ -27,7 +27,7 @@ export const LOCALES = {
     searchSub: 'Alertas al instante cuando los jugadores y equipos que no soportas fallan',
     shots: [
       ['Al segundo en que', 'tus rivales *fallan*', 'Alertas en tiempo real cuando los', 'rivales que odias cometen errores'],
-      ['Sigue a quien', 'amas *odiar*', 'Equipos y atletas de las ligas pro,', 'fútbol americano universitario, F1 y UFC'],
+      ['Sigue a quien', 'amas *odiar*', 'Equipos y atletas de las ligas pro,', 'fútbol americano universitario, automovilismo y MMA'],
       ['Mira sus partidos', 'mientras *suceden*', 'Marcadores en vivo y probabilidad de', 'ganar de cada partido de tus rivales'],
       ['Sin avisos,', 'toda la *miseria*', 'Silencia las notificaciones y aun así', 've sus alertas en tu feed'],
       ['Tus reglas,', 'jugador por *jugador*', 'Desactiva una alerta para un jugador', 'y consérvala para todos los demás'],
@@ -41,7 +41,7 @@ export const LOCALES = {
     searchSub: 'Alertes en temps réel quand les joueurs et équipes que vous détestez flanchent',
     shots: [
       ['À la seconde où', 'vos rivaux *échouent*', 'Alertes en temps réel quand les joueurs', 'et équipes que vous détestez flanchent'],
-      ['Suivez ceux que', 'vous aimez *détester*', 'Équipes et athlètes des ligues pro,', 'du football universitaire, F1 et UFC'],
+      ['Suivez ceux que', 'vous aimez *détester*', 'Équipes et athlètes des ligues pro,', 'du football universitaire, de la course auto et du MMA'],
       ['Regardez leurs matchs', 'en *direct*', 'Pointages en direct et probabilités de', 'victoire pour chaque match de vos rivaux'],
       ['Moins de pings,', 'plus de *misère*', 'Coupez les notifications et gardez', 'quand même leurs alertes dans votre fil'],
       ['Vos règles,', 'joueur par *joueur*', 'Désactivez une alerte pour un joueur', 'et gardez-la pour tous les autres'],
@@ -55,7 +55,7 @@ export const LOCALES = {
     searchSub: 'Alertas em tempo real quando os jogadores e times que você não suporta erram',
     shots: [
       ['No segundo em que', 'seus rivais *falham*', 'Alertas em tempo real quando os jogadores', 'e times que você não suporta erram'],
-      ['Acompanhe quem', 'você adora *odiar*', 'Times e atletas das ligas profissionais,', 'futebol americano universitário, F1 e UFC'],
+      ['Acompanhe quem', 'você adora *odiar*', 'Times e atletas das ligas profissionais,', 'futebol americano universitário, automobilismo e MMA'],
       ['Veja os jogos', 'enquanto *acontecem*', 'Placares ao vivo e chances de vitória de', 'cada jogo dos seus rivais'],
       ['Sem notificações,', 'só a *miséria*', 'Silencie o push de qualquer um e ainda', 'veja os alertas no seu feed'],
       ['Suas regras,', 'jogador por *jogador*', 'Desative um alerta para um jogador', 'e mantenha para todos os outros'],
@@ -69,7 +69,7 @@ export const LOCALES = {
     searchSub: 'Echtzeit-Alerts, wenn Spieler und Teams, die du nicht ausstehen kannst, patzen',
     shots: [
       ['Sofort erfahren:', 'Rivalen *scheitern*', 'Echtzeit-Alerts, wenn Spieler und Teams,', 'die du nicht ausstehen kannst, patzen'],
-      ['Folge allen,', 'die du *gern hasst*', 'Teams und Athleten der Profiligen,', 'College Football, F1 und UFC'],
+      ['Folge allen,', 'die du *gern hasst*', 'Teams und Athleten der Profiligen,', 'College Football, Motorsport und MMA'],
       ['Verfolge ihre Spiele', 'in *Echtzeit*', 'Live-Ergebnisse und Siegchancen für jedes', 'Spiel deiner Rivalen'],
       ['Ohne Pings,', 'voller *Schadenfreude*', 'Schalte Push für jeden stumm und sieh', 'trotzdem alle Alerts in deinem Feed'],
       ['Deine Regeln,', 'Spieler für *Spieler*', 'Schalte einen Alert für einen Spieler ab', 'und behalte ihn für alle anderen'],
@@ -84,7 +84,7 @@ export const LOCALES = {
     searchSub: '嫌いな選手やチームがミスしたらすぐにリアルタイムで通知',
     shots: [
       ['ライバルの失敗を', '*瞬時*にキャッチ', '嫌いな選手やチームがミスしたら', 'すぐにリアルタイム通知'],
-      ['嫌いな相手を', '*追跡*しよう', 'プロリーグ、大学フットボール、', 'F1、UFCの選手とチームに対応'],
+      ['嫌いな相手を', '*追跡*しよう', 'プロリーグ、大学フットボール、', 'モータースポーツ、格闘技の選手とチームに対応'],
       ['試合の展開を', '*リアルタイム*で', 'ライバルが出場する全試合の', 'ライブスコアと勝率'],
       ['通知はオフでも', '*悲劇*は見逃さない', '誰の通知もミュートしながら', 'アラートはフィードで確認'],
       ['ルールは', '*選手*ごとに自由に', 'ある選手だけアラートをオフにして', '他の選手では残せます'],

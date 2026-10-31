@@ -10,15 +10,6 @@ import { LOCALES, langs, useLang, out, here, png, text, defs, MARK, rawB64, WHIT
 
 const GREY = '#9a9aa2';
 
-const chips = (x0, y, h, size) => {
-  const names = ['NBA', 'MLB', 'NFL', 'NHL', 'F1'], w = h * 2.3, gap = h * 0.4;
-  return names.map((n, i) => {
-    const x = x0 + i * (w + gap);
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="#1c1c20" stroke="#34343a" stroke-width="2"/>` +
-      text(x + w / 2, y + h * 0.68, size, 700, '#c9c9ce', n);
-  }).join('');
-};
-
 // Feature graphic 1024x500. Play crops it on some surfaces, so everything sits in the centre.
 const feature = (L) => `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
   ${defs(1024, 500)}
@@ -26,7 +17,6 @@ const feature = (L) => `<svg xmlns="http://www.w3.org/2000/svg" width="1024" hei
   ${text(420, 215, 58, 800, WHITE, L.tagline[0], 'start', 540)}
   ${text(420, 285, 58, 800, WHITE, L.tagline[1], 'start', 540)}
   ${text(420, 332, 24, 500, GREY, L.headerSub, 'start', 570)}
-  ${chips(420, 365, 40, 19)}
 </svg>`;
 
 const SHOTS = [['1-feed', 'feed'], ['2-search', 'search'], ['3-scores', 'scores'], ['4-tracking', 'tracking'], ['5-player-alerts', 'player-alerts'], ['6-settings', 'settings']];

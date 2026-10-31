@@ -9,16 +9,6 @@ import { LOCALES, langs, useLang, out, write, png, text, defs, MARK, rawB64, WHI
 
 const GREY = '#9a9aa2';
 
-const chips = (cx, y, h, size) => {
-  const names = ['NBA', 'MLB', 'NFL', 'NHL', 'F1'], w = h * 2.3, gap = h * 0.45;
-  const x0 = cx - (names.length * w + (names.length - 1) * gap) / 2;
-  return names.map((n, i) => {
-    const x = x0 + i * (w + gap);
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="#1c1c20" stroke="#34343a" stroke-width="4"/>` +
-      text(x + w / 2, y + h * 0.68, size, 700, '#c9c9ce', n);
-  }).join('');
-};
-
 // Header 21:9. Cropped differently on each device, so everything sits in the centre ~60%.
 const header = (L, w = 3840, h = 1646) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   ${defs(w, h)}
@@ -27,7 +17,6 @@ const header = (L, w = 3840, h = 1646) => `<svg xmlns="http://www.w3.org/2000/sv
   ${text(1780, 690, 190, 800, WHITE, L.tagline[0], 'start', 1900)}
   ${text(1780, 900, 190, 800, WHITE, L.tagline[1], 'start', 1900)}
   ${text(1780, 1040, 76, 500, GREY, L.headerSub, 'start', 1800)}
-  ${chips(2555, 1150, 100, 46)}
   </g>
 </svg>`;
 

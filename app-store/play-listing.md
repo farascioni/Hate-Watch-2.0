@@ -14,7 +14,7 @@ Know the second your rivals fail.
 Hate Watch is for sports fans with rivalries. Track the players and teams you root against, and the app tells you the moment something goes wrong for them: a strikeout, an interception, a goal allowed, a lost lead, a lost game, a crash out of a race. It watches so you don't have to, sends a notification within seconds, and keeps every alert in a feed you can scroll back through.
 
 TRACK ANYONE YOU LOVE TO HATE
-Search any team or athlete and tap Track. Covers the NBA, WNBA, MLB, NFL, NHL, college football, the English Premier League, Formula 1 and UFC.
+Search any team or athlete and tap Track. Covers basketball, baseball, hockey, pro and college football, soccer, motorsport and mixed martial arts.
 
 REAL-TIME ALERTS
 Strikeouts, turnovers, blown leads, penalties, injuries, lost games, drops in the standings, DNFs and dozens more. Every alert type can be switched on or off for each league.

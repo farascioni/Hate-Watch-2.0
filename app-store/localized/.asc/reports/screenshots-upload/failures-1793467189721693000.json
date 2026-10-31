@@ -1,0 +1,71 @@
+{
+  "versionLocalizationId": "bcd1619c-2fe3-44e9-b99d-a951bc671cce",
+  "path": ".asc/reports/screenshots-upload/failures-1793467189721693000.json",
+  "rootPath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots",
+  "deviceType": "IPHONE_67",
+  "displayType": "APP_IPHONE_67",
+  "replace": true,
+  "setId": "569931ea-1f8b-4e05-843b-1dbea4f695aa",
+  "files": [
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/1-feed.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/2-search.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/3-scores.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/4-tracking.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/5-player-alerts.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/6-settings.jpg"
+  ],
+  "orderedIds": [
+    "12000019-6728-82bc-8002-66e911742ebb",
+    "02c00019-6728-82bc-801c-e3df518e106d",
+    "52000019-6728-82bc-8009-e0647f7bfbc9",
+    "d2400019-6728-82bc-8032-10c360f63cf2"
+  ],
+  "pendingFiles": [
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/5-player-alerts.jpg",
+    "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/6-settings.jpg"
+  ],
+  "pendingAssets": [
+    {
+      "fileName": "5-player-alerts.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/5-player-alerts.jpg",
+      "assetId": "85800019-6728-82bc-8033-9a994cff098c",
+      "checksum": "9ea63545d8927e0183f09f846ac7d2b8",
+      "state": "UPLOAD_COMPLETE"
+    }
+  ],
+  "results": [
+    {
+      "fileName": "1-feed.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/1-feed.jpg",
+      "assetId": "12000019-6728-82bc-8002-66e911742ebb",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "2-search.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/2-search.jpg",
+      "assetId": "02c00019-6728-82bc-801c-e3df518e106d",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "3-scores.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/3-scores.jpg",
+      "assetId": "52000019-6728-82bc-8009-e0647f7bfbc9",
+      "state": "COMPLETE"
+    },
+    {
+      "fileName": "4-tracking.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/4-tracking.jpg",
+      "assetId": "d2400019-6728-82bc-8032-10c360f63cf2",
+      "state": "COMPLETE"
+    }
+  ],
+  "failures": [
+    {
+      "fileName": "5-player-alerts.jpg",
+      "filePath": "/Users/griffinfarascioni/hate watch/app-store/localized/de/screenshots/5-player-alerts.jpg",
+      "error": "timed out waiting for screenshot 85800019-6728-82bc-8033-9a994cff098c checksum settlement after delivery state UPLOAD_COMPLETE: context deadline exceeded"
+    }
+  ],
+  "error": "timed out waiting for screenshot 85800019-6728-82bc-8033-9a994cff098c checksum settlement after delivery state UPLOAD_COMPLETE: context deadline exceeded",
+  "generatedAt": "2026-10-31T17:19:49Z"
+}
