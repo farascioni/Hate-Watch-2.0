@@ -1,5 +1,5 @@
-// Renders the iPad App Store screenshots (13-inch, 2064x2752) into screenshots-ipad-13in/ from the simulator screens in
-// app-store/raw-ipad/ (iPad Pro 13" simulator, `xcrun simctl io <udid> screenshot raw-ipad/<name>.png`; see docs/deploy.md).
+// Renders the iPad App Store screenshots (13-inch, 2064x2752) into screenshots-ipad-13in/ from the screens in
+// app-store/raw-ipad/ (web renders of the app at 1032x1376, 2x, or iPad Pro 13" simulator shots with KEEP below; see docs/deploy.md).
 // Captions reuse the phone set's lines in locales.mjs (index = the phone shot the iPad screen stands in for), so every language
 // works with no new text. One set per language: English in app-store/, the others in app-store/localized/<lang>/.
 // Run: node app-store/build-ipad-images.mjs [lang ...]   (needs app/node_modules; macOS `sips` makes the opaque JPEGs)
@@ -12,8 +12,9 @@ const W = 2064, H = 2752;
 // [file, raw screen in raw-ipad/, caption index in locales.mjs `shots`]
 const SHOTS = [['1-scores', 'scores', 0], ['2-search', 'search', 1], ['3-game', 'panes', 2], ['4-tracking', 'tracking', 3], ['5-player-alerts', 'player-alerts', 4], ['6-settings', 'settings', 5]];
 
-// The simulator draws a grey resize grip in the screen's bottom-right corner (below row 2670), so the frame stops above it.
-const KEEP = 2670 / 2752;
+// The raw screens are web renders at 1032x1376 and 2x (docs/deploy.md "App Store page images"), which have no simulator
+// resize grip to hide, so the frame keeps the whole screen. For a native simulator shot use 2670 / 2752 (the grip is below row 2670).
+const KEEP = 1;
 const shot = (raw, [h1, h2, s1, s2]) => {
   const sw = 1400, sh = Math.round(sw * 2752 / 2064), sx = (W - sw) / 2, sy = 700;
   const b64 = readFileSync(here(`raw-ipad/${raw}.png`)).toString('base64');
