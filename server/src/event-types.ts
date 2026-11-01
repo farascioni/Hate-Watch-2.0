@@ -232,7 +232,8 @@ const ALL_TYPES: EventTypeDef[] = [
 
 /**
  * The only alerts that push by default: a loss and what makes it a loss (its facts, a pitcher's loss, a UFC loss, an F1
- * team with no points), plus blowing a lead, elimination, the Hate Watch streak and the AP poll drops. Every other alert
+ * team with no points), plus blowing a lead, elimination, the Hate Watch streak, the AP poll drops and the three "Hate Watch
+ * Starting" alerts (a game, race or fight gets underway; October 31 2026). Every other alert
  * is on but feed only until the user turns its bell on (`defaultPush: false`).
  * Devices that existed before this was decided keep their old pushes (`keepNonLossPushes`, fanout.ts).
  */
@@ -241,6 +242,7 @@ export const LOSS_PUSH = new Set<string>([
   'team.last_second_loss', 'team.lost_as_favorite', 'team.shut_out', 'team.swept', 'team.lost_to_worse', 'team.below_500',
   'cfb.upset_loss', 'mlb.pitcher.loss', 'ufc.lost', 'ufc.lost_title', 'ufc.lost_as_favorite', 'ufc.losing_streak', 'f1.team.no_points', 'f1.team.double_dnf',
   'team.blew_lead', 'team.eliminated', 'team.hate_watch_streak', 'cfb.poll_drop', 'cfb.poll_out',
+  'team.game_start', 'f1.driver.session_start', 'ufc.fight_start',
 ]);
 export const EVENT_TYPES: EventTypeDef[] = ALL_TYPES.map((t) => (LOSS_PUSH.has(t.id) ? t : { ...t, defaultPush: false }));
 

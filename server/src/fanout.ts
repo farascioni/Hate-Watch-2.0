@@ -344,6 +344,34 @@ export function keepNonLossPushes() {
 keepNonLossPushes();
 
 /**
+ * October 31 2026: the three "Hate Watch Starting" alerts push for everyone, installs from before included (the owner's
+ * call): once, every device's bell for them is switched on, also where a device had switched it off, for the type and
+ * for any one team or player. A switch that is off stays off (the alert wouldn't arrive anyway).
+ */
+export const START_TYPES = ['team.game_start', 'f1.driver.session_start', 'ufc.fight_start'];
+export function pushStartsForAll() {
+  if (kvGet('prefs:starts-push')) return;
+  const rows = db.prepare('SELECT id, prefs FROM devices').all() as { id: string; prefs: string }[];
+  const save = db.prepare('UPDATE devices SET prefs = ? WHERE id = ?');
+  const on = Object.fromEntries(START_TYPES.map((t) => [t, true]));
+  tx(() => {
+    for (const { id, prefs } of rows) {
+      const p = JSON.parse(prefs || '{}');
+      p.pushTypes = { ...p.pushTypes, ...on };
+      // A team's own "off" is cleared so it follows the bell above again (a "true" would pin it on past a later global off).
+      for (const t of Object.values((p.targetPushTypes ?? {}) as Record<string, Record<string, boolean> | null>)) {
+        if (t && typeof t === 'object') for (const s of START_TYPES) if (t[s] === false) delete t[s];
+      }
+      save.run(JSON.stringify(p), id);
+    }
+    kvSet('prefs:starts-push', { at: Date.now(), devices: rows.length });
+  });
+  prefsCache.clear();
+  if (rows.length) console.log(`[prefs] the starting alerts push for ${rows.length} existing devices`);
+}
+pushStartsForAll();
+
+/**
  * Does the alert's type want a push (its 🔔)? An alert that counts for several types follows the most
  * specific one the user has switched on: with home runs feed-only and runs pushed, a homer stays quiet;
  * with home runs switched off, it arrives as a run and pushes.
