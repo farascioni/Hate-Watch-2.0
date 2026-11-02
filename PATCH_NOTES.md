@@ -17,7 +17,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Guide: drawings move on each page, the web guide is dark, and the Feed page says losses, bad news and starts push by default. (Update)
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, and more. Off under Reduce Motion. (Update)
 - Search and Tracking reload on open, so image switches show.
-- Badges (when logos and photos are off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code.
+- Badges (when logos and photos are off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code. (Update)
 - Server: new installs push only for losses, bad news and starts (25 alerts); the rest are Feed only. Installs already out keep their pushes and get the starts on.
 - Server: bad requests get a 400 or 413, new devices are rate limited, share links use our address.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
