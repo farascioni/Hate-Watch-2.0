@@ -320,7 +320,7 @@ Alerts go out the moment a play is first seen; nothing waits for a review. ESPN 
 - **Skipped when:** the flag is declined or offsetting (anywhere in the text), the formation in brackets is a punt, field goal or kick ("(Punt formation)", "(Field Goal formation)"), or the flagged team isn't the offense (the play's team, compared after mapping NFL codes with `NFL_CODE`: ARZ, BLT, CLV, HST, LA, WAS, JAC to ARI, BAL, CLE, HOU, LAR, WSH, JAX).
 - **The quarterback:** a penalized participant who is a QB, when ESPN names one; otherwise the offense's quarterback in the game right now (`g.qbs`, the latest passer the roster lists as a QB, set by `observePlay`; a trick-play pass by a non-QB doesn't change it).
 - **Title:** "Jordan Love took a delay of game penalty" (`test/sport-alerts.test.ts`). When ESPN named him as penalized, it replaces his "Commits a penalty" alert (`aliases: ['nfl.penalty']`); when he was only inferred, there was no penalty alert for him to replace.
-- Feed only by default for new installs since October 22, 2026 (only losses push by default; README "Defaults"). Existing installs keep the push (`keepNonLossPushes`).
+- Feed only by default for new installs since October 22, 2026 (only losses, bad news and game, race and fight starts push by default; README "Defaults"). Existing installs keep the push (`keepNonLossPushes`); the three starts are pushed for them too (`pushStartsForAll`).
 
 ### Gives up a safety
 
@@ -768,7 +768,7 @@ ESPN posts a hockey play before it has settled and edits it. In EDM at LA (314 p
 | `f1.driver.lost_places` | Loses places from the grid | player | Race | feed only |
 | `f1.driver.beaten_by_teammate` | Finishes behind teammate | player | Race | feed only |
 | `f1.driver.lapped` | Gets lapped | player | Race | feed only |
-| `f1.driver.session_start` | Race starts | player | Race | feed only |
+| `f1.driver.session_start` | Race starts | player | Race | push |
 | `f1.driver.back_of_grid` | Starts from the back | player | Race | feed only |
 | `f1.driver.pit_stop` | Pits | player | Race | feed only |
 | `f1.driver.quali_knockout` | Knocked out in qualifying | player | Qualifying | feed only |
@@ -845,7 +845,7 @@ When a race or sprint ends, each driver gets **one** alert with every fact that 
 | `f1.team.double_dnf` | Double DNF | team | Team | push |
 | `f1.team.no_points` | Scores no points | team | Team | push |
 | `team.standings_drop` | Drops in standings | team | Season | feed only |
-| `team.game_start` | Game starts | team | Game | feed only |
+| `team.game_start` | Game starts | team | Game | push |
 
 - **Double DNF (live):** the second car of a constructor out in a race or sprint (`RaceWatch.poll`): "Cadillac: double DNF" (`test/f1-merges.test.ts`), body "<session>: Sergio Pérez retired on lap 1; Valtteri Bottas retired on lap 6" (out first, by lap). It counts as "Scores no points" too (`aliases: ['f1.team.no_points']`), and it's a Successful Hate Watch (`HATE_WATCH_TYPES`). At the finish the classification makes the same alert (same id, `${compId}:f1.team.double_dnf:${team}`), so it isn't sent twice.
 - **Scores no points:** at the finish, every car of the constructor out or below the points: "Successful Hate Watch! Ferrari finished outside the points" with the body "<session>: <driver> P12, <driver> DNF" (each car with its driver's name, best first). It's F1's Successful Hate Watch: the counter goes up under the constructor.
@@ -947,7 +947,7 @@ The team alerts every league shares, and the standings alerts. The loss and its 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
 | `team.lost` | Loses a game | team | Game | push |
-| `team.game_start` | Game starts | team | Game | feed only |
+| `team.game_start` | Game starts | team | Game | push |
 | `team.fell_behind` | Falls behind | team | Game | feed only |
 | `team.opponent_scored` | Opponent scores | team | Game | feed only |
 | `team.eliminated` | Eliminated from playoffs | team | Season | push |
@@ -1013,9 +1013,9 @@ Two ways out.
 
 | Type id | Label in Settings | About | Section | Default |
 |---|---|---|---|---|
-| `team.game_start` | Game starts | team | Game | feed only |
-| `f1.driver.session_start` | Race starts | player | Race | feed only |
-| `ufc.fight_start` | Fight starts | player | Fight | feed only |
+| `team.game_start` | Game starts | team | Game | push |
+| `f1.driver.session_start` | Race starts | player | Race | push |
+| `ufc.fight_start` | Fight starts | player | Fight | push |
 
 - **Trigger:** the game's tracker sees ESPN's status go from "pre" to "in" (`GameTracker.poll` in `live.ts`, polled every 2 seconds; college football every 5). Once (`started`).
 - **Only for a game seen before it started** (`sawPre`): the scoreboard (every 10 seconds) noted it as "pre" while someone tracked a side (`preSeen` in `LiveEngine`), or the tracker itself read it as "pre". A tracker is created for a tracked game that's live or starts within 3 minutes. A game that's already under way when someone follows the team, or when the server restarts, never gets a late "starting" alert.
@@ -1026,6 +1026,7 @@ Two ways out.
 - **Favorite teams:** a device that favorites a team gets the start of its game, even when nobody tracks either side: the scan attaches a tracker to a favorite's game (`favoriteTeamKeys`), and the favorite receives the opponent's start alert ("Hate Watch Starting: Packers vs Lions" for a Lions favorite), once, with the favorite's own "Game starts" choice and push switch (`favoritePrefs`). Favoriting both sides gives one alert (`test/favorites.test.ts`, `test/game-start.test.ts`).
 - **F1:** at lights out of a race or sprint, one "Hate Watch Starting: <session>" per device, naming its constructors and drivers in it ("Yours: Alpine, George Russell."), with "Lights out." ([F1 drivers](#race-starts-and-starts-from-the-back)). The constructors' is `team.game_start`, the drivers' `f1.driver.session_start`.
 - **The UFC:** "Hate Watch Starting: Eric Nolan vs Court McGee" at the walk-outs ([UFC](#ufc)).
+- **Default:** all three starts push by default for new installs (October 31, 2026, `LOSS_PUSH`); installs from before have them pushed too: once, on October 31, 2026, `pushStartsForAll` (kv `prefs:starts-push`) switched each device's bell on for the three, also where it had turned it off, for the type or for one team or player (`NON_LOSS_WERE_PUSHED` had pinned it for installs from before October 22). A switch that is off stays off.
 - **Ids:** `${gameId}:team.game_start:${teamId}`.
 
 ## Successful Hate Watch
@@ -1413,7 +1414,7 @@ Fighters only, no teams (`server/src/ufc.ts`; its header comment is the summary)
 |---|---|---|---|---|
 | `ufc.lost` | Loses a fight | player | Fight | push |
 | `ufc.knocked_down` | Gets knocked down | player | Fight | feed only |
-| `ufc.fight_start` | Fight starts | player | Fight | feed only |
+| `ufc.fight_start` | Fight starts | player | Fight | push |
 | `ufc.lost_title` | Loses a title fight | player | Fight | push |
 | `ufc.lost_as_favorite` | Loses as the favorite | player | Fight | push |
 | `ufc.losing_streak` | Losing streak | player | Fight | push |
@@ -1482,6 +1483,6 @@ The rules every alert above goes through, in `publish()` in `server/src/fanout.t
 - **`lateOn`:** a line on the device's latest alert about a target since a time (a standings drop after a loss, an F1 championship drop after that day's result), read from the feed in the database, so it works after a restart. With no such alert, it's an alert of its own.
 - **Feed row:** one per device and alert (`ON CONFLICT DO NOTHING`), with its lines, and a live `event` frame to each open app.
 - **Push** if the device has a push token, push is on, the target isn't muted or snoozed (its bell-off switch or a snooze; through a player, that player's too), it's outside quiet hours (`pushAllowed`), and the alert's type wants a push (`pushWanted`). The type that decides is the most specific one the device has on: the alert's own type if on, else the first alias that's on. Its bell: the target's own bell (`targetPushTypes`), else the Settings bell (`pushTypes`), else the type's default (`defaultPush: false` means feed only), else push. A device's alert is pushed if anything it carries would be; its lines never add a push.
-- **Defaults:** each type's `defaultOn` and `defaultPush` in `event-types.ts`, in three tiers (push, feed only, off), shown in each section's table. Since October 22, 2026 only the 22 alerts in `LOSS_PUSH` (the losses, blowing a lead, elimination, the Hate Watch streak and the AP poll drops) push by default; every other alert that is on is feed only. Installs from before the October 2026 quieter defaults kept the old ones wherever they hadn't chosen (`keepOldDefaults`: `WERE_ON` and `WERE_PUSHED`, once, kv `prefs:quiet-defaults`); before October 11, 2026 NFL flags stay pushed (`keepFlagsPushed`); before October 22, 2026 every alert that pushed and is not a loss keeps its push (`keepNonLossPushes`, `NON_LOSS_WERE_PUSHED`, kv `prefs:loss-only-push`). `GET` and `PUT /me/prefs` fill in each feed-only type's bell as off (`prefsDto`).
+- **Defaults:** each type's `defaultOn` and `defaultPush` in `event-types.ts`, in three tiers (push, feed only, off), shown in each section's table. Since October 22, 2026 only the alerts in `LOSS_PUSH` (the losses, blowing a lead, elimination, the Hate Watch streak and the AP poll drops; since October 31, 2026 also the three Hate Watch Starting alerts, 25 in all) push by default; every other alert that is on is feed only. Installs from before the October 2026 quieter defaults kept the old ones wherever they hadn't chosen (`keepOldDefaults`: `WERE_ON` and `WERE_PUSHED`, once, kv `prefs:quiet-defaults`); before October 11, 2026 NFL flags stay pushed (`keepFlagsPushed`); before October 22, 2026 every alert that pushed and is not a loss keeps its push (`keepNonLossPushes`, `NON_LOSS_WERE_PUSHED`, kv `prefs:loss-only-push`). `GET` and `PUT /me/prefs` fill in each feed-only type's bell as off (`prefsDto`).
 - **Changes after the fact:** `addLateLine`, `eventChanged` (a clip came) and `reviseEvent` (an F1 result changed) send an `eventUpdate` frame and never push.
 - **A clip** of the play goes on its alert when ESPN posts one (MLB, NBA, WNBA, NHL), with no second notification (`readClips` in `live.ts`, `server/src/clips.ts`), and can be switched off on the server (`clips.*` in `server/src/flags.ts`).

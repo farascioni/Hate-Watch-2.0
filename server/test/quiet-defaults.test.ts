@@ -13,9 +13,13 @@ const install = (id: string, prefs: object) =>
   db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?, ?, ?, ?, ?, 0)').run(id, 's', 'ios', null, JSON.stringify(prefs));
 install('before', { pushEnabled: true, sound: true, leagues: {}, types: {}, muted: [], targetTypes: {}, pushTypes: {}, targetPushTypes: {} });
 install('ancient', {});
+// Installs that switched a "Hate Watch Starting" bell off (for the type, for one team), and one with the switch itself off.
+const START_OFF = { 'team.game_start': false, 'f1.driver.session_start': false, 'ufc.fight_start': false };
+install('startsoff', { pushTypes: START_OFF, targetPushTypes: { 'team:mlb:1': { 'ufc.fight_start': false, 'team.opponent_scored': false }, 'team:mlb:2': { 'team.game_start': true } } });
+install('startsswitch', { types: { 'team.game_start': false }, pushTypes: START_OFF });
 install('chose', { types: { 'nba.missed_shot': false, 'mlb.batter.popout': true }, pushTypes: { 'team.opponent_scored': false, 'nfl.qb.interception': false } });
 const { EVENT_TYPES, LOSS_PUSH } = await import('../src/event-types.ts');
-const { DEFAULT_PREFS, getPrefs, keepOldDefaults, keepFlagsPushed, keepNonLossPushes, NON_LOSS_WERE_PUSHED, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED, FLAGS_WERE_PUSHED } = await import('../src/fanout.ts');
+const { DEFAULT_PREFS, getPrefs, keepOldDefaults, keepFlagsPushed, keepNonLossPushes, NON_LOSS_WERE_PUSHED, pushStartsForAll, START_TYPES, pushTypeFor, typeEnabled, WERE_ON, WERE_PUSHED, FLAGS_WERE_PUSHED } = await import('../src/fanout.ts');
 const { startApi } = await import('../src/api.ts');
 
 type Prefs = typeof DEFAULT_PREFS;
@@ -54,9 +58,10 @@ test('a new install: only the loss alerts push, the rest are feed only, the nois
   assert.deepEqual(tiers(DEFAULT_PREFS), NEW);
   const pushed = Object.keys(NEW).filter((id) => NEW[id] === 'push').sort();
   assert.deepEqual(pushed, [...LOSS_PUSH].sort(), 'exactly the loss alerts push, and each is on');
-  assert.equal(pushed.length, 22);
-  for (const id of ['team.lost', 'player.team_lost', 'team.shut_out', 'mlb.pitcher.loss', 'ufc.lost', 'epl.team.heavy_loss', 'team.blew_lead', 'team.eliminated', 'team.hate_watch_streak', 'cfb.poll_drop', 'cfb.poll_out']) assert.equal(NEW[id], 'push', id);
-  for (const id of ['team.game_start', 'mlb.batter.strikeout', 'nfl.qb.interception', 'nhl.goalie.goal_allowed', 'epl.goal_conceded', 'f1.driver.dnf', 'f1.driver.out_of_points', 'app.weekly_recap']) assert.equal(NEW[id], 'feed', id);
+  assert.equal(pushed.length, 25);
+  for (const id of ['team.lost', 'player.team_lost', 'team.shut_out', 'mlb.pitcher.loss', 'ufc.lost', 'epl.team.heavy_loss', 'team.blew_lead', 'team.eliminated', 'team.hate_watch_streak', 'cfb.poll_drop', 'cfb.poll_out',
+    'team.game_start', 'f1.driver.session_start', 'ufc.fight_start']) assert.equal(NEW[id], 'push', id);
+  for (const id of ['mlb.batter.strikeout', 'nfl.qb.interception', 'nhl.goalie.goal_allowed', 'epl.goal_conceded', 'f1.driver.dnf', 'f1.driver.out_of_points', 'app.weekly_recap']) assert.equal(NEW[id], 'feed', id);
   assert.deepEqual([...WERE_PUSHED].sort(), FEED.filter((id) => !ADDED.includes(id) && !FLAGS_WERE_PUSHED.includes(id)).sort(), 'every feed-only alert pushed before');
   assert.deepEqual([...WERE_ON].sort(), ['epl.lost_ball', 'mlb.team.opponent_risp', 'nba.missed_shot', 'wnba.missed_shot'], 'the three that were on');
 });
@@ -74,6 +79,22 @@ test('installs from before keep exactly what they had; their own choices stay th
   keepFlagsPushed();
   keepNonLossPushes();
   assert.deepEqual(tiers(getPrefs('after')), NEW);
+});
+
+test('the starting alerts are switched to push once for installs already out, bell off or not; a switch that is off stays off', () => {
+  const a = getPrefs('startsoff');
+  for (const t of START_TYPES) assert.equal(pushTypeFor(a, 'team:mlb:9', t), true, t);
+  assert.equal(pushTypeFor(a, 'team:mlb:1', 'ufc.fight_start'), true, 'a team override that had it off is on');
+  assert.equal(a.targetPushTypes?.['team:mlb:1']?.['ufc.fight_start'], undefined, 'cleared, so it follows the global bell');
+  assert.equal(pushTypeFor(a, 'team:mlb:1', 'team.opponent_scored'), false, 'its other choices stay');
+  const b = getPrefs('startsswitch');
+  assert.equal(typeEnabled(b, 'team.game_start'), false);
+  assert.equal(pushTypeFor(b, 'team:mlb:1', 'team.game_start'), true);
+
+  // Once: a bell switched off after the migration stays off.
+  install('late', { pushTypes: START_OFF });
+  pushStartsForAll();
+  assert.equal(pushTypeFor(getPrefs('late'), 'team:mlb:1', 'team.game_start'), false);
 });
 
 test("the app sees each feed-only alert's 🔔 as off (builds that read a missing bell as push show it right), and can turn it on", async () => {
