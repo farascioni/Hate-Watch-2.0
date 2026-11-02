@@ -132,7 +132,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const counts = items.filter((x) => (x.haters ?? x.trackers) != null);
     if (counts.length) setTrackers((m) => { const n = new Map(m); for (const x of counts) n.set(x.key, (x.haters ?? x.trackers)!); return n; });
   }, []);
-  const refreshTrackers = useCallback(async () => { noteTrackers((await api.follows()).follows); }, [noteTrackers]);
+  // Also the targets themselves (their logos and photos follow the server's image switches) and the favorites.
+  const refreshTrackers = useCallback(async () => {
+    const [f, fav] = await Promise.all([api.follows(), api.favorites().catch(() => null)]);
+    noteTrackers(f.follows);
+    setFollows(new Map(f.follows.filter((x) => x.target).map((x) => [x.key, x.target!])));
+    if (fav) setFavorites(new Map(fav.favorites.map((x) => [x.key, x])));
+  }, [noteTrackers]);
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [leagues, setLeagues] = useState<LeagueInfo[]>([]);

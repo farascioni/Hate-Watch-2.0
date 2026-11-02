@@ -8,14 +8,15 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 ## Next build
 
 - Injury alerts: tracking a player and their team no longer shows one injury twice, and a player reinstated or activated from the injured list no longer alerts.
-- Scores: switching the league chip no longer leaves the My / Playoffs / All highlight misplaced. (Update)
-- Hate Watch Plus: a failed subscription shows the store's error code and details. (Update)
+- Scores: switching league keeps the My / Playoffs / All highlight right. (Update)
+- Plus: a failed subscription shows the store's error code. (Update)
 - Hate Watch Plus: star an alert to save it; the Feed's Saved chip lists them. A lapse hides the list, resubscribing brings it back. (Update)
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab. Alert presets (save, edit, build) set a target's alerts in one tap. Hidden, not deleted, on a lapse. (Update)
-- Tabs: quick swaps no longer leave a blank screen, the Feed no longer freezes after a switch, and you can swipe sideways to switch tabs. (Update)
-- Lock screen scoreboard: an unstarted game shows its start time in your time zone; the clock and quarter sit between the teams. One-game Hero adds a live dot, bigger score, who leads and venue (after server update). Tap a game for its box score, a push for its alert. (Update)
+- Tabs: quick swaps no longer leave a blank screen or freeze the Feed; swipe sideways to switch tabs. (Update)
+- Lock screen scoreboard: an unstarted game shows its start time in your time zone; clock and quarter sit between the teams. One-game Hero adds a live dot, bigger score, leader and venue (after server update). Tap for the box score. (Update)
 - Guide: drawings move on each page, the web guide is dark, and the Feed page says losses, bad news and starts push by default. (Update)
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, and more. Off under Reduce Motion. (Update)
+- Search and Tracking reload on open, so image switches show.
 - Server: new installs push only for losses, bad news and game, race and fight starts (25 alerts); every other alert is in the Feed with its bell off. Installs already out keep their pushes, and get the starts switched on.
 - Server: bad requests get a 400 or 413, new devices are limited per address, share links use our address, shared alert pages are noindex.
 - Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.

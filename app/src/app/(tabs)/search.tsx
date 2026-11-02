@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, Platform, Pressable, SectionList, StyleSheet, TextInput, View, Text } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { api } from '../../lib/api';
@@ -37,6 +38,13 @@ export default function SearchScreen() {
   const byDivision = sortByDivision && leagueUi(league).divisions; // F1's constructors have none (the server's leagueUi)
   const { leagueInfo } = useStore();
   const seq = useRef(0);
+  // Each time the tab opens the lists load again, so a server switch (the image switches) shows without restarting the app.
+  const [opened, setOpened] = useState(0);
+  const firstFocus = useRef(true); // the lists already load on mount
+  useFocusEffect(useCallback(() => {
+    if (firstFocus.current) { firstFocus.current = false; return; }
+    setOpened((n) => n + 1);
+  }, []));
 
   // Debounced search; stale responses are discarded so results never flash out of order.
   useEffect(() => {
@@ -52,7 +60,7 @@ export default function SearchScreen() {
       } finally { if (mine === seq.current) setLoading(false); }
     }, 150);
     return () => clearTimeout(t);
-  }, [q, league, searchKind]);
+  }, [q, league, searchKind, opened]);
 
   // Empty query: browse every team in the selected league (or every league), A-Z or by division.
   useEffect(() => {
@@ -60,20 +68,20 @@ export default function SearchScreen() {
     let live = true;
     api.teams(league, byDivision).then((r) => { if (live) { setTeams(r.teams); noteTrackers(r.teams); } }).catch(() => {});
     return () => { live = false; };
-  }, [league, byDivision, classes, noteTrackers]);
+  }, [league, byDivision, classes, noteTrackers, opened]);
   useEffect(() => {
     if (!classes) return;
     let live = true;
     api.weightClasses().then((r) => { if (live) { setWeightClasses(r.classes); noteTrackers(r.classes.flatMap((c) => c.fighters)); } }).catch(() => {});
     return () => { live = false; };
-  }, [classes, noteTrackers]);
+  }, [classes, noteTrackers, opened]);
 
   useEffect(() => {
     if (!allDrivers) return;
     let live = true;
     api.f1Drivers().then((r) => { if (live) { setDrivers(r.drivers); noteTrackers(r.drivers); } }).catch(() => {});
     return () => { live = false; };
-  }, [allDrivers, noteTrackers]);
+  }, [allDrivers, noteTrackers, opened]);
 
   const browsing = !q.trim();
   // What the bar shows, not the last pick: Athletes picked, then CFB (teams only), lists CFB's teams.
