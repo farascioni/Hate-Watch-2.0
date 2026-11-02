@@ -59,7 +59,8 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
 - **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop, a live dot pulses, the first cards wave in, a loss glints), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
 - **Video ads** ([docs/video-ads.md](docs/video-ads.md)): three vertical ads and a video of the startup guide, React components rendered to MP4 with Remotion in `marketing/video-ads/`; the sources are in git, the renders are not.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026.
+- **Officials** ([docs/officials.md](docs/officials.md)): referees and umpires can be tracked from Search (under Athletes, below the players); five overturned-call alerts (ABS, replay, coach's challenge, review, reversal) and a game-start alert, feed only by default, worded for the crew.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 671 tests in 86 files, offline, in about 9 seconds, all passing on October 31, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
@@ -174,6 +175,12 @@ The full detail: [docs/sharing.md](docs/sharing.md).
 
 The full detail: [docs/favorites.md](docs/favorites.md).
 
+## Officials
+
+**In short:** referees and umpires (NBA, MLB, NFL) can be tracked from Search like a player or team: they show under the Athletes filter, below the players. They have no team of their own, only a heading ("MLB Umpires"), which cannot be tracked. The names come from ESPN's game summaries, so an official is searchable once the server has seen a started game of theirs. Six alerts, on and feed only by default: a ball/strike call overturned by an ABS challenge, a replay overturning a call (MLB), a coach's challenge won and a call overturned on review (NBA), a call reversed on replay (NFL), and the game they work starting (first pitch, tip-off, kickoff). Only the ABS one names a person (the home plate umpire); the rest say "<name>'s crew".
+
+The full detail: [docs/officials.md](docs/officials.md).
+
 ## Lock screen scoreboard
 
 **In short:** with the switch on in Settings (on until switched off), an iOS Live Activity on the lock screen lists the live games of the teams the device tracks, and the ones starting within the hour (the board turns on by itself while the app is open; an eye on each score card adds or removes any game): a favorite's games first, then most hated, then the rest, four lines and "+N more" (four layouts to pick in Settings: Compact; Detailed, three two-line games; Grid, four cells two across; Hero, the top game big and two lines). The server builds each device's board and pushes it to Apple itself (`server/src/live-activity.ts`, `apns.ts`; inert until the APNs key and the `liveActivity` switch are set); the app starts it and sends its push token, its most hated list and the games picked by hand, so those leave the device while the board is on. Needs a native build once (the widget extension); after it, the board's wording, colors and rows change with a server deploy, and the widget's layout code (`ScoreboardActivity.tsx`) ships over the air with an EAS Update, using only the components and modifiers that build already has. With one game, Hero is an NBA-style card: a bigger score, the period over the clock beside a live dot, who leads, and venue and channel.
@@ -194,7 +201,7 @@ The full detail: [docs/video-ads.md](docs/video-ads.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 671 tests in 86 files, offline, in about 9 seconds, all passing on October 31, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

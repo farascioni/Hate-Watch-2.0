@@ -68,7 +68,7 @@ export default function SettingsScreen() {
     // team ones like MLB "strands runners", each under its section heading.
     ...leagues.map((l) => ({
       title: t('settings.leagueAlerts', { name: l.name }), color: leagueColor(l.id), league: l.id,
-      types: eventTypes.filter((t) => t.leagues.length === 1 && t.leagues[0] === l.id),
+      types: eventTypes.filter((t) => t.scope !== 'official' && t.leagues.length === 1 && t.leagues[0] === l.id),
     })),
     { title: t('settings.allPlayerAlerts'), types: eventTypes.filter((t) => t.scope === 'player' && t.leagues.length > 1) },
     { title: t('settings.teamAlerts'), types: eventTypes.filter((t) => t.scope === 'team' && t.leagues.length > 1) },

@@ -13,12 +13,13 @@ export interface GameInfo {
   status: string;
 }
 
-/** The team a card is about: the team itself, or a player's. */
-export const teamKeyOf = (t: Target) => (t.kind === 'team' ? t.key : t.teamKey);
+/** The team a card is about: the team itself, or a player's; none for an official. */
+export const teamKeyOf = (t: Target) => (t.kind === 'team' ? t.key : t.kind === 'player' ? t.teamKey : undefined);
 
 /** Live first, then the nearest one to come, then the latest final; else the "Up next" game. F1 and UFC have none. */
 export function gameInfo(t: Target, games: Map<string, GameCard>, upNext: NextGame[], now = Date.now()): GameInfo | null {
   const tk = teamKeyOf(t);
+  if (!tk) return null;
   const mine = [...games.values()].filter((g) => g.home?.team.key === tk || g.away?.team.key === tk);
   const g = mine.find((x) => x.state === 'in')
     ?? mine.filter((x) => x.state === 'pre').sort((a, b) => a.startsAt - b.startsAt)[0]

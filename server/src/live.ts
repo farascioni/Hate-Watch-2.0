@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { getJson, athleteIdFromRef } from './espn.ts';
 import { db, kvGet, kvSet } from './db.ts';
-import { addBoxPlayers, catalog } from './catalog.ts';
-import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, type League } from './leagues.ts';
+import { addBoxPlayers, addOfficials, catalog } from './catalog.ts';
+import { BASKETBALL, FOOTBALL, GAME_LEAGUES, LEAGUE_IDS, OFFICIAL_LEAGUES, SOCCER, TEAMS_ONLY, urls, teamKey, playerKey, officialKey, type League } from './leagues.ts';
 import { scanNews } from './news.ts';
 import { staleUpNext, startUpNext } from './upnext.ts';
 import { refreshSeries, refreshUpcoming } from './series.ts';
@@ -10,7 +10,7 @@ import { startF1, f1Status } from './f1.ts';
 import { startUfc, ufcStatus } from './ufc.ts';
 import { POLL_MS as CFB_POLL_MS, scanCfbPoll } from './cfb-poll.ts';
 import {
-  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, shootoutLossBody, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
+  PLAYER_DETECTORS, playerTeamLostEvents, eliminationOf, boxPitchers, fromCommentary, fromCorePlay, fromDrivePlays, have, are, fromKeyEvents, fromTouchKeyPlay, fromTouchFoul, fromSitePlay, gameLostEvent, shootoutLossBody, gameTiedEvents, heavyLossEvent, keepers, soccerFoul, soccerTouch, gameStartEvents, officialStartEvents, isSafety, clockSeconds, mergePlays, mlbFinalHalfInning, nextScore, observePlay, absCall, isPitch, pitchSlot, ordinal, pitcherEvents, teamScoreEvents, umpireReviewLost,
   bundleByPlay, boxHits, boxPlayerFacts, leadStory, lossFacts, playerFinalEvents, scoreLine, scorelessAtHalf, seriesSpot, soccerCommentaryEvents, sentOffTitle, type Detected, type GameCtx, type NPlay, type Pregame,
   awaitingBatter, awaitingHockey, awaitingScorer, awaitingShotType, impossibleTouchdown, goalNamesScorer, goalOffBoard, goalWords, endedHalf, finalHalfOnLoss, halfFromPlays, mlbHalfInningEnd, playerLossLines, summaryEvent, playsBehindFinal, roundLabel, seriesStanding, strikeoutUnderReview, RULING_PENDING, challengeOutcome, tiedLine, kickPending,
 } from './detectors.ts';
@@ -539,8 +539,10 @@ export class GameTracker {
         : versions.some((p) => absCall(p) === 'overturned') ? 'was overturned'
         : lastPitch && result && /\bchallenged:? call on the field (?:was )?overturned\b/i.test(result.text) ? "was overturned (the at-bat's result says so)"
         : null;
-      if (why) { log(`[mlb ${this.ctx.gameId}] ABS challenge at ${slot} ${why} after ESPN first posted it confirmed: no alert`); continue; }
-      send.push(...held.events);
+      if (why) log(`[mlb ${this.ctx.gameId}] ABS challenge at ${slot} ${why} after ESPN first posted it confirmed: no lost-challenge alert`);
+      // The umpire's alert (docs/officials.md) is the other way round: it goes only for a call that stayed overturned.
+      const stood = why !== null && why !== 'was taken back';
+      send.push(...held.events.filter((e) => (e.absOverturn ? stood : !why)));
     }
     return send;
   }
@@ -638,8 +640,8 @@ export class GameTracker {
    * MLB: a replay challenge's sentence added to a posted result is believed once it has held, unchanged, for
    * CHALLENGE_SETTLE_MS and the game is past that at-bat (a later at-bat's play, not an End Inning play, which can be taken
    * out), or 3 times as long: ALCS Game 1's review wrote "upheld" three times in 100 s, never for more than 35 s at a time, and ended "overturned". Then the lost challenge goes out
-   * (challengeLost's own id, from the text). A version without the sentence starts the wait over; "overturned" ends it.
-   * At the final it goes at once.
+   * (challengeLost's own id, from the text). A version without the sentence starts the wait over. An "overturned" challenge waits the same way, and
+   * goes out as the crew's alert (docs/officials.md) instead of a lost challenge. At the final it goes at once.
    */
   private challengeSettled(plays: NPlay[], now: number, final: boolean): Detected[] {
     const out: Detected[] = [];
@@ -648,12 +650,11 @@ export class GameTracker {
       if (i < 0) continue; // a stale read, or taken out: waits
       const p = plays[i], outcome = challengeOutcome(p.text);
       if (outcome !== w.outcome) { w.outcome = outcome; w.since = now; }
-      if (outcome === 'overturned') { this.challengeWatch.delete(id); log(`[mlb ${this.ctx.gameId}] result ${id}: the challenge was overturned: no alert`); continue; }
-      if (outcome !== 'upheld') continue;
+      if (!outcome) continue;
       const past = plays.slice(i + 1).some((x) => x.typeSlug !== 'end-inning' && x.id.slice(0, -6) !== id.slice(0, -6));
       if (!final && (now - w.since < CHALLENGE_SETTLE_MS || (!past && now - w.since < 3 * CHALLENGE_SETTLE_MS))) continue; // the next at-bat can be minutes away (a break between innings): 3 times as long is enough alone
       this.challengeWatch.delete(id);
-      out.push(...PLAYER_DETECTORS.mlb({ ...this.ctx, lastPitchAbs: w.abs }, p).filter((e) => e.type === 'mlb.challenge_lost'));
+      out.push(...PLAYER_DETECTORS.mlb({ ...this.ctx, lastPitchAbs: w.abs }, p).filter((e) => e.type === 'mlb.challenge_lost' || e.type === 'mlb.ump.review_overturned'));
     }
     return out;
   }
@@ -956,6 +957,7 @@ export class GameTracker {
       this.readPregame(s);
       this.box = s;
       if (BASKETBALL.has(league)) this.addMissingPlayers(s);
+      if (OFFICIAL_LEAGUES.has(league)) this.readOfficials(s);
       const comp = s.header?.competitions?.[0];
       const detail = String(comp?.status?.type?.detail ?? '');
       if (league === 'nhl' && /\/(OT|SO)\b/.test(detail)) this.overtime = /SO/.test(detail) ? 'so' : 'ot';
@@ -968,7 +970,7 @@ export class GameTracker {
         this.started = true;
         // A postseason game says its round and game ("NLCS Game 1 · First pitch at …"), from the summary's note, else the scoreboard's.
         const round = this.postseason ? roundLabel(s.header?.gameNote ?? comp?.notes?.[0]?.headline ?? this.info.note) : undefined;
-        events.push(...gameStartEvents(this.ctx, { ...this.info, round }, Date.now()));
+        events.push(...gameStartEvents(this.ctx, { ...this.info, round }, Date.now()), ...officialStartEvents(this.ctx, { ...this.info, round }, Date.now()));
       }
       const c = (side: string) => competitorScore(league, comp.competitors.find((x: any) => x.homeAway === side));
       if (comp?.status?.type?.completed) final = { home: c('home'), away: c('away') };
@@ -1395,6 +1397,20 @@ export class GameTracker {
     for (const id of before) if (!again.some((e) => e.id === id) && !fresh.some((e) => e.id === id)) log(`[${league} ${gameId}] alert ${id} no longer holds: the touches beside its play changed after it went out`);
     this.touchNext = Math.max(this.touchNext, this.touches.length - 1);
     return { fresh, again };
+  }
+
+  /** The summary's gameInfo.officials (docs/officials.md): new names enter the catalog, and `ctx.crew` is this game's list (empty until a started game's summary names them, and again after a restart until the next summary read), in ESPN's order. ESPN gives names and a position only, no id. A summary without them leaves the last crew alone. */
+  private readOfficials(s: any) {
+    const league = this.ctx.league;
+    const list = (Array.isArray(s.gameInfo?.officials) ? s.gameInfo.officials : [])
+      .map((o: any) => ({
+        name: String(o?.fullName ?? o?.displayName ?? '').replace(/\s+/g, ' ').trim(),
+        position: String(o?.position?.displayName ?? o?.position?.name ?? '').trim(),
+      }))
+      .filter((o: { name: string }) => o.name);
+    if (!list.length) return;
+    for (const o of addOfficials(league, list.map((x: { name: string }) => x.name))) log(`[${league} ${this.ctx.gameId}] new official in the catalog: ${o.name}`);
+    this.ctx.crew = list.map((o: { name: string; position: string }) => ({ key: officialKey(league, o.name), name: o.name, position: o.position }));
   }
 
   /** Basketball: players the box score lists that the catalog lacks are added once each (addBoxPlayers), so their alerts name them and they can be followed. */

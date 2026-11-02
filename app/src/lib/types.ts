@@ -37,7 +37,10 @@ export interface Player {
   standing?: string;
 }
 
-export type Target = Team | Player;
+/** A referee or umpire (docs/officials.md): tracked for their crew's overturned calls. `group` ("MLB Umpires") is a heading, not a team; there is no photo, stats page or leaderboard. */
+export interface Official { kind: 'official'; key: string; league: League; name: string; group: string; initials: string; haters?: number }
+
+export type Target = Team | Player | Official;
 
 /** A UFC weight class with its champion and top fighters, for Search (GET /ufc/weight-classes). */
 export interface WeightClass { name: string; fighters: Player[] }
@@ -247,7 +250,7 @@ export interface LeaderboardEntry { rank: number; tied?: boolean; haters: number
 export interface Leaderboard { entries: LeaderboardEntry[]; total?: number; moreTied?: number }
 
 export interface EventType {
-  id: string; scope: 'player' | 'team'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean;
+  id: string; scope: 'player' | 'team' | 'official'; alsoScope?: 'player' | 'team'; leagues: League[]; label: string; description: string; defaultOn: boolean;
   /** false: on by default but feed only (no push) until its 🔔 is tapped. Missing means pushed. */
   defaultPush?: boolean; emoji: string;
   /** The heading it's listed under ("Offense", "Pitching", "Team"…). The server lists alerts in section order. Missing from older servers. */

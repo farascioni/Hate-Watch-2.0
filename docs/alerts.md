@@ -6,7 +6,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 
 ## Index
 
-**Summary.** Hate Watch has 153 alert types (`EVENT_TYPES` in `server/src/event-types.ts`: the base list, a copy of each NBA-only type for the WNBA, and a copy of each soccer type for every soccer league). Each has a scope (a player or a team, some both), a section in the app's Settings, and a default in one of three tiers: **push**, **feed only** (on, no notification until its bell is tapped), or **off**. Live games are read by one game tracker per game every 2 seconds (`server/src/live.ts`), and each play goes through its league's detector once (`server/src/detectors.ts`). Losses and their facts are worked out at the final, standings every 60 seconds, injury reports every 30, news every 3 minutes, F1 and the UFC by their own watchers (`f1.ts`, `ufc.ts`). Every alert then goes through `publish()` (`server/src/fanout.ts`), which stores it once, decides per device whether it's wanted and whether it pushes, and makes alerts about one moment into one alert with lines. Each section starts with a table of its types (generated from `event-types.ts`): the type id, its label in Settings, who it's about (with the positions it fits, in ESPN's codes), its Settings section, and its default for a new install.
+**Summary.** Hate Watch has 161 alert types (`EVENT_TYPES` in `server/src/event-types.ts`: the base list, a copy of each NBA-only type for the WNBA, and a copy of each soccer type for every soccer league). Each has a scope (a player or a team, some both), a section in the app's Settings, and a default in one of three tiers: **push**, **feed only** (on, no notification until its bell is tapped), or **off**. Live games are read by one game tracker per game every 2 seconds (`server/src/live.ts`), and each play goes through its league's detector once (`server/src/detectors.ts`). Losses and their facts are worked out at the final, standings every 60 seconds, injury reports every 30, news every 3 minutes, F1 and the UFC by their own watchers (`f1.ts`, `ufc.ts`). Every alert then goes through `publish()` (`server/src/fanout.ts`), which stores it once, decides per device whether it's wanted and whether it pushes, and makes alerts about one moment into one alert with lines. Each section starts with a table of its types (generated from `event-types.ts`): the type id, its label in Settings, who it's about (with the positions it fits, in ESPN's codes), its Settings section, and its default for a new install.
 
 **Sections:**
 
@@ -48,6 +48,7 @@ Everything here was read from the code (`server/src/`) and the tests (`server/te
 - [College football](#college-football) (no table row): the NFL's alerts as a team's own `cfb.*` types, college flags, the AP poll, losing to an unranked team.
 - [UFC](#ufc) (no table row): fight starts, knockdowns, losses saying how and when, title fights, losing as the favorite, losing streaks.
 - [Your Hate Watch: the streak and the weekly recap](#your-hate-watch-the-streak-and-the-weekly-recap) (no table row): the device's own streak on a loss, and Monday's recap.
+- [Officials](#officials) (no table row): five overturned-call alerts and a game-start alert for a tracked referee or umpire, worded for the crew.
 - [How every alert is delivered](#how-every-alert-is-delivered): the rules in `publish()` every alert above goes through: who gets it, settings, moments and lines, late facts, pushes, defaults.
 
 ## MLB
@@ -1449,6 +1450,23 @@ Two alerts about the device, not one team. The app lists them in Settings only. 
 - **What:** the week that ended at midnight: "Your week in misery: 4 Successful Hate Watches", body "Yankees 2, Jets 1, Lakers 1. 37 alerts in all. Low point: Jets got BLOWN OUT by the Bills." (the header comment's example). Five teams at most, "and more". With no Successful Hate Watch: "Your week in misery: 37 alerts". The low point is the worst loss the device got: an elimination first, then the biggest margin.
 - **A quiet week gets none:** no Successful Hate Watch and fewer than 5 alerts (`MIN_ALERTS`).
 - **One device only** (`publishTo` in `fanout.ts`): stored once per device and week (id `recap:${hash of the device}:${week}`), pushed if the device's push is on, outside quiet hours and the type's bell is on, with the thread `recap`. Developer notices and recaps don't count as alerts in it.
+
+## Officials
+
+Scope `official`: they reach only a device that tracks that referee or umpire (`official:<league>:<slug>`), on and feed only by default. One alert per official in the game's crew, so a device tracking two of them gets one (an explicit moment). Full detail: [officials.md](officials.md).
+
+| Type | Label | When | Wording |
+|---|---|---|---|
+| `mlb.ump.abs_overturned` | Ball/strike overturned | an ABS challenge overturned a call, and it stood 30 s | "<home plate umpire> had a ball/strike call overturned by an ABS challenge" |
+| `mlb.ump.review_overturned` | Replay overturns a call | the crew chief's review or a team's replay challenge overturned a call, and it stood 45 s | "<Name>'s crew had a call overturned on replay" |
+| `nba.ref.challenge_won` | Coach's challenge won | a coach's challenge succeeded | "<Name>'s crew lost a coach's challenge" |
+| `nba.ref.review_overturned` | Call overturned on review | a ref-initiated review overturned the call | "<Name>'s crew had a call overturned on review" |
+| `nfl.ref.reversed` | Call reversed on replay | the play was REVERSED | "<Name>'s crew had a call reversed on replay" |
+| `mlb.ump.game_start` | Game starts | the game begins, seen before it started | "Hate Watch Starting: <Name>'s crew works <away> at <home>", body "First pitch at <venue>" |
+| `nba.ref.game_start` | Game starts | the same | the same, body "Tip-off at <venue>" |
+| `nfl.ref.game_start` | Game starts | the same | the same, body "Kickoff at <venue>" |
+
+The game start shares the teams' start moment (`<gameId>:start`): a device tracking a team and an official of the game gets one alert, with "<Name>'s crew works it." as a line on it. A game first seen under way, or whose crew ESPN names only after it starts, gets none.
 
 ## How every alert is delivered
 

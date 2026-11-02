@@ -33,7 +33,8 @@ export const kindOf = (f: Filter): Kind => onlyKind(f) ?? f.kind;
 
 export function matchesFilter(f: Filter, target: { kind: string; league: string }) {
   const kind = kindOf(f);
-  return (kind === 'all' || target.kind === kind) && (!f.league || target.league === f.league);
+  // An official is an athlete for filtering (Search puts them under Athletes too).
+  return (kind === 'all' || (target.kind === 'official' ? 'player' : target.kind) === kind) && (!f.league || target.league === f.league);
 }
 
 /** The UFC's weight classes, heaviest first, men's then women's (the server's order, ufc-classes.ts). */
@@ -47,6 +48,13 @@ export function groupByWeightClass(targets: Target[]): { title: string; data: Ta
   for (const t of targets) { const w = (t.kind === 'player' && t.position) || 'Other'; groups.set(w, [...(groups.get(w) ?? []), t]); }
   const order = (w: string) => { const i = WEIGHT_CLASSES.indexOf(w); return w === 'Other' ? WEIGHT_CLASSES.length + 1 : i < 0 ? WEIGHT_CLASSES.length : i; };
   return [...groups].sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b)).map(([title, data]) => ({ title, data }));
+}
+
+/** Athletes search: players first, then officials (they count as athletes) in a section per group the server names ("MLB Umpires"). */
+export function groupOfficials(targets: Target[]): { title: string; data: Target[] }[] {
+  const groups = new Map<string, Target[]>([['', []]]);
+  for (const t of targets) { const g = t.kind === 'official' ? t.group : ''; groups.set(g, [...(groups.get(g) ?? []), t]); }
+  return [...groups].filter(([, data]) => data.length).map(([title, data]) => ({ title, data }));
 }
 
 /**

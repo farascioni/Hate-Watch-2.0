@@ -280,6 +280,7 @@ export const ja: Record<Key, string> = {
   'filter.leagueWhat': '{league}の{what}',
   'filter.everything': 'すべて',
   'filter.teams': 'チーム',
+  'filter.officials': '審判',
   'filter.all': 'すべて',
   'filter.more': 'もっと見る',
   'filter.moreLeagues': 'ほかのリーグ',

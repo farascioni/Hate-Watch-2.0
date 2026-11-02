@@ -35,12 +35,17 @@ const FEED = ['mlb.pitcher.runs_allowed', 'mlb.pitcher.no_quality_start', 'mlb.c
   'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty',
   // F1's pit stops (October 2026).
   'f1.driver.pit_stop',
+  // Officials (October 2026): on, feed only, for whoever tracks one.
+  'mlb.ump.abs_overturned', 'mlb.ump.review_overturned', 'nba.ref.challenge_won', 'nba.ref.review_overturned', 'nfl.ref.reversed',
+  'mlb.ump.game_start', 'nba.ref.game_start', 'nfl.ref.game_start',
   // An NFL player's flag (October 11 2026): installs from before keep it pushed (FLAGS_WERE_PUSHED).
   'nfl.penalty'];
 // Alerts added since: nobody had them, so they come with the new defaults for everyone.
 const ADDED = ['mlb.team.down_in_order', 'team.rival_clinched', 'mlb.batter.hitless', 'mlb.team.position_player_pitching', 'nfl.team.three_and_out', 'nba.brick_night', 'nba.scoreless_half',
   'nba.team.opponent_run', 'wnba.brick_night', 'wnba.scoreless_half', 'wnba.team.opponent_run', 'nhl.minus', 'nhl.team.empty_net_goal', 'nhl.team.shorthanded_goal', 'epl.hit_woodwork',
-  'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty', 'f1.driver.pit_stop', 'nfl.team.tied'];
+  'cfb.team.three_and_out', 'cfb.team.sacked', 'cfb.team.penalty', 'f1.driver.pit_stop', 'nfl.team.tied',
+  'mlb.ump.abs_overturned', 'mlb.ump.review_overturned', 'nba.ref.challenge_won', 'nba.ref.review_overturned', 'nfl.ref.reversed',
+  'mlb.ump.game_start', 'nba.ref.game_start', 'nfl.ref.game_start'];
 // The defaults before October 22 2026 (what an install from before keeps), and the loss-only ones now.
 const BEFORE = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : FEED.includes(t.id) ? 'feed' : 'push']));
 const NEW = Object.fromEntries(EVENT_TYPES.map((t) => [t.id, OFF.includes(t.id) ? 'off' : LOSS_PUSH.has(t.id) ? 'push' : 'feed']));

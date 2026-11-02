@@ -280,6 +280,7 @@ export const fr: Record<Key, string> = {
   'filter.leagueWhat': '{what} {league}',
   'filter.everything': 'Tout',
   'filter.teams': 'Équipes',
+  'filter.officials': 'Arbitres',
   'filter.all': 'Tous',
   'filter.more': 'Plus',
   'filter.moreLeagues': 'Plus de ligues',

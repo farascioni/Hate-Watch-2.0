@@ -294,6 +294,7 @@ export const en = {
   'filter.leagueWhat': '{league} {what}',
   'filter.everything': 'Everything',
   'filter.teams': 'Teams',
+  'filter.officials': 'Officials',
   'filter.all': 'All',
   'filter.more': 'More',
   'filter.moreLeagues': 'More leagues',

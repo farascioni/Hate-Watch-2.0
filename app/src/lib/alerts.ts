@@ -21,5 +21,5 @@ export const openedAlert = (id: string) => opened.get(id);
  */
 export const isNotice = (item: Pick<FeedItem, 'type'>) => item.type === 'app.notice';
 
-/** Where who an alert is about opens: their player or team page. */
-export const targetHref = (target: Target) => `/target/${encodeURIComponent(target.key)}`;
+/** Where who an alert is about opens: their player or team page, or an official's alert settings (an official has no page). */
+export const targetHref = (target: Target) => (target.kind === 'official' ? `/alerts/${encodeURIComponent(target.key)}` : `/target/${encodeURIComponent(target.key)}`) as never;

@@ -131,3 +131,9 @@ export const urls = {
 
 export const playerKey = (lg: League, id: string) => `player:${lg}:${id}`;
 export const teamKey = (lg: League, id: string) => `team:${lg}:${id}`;
+/** ESPN gives officials no id, so the key is the name, lowercased with accents, punctuation and Jr/Sr/II/III dropped (two officials of one name in a league merge: accepted). */
+export const officialSlug = (name: string) =>
+  name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+export const officialKey = (lg: League, name: string) => `official:${lg}:${officialSlug(name)}`;
+/** Leagues whose game summary lists officials (EPL and CFB do not; the WNBA, UFC and F1 are unverified). */
+export const OFFICIAL_LEAGUES = new Set<League>(['nba', 'mlb', 'nfl']);

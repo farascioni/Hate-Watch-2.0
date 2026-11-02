@@ -5,7 +5,7 @@ import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { FollowButton, TargetRow, SectionHeader } from '../../components/ui';
 import { FavoriteButton } from '../../components/FavoriteButton';
-import { FilterBar, byWeightClass, groupByWeightClass, kindOf, playersWord, useFilter } from '../../components/FilterBar';
+import { FilterBar, byWeightClass, groupByWeightClass, groupOfficials, kindOf, playersWord, useFilter } from '../../components/FilterBar';
 import { colors, radius, space } from '../../theme';
 import type { Player, Target, Team, WeightClass } from '../../lib/types';
 import { leagueUi } from '../../lib/leagueUi';
@@ -16,7 +16,7 @@ export default function SearchScreen() {
   const t = useT();
   const { noteTrackers } = useStore();
   const [q, setQ] = useState('');
-  // Teams or players, Teams first: no Everything here (FilterBar `everything`).
+  // Teams or players (officials are players here), Teams first: no Everything here (FilterBar `everything`).
   const { filter, setFilter } = useFilter('team');
   const { kind, league } = filter;
   // The UFC: its fighters, a section per weight class (its champion and top five while nothing's typed).
@@ -45,7 +45,7 @@ export default function SearchScreen() {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const { results } = await api.search(q, league, searchKind === 'all' ? undefined : searchKind);
+        const { results } = await api.search(q, league, searchKind === 'all' ? undefined : searchKind, searchKind === 'player');
         if (mine === seq.current) { setResults(results); setFailed(false); noteTrackers(results); }
       } catch {
         if (mine === seq.current) { setResults([]); setFailed(true); }
@@ -87,7 +87,7 @@ export default function SearchScreen() {
   // One section of results, or of teams A-Z; by division, a section each ("AL East"; "MLB · AL East" across every league).
   // The UFC's weight classes: a section each, for results too.
   const sections = useMemo(() => {
-    if (!browsing) return !results.length ? [] : classes ? groupByWeightClass(results) : [{ title: '', data: results }];
+    if (!browsing) return !results.length ? [] : classes ? groupByWeightClass(results) : searchKind === 'player' ? groupOfficials(results) : [{ title: '', data: results }];
     if (classes) return weightClasses.map((c) => ({ title: c.name, data: c.fighters as Target[] }));
     if (allDrivers) {
       const byTeam = new Map<string, Target[]>();
@@ -104,7 +104,7 @@ export default function SearchScreen() {
       groups.set(title, [...(groups.get(title) ?? []), tm]);
     }
     return [...groups].map(([title, data]) => ({ title, data }));
-  }, [browsing, showTeams, byDivision, teams, results, league, leagueInfo, classes, weightClasses, allDrivers, drivers, t]);
+  }, [browsing, showTeams, byDivision, teams, results, league, leagueInfo, classes, weightClasses, allDrivers, drivers, searchKind, t]);
 
   return (
     <View style={[{ flex: 1, backgroundColor: colors.bg }, COLUMN]}>
@@ -140,7 +140,7 @@ export default function SearchScreen() {
       <SectionList<Target, { title: string }>
         sections={sections}
         keyExtractor={(t) => t.key}
-        renderItem={({ item }) => <TargetRow target={item} right={<View style={styles.rowActions}><FavoriteButton target={item} /><FollowButton target={item} /></View>} />}
+        renderItem={({ item }) => <TargetRow target={item} right={<View style={styles.rowActions}>{item.kind === 'official' ? null : <FavoriteButton target={item} />}<FollowButton target={item} /></View>} />}
         renderSectionHeader={({ section }) => (section.title ? <SectionHeader>{section.title}{byDivision && showTeams ? ` · ${section.data.length}` : ''}</SectionHeader> : null)}
         ListHeaderComponent={classes && browsing && sections.length ? <Text style={styles.hint}>{t('search.classesHint')}</Text> : null}
         stickySectionHeadersEnabled={false}

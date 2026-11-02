@@ -69,7 +69,7 @@ export default function FollowingScreen() {
     return () => { live = false; };
   }, [hasDrivers]));
   const formOf = (t: Target): { record?: string; streak?: string; standing?: string } | undefined =>
-    t.kind === 'player' && t.league === 'f1' ? drivers.get(t.key) : teams.get(teamKeyOf(t));
+    t.kind === 'player' && t.league === 'f1' ? drivers.get(t.key) : teams.get(teamKeyOf(t) ?? '');
   const { leagueInfo, games, upNext } = useStore();
   const layout = useTrackingLayout();
   const [menu, setMenu] = useState(false);
@@ -116,6 +116,7 @@ export default function FollowingScreen() {
     const groups = byWeightClass(filter) ? groupByWeightClass(all) : [
       { title: t('filter.teams'), data: all.filter((x) => x.kind === 'team') },
       { title: playersTitle(filter.league), data: all.filter((x) => x.kind === 'player') },
+      { title: t('filter.officials'), data: all.filter((x) => x.kind === 'official') },
     ].filter((s) => s.data.length);
     return groups.map((g) => ({ title: g.title, count: g.data.length, data: Array.from({ length: Math.ceil(g.data.length / per) }, (_, i) => g.data.slice(i * per, i * per + per)) }));
   }, [follows, filter, per, showHated, hated, members, t]);

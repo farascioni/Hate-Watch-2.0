@@ -9,7 +9,7 @@ const { LEAGUE_IDS } = await import('../src/leagues.ts');
 
 // Settings' groups, as the app makes them (settings.tsx).
 const GROUPS: [string, typeof EVENT_TYPES][] = [
-  ...LEAGUE_IDS.map((lg) => [`${lg} alerts`, EVENT_TYPES.filter((t) => t.leagues.length === 1 && t.leagues[0] === lg)] as [string, typeof EVENT_TYPES]),
+  ...LEAGUE_IDS.map((lg) => [`${lg} alerts`, EVENT_TYPES.filter((t) => t.scope !== 'official' && t.leagues.length === 1 && t.leagues[0] === lg)] as [string, typeof EVENT_TYPES]),
   ['All player alerts', EVENT_TYPES.filter((t) => t.scope === 'player' && t.leagues.length > 1)],
   ['Team alerts', EVENT_TYPES.filter((t) => t.scope === 'team' && t.leagues.length > 1)],
 ];

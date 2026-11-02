@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { api } from '../../lib/api';
 import { useStore } from '../../lib/store';
 import { Avatar } from '../../components/Avatar';
 import { SettingRow, SettingSection } from '../../components/SettingRow';
@@ -14,6 +15,7 @@ import { fitsPosition, positionsOf } from '../../lib/positions';
 import { leagueColor } from '../../lib/leagueUi';
 import { useT } from '../../lib/i18n';
 import type { Key } from '../../lib/strings/en';
+import type { Target } from '../../lib/types';
 
 /**
  * Alert choices for ONE tracked player or team. Anything set here beats the global Settings tab for
@@ -28,7 +30,14 @@ export default function TargetAlertsScreen() {
   const targetKey = decodeURIComponent(key);
   const { follows, favorites, updateFavorite, prefs, updatePrefs, eventTypes, refreshScores } = useStore();
   const favorite = isFav ? favorites.get(targetKey) : undefined;
-  const target = isFav ? favorite?.target ?? undefined : follows.get(targetKey);
+  // Search opens an official you don't track yet: its alerts page loads the official from the server, so the choices can be seen before tracking.
+  const [fetched, setFetched] = useState<Target | undefined>();
+  const tracked = isFav ? favorite?.target ?? undefined : follows.get(targetKey);
+  useEffect(() => {
+    if (tracked || !targetKey.startsWith('official:')) return;
+    api.official(targetKey).then(setFetched).catch(() => {});
+  }, [tracked, targetKey]);
+  const target = tracked ?? fetched;
   const { active: plus } = usePlus();
   const [presets, setPresets] = useState(false);
 

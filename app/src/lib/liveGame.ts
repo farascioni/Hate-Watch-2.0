@@ -15,12 +15,12 @@ const LIVE_GAME_MS = 15_000;
  */
 export function useLiveGame(target: Target): GameCard | null {
   const { games, follows } = useStore();
-  const teamKey = target.kind === 'team' ? target.key : target.teamKey;
+  const teamKey = target.kind === 'team' ? target.key : target.kind === 'player' ? target.teamKey : undefined;
   const eligible = !!teamKey && target.league !== 'f1' && target.league !== 'ufc';
   const ofTeam = (g: GameCard) => g.home?.team.key === teamKey || g.away?.team.key === teamKey;
   // The store holds every game of a team you track (or whose player you track); for any other team it holds
   // only games that happen to involve one you do (a final from yesterday), so those still need the read.
-  const tracked = follows.has(teamKey) || [...follows.values()].some((t) => t.kind === 'player' && t.teamKey === teamKey);
+  const tracked = (!!teamKey && follows.has(teamKey)) || [...follows.values()].some((t) => t.kind === 'player' && t.teamKey === teamKey);
   const stored = eligible ? [...games.values()].find((g) => g.state === 'in' && ofTeam(g)) ?? null : null;
   const [read, setRead] = useState<GameCard | null>(null);
   useFocusEffect(useCallback(() => {

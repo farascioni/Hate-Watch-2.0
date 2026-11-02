@@ -100,6 +100,8 @@ export interface GameCtx {
   qbAtt?: Record<string, number>;
   qbOther?: Record<string, { id: string; n: number }>;
   qbPulled?: Set<string>;
+  /** The game's referees or umpires (live.ts readOfficials), for the crew alerts of docs/officials.md. */
+  crew?: { key: string; name: string; position: string }[];
 }
 
 export interface Detected {
@@ -166,6 +168,8 @@ export interface Detected {
    * the pitch's place in the game, its ESPN id without the 4-digit type that changes when a call is overturned.
    */
   absSlot?: string;
+  /** With absSlot: the plate umpire's alert for an ABS call that was overturned; holdAbs sends it only if the pitch still reads overturned, the reverse of the lost-challenge alerts. */
+  absOverturn?: boolean;
   targetKey: string;
   title: string;
   body: string;
@@ -662,6 +666,21 @@ export function bundleByPlay(events: Detected[]): Detected[] {
   });
 }
 
+/**
+ * A call that went against the game's officials (docs/officials.md): one alert per official of the crew, each to whoever tracks
+ * that official (`only`: the plate umpire alone, the one position ESPN lets us pin a call on). The title says the crew, not the
+ * person, unless `only` names one. bundleByPlay gives nothing to a teamless key, so every alert here carries `moment`:
+ * a device tracking two of the crew gets the first, and one tracking a team of the same moment gets that team's alert.
+ */
+export function crewAlerts(g: GameCtx, p: NPlay, type: string, moment: string, what: string, body: string, extra: Partial<Detected> = {}, only?: RegExp): Detected[] {
+  const slug = (key: string) => key.slice(key.lastIndexOf(':') + 1);
+  return (g.crew ?? []).filter((o) => !only || only.test(o.position)).map((o) => ({
+    id: `${g.gameId}:${p.id}:${type}:ump-${slug(o.key)}`, type, targetKey: o.key,
+    title: only ? `${o.name} ${what}` : `${o.name}'s crew ${what}`, body,
+    at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment, ...extra,
+  }));
+}
+
 export const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -1082,6 +1101,7 @@ export function umpireReviewLost(g: GameCtx, p: NPlay): Detected[] {
     body: body(homer ? `${batter ? `${nameOf('mlb', batter)}'s` : 'a'} home run was overturned${why}.` : `the call on the field was overturned${why}.`),
     at: p.at, meta: { gameId: g.gameId, playId: p.id }, moment,
   });
+  out.push(...crewAlerts(g, p, 'mlb.ump.review_overturned', moment, 'had a call overturned on replay', body(`the call was overturned${why}.`)));
   return out;
 }
 
@@ -1106,7 +1126,10 @@ function challengeLost(g: GameCtx, p: NPlay): Detected[] {
   const [battingId, fieldingId] = key.startsWith('Top') ? [g.awayId, g.homeId] : [g.homeId, g.awayId];
   const abs = p.type.match(ABS_PITCH);
   if (abs) {
-    if (!/^confirmed$/i.test(abs[2])) return []; // overturned: they won it
+    if (!/^confirmed$/i.test(abs[2])) { // overturned: they won it, and the plate umpire missed the call (held like the lost ones, but sent only if it stays overturned)
+      const call = /^strike/i.test(abs[1]) ? 'a strike' : 'a ball';
+      return crewAlerts(g, p, 'mlb.ump.abs_overturned', `${g.gameId}:${p.id}:abs`, `had ${call} call overturned by an ABS challenge`, `${halfLabel(p)}: ${p.text} — ${scoreLine(g, p)}`, { absSlot: pitchSlot(p.id), absOverturn: true }, /home plate/i);
+    }
     const strike = /^strike/i.test(abs[1]);
     const [batter] = role(p, 'batter'), [pitcher] = role(p, 'pitcher');
     const loserId = strike ? battingId : fieldingId;
@@ -1128,7 +1151,10 @@ function challengeLost(g: GameCtx, p: NPlay): Detected[] {
     });
     return out;
   }
-  if (g.lastPitchAbs || !CHALLENGE_LOST.test(p.text)) return [];
+  if (g.lastPitchAbs) return [];
+  // A team's replay challenge won: the crew had a call overturned (docs/officials.md). The crew chief's own review went above.
+  if (challengeOutcome(p.text) === 'overturned') return crewAlerts(g, p, 'mlb.ump.review_overturned', `${g.gameId}:${p.id}:review`, 'had a call overturned on a replay challenge', `${halfLabel(p)}: ${p.text} — ${scoreLine(g, p)}`);
+  if (!CHALLENGE_LOST.test(p.text)) return [];
   const said = normalize(p.text);
   const loserId = [battingId, fieldingId].find((id) => {
     const t = catalog.teamByEspn('mlb', id);
@@ -1367,6 +1393,10 @@ export const ruled = (text: string) => text.split(/\bthe play was REVERSED\.?/i)
 
 function nfl(g: GameCtx, p: NPlay): Detected[] {
   const out: Detected[] = [];
+  // A call the replay official reversed went against the crew (docs/officials.md); the text before "REVERSED." is what was called.
+  if (/\bthe play was REVERSED\b/i.test(p.text)) {
+    out.push(...crewAlerts(g, p, 'nfl.ref.reversed', `${g.gameId}:${p.id}:official`, 'had a call reversed on replay', `${p.text.replace(/\s+/g, ' ').trim()} — ${scoreLine(g, p)}`));
+  }
   const [passer] = role(p, 'passer');
   const ty = p.type;
   // A play wiped out by a penalty ("… enforced at WAS 35 - No Play.") is only its flags. ESPN often leaves its type
@@ -1852,6 +1882,14 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   // ESPN posts a turnover it has not typed yet as "Tre Jones turnover Brayden Burries" (type "No Turnover"): that name is a guess, often not the stealer.
   if (/^no turnover/i.test(p.type)) say = say.replace(/(\bturnover)\s+\S.*$/i, '$1');
   const actor = onTeam(g, p, p.teamId) ?? p.participants[0]?.id;
+  // A call overturned on review went against the crew (docs/officials.md). ESPN types the outcome: "Coach's Challenge (Overturned)",
+  // "Ref-Initiated Review (Overturned)"; "Supported" and "Stands" mean the call stood. These plays have no player, so this comes before the actor check.
+  const review = /^(coach's challenge|ref-initiated review) \(overturned\)$/i.exec(p.type.trim());
+  if (review) {
+    const won = /^coach/i.test(review[1]);
+    out.push(...crewAlerts(g, p, `nba.ref.${won ? 'challenge_won' : 'review_overturned'}`, `${g.gameId}:${p.id}:official`,
+      won ? 'lost a coach\'s challenge' : 'had a call overturned on review', `${say} — ${scoreLine(g, p)}`));
+  }
   if (!actor && !/technical/i.test(p.type)) return out;
   if (p.shooting && !p.scoring) {
     if (/blocks/i.test(t)) {
@@ -2134,6 +2172,26 @@ export function gameStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' 
     at,
     moment: `${g.gameId}:start`,
     firstFollowed: true,
+    meta: { gameId: g.gameId },
+  }));
+}
+
+/**
+ * "Hate Watch Starting" for each official of the crew (docs/officials.md), to whoever tracks that official. It shares the team
+ * start's moment, so a device tracking a team of the game too gets one alert, with this as its extra line.
+ */
+export function officialStartEvents(g: Pick<GameCtx, 'league' | 'gameId' | 'homeId' | 'awayId' | 'crew'>, info: { venue?: string; tv?: string; round?: string }, at: number): Detected[] {
+  const type = `${g.league}.${g.league === 'mlb' ? 'ump' : 'ref'}.game_start`;
+  const body = [info.round, `${START_WORD[g.league]}${info.venue ? ` at ${info.venue}` : ''}`, info.tv].filter(Boolean).join(' · ');
+  return (g.crew ?? []).map((o) => ({
+    id: `${g.gameId}:${type}:ump-${o.key.slice(o.key.lastIndexOf(':') + 1)}`,
+    type,
+    targetKey: o.key,
+    title: `Hate Watch Starting: ${o.name}'s crew works ${teamName(g.league, g.awayId)} at ${teamName(g.league, g.homeId)}`,
+    body,
+    at,
+    moment: `${g.gameId}:start`,
+    fold: `${o.name}'s crew works it.`,
     meta: { gameId: g.gameId },
   }));
 }

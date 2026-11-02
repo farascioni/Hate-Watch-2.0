@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useStore } from '../lib/store';
-import { Avatar, readableOn } from './Avatar';
+import { Avatar, readableOn, tintOf } from './Avatar';
+import { targetHref } from '../lib/alerts';
 import { HaterCount, LeagueTag, TargetCard, subtitle } from './ui';
 import { streakOf, type GameInfo } from '../lib/trackingInfo';
 import type { TrackingLayout } from '../lib/trackingLayout';
@@ -30,8 +31,7 @@ function Form({ info, short }: { info: CardInfo; short?: boolean }) {
   return <>{info.record ? <Pill text={info.record} /> : null}{s ? <Pill text={s.text} tone={s.win} /> : null}{info.standing ? <Pill text={short ? info.standing.replace(' in conference', ' conf') : info.standing} /> : null}</>;
 }
 
-const open = (t: Target) => router.push(`/target/${encodeURIComponent(t.key)}`);
-const tintOf = (t: Target) => (t.kind === 'team' ? t.color : t.teamColor) ?? colors.border;
+const open = (t: Target) => router.push(targetHref(t));
 const sub = (t: Target, info: CardInfo) => [info.note, subtitle(t), info.division].filter(Boolean).join(' · ');
 
 /**

@@ -2,12 +2,14 @@ import { db, tx, kvGet, kvSet } from './db.ts';
 import { fiveRoundFights, rankFighters, titleOf, type Belts, type WeightClass } from './ufc-classes.ts';
 import { getJson, probePng, mapLimit } from './espn.ts';
 import { savingOn } from './flags.ts';
-import { LEAGUE_IDS, LEAGUES, urls, playerKey, teamKey, type League } from './leagues.ts';
+import { LEAGUE_IDS, LEAGUES, urls, playerKey, teamKey, officialKey, type League } from './leagues.ts';
 
 export interface Team {
   key: string; league: League; espnId: string; name: string; shortName: string; abbrev: string; location: string | null;
   color: string | null; altColor: string | null; logo: string; logoDark: string | null; logoW: number; logoH: number;
 }
+/** A referee or umpire (docs/officials.md): no team, no photo, no ESPN id. Their role changes by game, so it is not stored here. */
+export interface Official { key: string; league: League; name: string }
 export interface Player {
   key: string; league: League; espnId: string; name: string; shortName: string | null; position: string | null; jersey: string | null;
   /** Every position ESPN lists them at this season (Ohtani: P, DH, SP), for which alerts fit them; null when it lists none. */
@@ -48,19 +50,21 @@ export interface IngestReport {
 const teams = new Map<string, Team>();
 const players = new Map<string, Player>();
 const rosterByTeam = new Map<string, Player[]>();
+const officials = new Map<string, Official>();
 
 export const catalog = {
   team: (key: string) => teams.get(key),
   player: (key: string) => players.get(key),
   teamByEspn: (lg: League, id: string) => teams.get(teamKey(lg, id)),
   playerByEspn: (lg: League, id: string) => players.get(playerKey(lg, id)),
+  official: (key: string) => officials.get(key),
   roster: (key: string) => rosterByTeam.get(key) ?? [],
   allTeams: () => [...teams.values()],
-  size: () => ({ teams: teams.size, players: players.size }),
+  size: () => ({ teams: teams.size, players: players.size, officials: officials.size }),
 };
 
 export function loadCatalog() {
-  teams.clear(); players.clear(); rosterByTeam.clear();
+  teams.clear(); players.clear(); rosterByTeam.clear(); officials.clear();
   for (const r of db.prepare('SELECT * FROM teams').all() as any[]) {
     teams.set(r.key, {
       key: r.key, league: r.league, espnId: r.espn_id, name: r.name, shortName: r.short_name, abbrev: r.abbrev,
@@ -76,8 +80,33 @@ export function loadCatalog() {
     if (!rosterByTeam.has(p.teamKey)) rosterByTeam.set(p.teamKey, []);
     rosterByTeam.get(p.teamKey)!.push(p);
   }
+  for (const r of db.prepare('SELECT key, league, name FROM officials').all() as unknown as Official[]) officials.set(r.key, r);
   buildSearchIndex();
 }
+
+// ─── Officials ──────────────────────────────────────────────────────────────────────────────
+/**
+ * Referees and umpires a started game's officials list names that the catalog lacks, added so they can be searched and tracked (docs/officials.md).
+ * ESPN lists them only once a game has its crew, so an official is searchable after the first game they work that the server has seen.
+ * Returns the officials added; the key is the league and the name (leagues.ts officialKey).
+ */
+export function addOfficials(lg: League, names: string[]): Official[] {
+  const added: Official[] = [];
+  for (const name of names) {
+    const key = officialKey(lg, name);
+    if (!name.trim() || key.endsWith(':') || officials.has(key)) continue;
+    const o: Official = { key, league: lg, name: name.trim() };
+    db.prepare('INSERT INTO officials (key, league, name, updated_at) VALUES (?,?,?,?) ON CONFLICT(key) DO NOTHING').run(o.key, o.league, o.name, Date.now());
+    officials.set(key, o);
+    const text = normalize(o.name);
+    index.push({ key, kind: 'official', league: lg, text, tokens: text.split(' '), boost: 0 });
+    added.push(o);
+  }
+  return added;
+}
+
+/** The group an official is filed under in search and on the Tracking tab: a heading only, not a team (it has no key, page or Track button). */
+export const OFFICIAL_GROUP: Partial<Record<League, string>> = { nba: 'NBA Officials', mlb: 'MLB Umpires', nfl: 'NFL Officials' };
 
 // ─── Players the rosters lack ───────────────────────────────────────────────────────────────
 /** kv: players a live game's box score listed that no roster did (addBoxPlayers), kept across ingests for BOX_KEEP_MS: `{ [playerKey]: { p, at } }`. */
@@ -526,7 +555,7 @@ async function ufcTitles(boards: any[]): Promise<Record<string, string | null>> 
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────────────────────
-interface Indexed { key: string; kind: 'team' | 'player'; league: League; text: string; tokens: string[]; boost: number }
+interface Indexed { key: string; kind: 'team' | 'player' | 'official'; league: League; text: string; tokens: string[]; boost: number }
 let index: Indexed[] = [];
 
 function buildSearchIndex() {
@@ -540,16 +569,22 @@ function buildSearchIndex() {
     const text = normalize(p.name);
     index.push({ key: p.key, kind: 'player', league: p.league, text, tokens: text.split(' '), boost: 0 });
   }
+  for (const o of officials.values()) {
+    const text = normalize(o.name);
+    index.push({ key: o.key, kind: 'official', league: o.league, text, tokens: text.split(' '), boost: 0 });
+  }
 }
 
-export function search(q: string, opts: { league?: League; kind?: 'team' | 'player'; limit?: number } = {}) {
+/** `officials`: referees and umpires count as athletes (kind player); only a build that asks for them meets one. */
+export function search(q: string, opts: { league?: League; kind?: 'team' | 'player'; officials?: boolean; limit?: number } = {}) {
   const nq = normalize(q);
   if (!nq) return [];
   const qTokens = nq.split(' ');
   const scored: { item: Indexed; score: number }[] = [];
   for (const item of index) {
     if (opts.league && item.league !== opts.league) continue;
-    if (opts.kind && item.kind !== opts.kind) continue;
+    if (item.kind === 'official') { if (!opts.officials || opts.kind === 'team') continue; } // builds up to 12 never meet a team-less target
+    else if (opts.kind && item.kind !== opts.kind) continue;
     let score = 0;
     if (item.text === nq) score = 100;
     else if (item.text.startsWith(nq)) score = 80;
@@ -558,7 +593,7 @@ export function search(q: string, opts: { league?: League; kind?: 'team' | 'play
     if (score) scored.push({ item, score: score + item.boost });
   }
   scored.sort((a, b) => b.score - a.score || a.item.text.localeCompare(b.item.text));
-  return scored.slice(0, opts.limit ?? 40).map(({ item }) => (item.kind === 'team' ? teamDto(teams.get(item.key)!) : playerDto(players.get(item.key)!)));
+  return scored.slice(0, opts.limit ?? 40).map(({ item }) => (item.kind === 'team' ? teamDto(teams.get(item.key)!) : item.kind === 'official' ? officialDto(officials.get(item.key)!) : playerDto(players.get(item.key)!)));
 }
 
 export const teamDto = (t: Team) => ({ kind: 'team' as const, ...t });
@@ -566,7 +601,12 @@ export const playerDto = (p: Player) => {
   const t = teams.get(p.teamKey);
   return { kind: 'player' as const, ...p, teamName: t?.name ?? null, teamAbbrev: t?.abbrev ?? null, teamColor: t?.color ?? null, teamLogo: t?.logo ?? null };
 };
+export const officialDto = (o: Official) => ({
+  kind: 'official' as const, ...o, group: OFFICIAL_GROUP[o.league] ?? 'Officials',
+  initials: o.name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase(),
+});
 export const targetDto = (key: string) => {
+  if (key.startsWith('official:')) { const o = officials.get(key); return o ? officialDto(o) : null; }
   if (key.startsWith('team:')) { const t = teams.get(key); return t ? teamDto(t) : null; }
   const p = players.get(key); return p ? playerDto(p) : null;
 };

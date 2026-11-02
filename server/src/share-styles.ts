@@ -120,7 +120,7 @@ function citation(e: EventRow): El | null {
   else if (e.type === 'nfl.penalty' || e.type === 'cfb.team.penalty') violation = /was flagged: (.+)$/.exec(e.title)?.[1];
   if (!violation) return null;
   const score = /([A-Z]{2,4} \d+, [A-Z]{2,4} \d+)\s*$/.exec(e.body)?.[1];
-  const teamName = t.kind === 'team' ? t.abbrev : t.teamName ?? leagueName(e);
+  const teamName = t.kind === 'team' ? t.abbrev : t.kind === 'player' ? t.teamName ?? leagueName(e) : leagueName(e);
   const cell = (label: string, value: string) => h('div', { width: 430, flexDirection: 'column', borderBottom: '3px solid rgba(42, 36, 0, 0.5)', paddingBottom: 6 }, small(label), h('div', { fontSize: 36, fontWeight: 900 }, clip(value, 24)));
   return frame(h('div', { width: 1008, height: 480, marginTop: 28, transform: 'rotate(2deg)', flexDirection: 'column', justifyContent: 'space-between', padding: '30px 44px', backgroundColor: '#F2D95C', color: '#2A2400', borderRadius: 10 },
     h('div', { justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '6px solid #2A2400', paddingBottom: 10, fontSize: 42, fontWeight: 900, letterSpacing: 4 }, h('div', {}, 'CITATION'), h('div', { fontSize: 26 }, `No. ${serial(e.id)}`)),

@@ -9,7 +9,7 @@ import { FeedCard } from '../../components/FeedCard';
 import { StatsView } from '../../components/StatsView';
 import { ChipRows, FollowButton, HaterCount, LeagueTag, SectionHeader, TargetRow, subtitle, useNow } from '../../components/ui';
 import { colors, space } from '../../theme';
-import type { FeedItem, Player, StatsPage, Target } from '../../lib/types';
+import type { FeedItem, Player, StatsPage, Team } from '../../lib/types';
 import { ROSTER_GROUPS } from '../../lib/positions';
 import { tr, useT } from '../../lib/i18n';
 
@@ -31,7 +31,7 @@ export default function TargetScreen() {
   const [tab, setTab] = useState<'stats' | 'misery'>('stats'); // Stats first (F1 and the UFC have stats pages too: f1-stats.ts, ufc.ts)
   const [stats, setStats] = useState<StatsPage | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
-  const [target, setTarget] = useState<(Target & { roster?: Player[] }) | null>(null);
+  const [target, setTarget] = useState<((Team | Player) & { roster?: Player[] }) | null>(null);
   const [position, setPosition] = useState<string | null>(null); // the roster filter: a group's label, or all
   const now = useNow();
 

@@ -2,7 +2,8 @@ import { SOCCER, type League } from './leagues.ts';
 
 export interface EventTypeDef {
   id: string;
-  scope: 'player' | 'team';
+  /** 'official': a referee or umpire (docs/officials.md); only the OFFICIAL_TYPES below, never cloned for the WNBA. */
+  scope: 'player' | 'team' | 'official';
   /** The heading it's listed under in the app ("Offense", "Pitching", "Team"…): see the order of BASE. */
   section: string;
   /**
@@ -221,6 +222,22 @@ const BASE: EventTypeDef[] = [
 ];
 
 /**
+ * What a tracked referee or umpire can be alerted to (docs/officials.md). On, but feed only, once tracked (tracking one is
+ * the opt-in). Only ESPN's own review outcomes: nothing says who made a call, so all but the ABS plate call name "the crew".
+ * Not in BASE: the WNBA clone below would copy the nba.* ones, and nothing in ESPN's WNBA summaries has been checked.
+ */
+const OFFICIAL_TYPES: EventTypeDef[] = [
+  { id: 'mlb.ump.abs_overturned', scope: 'official', leagues: ['mlb'], section: 'Overturned', label: 'Ball/strike overturned', description: 'An ABS challenge changes the home plate umpire\'s call.', defaultOn: true, defaultPush: false, emoji: '🎯' },
+  { id: 'mlb.ump.review_overturned', scope: 'official', leagues: ['mlb'], section: 'Overturned', label: 'Replay overturns a call', description: 'A replay or crew chief review reverses the crew\'s call.', defaultOn: true, defaultPush: false, emoji: '📺' },
+  { id: 'nba.ref.challenge_won', scope: 'official', leagues: ['nba'], section: 'Challenges and reviews', label: 'Coach\'s challenge won', description: 'A call is overturned after a coach\'s challenge.', defaultOn: true, defaultPush: false, emoji: '🚩' },
+  { id: 'nba.ref.review_overturned', scope: 'official', leagues: ['nba'], section: 'Challenges and reviews', label: 'Call overturned on review', description: 'A referee-initiated review reverses a call.', defaultOn: true, defaultPush: false, emoji: '📺' },
+  { id: 'nfl.ref.reversed', scope: 'official', leagues: ['nfl'], section: 'Overturned', label: 'Call reversed on replay', description: 'Replay reverses the crew\'s call on the field.', defaultOn: true, defaultPush: false, emoji: '📺' },
+  { id: 'mlb.ump.game_start', scope: 'official', leagues: ['mlb'], section: 'Game', label: 'Game starts', description: 'A game this umpire is working starts.', defaultOn: true, defaultPush: false, emoji: '🍿' },
+  { id: 'nba.ref.game_start', scope: 'official', leagues: ['nba'], section: 'Game', label: 'Game starts', description: 'A game this referee is working starts.', defaultOn: true, defaultPush: false, emoji: '🍿' },
+  { id: 'nfl.ref.game_start', scope: 'official', leagues: ['nfl'], section: 'Game', label: 'Game starts', description: 'A game this referee is working starts.', defaultOn: true, defaultPush: false, emoji: '🍿' },
+];
+
+/**
  * The WNBA gets every alert the NBA has: a copy of each NBA-only alert (wnba.*, with its own switches
  * under "WNBA alerts", fed by the same basketball detectors), and every multi-league alert the NBA is in.
  */
@@ -228,6 +245,7 @@ const withWnba = (lgs: League[]): League[] => lgs.flatMap((lg) => (lg === 'nba' 
 const ALL_TYPES: EventTypeDef[] = [
   ...BASE.map((t) => (t.leagues.length > 1 && t.leagues.includes('nba') ? { ...t, leagues: withWnba(t.leagues) } : t)),
   ...BASE.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'nba').map((t) => ({ ...t, id: t.id.replace(/^nba\./, 'wnba.'), leagues: ['wnba'] as League[] })),
+  ...OFFICIAL_TYPES,
 ];
 
 /**

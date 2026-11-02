@@ -22,12 +22,14 @@ const g: any = { league: 'wnba', gameId: 'G', homeId: '20', awayId: '9', goalies
 
 test('every NBA alert has a WNBA twin, and every multi-league alert the NBA is in covers the WNBA', () => {
   assert.ok(LEAGUE_IDS.includes('wnba'));
-  const nbaOnly = EVENT_TYPES.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'nba');
+  // Officials (scope 'official') are not cloned: WNBA officials are not tracked.
+  const ex = EVENT_TYPES.filter((t) => t.scope !== 'official');
+  const nbaOnly = ex.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'nba');
   const wnbaOnly = EVENT_TYPES.filter((t) => t.leagues.length === 1 && t.leagues[0] === 'wnba');
   assert.deepEqual(wnbaOnly.map((t) => t.id), nbaOnly.map((t) => t.id.replace('nba.', 'wnba.')));
   assert.deepEqual(wnbaOnly.map((t) => [t.label, t.defaultOn]), nbaOnly.map((t) => [t.label, t.defaultOn]), 'same labels and defaults');
   for (const t of EVENT_TYPES.filter((x) => x.leagues.length > 1 && x.leagues.includes('nba'))) assert.ok(t.leagues.includes('wnba'), t.id);
-  assert.equal(EVENT_TYPES.filter((t) => t.leagues.includes('wnba')).length, EVENT_TYPES.filter((t) => t.leagues.includes('nba')).length);
+  assert.equal(ex.filter((t) => t.leagues.includes('wnba')).length, ex.filter((t) => t.leagues.includes('nba')).length);
   assert.equal(START_WORD.wnba, 'Tip-off');
 });
 

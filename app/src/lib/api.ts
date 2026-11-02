@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, LiveBoard, HateWatchTally, Leaderboard, League, Prefs, PrefsPatch, Target, UpcomingEvent, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
+import type { EventType, F1Weekend, Favorite, FavoritePatch, FeedItem, GameCard, GameDetail, LiveBoard, HateWatchTally, Leaderboard, League, Official, Prefs, PrefsPatch, Target, UpcomingEvent, Team, Player, NextGame, StatsPage, WeightClass, F1Preview, UfcCard } from './types';
 
 // Point devices at your machine/server with EXPO_PUBLIC_API_URL=http://192.168.x.x:8787
 // Without it, a release build (a TestFlight build, or an over-the-air update published without it) uses production's,
@@ -63,8 +63,8 @@ const enc = encodeURIComponent;
 
 export const api = {
   eventTypes: () => request<{ leagues: { id: League; name: string }[]; types: EventType[] }>('GET', '/catalog/event-types', undefined, false),
-  search: (q: string, league?: League, kind?: 'team' | 'player') =>
-    request<{ results: Target[] }>('GET', `/search?q=${enc(q)}${league ? `&league=${league}` : ''}${kind ? `&kind=${kind}` : ''}&limit=50`, undefined, false),
+  search: (q: string, league?: League, kind?: 'team' | 'player', officials = false) =>
+    request<{ results: Target[] }>('GET', `/search?q=${enc(q)}${league ? `&league=${league}` : ''}${kind ? `&kind=${kind}` : ''}${officials ? '&officials=1' : ''}&limit=50`, undefined, false),
   /** Every team (in a league): A-Z, or by league and division (each with its `division`). */
   teams: (league?: League, byDivision = false) => {
     const q = [league && `league=${league}`, byDivision && 'by=division'].filter(Boolean).join('&');
@@ -72,7 +72,9 @@ export const api = {
   },
   /** The UFC's weight classes, heaviest first, each its champion and top five fighters. */
   weightClasses: () => request<{ classes: WeightClass[] }>('GET', '/ufc/weight-classes', undefined, false),
-  target: (key: string) => request<Target & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
+  target: (key: string) => request<Exclude<Target, Official> & { roster?: Player[] }>('GET', `/targets/${enc(key)}`, undefined, false),
+  /** An official by key: the alerts page of one you don't track yet (Search opens it). */
+  official: (key: string) => request<Official>('GET', `/targets/${enc(key)}`, undefined, false),
   /** A player's or team's stats page (every league: F1's from f1-stats.ts, the UFC's from ufc.ts). */
   stats: (key: string) => request<StatsPage>('GET', `/targets/${enc(key)}/stats`, undefined, false),
   /** The newest iOS build (null until the server has one recorded) and the TestFlight or App Store link that gets it, for the "update available" alert (lib/updates.ts). */

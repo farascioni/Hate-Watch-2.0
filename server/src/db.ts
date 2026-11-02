@@ -32,6 +32,11 @@ CREATE TABLE IF NOT EXISTS players (
 );
 CREATE INDEX IF NOT EXISTS players_team ON players(team_key);
 
+-- Referees and umpires (docs/officials.md): written the first time a started game's officials list names one. No team, no photo, no ESPN id.
+CREATE TABLE IF NOT EXISTS officials (
+  key TEXT PRIMARY KEY, league TEXT NOT NULL, name TEXT NOT NULL, updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY, secret TEXT NOT NULL, platform TEXT,
   push_token TEXT, prefs TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL

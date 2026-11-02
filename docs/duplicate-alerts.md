@@ -77,6 +77,8 @@ from the tests):
 | Alert | Id | Example |
 |---|---|---|
 | A player's play alert (`mk`) | `${gameId}:${playId}:${type}:${athleteId}` | `401907994:4019079941102990057:mlb.batter.strikeout:32801`, "Jose Ramirez struck out looking" |
+| An official's alert (`crewAlerts`, one per crew member) | `${gameId}:${playId}:${type}:ump-${slug}` | `401908030:4019080301:mlb.ump.abs_overturned:ump-angel-hernandez` (a test shape, not a recorded game); always with an explicit moment (`:abs`, `:review`, `:official`), since a teamless key has nothing to fold into |
+| An official's game start (`officialStartEvents`, one per crew member) | `${gameId}:${type}:ump-${slug}` (no play id) | `401908030:mlb.ump.game_start:ump-angel-hernandez`; moment `${gameId}:start`, the teams' start moment, so a device tracking a team and an official gets one alert with the official's line folded in |
 | A team's play alert | `${gameId}:${playId}:${type}:${teamId}` | `401858481:401858481541:cfb.team.interception:158`, "Nebraska threw an interception" (Indiana at Nebraska, October 10 2026) |
 | A team's play alert, other form | `${gameId}:${playId}:${type}:team-${teamId}` (the safety, a lost ABS challenge) | `401907994:4019079940401020090:mlb.challenge_lost:team-5`, "Guardians lost an ABS challenge" |
 | A team's flag (NFL, `teamFlags`: one per team per play, its penalties joined) | `${gameId}:${playId}:nfl.penalty:team-${teamId}` | `401872994:4018729944019:nfl.penalty:team-2`, "Bills were flagged: False Start" |
@@ -210,7 +212,7 @@ summary in parallel). Most re-polls produce no alerts at all, because the tracke
   server started, so this is a restart) takes `BOOT_BACKFILL_MS` (5 minutes, `HW_BOOT_BACKFILL_MS`) instead: a play
   the old server never read is still news, and the ones it did send stop at the insert (Layer 2;
   `restart-backfill.test.ts`). A game first seen already under way never gets "Hate Watch Starting": the start alert needs the
-  tracker to have seen the game before it started (`sawPre`). The box score's pitcher alerts (a blown save, no
+  tracker to have seen the game before it started (`sawPre`); an official's game start follows the same rule. The box score's pitcher alerts (a blown save, no
   quality start), finished drives and scoreless halves are baselined on the first read, not sent.
 - **`announced`:** the score each side's team alerts have gone out for. The score is re-derived from every play on
   every poll (ESPN edits plays), and a team alert goes out once per score a side reaches. A goal flagged as scoring
@@ -569,7 +571,7 @@ A restart, step by step:
    the goalies and the half-inning, and send nothing. A play from the last 5 minutes is detected again with the
    same id, which the database already has, so `publish` stops at the insert, and one the old server never read
    goes out as news. The box score's pitchers, finished
-   drives and scoreless halves are baselines. The game was first seen already under way, so no "Hate Watch Starting".
+   drives and scoreless halves are baselines. The game was first seen already under way, so no "Hate Watch Starting" (nor an official's game start).
 5. **Off-game scans.** Standings, injuries and news compare with their `kv` baselines and find nothing new. F1
    reads the results of sessions from the last 8 hours again; their ids are stored, so nothing goes out
    (`f1-merges.test.ts`, "a restart").

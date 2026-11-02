@@ -7,7 +7,7 @@ import { StatsView } from '../../components/StatsView';
 import { Empty, LeagueTag, PrimaryButton, subtitle, useNow } from '../../components/ui';
 import { useT } from '../../lib/i18n';
 import { colors, space } from '../../theme';
-import type { StatsPage, Target } from '../../lib/types';
+import type { Player, StatsPage, Team } from '../../lib/types';
 
 /**
  * A player's or team's stats on a screen of their own (components/StatsView). The player page shows the
@@ -18,7 +18,7 @@ export default function StatsScreen() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const targetKey = decodeURIComponent(key);
   const now = useNow();
-  const [target, setTarget] = useState<Target | null>(null);
+  const [target, setTarget] = useState<Team | Player | null>(null);
   const [page, setPage] = useState<StatsPage | null>(null);
   const [failed, setFailed] = useState(false);
   const load = () => {

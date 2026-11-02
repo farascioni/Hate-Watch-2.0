@@ -128,6 +128,7 @@ route('GET', '/search', false, (_r, url) => ({
   results: withHaters(search(url.searchParams.get('q') ?? '', {
     league: (url.searchParams.get('league') as League) || undefined,
     kind: (url.searchParams.get('kind') as 'team' | 'player') || undefined,
+    officials: url.searchParams.get('officials') === '1',
     limit: intParam(url, 'limit', 40, 1, 100),
   })),
 }));
@@ -222,7 +223,7 @@ route('GET', '/me/follows', true, (req) => ({
 }));
 route('PUT', '/me/follows/:key', true, (req, _u, [key]) => {
   const k = decodeURIComponent(key);
-  if (!targetDto(k)) throw new HttpError(404, 'unknown team/player');
+  if (!targetDto(k)) throw new HttpError(404, 'unknown team/player/official');
   db.prepare('INSERT INTO follows (device_id, target_key, created_at) VALUES (?,?,?) ON CONFLICT (device_id, target_key) DO UPDATE SET event_key = NULL, event_until = NULL').run(req.deviceId!, k, Date.now());
   forgetDeviceTeams(req.deviceId!); // their Scores tab changes now
   engine.kick(); // a game in progress for this target starts tracking right now

@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { sizedImage } from '../lib/images';
 import { colors } from '../theme';
+import { leagueColor } from '../lib/leagueUi';
 import type { Target } from '../lib/types';
 
 /**
@@ -11,7 +12,15 @@ import type { Target } from '../lib/types';
  * - Players with no ESPN photo show their team logo plus a jersey-number badge, never a wrong face.
  */
 export function Avatar({ target, size = 48 }: { target: Target; size?: number }) {
-  const ring = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.border;
+  const ring = tintOf(target);
+  // An official has no photo or team: initials on the league's colour (docs/officials.md).
+  if (target.kind === 'official') {
+    return (
+      <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: ring, backgroundColor: ring }]} accessibilityLabel={target.name}>
+        <Text style={{ color: readableOn(ring), fontSize: Math.round(size * 0.34), fontWeight: '900', letterSpacing: 0.5 }} numberOfLines={1}>{target.initials}</Text>
+      </View>
+    );
+  }
   const isHeadshot = target.kind === 'player' && target.imageKind === 'headshot';
 
   let uri: string, w: number, h: number;
@@ -60,6 +69,9 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
     </View>
   );
 }
+
+/** The colour a target's card, avatar ring and banner take: a team's, a player's team's, an official's league's. */
+export const tintOf = (t: Target) => (t.kind === 'official' ? leagueColor(t.league) : t.kind === 'team' ? t.color : t.teamColor) ?? colors.border;
 
 /** Black or white text, whichever reads better on a hex background (Alpine yellow, Williams white…). */
 export function readableOn(hex: string) {

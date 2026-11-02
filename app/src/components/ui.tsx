@@ -2,13 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Avatar, readableOn } from './Avatar';
+import { Avatar, readableOn, tintOf } from './Avatar';
 import { useStore } from '../lib/store';
 import { GOLD, colors, radius, space } from '../theme';
 import { usePlus } from '../lib/plus';
 import { syncUpdate } from '../lib/updates';
 import type { Target } from '../lib/types';
 import { leagueColor } from '../lib/leagueUi';
+import { targetHref } from '../lib/alerts';
 import { currentLocale, tr, useT } from '../lib/i18n';
 
 export function Chip({ label, active, onPress, color, style, accessibilityLabel }: { label: string; active?: boolean; onPress?: () => void; color?: string; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
@@ -106,7 +107,10 @@ export function FollowButton({ target, compact }: { target: Target; compact?: bo
   );
 }
 
+/** Where a target's row or card goes: an official has no page of its own, so its alert settings. */
+
 export function subtitle(t: Target) {
+  if (t.kind === 'official') return t.group;
   if (t.kind === 'team') return t.league === 'f1' ? tr('ui.constructor') : t.location ?? t.abbrev;
   // F1 team codes (RBR, AMR) are our own badge labels, so drivers show the constructor's name instead.
   const team = t.league === 'f1' ? t.teamName : t.teamAbbrev;
@@ -135,7 +139,7 @@ export function HaterCount({ target, size = 12, tint }: { target: Target; size?:
 /** A player or team in a list, with how many people hate them. `extra` replaces that line. */
 export function TargetRow({ target, right, extra }: { target: Target; right?: ReactNode; extra?: ReactNode }) {
   return (
-    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <Pressable onPress={() => router.push(targetHref(target))} style={({ pressed }) => [styles.row,pressed && { backgroundColor: colors.surfaceHi }]}>
       <Avatar target={target} size={48} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{target.name}</Text>
@@ -156,10 +160,10 @@ export function TargetRow({ target, right, extra }: { target: Target; right?: Re
  */
 export function TargetCard({ target, division, note, actions }: { target: Target; division?: string; note?: string; actions: ReactNode }) {
   const { leagueInfo } = useStore();
-  const tint = (target.kind === 'team' ? target.color : target.teamColor) ?? colors.border;
+  const tint = tintOf(target);
   const ink = readableOn(tint);
   return (
-    <Pressable onPress={() => router.push(`/target/${encodeURIComponent(target.key)}`)} style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHi }]}>
+    <Pressable onPress={() => router.push(targetHref(target))} style={({ pressed }) => [styles.card, pressed && { backgroundColor: colors.surfaceHi }]}>
       <View style={[styles.banner, { backgroundColor: tint }]}>
         <Text style={[styles.bannerLeague, { color: ink }]}>{leagueInfo(target.league)?.name ?? target.league.toUpperCase()}</Text>
         <HaterCount target={target} tint={ink} />
