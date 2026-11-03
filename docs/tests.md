@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 667 tests in 86 files, offline, in about 9 seconds, all passing on November 2, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 667 tests in 86 files, offline, in about 9 seconds, all passing on November 2, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 653 tests in 85 files, offline, in about 9 seconds, all passing on October 20, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 667 tests in 86 files, offline, in about 9 seconds, all passing on November 2, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 653 tests, offline, ~9s
+npm test                      # every test/*.test.ts: 667 tests, offline, ~9s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -110,6 +110,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `stats.test.ts` | Stats pages for players and teams (Aaron Judge, Gerrit Cole, Trae Young, the Yankees, the EPL table) |
 | `team-lost.test.ts` | "Their team loses": one alert per device per loss, through a real `GameTracker`'s final and `publish()` |
 | `trackers.test.ts` | Hater counts on every follow and back from following or unfollowing, over real HTTP |
+| `transfer.test.ts` | Moving to a new install: the code's shape and normalization, redeem moving the data and signing the old token out, the caller's own code, an unknown code, replacing a code, the two caps, delete |
 | `ufc-classes.test.ts` | The UFC's weight classes and who heads each, and `/ufc/weight-classes` |
 | `ufc-preview.test.ts` | A UFC card's preview, before (Allen vs. Duncan, October 10 2026) and after (UFC 332), the calendar, the routes |
 | `ufc.test.ts` | The UFC: fighters as players, a card watched poll by poll, and what a fighter's haters get (UFC 332 and a Fight Night, 2026-10-03 and 09-26) |

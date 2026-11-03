@@ -42,10 +42,14 @@ export async function forgetToken() {
 /** `oldToken` is set only on the one retry after a 401, so a request retries once. */
 async function request<T>(method: string, path: string, body?: unknown, auth = true, oldToken?: string): Promise<T> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
-  if (auth) headers.authorization = `Bearer ${await ensureToken()}`;
+  const sent = auth ? await ensureToken() : null;
+  if (sent) headers.authorization = `Bearer ${sent}`;
   const res = await fetch(API_URL + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (res.status === 401 && auth) {
-    if (oldToken === undefined) {
+    if (oldToken === undefined && token !== sent) {
+      // A recovery code swapped our identity while this request was in flight: retry as the new one, never register a blank device over it.
+      return request(method, path, body, auth, token!);
+    } else if (oldToken === undefined) {
       // Server lost our device (fresh DB): register a new one and retry once. If registering fails, the old token stays and the 401 below is the error.
       const old = token!;
       if (await register().then(() => true, () => false)) return request(method, path, body, auth, old);
@@ -106,6 +110,14 @@ export const api = {
   setPrefs: (patch: PrefsPatch) => request<Prefs>('PUT', '/me/prefs', patch),
   resetPrefs: () => request<Prefs>('DELETE', '/me/prefs'),
   setPushToken: (pushToken: string | null) => request('PUT', '/me/push-token', { pushToken }),
+  /** A new recovery code for this device (replacing its last one), to enter on the install that takes over. */
+  createTransferCode: () => request<{ code: string }>('POST', '/me/transfer-code'),
+  /** Take over the device a recovery code belongs to: this install's token becomes that device's (its old install is signed out). 404: no such code; 429: too many wrong ones. */
+  redeemTransferCode: async (code: string) => {
+    const res = await request<{ token: string }>('POST', '/transfer/redeem', { code });
+    token = res.token;
+    await storage.set(TOKEN_KEY, token);
+  },
 
   /** One player's or team's alerts to this device since a time: Recent misery's fallback for a server without /misery. */
   /** Recent misery: the priority things that happened to one player or team in the last 30 days, the same for everyone (server misery.ts). */

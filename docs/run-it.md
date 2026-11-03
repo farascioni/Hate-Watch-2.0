@@ -8,7 +8,7 @@
 
 **Sections:**
 - **Run it**: Start the server with `cd server && npm ci && npm start`.
-- **Request limits**: what the server accepts from a caller: a JSON body of at most 64 KB (400 / 413), numeric query values clamped to their route's range, a known platform and a string-or-null push token on devices, at most 30 new devices an hour per address (429), and a share link's host that is one of ours.
+- **Request limits**: what the server accepts from a caller: a JSON body of at most 64 KB (400 / 413), numeric query values clamped to their route's range, a known platform and a string-or-null push token on devices, at most 30 new devices an hour per address (429), at most 10 new recovery codes an hour per device and 10 wrong ones per address (429), and a share link's host that is one of ours.
 
 The README's "Run it" has the summary; this is the full detail. Read this index first, then only the part you need.
 
@@ -125,8 +125,10 @@ Nothing in a request is trusted (`server/src/api.ts`, header comment; `server/te
 | **A push token is a string, or null / absent for none** (`PUT /me/push-token` and `POST /devices`). | Anything else (an object, a number): 400 `pushToken is a string or null`. | `pushTokenOf` |
 | **A device registers with `platform` ios, android or web** (`PLATFORMS`: what `Platform.OS` is in the app's `ensureToken`). | Missing or anything else: 400, checked before the cap, so a bad request costs nothing. | `POST /devices` |
 | **30 new devices an hour per address** (`DEVICES_PER_HOUR`). A device costs a feed row on every developer notice (`notices.ts`), so a script registering thousands would bloat the database. | The 31st: 429 `too many new devices from this address, try again later`, until the hour (a fixed window from the address's first device) ends. | `overDeviceCap` |
+| **10 new recovery codes an hour per device** (`newCodes`; `docs/transfer.md`). | The 11th: 429 `too many new codes, try again later`. | `POST /me/transfer-code` |
+| **10 wrong recovery codes an hour per address** (`wrongCodes`), bumped only when a code is unknown, so a used code or the caller's own does not count. | The 11th: 429 `too many wrong codes from this address, try again later`, checked before the code is looked at. | `POST /transfer/redeem` |
 | **A share link's host is one of ours** (`origin`; `docs/sharing.md`). | Any other `Host` header: `HW_PUBLIC_URL`. | `origin` |
 
 **The address** (`clientIp`) is Fly's `fly-client-ip` header ("the IP address of the client from the perspective of Fly Proxy", docs.fly.io/networking/request-headers). Fly's docs don't say whether the proxy replaces a `fly-client-ip` a caller sends, and this was not tested, so the cap stops a careless script, not a determined one. Without the header (development) it is the first address of `x-forwarded-for`, which is whatever the caller sent, then the socket's.
 
-**What the cap doesn't do:** it lives in the server's memory (`newDevices`, a Map that drops expired windows as it goes), so a restart clears it, and it counts one machine, which is what production is (`docs/known-limits.md`). Addresses behind one network (a school, a mobile carrier's shared address) share a count; 30 an hour is far above what real installs do. Raising it is the one number `DEVICES_PER_HOUR`.
+**What the cap doesn't do:** it lives in the server's memory (`newDevices`, a Map that drops expired windows as it goes), so a restart clears it, and it counts one machine, which is what production is (`docs/known-limits.md`). Addresses behind one network (a school, a mobile carrier's shared address) share a count; 30 an hour is far above what real installs do. Raising it is the one number `DEVICES_PER_HOUR`. The two recovery code caps (`newCodes`, `wrongCodes`) are `windowCap` windows with the same limits: in memory, one machine, a shared address shares a count.

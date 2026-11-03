@@ -185,6 +185,10 @@ export default function SettingsScreen() {
         }}>
           <Text style={[styles.actionText, { color: colors.hate }]}>{t('settings.clearFeed')}</Text>
         </Pressable>
+        <Pressable style={styles.action} onPress={() => router.push('/transfer')} accessibilityRole="button">
+          <Text style={styles.actionText}>{t('settings.transfer')}</Text>
+          <Text style={styles.actionSub}>{t('settings.transferDesc')}</Text>
+        </Pressable>
         <Pressable style={styles.action} onPress={() => {
           const go = () => deleteAllData().catch((e) => Alert.alert(t('settings.deleteFailed'), String(e)));
           const msg = t('settings.deleteAllBody');

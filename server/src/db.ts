@@ -77,6 +77,12 @@ CREATE TABLE IF NOT EXISTS hate_watches (
   PRIMARY KEY (device_id, event_id)
 );
 
+-- Recovery code for moving to a new install (transfer.ts): the sha256 of the device's one code; deleting the device deletes it.
+CREATE TABLE IF NOT EXISTS transfer_codes (
+  device_id TEXT PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL
+);
+
 -- Lock screen scoreboard (live-activity.ts): the push token of the device's running Live Activity, and the keys it starred
 -- as most hated (kept on the device otherwise) so the board can sort by them. sandbox: a development build's token.
 CREATE TABLE IF NOT EXISTS live_activities (

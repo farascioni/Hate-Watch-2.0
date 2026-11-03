@@ -66,6 +66,8 @@ interface Store {
   push: { status: PushStatus | 'unknown'; reason?: string };
   enablePush: () => Promise<void>;
   deleteAllData: () => Promise<void>;
+  /** Take over the data of the device a recovery code (Settings → Move to a new install) belongs to; throws a 404 for an unknown code, a 429 for too many wrong ones. */
+  restoreFromCode: (code: string) => Promise<void>;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -357,6 +359,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setUnseen(0);
       setHateWatches({ total: 0, teams: [] });
       setPrefs(await api.prefs());
+      const r = await registerForPush();
+      if (r.token) api.setPushToken(r.token).catch(() => {});
+    },
+    restoreFromCode: async (code: string) => {
+      // The server moves the old device's identity to this install; everything below reloads as that device.
+      await setLiveBoard(false); // this install's board belongs to the blank device; the old phone's was dropped server-side
+      await api.redeemTransferCode(code);
+      ws.current?.close(); // reconnects (onclose) with the new token
+      setFeed([]);
+      setUnseen(0);
+      setGames(new Map());
+      // loaded.current is already true, so the socket's onopen won't reload these.
+      await loadCore();
+      await Promise.all([refreshFeed(), refreshScores().catch(() => {}), api.hateWatches().then(setHateWatches, () => {})]);
       const r = await registerForPush();
       if (r.token) api.setPushToken(r.token).catch(() => {});
     },

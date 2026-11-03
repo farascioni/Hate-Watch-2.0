@@ -17,17 +17,18 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Guide: drawings move on each page, the web guide is dark, and the Feed page says losses, bad news and starts push by default. (Update)
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, and more. Off under Reduce Motion. (Update)
 - Search and Tracking reload on open, so image switches show.
+- Settings: "Move to a new install" makes a recovery code on the old install and restores it on the new one: tracking, favorites, counts and the feed come across. (Update)
+- Server: cards carry the event, series and each game's result.
 - Badges (when logos and photos are off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code. (Update)
 - Server: new installs push only for losses, bad news and starts (25 alerts); the rest are Feed only. Installs already out keep their pushes and get the starts on.
 - Server: bad requests get a 400 or 413, new devices are rate limited, share links use our address.
-- Server: saving alert settings rejects a malformed body and keeps the old settings; one failing device no longer stops the others' alerts.
-- Server: pushes check Expo's delivery receipts after 15 minutes, so deleted apps stop getting them.
+- Server: saving alert settings rejects a malformed body; one failing device no longer stops the others' alerts.
+- Server: pushes check Expo's delivery receipts after 15 minutes.
 - Website: hatewatch.dev is now an animated page promoting the apps; the web app moved to /app, old links redirect.
 - Scores: a "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card) with both teams, scores, the series line and each game's winner.
 - Scores: "Coming up" lists playoff games and series starting within 7 days with "Who do you want to lose?". Vote, see each team's share, change it until the first game starts.
-- Scores: under your vote, an "Alert me about (team) losses" switch, off by default; on, the team is tracked for you. A series ends it once won.
+- Scores: under your vote, an "Alert me about (team) losses" switch, off by default. A series ends it once won.
 - Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader or yesterday's final no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. A favorite's win is gold. (Update; strip needs the server update.)
-- Server: cards carry the event, series and each game's result from ESPN's postseason schedule; box scores stay 3 days after the series.
 - Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first went out.
 - Tracking: hold a bell to snooze a player or team for 1 day, 3 days or a week. (Update, after the server deploy.)
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your data if that fails. A live frame that is not JSON is ignored.

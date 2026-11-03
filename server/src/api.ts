@@ -1,8 +1,9 @@
 // The HTTP and WebSocket API the app and the public pages talk to: a route table (`route`), device-token auth, and the
 // server that reads each request. Nothing in a request is trusted: a body is JSON of at most 64 KB (400 / 413 otherwise),
 // a numeric query value is clamped to its route's range (`intParam`), a device registers with a known platform at
-// most 30 times an hour per client IP (429), and a share link's host is the caller's only if it is one of ours (`origin`).
-// Docs: docs/run-it.md "Request limits", docs/sharing.md (the host rule).
+// most 30 times an hour per client IP (429), a recovery code moves a device's data to a new install (`/me/transfer-code`,
+// `/transfer/redeem`, 10 wrong guesses an hour per IP), and a share link's host is the caller's only if it is one of ours (`origin`).
+// Docs: docs/run-it.md "Request limits", docs/transfer.md, docs/sharing.md (the host rule).
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
@@ -12,7 +13,7 @@ import type { WeightClass } from './ufc-classes.ts';
 import { EVENT_TYPES } from './event-types.ts';
 import { LEAGUES, LEAGUE_IDS, GAME_LEAGUES, TEAMS_ONLY, type League } from './leagues.ts';
 import { addFavorite, favoriteOf, favoritesOf, removeFavorite, updateFavorite, registerGame, type FavoriteRow } from './favorites.ts';
-import { addSocket, feedItem, forgetDevice, getPrefs, setPrefs, prefsDto, publish, watchingCount, DEFAULT_PREFS, PUBLIC_URL, prefsProblem, resetPrefs } from './fanout.ts';
+import { addSocket, feedItem, getPrefs, setPrefs, prefsDto, publish, watchingCount, DEFAULT_PREFS, PUBLIC_URL, prefsProblem, resetPrefs } from './fanout.ts';
 import { engine } from './live.ts';
 import { callStats } from './calls.ts';
 import { privacyPage, supportPage } from './pages.ts';
@@ -32,7 +33,8 @@ import { MISERY_DAYS, miseryRows } from './misery.ts';
 import { f1Preview } from './f1-preview.ts';
 import { ufcCard, ufcCards } from './ufc-preview.ts';
 import { RECAP_TYPE } from './recap.ts';
-import { forgetSeasonCards, seasonCard } from './season.ts';
+import { seasonCard } from './season.ts';
+import { createCode, dropped, redeem } from './transfer.ts';
 import { divisionsOf, f1DriverStandings } from './divisions.ts';
 import { deepHealth, liveDeps } from './health.ts';
 
@@ -86,16 +88,23 @@ async function readBody(req: IncomingMessage) {
 const clientIp = (req: IncomingMessage) =>
   String(req.headers['fly-client-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || 'unknown';
 
-// A device row costs a feed row on every developer notice (notices.ts), so one address registers only so many an hour.
 // shortcut: fixed window, in memory (a restart forgets it), one machine; upgrade when the API runs on more than one.
-const DEVICES_PER_HOUR = 30;
-const newDevices = new Map<string, { n: number; resetAt: number }>(); // oldest window first, so pruning stops at the first live one
-const overDeviceCap = (ip: string, now = Date.now()) => {
-  for (const [k, v] of newDevices) { if (v.resetAt > now) break; newDevices.delete(k); }
-  const w = newDevices.get(ip) ?? { n: 0, resetAt: now + 3_600_000 };
-  newDevices.set(ip, w);
-  return ++w.n > DEVICES_PER_HOUR;
+/** `max` hits an hour per key. `hit` counts one and says whether the key is now over; `over` only asks. */
+const windowCap = (max: number) => {
+  const windows = new Map<string, { n: number; resetAt: number }>(); // oldest window first, so pruning stops at the first live one
+  const of = (key: string, now: number) => {
+    for (const [k, v] of windows) { if (v.resetAt > now) break; windows.delete(k); }
+    const w = windows.get(key) ?? { n: 0, resetAt: now + 3_600_000 };
+    windows.set(key, w);
+    return w;
+  };
+  return { hit: (key: string, now = Date.now()) => ++of(key, now).n > max, over: (key: string, now = Date.now()) => of(key, now).n >= max };
 };
+// A device row costs a feed row on every developer notice (notices.ts), so one address registers only so many an hour.
+const newDevices = windowCap(30);
+// Recovery codes (transfer.ts): a device makes few, and an address gets few wrong guesses at one.
+const newCodes = windowCap(10);
+const wrongCodes = windowCap(10);
 
 const routes: { method: string; re: RegExp; auth: boolean; fn: Handler }[] = [];
 const route = (method: string, path: string, auth: boolean, fn: Handler) =>
@@ -200,7 +209,7 @@ route('GET', '/targets/:key', false, (_r, _u, [key]) => {
 route('POST', '/devices', false, (req, _u, _p, body) => {
   if (!PLATFORMS.includes(body?.platform)) throw new HttpError(400, `platform is ${PLATFORMS.join(', ')}`);
   const pushToken = pushTokenOf(body.pushToken);
-  if (overDeviceCap(clientIp(req))) throw new HttpError(429, 'too many new devices from this address, try again later');
+  if (newDevices.hit(clientIp(req))) throw new HttpError(429, 'too many new devices from this address, try again later');
   const id = randomUUID();
   const secret = randomBytes(24).toString('base64url');
   db.prepare('INSERT INTO devices (id, secret, platform, push_token, prefs, created_at) VALUES (?,?,?,?,?,?)')
@@ -210,6 +219,20 @@ route('POST', '/devices', false, (req, _u, _p, body) => {
 route('PUT', '/me/push-token', true, (req, _u, _p, body) => {
   db.prepare('UPDATE devices SET push_token = ? WHERE id = ?').run(pushTokenOf(body?.pushToken), req.deviceId!);
   return { ok: true };
+});
+// A recovery code moves this device's data to a new install (transfer.ts, docs/transfer.md): the new install, a blank device of its own, redeems it.
+route('POST', '/me/transfer-code', true, (req) => {
+  if (newCodes.hit(req.deviceId!)) throw new HttpError(429, 'too many new codes, try again later');
+  return { code: createCode(req.deviceId!) };
+});
+route('POST', '/transfer/redeem', true, (req, _u, _p, body) => {
+  const ip = clientIp(req);
+  if (wrongCodes.over(ip)) throw new HttpError(429, 'too many wrong codes from this address, try again later');
+  if (typeof body?.code !== 'string' || body.code.length > 64) throw new HttpError(400, 'code is a string');
+  const out = redeem(req.deviceId!, body.code);
+  if (out === 'self') throw new HttpError(400, 'that code belongs to this install');
+  if (!out) { wrongCodes.hit(ip); throw new HttpError(404, 'no such code'); }
+  return out;
 });
 
 // ─── Follows ──────────────────────────────────────────────────────────────────────────────────
@@ -349,9 +372,7 @@ route('DELETE', '/me/feed', true, (req) => {
 // "Delete all my data": the device row cascades to follows + feed (see db.ts foreign keys).
 route('DELETE', '/me', true, (req) => {
   db.prepare('DELETE FROM devices WHERE id = ?').run(req.deviceId!);
-  forgetSeasonCards(req.deviceId!);
-  forgetDevice(req.deviceId!);
-  engine.kick();
+  dropped(req.deviceId!);
   return { ok: true };
 });
 
