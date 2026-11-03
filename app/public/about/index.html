@@ -122,9 +122,10 @@ a.store:hover{transform:translateY(-2px)}
 .js .rs.in .sin,.js .rs.in .tk{opacity:1;transform:none}
 
 /* ticker */
-.mq{overflow:hidden;border-block:1px solid var(--line);background:#101013;padding:14px 0;white-space:nowrap}
-.mq div{display:inline-flex;gap:28px;animation:mq 32s linear infinite;will-change:transform}
+.mq{-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);overflow:hidden;border-block:1px solid var(--line);background:#101013;padding:14px 0;white-space:nowrap}
+.mq div{display:inline-flex;animation:mq 160s linear infinite;will-change:transform}
 .mq span{font-weight:800;letter-spacing:.14em;font-size:.85rem;color:var(--muted);text-transform:uppercase}
+.mq span{padding-right:28px}
 .mq span::after{content:"/";margin-left:28px;color:var(--red)}
 
 /* feature sections */
@@ -175,7 +176,7 @@ footer a{margin-right:16px}
 @keyframes rise{to{opacity:1;transform:none}}
 @keyframes breathe{50%{opacity:.6}}
 @keyframes fl{50%{transform:translateY(-12px)}}
-@keyframes mq{to{transform:translateX(-50%)}}
+@keyframes mq{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
 @keyframes ring{0%{opacity:0;transform:translateY(-26px) scale(.94)}10%{opacity:1;transform:none}82%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px)}}
 @keyframes pop{from{opacity:0;transform:translateY(-14px) scale(.95)}to{opacity:1;transform:none}}
 @keyframes blink{50%{opacity:.25}}
@@ -239,7 +240,7 @@ html{scroll-behavior:auto}
 </div>
 </section>
 
-<div class="mq" aria-hidden="true"><div id="mq"><span>Blown lead</span><span>Fumble</span><span>Missed free throw</span><span>Strikeout</span><span>Interception</span><span>Own goal</span><span>Technical foul</span><span>Lost</span></div></div>
+<div class="mq" aria-hidden="true"><div id="mq"><span>Blown lead</span><span>Fumble</span><span>Missed free throw</span><span>Strikeout</span><span>Interception</span><span>Own goal</span><span>Technical foul</span><span>Lost</span><span>Double play</span><span>Passed ball</span><span>Thrown out stealing</span><span>Gives up a home run</span><span>Hitless night</span><span>Error</span><span>Quarterback pulled</span><span>Sacked</span><span>Three-and-out</span><span>Missed field goal</span><span>Delay of game</span><span>Safety</span><span>Touchdown wiped out</span><span>Blocked shot</span><span>Brick night</span><span>Turnover</span><span>Ejected</span><span>Fouled out</span><span>Red card</span><span>Missed penalty</span><span>Goal ruled out by VAR</span><span>Keeper concedes</span><span>Late goal conceded</span><span>Goalie pulled</span><span>Empty-netter</span><span>Shootout miss</span><span>Lapped</span><span>Did not finish</span></div></div>
 
 <section class="sec" id="search"><div class="wrap feat">
 <div class="rv">
@@ -391,7 +392,7 @@ if(RM||!('IntersectionObserver' in window))return;
 var tick=false;
 addEventListener('scroll',function(){if(tick)return;tick=true;requestAnimationFrame(function(){document.documentElement.style.setProperty('--sy',scrollY);tick=false})},{passive:true});
 
-// ticker: duplicate so the -50% loop is seamless
+// ticker: duplicate so the -50% loop is seamless (spans carry their own spacing, so half the row is exactly one set)
 var mq=$('#mq');mq.innerHTML+=mq.innerHTML;
 
 // counter
