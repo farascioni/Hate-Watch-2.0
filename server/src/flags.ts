@@ -19,6 +19,7 @@ export const FLAGS = {
   'images.logos': 'Team logos (a badge in the team\'s colour with its code instead)',
   liveActivity: 'The lock screen scoreboard (Live Activity): no board for the app to start, no updates sent',
   savings: 'Kill switch for every saving below: off turns them all off, on never turns one on (each is opt-in)',
+  social: 'Kill switch for every automatic post to X below: off stops them all, on never turns one on (each is opt-in)',
 } as const;
 export type Flag = keyof typeof FLAGS;
 
@@ -63,6 +64,38 @@ export function setSaving(saving: Saving, on: boolean) {
 }
 
 export const savingList = () => (Object.keys(SAVINGS) as Saving[]).map((s) => ({ saving: s, on: savingOn(s), about: SAVINGS[s] }));
+
+// Social: automatic posts to X (social.ts), built but OFF until turned on, like the savings. `dryrun` only logs the post it
+// would make (and claims the loss, so turning `live` on later does not post the evening's earlier games); `live` posts.
+// Same ways: flag-cli.ts, or the secret HW_SOCIAL_ON=social.nba.dryrun. The flag `social` off stops every post.
+export const SOCIAL = {
+  'social.nba.dryrun': 'NBA losses: log the post that would go to X (text, team handle, card), post nothing',
+  'social.nba.live': 'NBA losses: post to X (the loss, its card, the team\'s @handle); needs the four HW_X_* secrets',
+} as const;
+export type Social = keyof typeof SOCIAL;
+
+const SOCIAL_KEY = 'social';
+let socialCache: { at: number; on: string[] } | null = null;
+
+/** Whether an automatic post is on: turned on (database or HW_SOCIAL_ON), and the `social` kill switch not off. */
+export function socialOn(social: Social): boolean {
+  if (!flagOn('social')) return false;
+  if (!socialCache || Date.now() - socialCache.at >= FRESH_MS) {
+    const stored = kvGet<Record<string, boolean>>(SOCIAL_KEY) ?? {};
+    socialCache = { at: Date.now(), on: Object.entries(stored).filter(([, on]) => on === true).map(([s]) => s) };
+  }
+  return socialCache.on.includes(social) || (process.env.HW_SOCIAL_ON ?? '').split(',').map((x) => x.trim()).includes(social);
+}
+
+/** Turn an automatic post on or off in the database (a secret's HW_SOCIAL_ON still turns it on). */
+export function setSocial(social: Social, on: boolean) {
+  const stored = kvGet<Record<string, boolean>>(SOCIAL_KEY) ?? {};
+  if (on) stored[social] = true; else delete stored[social];
+  kvSet(SOCIAL_KEY, stored);
+  socialCache = null;
+}
+
+export const socialList = () => (Object.keys(SOCIAL) as Social[]).map((s) => ({ social: s, on: socialOn(s), about: SOCIAL[s] }));
 
 const KEY = 'flags';
 const FRESH_MS = 5000;

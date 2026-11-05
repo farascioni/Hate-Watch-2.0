@@ -55,13 +55,14 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Tracking profiles and alert presets** ([docs/profiles-and-presets.md](docs/profiles-and-presets.md)): Two Hate Watch Plus extras kept on the device: a profile narrows the Feed and the Tracking tab to a named group of what you track (never your push notifications), and a preset saves one target's alert choices to apply to another.
 - **Developer notices** ([docs/developer-notices.md](docs/developer-notices.md)): A developer notice is a message from Hate Watch itself that goes into every install's feed and is never pushed, for an emergency (an outage, alerts that went out wrong) or news of what's coming.
 - **Moving to a new install** ([docs/transfer.md](docs/transfer.md)): A device has no account, so a new install starts blank; Settings → Move to a new install carries tracking, favorites, Hate Watch counts and the feed over with a one-time recovery code made on the old install and entered on the new one.
+- **Automatic posts to X** ([docs/social-posts.md](docs/social-posts.md)): When an NBA team loses, the server can post the Successful Hate Watch to X from Hate Watch's own account: the alert as the share sheet words it, the share card and the team's @handle, with no link. Both switches are off until turned on.
 - **Sharing an alert** ([docs/sharing.md](docs/sharing.md)): Sharing an alert sends a link, `https://hate-watch-api.fly.dev/a/<code>`, not text.
 - **Favorite teams** ([docs/favorites.md](docs/favorites.md)): a Hate Watch Plus subscriber can favorite a team or an F1 constructor (the heart on Search and a team's page); while it plays, its opponent's alerts reach the feed and push, and stop when the game ends.
 - **Lock screen scoreboard** ([docs/live-activity.md](docs/live-activity.md)): an iOS Live Activity on the lock screen lists the live games of the teams a device tracks and those starting within the hour, favorites first, then most hated, then the rest; an eye on each score card adds or removes any game; on until switched off, and it starts when the app is open.
 - **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop, a live dot pulses, the first cards wave in, a loss glints), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
 - **Video ads** ([docs/video-ads.md](docs/video-ads.md)): three vertical ads, a video of the startup guide and the animated App Store header and search result videos, React components rendered to MP4 with Remotion in `marketing/video-ads/`; the sources are in git, the renders are not.
 - **Officials** ([docs/officials.md](docs/officials.md)): referees and umpires can be tracked from Search (under Athletes, below the players); five overturned-call alerts (ABS, replay, coach's challenge, review, reversal) and a game-start alert, feed only by default, worded for the crew.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 683 tests in 88 files, offline, in about 9 seconds, all passing on November 7, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
@@ -169,6 +170,11 @@ The full detail: [docs/developer-notices.md](docs/developer-notices.md).
 **In short:** A device has no account, so a new install (the App Store build replacing a TestFlight one, a new phone) starts blank. Settings → Move to a new install carries it over with a recovery code: the old install makes a 12-character code (`POST /me/transfer-code`, valid until used or replaced, only its hash is stored), the new install enters it (`POST /transfer/redeem`), and the old device, with its tracking, favorites, Hate Watch counts and feed, takes the new install's identity and push token. The old install is signed out. Saved alerts, profiles, presets, the most hated list, the language and layouts stay on the old install. Codes are rate limited (10 new an hour per device, 10 wrong guesses an hour per address).
 
 The full detail: [docs/transfer.md](docs/transfer.md).
+## Automatic posts to X
+
+**In short:** When an NBA team loses, the server can post the Successful Hate Watch to X from Hate Watch's own account: the alert as the app's share sheet words it, the share card (`share.ts`) as the picture, and the team's @handle, as a standalone post with no link, reply or quote (`server/src/social.ts`, called by `misery.ts` as it records a loss). A pilot: NBA only, both switches (`social.nba.dryrun` logs, `social.nba.live` posts) off until turned on with `flag-cli.ts`, the kill switch `social`, one post per loss a minute after it, 15 a day at most, nothing retried. Live needs four `HW_X_*` secrets, which the owner sets. The handles, the media upload's sign-in and the @mention's risk are unverified until one supervised real post.
+
+The full detail: [docs/social-posts.md](docs/social-posts.md).
 
 ## Sharing an alert
 
@@ -208,7 +214,7 @@ The full detail: [docs/video-ads.md](docs/video-ads.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 683 tests in 88 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

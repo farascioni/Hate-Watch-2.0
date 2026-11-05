@@ -4,21 +4,21 @@
 
 ## Index
 
-**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 683 tests in 88 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**Summary:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 **Sections:**
-- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 683 tests in 88 files, offline, in about 9 seconds, all passing on November 7, 2026.
+- **Tests**: `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026.
 
 The README's "Tests" has the summary; this is the full detail. Read this index first, then only the part you need.
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 683 tests in 88 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 ```bash
 cd server
 npm ci                        # once, on a fresh clone (not npm install: it can rewrite the lockfile)
-npm test                      # every test/*.test.ts: 683 tests, offline, ~9s
+npm test                      # every test/*.test.ts: 692 tests, offline, ~9s
 node --test test/notices.test.ts   # one file
 npm run typecheck             # tsc --noEmit
 node test/replay.ts           # replays real finished games; asserts tracked score == final score
@@ -83,6 +83,7 @@ node test/find-nobletiger.ts  # finds real NOBLETIGERs in recent MLB games
 | `new-alerts.test.ts` | Blowing a big lead live, a division rival clinching, ejections, the weekly misery recap, each one alert per device |
 | `news.test.ts` | Off-field trouble and fines or suspensions from ESPN's league news (NBA 2026-09-30, MLB 2026-10-04, NFL 2026-10-06) |
 | `notices.test.ts` | Developer notices: every feed, never pushed, drawn as from Hate Watch; urgent; dry run and the text checks; left out of the recap; live to open apps; withdrawn |
+| `social.test.ts` | Automatic posts to X: the text and handles, the OAuth header, nothing claimed while off, the claim filters and once-only rule, an earlier game never claimed after live is switched on, dry run, a removed row, the live post against a stand-in for X, the daily cap, an X failure recorded |
 | `pitchers.test.ts` | Blown saves, no quality starts and losses from the box score (NYY @ TB live, 2026-10-06; finals from 2026-09-20 and 2026-10-04) |
 | `kenn-most.test.ts` | Kennesaw State at Missouri State (October 14, 2026), through a real tracker, for the four fixes its post game recording report found: a football touchdown whose words say "yards loss to the MSU00 TOUCHDOWN" waits for ESPN's rewrite (`HW_SCORE_WORDS_WAIT_MS`) so one ESPN removes never alerts, a final score the plays never had is announced from the final and never read as taken back, a drive that ends in kneel-downs is no downs or red-zone alert, and a touchdown ESPN edits to carry a two-point try (and a "NO PLAY") takes the try on its row and "scored 6" becomes "scored 8". |
 | `play-revisions.test.ts` | Football plays ESPN changes after posting them, with October 10 2026's noon college games' own plays: a pick wiped out by a penalty, an incompletion turned interception, a flag added later, a touchdown overturned and scored on the same drive, one touchdown under three ids, the header ahead of lagging drives, a stray "End of Game", drives whose result changed, Delaware's safety (a sack ESPN made a safety is pushed as the safety, with no "the" before a school), and WKU at SHSU (a flag a review took back is no flag, a sack typed as a fumble is a sack, a flag posted again as its own play is a line, an extra point is no "late score") |

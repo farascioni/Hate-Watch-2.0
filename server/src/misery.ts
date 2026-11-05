@@ -28,6 +28,7 @@ import { eliminationOf, gameLostEvent, heavyLossEvent, seriesStanding, type Dete
 import { SOCCER, type League } from './leagues.ts';
 import { competitorScore } from './scores.ts';
 import { marginFromBody, rateLoss, type LossRating } from './loss-rating.ts';
+import { socialLoss } from './social.ts';
 
 export const MISERY_DAYS = 30;
 export const MISERY_LIMIT = 30;
@@ -134,6 +135,7 @@ function record(e: Detected, league: League, source: MiseryRow['source'], now: n
   const loss = LOSSES.has(e.type) || isHeavy(e.type);
   const type = shownType(e) ?? e.type; // a pitcher's loss folded under "no quality start" is a loss on the page
   const id = loss ? lostId ?? e.id : e.id; // soccer's heavy loss is the row of the loss it belongs to
+  const seen = loss && db.prepare('SELECT 1 FROM misery WHERE id = ?').get(id) !== undefined;
   db.prepare(`INSERT INTO misery (id, kind, type, league, game_id, target_key, title, body, lines, occurred_at, meta, share_code, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET type = excluded.type, title = excluded.title, body = excluded.body, meta = excluded.meta, source = excluded.source
@@ -141,6 +143,7 @@ function record(e: Detected, league: League, source: MiseryRow['source'], now: n
          OR (excluded.type LIKE '%.team.heavy_loss' AND misery.type NOT LIKE '%.team.heavy_loss')`)
     .run(id, loss ? 'loss' : 'event', type, league, ((e.meta?.gameId ?? e.meta?.compId) as string | undefined) ?? null, e.targetKey, plain(e.title), e.body,
       e.at, json(metaOf(e.meta)), shareCode(id), source);
+  if (loss && !seen) socialLoss(e, league, source, id, now); // an automatic post to X; only a loss new to the list, so switching it on never posts earlier games
   prune(now);
 }
 
