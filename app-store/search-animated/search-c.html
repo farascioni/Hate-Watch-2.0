@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hate Watch animated search result C</title>
+<!-- Variant C from mockups.html, final: the last headline word rolls (fail, choke, fold, melt down, blow it, fail) and the feed steps to a
+     different sport's alert for each word. Same 3840x2560 frame as header-search/search-results-3840x2560.png (build-store-images.mjs `search`),
+     sized in cqw (px / 38.4). The Remotion video (marketing/video-ads/src/SearchPreview.tsx) mirrors CARDS and the timing below. -->
+<style>
+@font-face{font-family:Inter;font-weight:800;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_bold.ttf")}
+@font-face{font-family:Inter;font-weight:500;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_medium.ttf")}
+:root{--red:#E5232B;--white:#F4F4F5;--grey:#9a9aa2;--bg:#0B0B0D;--ease:cubic-bezier(.65,0,.35,1)}
+*{box-sizing:border-box;margin:0}
+body{background:#050506;color:var(--white);font-family:Inter,-apple-system,system-ui,sans-serif;padding:24px 16px}
+main{max-width:1000px;margin:0 auto}
+.bar{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.bar b{font-size:16px;flex:1}
+button{background:#1b1b1f;color:var(--white);border:1px solid #33333a;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.stage{--line:6.77cqw;--pitch:11.4cqw;container-type:inline-size;position:relative;aspect-ratio:3/2;overflow:hidden;border-radius:10px;
+  background:radial-gradient(70% 70% at 50% 50%,#3B0D12 0,#170A0C 55%,var(--bg) 100%)}
+.mark{position:absolute;left:44.2cqw;top:3.9cqw;width:11.6cqw}
+.mark svg{display:block;width:100%;overflow:visible}
+.h{position:absolute;left:0;right:0;top:14.3cqw;text-align:center;font-weight:800;font-size:6.51cqw;line-height:var(--line);letter-spacing:-.01em;white-space:nowrap}
+.h .l{display:block}
+.slot{display:inline-block;height:var(--line);overflow:hidden;vertical-align:top;color:var(--red);animation:wid 12s infinite var(--ease)}
+.reel{display:block;animation:roll 12s infinite var(--ease)}
+.reel span{display:block;height:var(--line);white-space:nowrap}
+.sub{position:absolute;left:0;right:0;top:29.8cqw;text-align:center;font-weight:500;font-size:2.4cqw;line-height:3cqw;color:var(--grey);white-space:nowrap}
+.card{position:absolute;left:31cqw;width:33.85cqw;top:36.2cqw;height:31cqw;border:.12cqw solid #2a2a30;border-radius:2.86cqw 2.86cqw 0 0;overflow:hidden;background:#0B0B0D}
+.hdr{position:absolute;left:0;right:0;top:0;height:12.86cqw;overflow:hidden}
+.hdr img{display:block;width:100%}
+.scr{position:absolute;left:0;right:0;top:12.86cqw;bottom:0;overflow:hidden}
+.feed{padding:.3cqw 1.2cqw 0;animation:feed 12s infinite var(--ease)}
+.a{display:flex;gap:1.3cqw;height:calc(var(--pitch) - .6cqw);margin-bottom:.6cqw;padding:1.3cqw;border:.1cqw solid #26262c;border-radius:1.7cqw;background:#141417;overflow:hidden}
+.av{position:relative;flex:none;width:5.1cqw;height:5.1cqw;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.55cqw}
+.av i{position:absolute;right:-.6cqw;bottom:-.6cqw;width:2.2cqw;height:2.2cqw;border-radius:50%;background:#141417;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:1.3cqw}
+.tx{min-width:0;flex:1}
+.t{font-weight:800;font-size:1.62cqw;line-height:2cqw}
+.b{margin-top:.3cqw;font-weight:500;font-size:1.28cqw;line-height:1.7cqw;color:var(--grey)}
+.m{display:flex;align-items:center;gap:.7cqw;margin-top:.7cqw;font-weight:500;font-size:1.15cqw;line-height:1.5cqw;color:var(--grey);white-space:nowrap}
+.lg{font-weight:800;font-size:1.05cqw;line-height:1.4cqw;padding:0 .6cqw;border-radius:.5cqw;background:var(--red);color:#fff}
+.also{font-weight:800;font-size:1.05cqw;line-height:1.4cqw;padding:0 .7cqw;border-radius:.8cqw;background:#12331f;color:#4ade80}
+@media (prefers-reduced-motion:reduce){.reel,.slot,.feed{animation:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <div class="bar"><b>Hate Watch search result video, C (word-matched alerts)</b><button id="replay">Replay</button></div>
+  <div id="host"></div>
+</main>
+<template id="tpl">
+  <div class="stage">
+    <div class="mark"><svg viewBox="-360 -290 720 620" aria-hidden="true">
+      <clipPath id="eye"><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z"/></clipPath>
+      <path d="M -306.4 -256.7 L 272.8 -187.4 L 257.2 -92.6 L -313.6 -213.3 Z" fill="#E5232B"/>
+      <circle cx="-310" cy="-235" r="22" fill="#E5232B"/><circle cx="265" cy="-140" r="48" fill="#E5232B"/>
+      <path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z" fill="#F4F4F5"/>
+      <g clip-path="url(#eye)"><circle cx="0" cy="40" r="125" fill="#E5232B"/><circle cx="0" cy="40" r="125" fill="none" stroke="#7A0D12" stroke-width="14"/>
+        <circle cx="0" cy="40" r="58" fill="#0B0B0D"/><circle cx="36" cy="6" r="22" fill="#fff" opacity=".92"/></g></svg></div>
+    <div class="h"><span class="l">Know the second</span>
+      <span class="l">your rivals <span class="slot"><span class="reel"></span></span></span></div>
+    <div class="sub">Real-time alerts when the players and teams you can’t stand mess up</div>
+    <div class="card"><div class="hdr"><img src="../raw/feed.jpg" alt=""></div><div class="scr"><div class="feed"></div></div></div>
+  </div>
+</template>
+<script>
+// One alert per headline word, one sport each: fail NFL, choke NBA, fold CFB, melt down EPL, blow it MLB, then fail/NFL again so the loop closes.
+const WORDS = ['fail', 'choke', 'fold', 'melt down', 'blow it', 'fail'];
+const CARDS = [
+  {code:'KC',  bg:'#E31837', fg:'#fff',    emoji:'🤦', title:'Patrick Mahomes threw an interception', body:'Picked off at the KC 38, 2:11 left.', lg:'NFL', kind:'Offense', ago:'now'},
+  {code:'HOU', bg:'#CE1141', fg:'#fff',    emoji:'😬', title:'Rockets lost to the Pelicans as 77% favorites', body:'Final: Pelicans 112, Rockets 104.', lg:'NBA', kind:'Final', ago:'2m ago', also:'4,812 hate watchers'},
+  {code:'UGA', bg:'#BA0C2F', fg:'#fff',    emoji:'😱', title:'No. 2 Georgia lost to unranked Vanderbilt', body:'Final: Vanderbilt 31, Georgia 24.', lg:'CFB', kind:'Final', ago:'4m ago'},
+  {code:'COV', bg:'#5CBFEB', fg:'#0B0B0D', emoji:'🔥', title:'Coventry were thrashed 5-0 by Brighton', body:'Final Score: 5 to 0', lg:'EPL', kind:'Final', ago:'6m ago', also:'1,926 hate watchers'},
+  {code:'PHI', bg:'#E81828', fg:'#fff',    emoji:'💥', title:'Phillies closer blew the save in the 9th', body:'0.2 IP, 3 H, 2 ER · WSH 5, PHI 4', lg:'MLB', kind:'Pitching', ago:'9m ago'},
+];
+// 7 cards: step 5 shows card 0 again, identical to the first frame.
+const feedCards = [...CARDS, CARDS[0], CARDS[1]];
+const cardHtml = (c) => `<div class="a"><div class="av" style="background:${c.bg};color:${c.fg}">${c.code}<i>${c.emoji}</i></div>
+  <div class="tx"><div class="t">${c.title}</div><div class="b">${c.body}</div>
+  <div class="m"><span class="lg">${c.lg}</span><span>${c.kind}</span><span>· ${c.ago}</span>${c.also ? `<span class="also">${c.also}</span>` : ''}</div></div></div>`;
+
+// Widths of the rolling words in em, so the slot (and with it the centred line) follows the word.
+const probe = document.createElement('span');
+probe.style.cssText = 'position:absolute;visibility:hidden;font:800 100px Inter,sans-serif;letter-spacing:-.01em;white-space:nowrap';
+document.body.appendChild(probe);
+const stops = [[0,0],[12,0],[18,1],[29,1],[35,2],[46,2],[52,3],[63,3],[69,4],[80,4],[86,5],[100,5]];
+const build = async () => {
+  await document.fonts.load('800 100px Inter');
+  const em = WORDS.map(w => { probe.textContent = w; return probe.getBoundingClientRect().width / 100; });
+  const frames = (f) => stops.map(([p, k]) => `${p}%{${f(k)}}`).join('');
+  const s = document.createElement('style');
+  s.textContent = `@keyframes roll{${frames(k => `transform:translateY(calc(${-k} * var(--line)))`)}}`
+    + `@keyframes wid{${frames(k => `width:${em[k].toFixed(3)}em`)}}`
+    + `@keyframes feed{${frames(k => `transform:translateY(calc(${-k} * var(--pitch)))`)}}`;
+  document.head.appendChild(s);
+  probe.remove();
+};
+const mount = () => {
+  const host = document.getElementById('host');
+  host.replaceChildren(document.getElementById('tpl').content.cloneNode(true));
+  host.querySelector('.reel').innerHTML = WORDS.map(w => `<span>${w}</span>`).join('');
+  host.querySelector('.feed').innerHTML = feedCards.map(cardHtml).join('');
+};
+build().then(() => { mount(); document.getElementById('replay').onclick = mount; });
+</script>
+</body>
+</html>

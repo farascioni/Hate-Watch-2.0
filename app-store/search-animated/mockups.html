@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hate Watch animated search result mockups</title>
+<!-- The static search graphic (header-search/search-results-3840x2560.png, built by build-store-images.mjs `search`) in three animated versions.
+     Everything is sized in cqw of the 3840x2560 frame (px / 38.4), so what you see here is the frame Apple takes: 3:2, looping, silent. -->
+<style>
+@font-face{font-family:Inter;font-weight:800;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_bold.ttf")}
+@font-face{font-family:Inter;font-weight:500;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_medium.ttf")}
+:root{--red:#E5232B;--white:#F4F4F5;--grey:#9a9aa2;--bg:#0B0B0D;--ease:cubic-bezier(.65,0,.35,1)}
+*{box-sizing:border-box;margin:0}
+body{background:#050506;color:var(--white);font-family:Inter,-apple-system,system-ui,sans-serif;padding:24px 16px 64px}
+main{max-width:1000px;margin:0 auto}
+h1{font-size:20px;margin-bottom:6px}
+.intro{color:var(--grey);font-size:14px;line-height:1.5;margin-bottom:28px}
+.bar{display:flex;gap:12px;align-items:center;margin:34px 0 10px}
+.bar b{font-size:16px;flex:1}
+button{background:#1b1b1f;color:var(--white);border:1px solid #33333a;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.note{color:var(--grey);font-size:13px;line-height:1.5;margin-top:10px}
+.stage{--line:6.77cqw;container-type:inline-size;position:relative;aspect-ratio:3/2;overflow:hidden;border-radius:10px;
+  background:radial-gradient(70% 70% at 50% 50%,#3B0D12 0,#170A0C 55%,var(--bg) 100%)}
+.mark{position:absolute;left:44.2cqw;top:3.9cqw;width:11.6cqw}
+.mark svg{display:block;width:100%;overflow:visible}
+.h{position:absolute;left:0;right:0;top:14.3cqw;text-align:center;font-weight:800;font-size:6.51cqw;line-height:var(--line);letter-spacing:-.01em;white-space:nowrap}
+.h .l{display:block}
+.slot{display:inline-block;height:var(--line);overflow:hidden;vertical-align:top;color:var(--red)}
+.reel{display:block}
+.reel span{display:block;height:var(--line);white-space:nowrap}
+.sub{position:absolute;left:0;right:0;top:29.8cqw;text-align:center;font-weight:500;font-size:2.4cqw;line-height:3cqw;color:var(--grey);white-space:nowrap}
+.card{position:absolute;left:31cqw;width:33.85cqw;top:36.2cqw;height:31cqw;border:.12cqw solid #2a2a30;border-radius:2.86cqw 2.86cqw 0 0;overflow:hidden;background:#0B0B0D}
+.card img{display:block;width:100%}
+.hdr{position:absolute;left:0;right:0;top:0;height:12.86cqw;overflow:hidden}
+.scr{position:absolute;left:0;right:0;top:12.86cqw;bottom:0;overflow:hidden}
+.scr img{position:absolute;left:0;top:-12.86cqw;will-change:transform}
+/* A and C: the last word rolls (keyframes from the script below). */
+.a .reel,.c .reel{animation:roll 12s infinite var(--ease)}
+.a .slot,.c .slot{animation:wid 12s infinite var(--ease)}
+/* B: the headline stays on "fail" (the slot would otherwise be as wide as "melt down"). */
+.b .reel span:not(:first-child){display:none}
+/* B: the feed scrolls down and back; the headline stays. C: one card per word. */
+.b .scr img{animation:scrollB 12s infinite ease-in-out}
+.c .scr img{animation:scrollC 12s infinite var(--ease)}
+@keyframes scrollB{0%,8%{transform:translateY(0)}46%,54%{transform:translateY(-36.7cqw)}92%,100%{transform:translateY(0)}}
+@keyframes scrollC{
+  0%,12%{transform:translateY(0)}18%,29%{transform:translateY(-14.38cqw)}35%,46%{transform:translateY(-24.46cqw)}
+  52%,63%{transform:translateY(-32.9cqw)}69%,80%{transform:translateY(-36.7cqw)}92%,100%{transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.reel,.slot,.scr img{animation:none!important}}
+.spec{border-collapse:collapse;font-size:13px;line-height:1.5;width:100%}
+.spec td{border-top:1px solid #26262c;padding:7px 10px 7px 0;vertical-align:top}
+.spec td:first-child{color:var(--grey);width:130px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Search results video, animated mockups</h1>
+  <p class="intro">Same 3:2 frame as the static search graphic (3840 x 2560). Each one is a 12 second loop that starts and ends on the same picture, so Apple's endless loop has no jump. Replay restarts it.</p>
+
+  <template id="tpl">
+    <div class="stage">
+      <div class="mark"><svg viewBox="-360 -290 720 620" aria-hidden="true">
+        <clipPath id="eye"><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z"/></clipPath>
+        <path d="M -306.4 -256.7 L 272.8 -187.4 L 257.2 -92.6 L -313.6 -213.3 Z" fill="#E5232B"/>
+        <circle cx="-310" cy="-235" r="22" fill="#E5232B"/><circle cx="265" cy="-140" r="48" fill="#E5232B"/>
+        <path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z" fill="#F4F4F5"/>
+        <g clip-path="url(#eye)"><circle cx="0" cy="40" r="125" fill="#E5232B"/><circle cx="0" cy="40" r="125" fill="none" stroke="#7A0D12" stroke-width="14"/>
+          <circle cx="0" cy="40" r="58" fill="#0B0B0D"/><circle cx="36" cy="6" r="22" fill="#fff" opacity=".92"/></g></svg></div>
+      <div class="h"><span class="l">Know the second</span>
+        <span class="l">your rivals <span class="slot"><span class="reel"><span>fail</span><span>choke</span><span>fold</span><span>melt down</span><span>blow it</span><span>fail</span></span></span></span></div>
+      <div class="sub">Real-time alerts when the players and teams you can’t stand mess up</div>
+      <div class="card"><div class="hdr"><img src="../raw/feed.jpg" alt=""></div><div class="scr"><img src="../raw/feed.jpg" alt=""></div></div>
+    </div>
+  </template>
+
+  <div class="bar"><b>A. Fail roulette, feed still</b><button data-r="a">Replay</button></div>
+  <div id="a" data-v="a"></div>
+  <p class="note">Only the last word changes (fail, choke, fold, melt down, blow it, fail), the same rolling word as the header video and the website. The line re-centres as the word gets longer or shorter. Calmest of the three.</p>
+
+  <div class="bar"><b>B. Feed scrolls, headline still</b><button data-r="b">Replay</button></div>
+  <div id="b" data-v="b"></div>
+  <p class="note">The app bar and tabs stay put while the alerts slide up under them, then slide back. Shows the product, says "fail" once. The headline never changes, so this is the safest if a still headline is what you want people to read in search.</p>
+
+  <div class="bar"><b>C. Roulette plus a new alert per word</b><button data-r="c">Replay</button></div>
+  <div id="c" data-v="c"></div>
+  <p class="note">Each time the word changes, the feed scrolls to the next alert, so it reads as alerts landing as rivals fail. Busiest; the scroll back to the top at the end takes longer than the other steps so the loop closes smoothly.</p>
+
+  <h1 style="margin-top:40px">Fit with Apple's search results video spec</h1>
+  <p class="intro">Checked against Apple's creative assets specifications (fetched 2026-11-04). The file items are confirmed with ffprobe once one is picked and rendered.</p>
+  <table class="spec">
+    <tr><td>Aspect ratio</td><td>3:2. Frame is 3840 x 2560, the maximum Apple takes (1920 x 1280 minimum).</td></tr>
+    <tr><td>Frame rate</td><td>30 fps (Apple takes 30 or 60).</td></tr>
+    <tr><td>Length</td><td>12 s (Apple takes 5 to 30 s).</td></tr>
+    <tr><td>Format</td><td>.mp4, H.264 (Apple takes .mov, .m4v and .mp4).</td></tr>
+    <tr><td>Looping</td><td>Apple loops it, so the last frame equals the first. Built in all three.</td></tr>
+    <tr><td>Sound</td><td>Muted in search and viewers can't unmute. A silent track is attached, nothing is lost.</td></tr>
+    <tr><td>Content</td><td>Search video is not an App Preview, so no Guideline 2.3.4 screen-capture rule. The phone frame is the real feed screenshot already used in the static graphic.</td></tr>
+  </table>
+</main>
+<script>
+// Widths of the rolling words in em, so the slot (and with it the centred line) follows the word.
+const words = ['fail','choke','fold','melt down','blow it','fail'];
+const probe = document.createElement('span');
+probe.style.cssText = 'position:absolute;visibility:hidden;font:800 100px Inter,sans-serif;letter-spacing:-.01em;white-space:nowrap';
+document.body.appendChild(probe);
+const stops = [[0,0],[12,0],[18,1],[29,1],[35,2],[46,2],[52,3],[63,3],[69,4],[80,4],[86,5],[100,5]];
+const build = async () => {
+  await document.fonts.load('800 100px Inter');
+  const em = words.map(w => { probe.textContent = w; return probe.getBoundingClientRect().width / 100; });
+  const frames = (f) => stops.map(([p, k]) => `${p}%{${f(k)}}`).join('');
+  const s = document.createElement('style');
+  s.textContent = `@keyframes roll{${frames(k => `transform:translateY(calc(${-k} * var(--line)))`)}}@keyframes wid{${frames(k => `width:${em[k].toFixed(3)}em`)}}`;
+  document.head.appendChild(s);
+  probe.remove();
+};
+const mount = (id) => { const host = document.getElementById(id); host.replaceChildren(document.getElementById('tpl').content.cloneNode(true)); host.firstElementChild.classList.add(host.dataset.v); };
+build().then(() => {
+  ['a','b','c'].forEach(mount);
+  document.querySelectorAll('button[data-r]').forEach(b => b.onclick = () => mount(b.dataset.r));
+});
+</script>
+</body>
+</html>
