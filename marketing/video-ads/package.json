@@ -7,7 +7,8 @@
     "render:a": "remotion render src/index.ts FailFeed out/hate-watch-ad-1-fail-feed.mp4",
     "render:b": "remotion render src/index.ts FeatureTour out/hate-watch-ad-2-feature-tour.mp4",
     "render:c": "remotion render src/index.ts Ad3 out/hate-watch-ad-3-rough-week.mp4",
-    "render:guide": "remotion render src/index.ts GuideVideo out/hate-watch-guide-video.mp4"
+    "render:guide": "remotion render src/index.ts GuideVideo out/hate-watch-guide-video.mp4",
+    "render:header": "remotion render src/index.ts HeaderPreview out/hate-watch-header-preview-raw.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.537",

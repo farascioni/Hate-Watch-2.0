@@ -39,14 +39,18 @@ a:focus-visible,summary:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(229,35,43,.4)}
 
 /* hero */
+/* animated store header (app-store/header-animated/header-b.html): the last word rolls, the eye stays still; reduced motion stops the roll */
 .hero{position:relative;overflow:hidden;padding:64px 0 40px}
 .glow{position:absolute;left:50%;top:-10%;width:900px;height:700px;margin-left:-450px;background:radial-gradient(closest-side,rgba(229,35,43,.38),transparent);filter:blur(30px);pointer-events:none;transform:translateY(calc(var(--sy,0)*.25px));animation:breathe 6s ease-in-out infinite}
 .hero .wrap{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
 .hero h1{font-size:clamp(2.8rem,7.4vw,5.4rem);font-weight:800}
 h1 em{font-style:normal;color:var(--red);background:linear-gradient(90deg,var(--red),#ff9a6b,var(--red));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:glint 4s linear infinite}
+.slot{display:inline-block;height:1.05em;overflow:hidden;vertical-align:top}
+.reel{display:block;animation:reel 12s infinite}
+.reel em{display:block;height:1.05em}
+@keyframes reel{0%,12%{transform:translateY(0)}18%,29%{transform:translateY(-1.05em)}35%,46%{transform:translateY(-2.1em)}52%,63%{transform:translateY(-3.15em)}69%,80%{transform:translateY(-4.2em)}86%,100%{transform:translateY(-5.25em)}}
 .lead{font-size:1.2rem;color:var(--muted);max-width:30em;margin:22px 0 28px}
 .stores{display:flex;flex-wrap:wrap;gap:12px}
-/* shortcut: the App Store badge is still a placeholder span, swap it for <a href="store URL"> once that listing is live (docs/seo-plan.md, Phase 1) */
 .store{display:flex;flex-direction:column;justify-content:center;min-width:176px;padding:10px 20px;border-radius:14px;background:#fff;color:#0b0b0d;line-height:1.15}
 a.store{text-decoration:none;transition:transform .2s}
 a.store:hover{transform:translateY(-2px)}
@@ -214,10 +218,10 @@ html{scroll-behavior:auto}
 <div class="glow" id="glow"></div>
 <div class="wrap">
 <div>
-<h1 class="rise">Know the second they <em>fail.</em></h1>
+<h1 class="rise" aria-label="Know the second they fail.">Know the second they <span class="slot" aria-hidden="true"><span class="reel"><em>fail.</em><em>choke.</em><em>fold.</em><em>melt down.</em><em>blow it.</em><em>fail.</em></span></span></h1>
 <p class="lead rise">Hate Watch tracks the teams and athletes you root against and pings you the moment something goes wrong for them: a strikeout, an interception, a blown lead, a lost game, a crash out of a race.</p>
 <div class="stores rise" id="stores">
-<span class="store" role="img" aria-label="App Store, coming soon"><small>Coming soon to the</small><b>App Store</b></span>
+<a class="store" href="https://apps.apple.com/us/app/hate-watch-rival-team-alerts/id6819054268"><small>Download on the</small><b>App Store</b></a>
 <a class="store" href="https://play.google.com/store/apps/details?id=com.hatewatch.app"><small>Get it on</small><b>Google Play</b></a>
 </div>
 <p class="note rise">Free. No account. Want a look now? <a href="/app">Open the web version</a>.</p>
@@ -361,7 +365,7 @@ html{scroll-behavior:auto}
 <div class="cta rv">
 <h2>Never miss<br>the <em>L.</em></h2>
 <div class="stores">
-<span class="store" role="img" aria-label="App Store, coming soon"><small>Coming soon to the</small><b>App Store</b></span>
+<a class="store" href="https://apps.apple.com/us/app/hate-watch-rival-team-alerts/id6819054268"><small>Download on the</small><b>App Store</b></a>
 <a class="store" href="https://play.google.com/store/apps/details?id=com.hatewatch.app"><small>Get it on</small><b>Google Play</b></a>
 </div>
 <p class="note">Free. No account. Push alerts need the iPhone or Android app. <a href="/app">Try the web version</a>.</p>
