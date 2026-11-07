@@ -7,6 +7,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Server: long push titles are not cut off.
 - Injury alerts: tracking a player and their team no longer shows one injury twice, and a player reinstated or activated from the injured list no longer alerts.
 - Scores: switching league keeps the My / Playoffs / All highlight right. (Update)
 - Plus: a failed subscription shows the store's error code. (Update)
@@ -24,11 +25,11 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Server: bad requests get a 400 or 413, new devices are rate limited, share links use our address.
 - Server: saving alert settings rejects a malformed body; one failing device no longer stops the others' alerts.
 - Server: pushes check Expo's delivery receipts after 15 minutes.
-- Website: hatewatch.dev is now an animated page promoting the apps; the web app moved to /app, old links redirect.
+- Website: hatewatch.dev is an animated page promoting the apps; the web app moved to /app, old links redirect.
 - Scores: a "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, MLB wild card) with both teams, scores, the series line and each game's winner.
 - Scores: "Coming up" lists playoff games and series starting within 7 days with "Who do you want to lose?". Vote, see each team's share, change it until the first game starts.
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. A series ends it once won.
-- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader or yesterday's final no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. A favorite's win is gold. (Update; strip needs the server update.)
+- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader or yesterday's final no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. (Update; strip needs the server update.)
 - Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first went out.
 - Tracking: hold a bell to snooze a player or team for 1 day, 3 days or a week. (Update, after the server deploy.)
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once and keeps your data if that fails. A live frame that is not JSON is ignored.
