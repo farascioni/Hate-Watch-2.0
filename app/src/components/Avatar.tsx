@@ -10,6 +10,8 @@ import type { Target } from '../lib/types';
  * - Headshots (600×436 landscape) fill the circle with cover + top anchoring so faces are never cropped.
  * - Logos are drawn with contain + padding so the whole mark is visible.
  * - Players with no ESPN photo show their team logo plus a jersey-number badge, never a wrong face.
+ * - With the server's image switches off (or for F1 constructors) the image is "badge://…" and the app draws
+ *   the badge itself: a team is a circle with a darker sash and its code, a player a jersey plate.
  */
 export function Avatar({ target, size = 48 }: { target: Target; size?: number }) {
   const ring = tintOf(target);
@@ -32,19 +34,31 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
   const inner = isHeadshot ? size - 4 : Math.round(size * 0.68);
   const src = sizedImage(uri, w, h, inner, isHeadshot ? 'cover' : 'contain');
 
-  // F1 constructors have no logo on ESPN: the server marks them "badge://" and we draw a badge in the
-  // team's official colour with its code (FER, MCL…). Crisp at any size, and clearly not a fake logo.
+  // F1 constructors have no logo on ESPN, and the image switches take logos and photos out: the server marks
+  // them "badge://" and we draw a badge in the team's colour with its code (FER, MCL, PHI…). Crisp at any
+  // size, and clearly not a fake logo.
   if (uri.startsWith('badge://')) {
     const code = (target.kind === 'team' ? target.abbrev : target.teamAbbrev) ?? '?';
     const fill = ring;
+    const ink = readableOn(fill);
+    // A player is a jersey plate (a rounded square, the number big, the team code under it); a team is a
+    // circle with a darker sash across the bottom and its code above the sash.
+    if (target.kind === 'player') {
+      const jersey = target.jersey ? String(target.jersey) : null;
+      // No number and no team (a fighter): the initials, never a bare "?".
+      const big = jersey ?? (code === '?' ? target.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() : code);
+      const bigSize = Math.round(size * (big.length > 2 ? 0.34 : jersey ? 0.46 : 0.34));
+      return (
+        <View style={[styles.wrap, { width: size, height: size, borderRadius: Math.round(size * 0.28), borderColor: fill, backgroundColor: fill }]} accessibilityLabel={target.name}>
+          <Text style={{ color: ink, fontSize: bigSize, fontWeight: '900', lineHeight: Math.round(bigSize * 1.05) }} numberOfLines={1}>{big}</Text>
+          {jersey && size >= 30 ? <Text style={{ color: ink, opacity: 0.8, fontSize: Math.round(size * 0.18), fontWeight: '800', letterSpacing: 0.5 }} numberOfLines={1}>{code}</Text> : null}
+        </View>
+      );
+    }
     return (
-      <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: fill, backgroundColor: fill }]} accessibilityLabel={target.name}>
-        <Text style={{ color: readableOn(fill), fontSize: Math.round(size * (code.length > 2 ? 0.28 : 0.34)), fontWeight: '900', letterSpacing: 0.5 }} numberOfLines={1}>{code}</Text>
-        {target.kind === 'player' && target.jersey ? (
-          <View style={[styles.badge, { backgroundColor: colors.surfaceHi }]}>
-            <Text style={styles.badgeText}>{target.jersey}</Text>
-          </View>
-        ) : null}
+      <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2, borderColor: fill, backgroundColor: fill, overflow: 'hidden' }]} accessibilityLabel={target.name}>
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '30%', backgroundColor: 'rgba(0,0,0,0.3)' }} />
+        <Text style={{ color: ink, marginBottom: Math.round(size * 0.14), fontSize: Math.round(size * (code.length > 2 ? 0.28 : 0.34)), fontWeight: '900', letterSpacing: 0.5 }} numberOfLines={1}>{code}</Text>
       </View>
     );
   }

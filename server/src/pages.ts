@@ -1,6 +1,6 @@
 // Public HTML pages linked from the App Store listing and the app's Settings screen.
 const CONTACT = process.env.HW_CONTACT_EMAIL ?? 'hatewatchfeedback@gmail.com';
-const UPDATED = 'October 5, 2026';
+const UPDATED = 'October 27, 2026';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -87,12 +87,15 @@ email address or phone number.</strong></p>
 <h2>How long we keep it</h2>
 <p>We keep your data while you use the app. You can delete it at any time:</p>
 <ul>
-<li><strong>Settings → Delete all my data</strong> immediately and permanently deletes your device ID, tracked teams and players, settings, push token and alert feed from our server, and gives the app a fresh anonymous identity.</li>
+<li><strong>Settings → Delete all my data</strong> immediately and permanently deletes your device ID, tracked teams and players, settings, push token, recovery code and alert feed from our server, and gives the app a fresh anonymous identity.</li>
 <li><strong>Settings → Clear feed</strong> deletes your alert history only.</li>
 <li>Deleted data may remain in encrypted server backups for up to 5 days before those backups expire.</li>
 </ul>
 <p>Uninstalling the app removes the device ID from your phone, but not from our server. To remove server data, use
 <strong>Delete all my data</strong> before uninstalling, or email us.</p>
+<p>If you make a recovery code (<strong>Settings → Move to a new install</strong>) to move your data to a new install, we store only
+a one-way hash of the code, not the code itself. The code stays valid, even after you uninstall, until it is used, replaced or deleted
+with the rest of your data.</p>
 
 <h2>Security</h2>
 <p>All traffic between the app and our server is encrypted with HTTPS/TLS. Our database is stored on an encrypted volume.

@@ -82,6 +82,7 @@ export default function RootLayout() {
         <Stack.Screen name="ufc/[event]" options={{ title: '', headerBackTitle: t('nav.back') }} />
         <Stack.Screen name="leaderboard" options={{ title: t('web.leaderboard'), headerBackTitle: t('nav.back') }} />
         <Stack.Screen name="a/[code]" options={{ title: t('nav.shared'), headerBackTitle: t('nav.back') }} />
+        <Stack.Screen name="transfer" options={{ title: t('settings.transfer'), headerBackTitle: t('nav.back') }} />
         <Stack.Screen name="guide" options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
       </ThemeProvider>

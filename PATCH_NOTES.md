@@ -7,28 +7,31 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- Server: long push titles are not cut off.
 - Injury alerts: tracking a player and their team no longer shows one injury twice, and a player reinstated or activated from the injured list no longer alerts.
 - Scores: switching league keeps the My / Playoffs / All highlight right. (Update)
 - Plus: a failed subscription shows the store's error code. (Update)
-- Hate Watch Plus: star an alert to save it; the Feed's Saved chip lists them. A lapse hides the list, resubscribing brings it back. (Update)
+- Hate Watch Plus: star an alert to save it; the Feed's Saved chip lists them. A lapse hides the list; resubscribing restores it. (Update)
 - Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab. Alert presets (save, edit, build) set a target's alerts in one tap. Hidden, not deleted, on a lapse. (Update)
-- Tabs: quick swaps no longer leave a blank screen or freeze the Feed; swipe sideways to switch tabs. (Update)
+- Tabs: quick swaps no longer leave a blank screen or freeze the Feed; swipe to switch tabs. (Update)
 - Lock screen scoreboard: an unstarted game shows its start time in your time zone; clock and quarter sit between the teams. One-game Hero adds a live dot, bigger score, leader and venue (after server update). Tap for the box score. (Update)
 - Guide: drawings move on each page, the web guide is dark, and the Feed page says losses, bad news and starts push by default. (Update)
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, and more. Off under Reduce Motion. (Update)
-- Search and Tracking reload on open. (Update)
-- Server: new installs push only for losses, bad news and game, race and fight starts (25 alerts); every other alert is in the Feed with its bell off. Installs already out keep their pushes, and get the starts switched on.
-- Server: bad requests get a 400 or 413, new devices are limited per address, share links use our address, shared alert pages are noindex.
-- Server: saving alert settings rejects a malformed body and keeps the old ones; one failing device no longer stops others' alerts.
-- Server: pushes check Expo's delivery receipts after 15 minutes, so deleted apps stop getting them.
-- Website: hatewatch.dev is now an animated page promoting the apps; the web app moved to /app, old links redirect.
-- Scores: a "Special Events" view between My and All lists postseason games (ALCS, World Series, Super Bowl, wild card) with teams, scores, the series line and each winner.
-- Scores: "Coming up" lists playoff games and series starting within 7 days with "Who do you want to lose?". Vote, see each team's share, change it until the first game starts.
-- Scores: under your vote, an "Alert me about (team) losses" switch, off by default, tracks the team for you until the series is won.
-- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader or last night's final shows once. The strip shows the series line, a cell per game (tap for its box score) and the next game. A favorite's win is gold. (Update; strip needs the server update.)
+- Search and Tracking reload on open, so image switches show.
+- Settings: "Move to a new install" makes a recovery code on the old install and restores it on the new one: tracking, favorites, counts and the feed come across. (Update)
+- Server: cards carry the event, series and each game's result.
+- Badges (when logos and photos are off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code. (Update)
+- Server: new installs push only for losses, bad news and starts (25 alerts); the rest are Feed only. Installs already out keep their pushes and get the starts on.
+- Server: bad requests get a 400 or 413, new devices are rate limited, share links use our address.
+- Server: saving alert settings rejects a malformed body; one failing device no longer stops the others' alerts.
+- Server: pushes check Expo's delivery receipts after 15 minutes.
+- Website: hatewatch.dev is an animated page; the web app moved to /app.
+- Scores: a "Special Events" view between My and All lists postseason games with teams, scores, the series line and each winner.
+- Scores: "Coming up" lists playoff series starting within 7 days with "Who do you want to lose?". Vote and change it until game 1.
+- Scores: under your vote, an "Alert me about (team) losses" switch, off by default. A series ends it once won.
+- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. (Update; needs the server update.)
 - Officials: track a referee or umpire from Search; alerts for overturned calls and their game starting, feed only, worded for the crew. (Update, after the server update)
-- Server: cards carry the event, series and each game's result from ESPN's postseason schedule; box scores stay 3 days after the series.
-- Server: the MLB "Opponent has runners in scoring position" alert repeats in the same half-inning when a runner then steals third.
+- Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first went out.
 - Tracking: hold a bell to snooze a player or team for 1 day, 3 days or a week. (Update, after the server deploy.)
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once, keeping your data if that fails. A non-JSON live frame is ignored.
 - Game screen: "4 hate-watching now" counts other people who would get an alert for either team; hidden at 0. (Update, after the server update)

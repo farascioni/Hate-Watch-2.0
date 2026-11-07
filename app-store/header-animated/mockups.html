@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hate Watch animated header mockups</title>
+<!-- Review page: five animated takes on the 21:9 App Store header (app-store/header-search/header-3840x1646.png).
+     Same eye mark, colours, Inter type and centre-60% safe zone as the static header. Everything is sized in cqw (1% of the stage width). -->
+<style>
+@font-face{font-family:Inter;font-weight:800;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_bold.ttf")}
+@font-face{font-family:Inter;font-weight:500;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_medium.ttf")}
+:root{--red:#E5232B;--white:#F4F4F5;--grey:#9a9aa2;--bg:#0B0B0D}
+*{box-sizing:border-box;margin:0}
+body{background:#050506;color:var(--white);font-family:Inter,-apple-system,system-ui,sans-serif;padding:24px 16px 64px}
+main{max-width:1280px;margin:0 auto}
+h1{font-size:22px;margin-bottom:6px}
+.lede{color:var(--grey);font-size:14px;margin-bottom:28px;line-height:1.5}
+section{margin-bottom:36px}
+.label{display:flex;align-items:baseline;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.label b{font-size:16px}
+.label span{color:var(--grey);font-size:13px;flex:1;min-width:240px}
+.label button{background:#1b1b1f;color:var(--white);border:1px solid #33333a;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+
+.stage{container-type:inline-size;position:relative;aspect-ratio:3840/1646;overflow:hidden;border-radius:10px;
+  background:radial-gradient(70% 70% at 50% 50%,#3B0D12 0,#170A0C 55%,var(--bg) 100%)}
+.mark{position:absolute;left:15.5cqw;top:5.2cqw;width:24.2cqw}
+.mark svg{display:block;width:100%;overflow:visible}
+.copy{position:absolute;left:42.7cqw;top:13.1cqw;width:50cqw}
+.h{font-weight:800;font-size:4.95cqw;line-height:5.45cqw;letter-spacing:-.01em;white-space:nowrap}
+.h .l{display:block}
+.fail{color:var(--red)}
+.sub{font-weight:500;font-size:1.98cqw;color:var(--grey);margin-top:.9cqw;white-space:nowrap}
+
+/* the mark's parts */
+.brow,.eyeball,.iris{transform-box:view-box}
+.brow{transform-origin:-310px -235px}
+.eyeball{transform-origin:0 40px}
+
+/* ---------- A: brow slam ---------- */
+.a{--t:7s}
+.a .eyeball{animation:a-open var(--t) infinite}
+.a .brow{animation:a-brow var(--t) infinite}
+.a .iris{animation:a-look var(--t) infinite}
+.a .l1{animation:a-l1 var(--t) infinite}
+.a .l2a{display:inline-block;animation:a-l2 var(--t) infinite}
+.a .fail{display:inline-block;animation:a-fail var(--t) infinite}
+.a .sub{animation:a-sub var(--t) infinite}
+.a .flash{position:absolute;inset:0;background:radial-gradient(40% 60% at 60% 50%,rgba(229,35,43,.5),transparent 70%);opacity:0;animation:a-flash var(--t) infinite}
+@keyframes a-open{0%,4%{transform:scaleY(.04)}14%{transform:scaleY(1.06)}18%,88%{transform:scaleY(1)}95%,100%{transform:scaleY(.04)}}
+@keyframes a-brow{0%,10%{transform:translateY(-190px) rotate(-8deg);opacity:0}14%{opacity:1}24%{transform:translateY(40px) rotate(3deg)}28%{transform:translateY(-10px) rotate(-1deg)}32%,88%{transform:none;opacity:1}95%,100%{transform:translateY(-190px);opacity:0}}
+@keyframes a-look{0%,18%{transform:translate(0,0)}24%{transform:translate(-120px,10px)}30%{transform:translate(120px,-20px)}36%,88%{transform:translate(0,0)}}
+@keyframes a-l1{0%,26%{opacity:0;transform:translateY(1.2cqw)}34%,88%{opacity:1;transform:none}95%,100%{opacity:0}}
+@keyframes a-l2{0%,34%{opacity:0;transform:translateY(1.2cqw)}42%,88%{opacity:1;transform:none}95%,100%{opacity:0}}
+@keyframes a-fail{0%,46%{opacity:0;transform:scale(2.6)}52%{opacity:1;transform:scale(.94)}55%,88%{opacity:1;transform:none}95%,100%{opacity:0}}
+@keyframes a-sub{0%,56%{opacity:0}64%,88%{opacity:1}95%,100%{opacity:0}}
+@keyframes a-flash{0%,50%{opacity:0}52%{opacity:1}62%,100%{opacity:0}}
+
+/* ---------- B: fail roulette ---------- */
+.b{--t:12s}
+.b .eyeball .iris{animation:b-look var(--t) infinite}
+.b .brow{animation:b-brow 3s ease-in-out infinite}
+.b .slot{display:inline-block;height:5.45cqw;overflow:hidden;vertical-align:top;position:relative}
+.b .reel{display:block;animation:b-reel var(--t) infinite}
+.b .reel span{display:block;height:5.45cqw}
+@keyframes b-reel{0%,12%{transform:translateY(0)}18%,29%{transform:translateY(-5.45cqw)}35%,46%{transform:translateY(-10.9cqw)}52%,63%{transform:translateY(-16.35cqw)}69%,80%{transform:translateY(-21.8cqw)}86%,100%{transform:translateY(-27.25cqw)}}
+@keyframes b-look{0%,100%{transform:translate(0,0)}20%{transform:translate(70px,40px)}50%{transform:translate(-60px,30px)}80%{transform:translate(80px,30px)}}
+@keyframes b-brow{0%,100%{transform:rotate(0)}50%{transform:rotate(-3deg) translateY(-8px)}}
+
+/* ---------- C: alert drops ---------- */
+.c{--t:18s}
+.c .mark{top:4.2cqw}
+.c .copy{top:9.6cqw}
+.c .eyeball .iris{animation:c-look 6s infinite}
+.c .stack{position:absolute;left:42.7cqw;top:25.3cqw;width:34cqw;height:12cqw}
+.c .n{position:absolute;left:0;top:0;width:100%;display:flex;align-items:center;gap:1.1cqw;padding:.9cqw 1.3cqw;border-radius:1.6cqw;
+  background:rgba(40,40,46,.82);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(8px);opacity:0;animation:c-n var(--t) infinite}
+.c .n i{flex:none;width:2.8cqw;height:2.8cqw;border-radius:.7cqw;background:var(--bg);display:grid;place-items:center}
+.c .n i svg{width:2.1cqw}
+.c .n b{display:block;font-size:1.25cqw;font-weight:800}
+.c .n em{display:block;font-style:normal;font-size:1.1cqw;font-weight:500;color:var(--grey);margin-top:.15cqw}
+.c .n small{margin-left:auto;font-size:.95cqw;color:var(--grey);font-weight:500}
+@keyframes c-n{0%{opacity:0;transform:translateY(-3cqw) scale(.96)}2%{opacity:1;transform:none}16.6%{opacity:1;transform:none}19.6%{opacity:.8;transform:translateY(3.7cqw) scale(.96)}33.3%{opacity:.8;transform:translateY(3.7cqw) scale(.96)}36.3%{opacity:.5;transform:translateY(7.4cqw) scale(.92)}50%{opacity:.5;transform:translateY(7.4cqw) scale(.92)}53%,100%{opacity:0;transform:translateY(9cqw) scale(.9)}}
+@keyframes c-look{0%,100%{transform:translate(0,0)}30%{transform:translate(60px,60px)}60%{transform:translate(-40px,50px)}}
+
+/* ---------- D: radar pulse ---------- */
+.d .rings{position:absolute;left:27.6cqw;top:16.3cqw;width:0;height:0}
+.d .rings i{position:absolute;left:-14cqw;top:-14cqw;width:28cqw;height:28cqw;border-radius:50%;border:.28cqw solid var(--red);opacity:0;animation:d-ring 4.8s ease-out infinite}
+.d .rings i:nth-child(2){animation-delay:1.2s}.d .rings i:nth-child(3){animation-delay:2.4s}.d .rings i:nth-child(4){animation-delay:3.6s}
+.d .mark{z-index:2}
+.d .brow{animation:d-brow 4.8s infinite}
+.d .iris{animation:d-iris 4.8s infinite}
+.d .fail{animation:d-fail 4.8s infinite}
+.d .badge{position:absolute;left:37.6cqw;top:6.6cqw;z-index:3;min-width:3.6cqw;height:3.6cqw;padding:0 .9cqw;border-radius:2cqw;background:var(--red);border:.3cqw solid #170A0C;
+  display:grid;place-items:center;font-weight:800;font-size:1.7cqw;animation:d-badge 4.8s infinite}
+@keyframes d-ring{0%{transform:scale(.15);opacity:.7}100%{transform:scale(1.9);opacity:0}}
+@keyframes d-brow{0%,100%{transform:none}4%{transform:translateY(-24px) rotate(-5deg)}12%{transform:translateY(14px) rotate(2deg)}18%{transform:none}}
+@keyframes d-iris{0%,100%{transform:scale(1)}4%{transform:scale(.8)}12%{transform:scale(1.12)}20%{transform:scale(1)}}
+@keyframes d-fail{0%,100%{text-shadow:none}6%{text-shadow:0 0 1.6cqw rgba(229,35,43,.95)}30%{text-shadow:none}}
+@keyframes d-badge{0%,2%{transform:scale(0)}8%{transform:scale(1.25)}13%,92%{transform:scale(1)}100%{transform:scale(0)}}
+
+/* ---------- E: hate meter ---------- */
+@property --n{syntax:"<integer>";inherits:false;initial-value:0}
+.e{--t:8s}
+.e .copy{top:11.2cqw}
+.e .brow{animation:e-brow var(--t) infinite}
+.e .iris{animation:e-iris var(--t) infinite}
+.e .meter{margin-top:1.9cqw;width:36cqw}
+.e .meter .row{display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:1.3cqw;letter-spacing:.12em;color:var(--grey)}
+.e .count{animation:e-count var(--t) infinite;counter-reset:n var(--n);font-size:2.6cqw;letter-spacing:0;color:var(--white)}
+.e .count::after{content:counter(n)}
+.e .bar{margin-top:.7cqw;height:1cqw;border-radius:.5cqw;background:rgba(255,255,255,.1);overflow:hidden}
+.e .bar i{display:block;height:100%;width:100%;border-radius:.5cqw;background:linear-gradient(90deg,#7A0D12,var(--red));transform-origin:0 50%;animation:e-bar var(--t) infinite}
+@keyframes e-count{0%,6%{--n:0}20%{--n:3}34%{--n:7}50%{--n:12}70%,88%{--n:23}97%,100%{--n:23}}
+@keyframes e-bar{0%,6%{transform:scaleX(.02)}20%{transform:scaleX(.18)}34%{transform:scaleX(.36)}50%{transform:scaleX(.58)}70%,88%{transform:scaleX(1)}97%,100%{transform:scaleX(.02)}}
+@keyframes e-brow{0%,6%{transform:rotate(7deg) translateY(-30px)}70%,88%{transform:rotate(-4deg) translateY(10px)}97%,100%{transform:rotate(7deg) translateY(-30px)}}
+@keyframes e-iris{0%,6%{transform:scale(.85)}70%,88%{transform:scale(1.15)}97%,100%{transform:scale(.85)}}
+
+/* the safe zone, drawn on request */
+.safe .stage::after{content:"";position:absolute;left:20%;right:20%;top:0;bottom:0;border:2px dashed rgba(255,255,255,.35);border-width:0 2px;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.stage *{animation-duration:.001s!important;animation-iteration-count:1!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Hate Watch: animated header mockups</h1>
+  <p class="lede">Five takes on the 21:9 header, all on the app's own mark, colours and type. Each loops. "Replay" restarts one; "Safe zone" shows the centre 60% that every device crops to.
+    <label style="margin-left:8px;white-space:nowrap"><input type="checkbox" id="safe"> Safe zone</label></p>
+
+  <section id="a">
+    <div class="label"><b>A. Brow slam</b><span>The eye snaps open, the brow comes down hard, then the headline lands and "fail" slams in with a red flash.</span><button>Replay</button></div>
+    <div class="stage a"><div class="mark"></div><div class="flash"></div>
+      <div class="copy"><div class="h"><span class="l l1">Know the second</span><span class="l"><span class="l2a">your rivals&nbsp;</span><span class="fail">fail</span></span></div>
+        <div class="sub">Real-time alerts for the rivals you can’t stand</div></div></div>
+  </section>
+
+  <section id="b">
+    <div class="label"><b>B. Fail roulette</b><span>The last word rolls through fail, choke, fold, melt down, blow it. The eye tracks it and the brow twitches.</span><button>Replay</button></div>
+    <div class="stage b"><div class="mark"></div>
+      <div class="copy"><div class="h"><span class="l">Know the second</span><span class="l">your rivals <span class="slot fail"><span class="reel"><span>fail</span><span>choke</span><span>fold</span><span>melt down</span><span>blow it</span><span>fail</span></span></span></span></div>
+        <div class="sub">Real-time alerts for the rivals you can’t stand</div></div></div>
+  </section>
+
+  <section id="c">
+    <div class="label"><b>C. Alert drops</b><span>Push notifications drop in under the headline and stack up, the way they would on a phone. Shows the product in the header.</span><button>Replay</button></div>
+    <div class="stage c"><div class="mark"></div>
+      <div class="copy"><div class="h"><span class="l">Know the second</span><span class="l">your rivals <span class="fail">fail</span></span></div>
+        <div class="sub">Real-time alerts for the rivals you can’t stand</div></div>
+      <div class="stack" id="stack"></div></div>
+  </section>
+
+  <section id="d">
+    <div class="label"><b>D. Radar pulse</b><span>Red rings ping out of the eye every few seconds with an unread badge popping on it. The brow flinches and "fail" glows on each ping.</span><button>Replay</button></div>
+    <div class="stage d"><div class="rings"><i></i><i></i><i></i><i></i></div><div class="mark"></div><div class="badge">1</div>
+      <div class="copy"><div class="h"><span class="l">Know the second</span><span class="l">your rivals <span class="fail">fail</span></span></div>
+        <div class="sub">Real-time alerts for the rivals you can’t stand</div></div></div>
+  </section>
+
+  <section id="e">
+    <div class="label"><b>E. Hate meter</b><span>A counter ticks up and a red bar fills while the brow gets angrier and the pupil swells, then it resets. Nods to the in-app Hate Watch counter.</span><button>Replay</button></div>
+    <div class="stage e"><div class="mark"></div>
+      <div class="copy"><div class="h"><span class="l">Know the second</span><span class="l">your rivals <span class="fail">fail</span></span></div>
+        <div class="sub">Real-time alerts for the rivals you can’t stand</div>
+        <div class="meter"><div class="row"><span>RIVAL FAILS TODAY</span><span class="count"></span></div><div class="bar"><i></i></div></div></div></div>
+  </section>
+</main>
+
+<script>
+// The icon's eye mark (same paths as app-store/store-art.mjs MARK), split into brow / eyeball / iris so each can move.
+const mark = (id) => `<svg viewBox="-360 -290 720 620" aria-hidden="true">
+  <clipPath id="eye${id}"><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z"/></clipPath>
+  <g class="brow"><path d="M -306.4 -256.7 L 272.8 -187.4 L 257.2 -92.6 L -313.6 -213.3 Z" fill="#E5232B"/>
+    <circle cx="-310" cy="-235" r="22" fill="#E5232B"/><circle cx="265" cy="-140" r="48" fill="#E5232B"/></g>
+  <g class="eyeball"><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z" fill="#F4F4F5"/>
+    <g clip-path="url(#eye${id})"><g class="iris" style="transform-origin:0 40px">
+      <circle cx="0" cy="40" r="125" fill="#E5232B"/><circle cx="0" cy="40" r="125" fill="none" stroke="#7A0D12" stroke-width="14"/>
+      <circle cx="0" cy="40" r="58" fill="#0B0B0D"/><circle cx="36" cy="6" r="22" fill="#fff" opacity=".92"/></g></g></g></svg>`;
+document.querySelectorAll('.mark').forEach((m, i) => m.innerHTML = mark(i));
+
+const alerts = [
+  ['Rival QB throws a pick-six', 'Third turnover of the half'],
+  ['Rival closer blows the save', 'Ninth inning, two on, nobody out'],
+  ['Rival striker misses the open net', 'Stoppage time, still 0-0'],
+  ['Rival drops out of the poll', 'Down six spots after the loss'],
+  ['Rival goalie lets in the softest goal', 'From the red line, 98 feet out'],
+  ['Rival loses by 30', 'Their fifth in a row'],
+];
+const bell = '<svg viewBox="-360 -290 720 620"><path d="M -306 -256 L 272 -187 L 257 -92 L -313 -213 Z" fill="#E5232B"/><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z" fill="#F4F4F5"/><circle cx="0" cy="40" r="125" fill="#E5232B"/><circle cx="0" cy="40" r="58" fill="#0B0B0D"/></svg>';
+document.getElementById('stack').innerHTML = alerts.map(([t, s], i) =>
+  `<div class="n" style="animation-delay:${i * 3}s"><i>${bell}</i><div><b>${t}</b><em>${s}</em></div><small>now</small></div>`).join('');
+
+// Replay: clone the stage so every animation restarts at 0.
+document.querySelectorAll('section').forEach((s) => s.querySelector('button').onclick = () => {
+  const st = s.querySelector('.stage'); st.replaceWith(st.cloneNode(true));
+});
+document.getElementById('safe').onchange = (e) => document.body.classList.toggle('safe', e.target.checked);
+</script>
+</body>
+</html>

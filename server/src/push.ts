@@ -25,6 +25,16 @@ const headers = () => ({
 
 const clearToken = (token: string) => db.prepare('UPDATE devices SET push_token = NULL WHERE push_token = ?').run(token);
 
+// iOS shows a push title on one line (about 24 characters beside the emoji and the time) and wraps the body over
+// several, so a longer title is cut off with "…". Such a title goes first in the body instead, under a short title.
+const TITLE_FITS = 24;
+export function fitTitle(m: PushMessage): PushMessage {
+  const [emoji, ...rest] = m.title.split(' ');
+  const text = rest.join(' ');
+  if (!text || text.length <= TITLE_FITS) return m;
+  return { ...m, title: `${emoji} Hate Watch`, body: `${text}\n${m.body}` };
+}
+
 export function sendPushes(messages: PushMessage[]) {
   // Fire immediately; chunks of 100 per Expo's limit. Never awaited by the detection path.
   for (let i = 0; i < messages.length; i += 100) void sendChunk(messages.slice(i, i + 100));
@@ -35,7 +45,7 @@ async function sendChunk(chunk: PushMessage[]) {
     const res = await fetch(`${EXPO_PUSH_URL}/send`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify(chunk),
+      body: JSON.stringify(chunk.map(fitTitle)),
       signal: AbortSignal.timeout(10_000),
     });
     const json = (await res.json()) as { data?: Ticket[] };

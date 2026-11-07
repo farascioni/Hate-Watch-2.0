@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hate Watch animated header B</title>
+<!-- Variant B from mockups.html: static eye and brow, only the last word rolls. Same layout and type as header-search/header-3840x1646.png. -->
+<style>
+@font-face{font-family:Inter;font-weight:800;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_bold.ttf")}
+@font-face{font-family:Inter;font-weight:500;src:url("../../app/node_modules/expo-dev-menu/android/src/debug/res/font/inter_medium.ttf")}
+:root{--red:#E5232B;--white:#F4F4F5;--grey:#9a9aa2;--bg:#0B0B0D}
+*{box-sizing:border-box;margin:0}
+body{background:#050506;color:var(--white);font-family:Inter,-apple-system,system-ui,sans-serif;padding:24px 16px}
+main{max-width:1280px;margin:0 auto}
+.bar{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.bar b{font-size:16px;flex:1}
+button{background:#1b1b1f;color:var(--white);border:1px solid #33333a;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.stage{container-type:inline-size;position:relative;aspect-ratio:3840/1646;overflow:hidden;border-radius:10px;
+  background:radial-gradient(70% 70% at 50% 50%,#3B0D12 0,#170A0C 55%,var(--bg) 100%)}
+.mark{position:absolute;left:15.5cqw;top:5.2cqw;width:24.2cqw}
+.mark svg{display:block;width:100%;overflow:visible}
+.copy{position:absolute;left:42.7cqw;top:13.1cqw;width:50cqw}
+.h{font-weight:800;font-size:4.95cqw;line-height:5.45cqw;letter-spacing:-.01em;white-space:nowrap}
+.h .l{display:block}
+.fail{color:var(--red)}
+.sub{font-weight:500;font-size:1.98cqw;color:var(--grey);margin-top:.9cqw;white-space:nowrap}
+.slot{display:inline-block;height:5.45cqw;overflow:hidden;vertical-align:top}
+.reel{display:block;animation:reel 12s infinite}
+.reel span{display:block;height:5.45cqw}
+@keyframes reel{0%,12%{transform:translateY(0)}18%,29%{transform:translateY(-5.45cqw)}35%,46%{transform:translateY(-10.9cqw)}52%,63%{transform:translateY(-16.35cqw)}69%,80%{transform:translateY(-21.8cqw)}86%,100%{transform:translateY(-27.25cqw)}}
+@media (prefers-reduced-motion:reduce){.reel{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="bar"><b>Hate Watch header, B: fail roulette (eye and brow still)</b><button id="replay">Replay</button></div>
+  <div class="stage" id="stage">
+    <div class="mark"><svg viewBox="-360 -290 720 620" aria-hidden="true">
+      <clipPath id="eye"><path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z"/></clipPath>
+      <path d="M -306.4 -256.7 L 272.8 -187.4 L 257.2 -92.6 L -313.6 -213.3 Z" fill="#E5232B"/>
+      <circle cx="-310" cy="-235" r="22" fill="#E5232B"/><circle cx="265" cy="-140" r="48" fill="#E5232B"/>
+      <path d="M -340 40 Q 0 -230 340 40 Q 0 310 -340 40 Z" fill="#F4F4F5"/>
+      <g clip-path="url(#eye)"><circle cx="0" cy="40" r="125" fill="#E5232B"/><circle cx="0" cy="40" r="125" fill="none" stroke="#7A0D12" stroke-width="14"/>
+        <circle cx="0" cy="40" r="58" fill="#0B0B0D"/><circle cx="36" cy="6" r="22" fill="#fff" opacity=".92"/></g></svg></div>
+    <div class="copy"><div class="h"><span class="l">Know the second</span>
+      <span class="l">your rivals <span class="slot fail"><span class="reel"><span>fail</span><span>choke</span><span>fold</span><span>melt down</span><span>blow it</span><span>fail</span></span></span></span></div>
+      <div class="sub">Real-time alerts for the rivals you can’t stand</div></div>
+  </div>
+</main>
+<script>
+document.getElementById('replay').onclick = () => { const s = document.getElementById('stage'); s.replaceWith(s.cloneNode(true)); };
+</script>
+</body>
+</html>
