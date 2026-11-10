@@ -8,9 +8,9 @@
 
 **Sections:**
 - [Officials](#officials): what they are, which leagues, how to find one, the six alerts, what is not built.
-- [How it works](#how-it-works): where the names come from, the key, the wording rule, one alert per moment, the settle waits.
+- [How it works](#how-it-works): where the names come from, the pre-game sweep, the key, the wording rule, one alert per moment, the settle waits.
 - [Settings and defaults](#settings-and-defaults): on, feed only; what Settings and the WNBA ignore.
-- [Limits](#limits): attribution, when an official becomes searchable, restarts, the leagues left out.
+- [Limits](#limits): attribution, when an official becomes searchable (a sweep reads today's board), restarts, the leagues left out.
 - [Tests](#tests): the test file and the tests it changed.
 
 The README's "Officials" has the summary; this is the full detail. Read this index first, then only the part you need.
@@ -33,6 +33,7 @@ The README's "Officials" has the summary; this is the full detail. Read this ind
 ## How it works
 
 - **Where the names come from.** ESPN's game summary has `gameInfo.officials` (a name and a position, no id, no photo). `readOfficials` in `server/src/live.ts` runs for a game in `OFFICIAL_LEAGUES`: it reads `fullName ?? displayName` and `position.displayName ?? position.name`, adds each to the catalog (`addOfficials` in `server/src/catalog.ts`, the `officials` table, the in-memory map and the search index; the log says "new official in the catalog"), and sets the game's crew (`ctx.crew`). A summary with no officials leaves the last crew alone.
+- **Pre-game sweep.** A tracker exists only for a game with a watched or favorited team, so most crews were never read. `sweepOfficials` in `server/src/live.ts` runs at the end of every scoreboard read for an `OFFICIAL_LEAGUES` league, in the background (not awaited, so a slow or odd summary never holds up the scan; a failure in one game is logged and skipped): each game on the board with no tracker gets one summary read (pre, live or final), at most `OFFICIALS_PER_SCAN` (4) per scoreboard read, through the same `crewOf` helper the tracker uses. A game whose summary names no crew yet (or whose read failed) is asked again `OFFICIALS_RETRY_MS` (3 h) later; a game with a crew is done for good. It reads today's board only (the NFL: the current week's), is not behind a savings switch (about 40 reads a day plus retries, against about 416,000 ESPN calls a day), and publishes nothing: it only inserts catalog rows (`addOfficials` ignores a name already there), so it adds no alert ids and touches none of the duplicate-alert layers. `crewsSwept` is memory only: after a restart each board game is read once more, which changes nothing.
 - **The key.** `officialSlug(name)` lower-cases, strips diacritics and `jr/sr/ii/iii/iv`, and turns anything else into `-`. `officialKey(league, name)` is `official:<league>:<slug>`. Two officials with the same name in one league merge into one, which is accepted.
 - **The wording rule.** `crewAlerts` in `server/src/detectors.ts` makes one alert per official in the crew, each with the id `<gameId>:<playId>:<type>:ump-<slug>` and that official's key as the target. Nothing says which official made a call except a home plate ABS ruling, so the title says "<Name>'s crew" for every official; the `only` position pattern (`/home plate/i` for ABS) is what switches to the plain name. An empty crew makes no alert.
 - **One alert per moment.** `bundleByPlay` has nothing to fold a teamless key into, so every official alert carries an explicit moment (`<gameId>:<playId>:abs`, `:review` or `:official`). A device tracking two of the crew gets the first; a device tracking a team of the same moment gets the team's alert.
@@ -49,8 +50,8 @@ The README's "Officials" has the summary; this is the full detail. Read this ind
 ## Limits
 
 - **Attribution.** Only the ABS overturn names a person (the home plate umpire). Everything else says "the crew", because ESPN does not say who made a call. Nothing is a stat on one official.
-- **Searchable late.** An official is added to the catalog when the server first sees a started game's summary naming the crew. Before that they cannot be found. Pre-game indexing is not built.
-- **Empty crew.** The crew is empty until a started game's summary names it, and after a server restart. An alert in that gap is skipped, not sent without a crew.
+- **Searchable late.** An official is added to the catalog when the server reads a summary naming the crew: the pre-game sweep reads today's board (checked against ESPN on 2026-11-08: NBA games a day ahead and tonight's `pre` games listed no crew, NFL games 3 h before kickoff listed none, an NFL game in progress listed 7 and the day's finished NBA games listed 3 each, so crews show up near or at game time, hence the 3 h retry; MLB was not checked, in the offseason), and a started game's tracker reads it too. A game on a later day's board is not read until it is on the board, so its officials cannot be found before then.
+- **Empty crew.** A tracker's crew is empty until a summary it reads names it, and after a server restart. An alert in that gap is skipped, not sent without a crew.
 - **NBA crew.** ESPN's NBA list can include alternates (the order-0 entries may not all be floor officials). "Supported" is read as the call standing; not confirmed.
 - **Savings switch.** `savings.summary-on-demand` stops the summary reads officials depend on; with it on, the crew stays empty.
 - **Game start.** Feed only, like the other five, while a team's start now pushes by default: someone who tracks only an official sees the start in the feed and gets no notification unless they turn the bell on. A crew ESPN names only after the game starts gets no start alert.
@@ -58,6 +59,6 @@ The README's "Officials" has the summary; this is the full detail. Read this ind
 
 ## Tests
 
-`server/test/officials.test.ts` (13 tests): the slug, the catalog and search, the DTO and group, each of the five call detectors on real ESPN play shapes, the game start (all three sports), the crew wording, an empty crew, the ABS settle (standing and taken back), the replay overturn, following an official, and the one-alert-per-moment rule.
+`server/test/officials.test.ts` (15 tests): the pre-game sweep (four a scan, once per game, retry for a game with no crew, an odd summary skipped), the slug, the catalog and search, the DTO and group, each of the five call detectors on real ESPN play shapes, the game start (all three sports), the crew wording, an empty crew, the ABS settle (standing and taken back), the replay overturn, following an official, and the one-alert-per-moment rule.
 
 Changed: `sections.test.ts` (Settings' groups leave out official-scope types), `wnba.test.ts` (the twin test leaves them out), `quiet-defaults.test.ts` (the five ids are feed-only and added-since).

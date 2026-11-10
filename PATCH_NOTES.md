@@ -30,7 +30,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Scores: "Coming up" lists playoff series starting within 7 days with "Who do you want to lose?". Vote and change it until game 1.
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. A series ends it once won.
 - Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. (Update; needs the server update.)
-- Officials: track a referee or umpire from Search; alerts for overturned calls and their game starting, feed only, worded for the crew. (Update, after the server update)
+- Officials: track a referee or umpire from Search (crews show at game time); alerts for overturned calls and game starts, feed only. (Update, after the server deploy)
 - Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first went out.
 - Tracking: hold a bell to snooze a player or team for 1 day, 3 days or a week. (Update, after the server deploy.)
 - App: a server that keeps answering 401 no longer loops the app: it re-registers once, keeping your data if that fails. A non-JSON live frame is ignored.

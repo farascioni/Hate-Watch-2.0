@@ -10,7 +10,7 @@ const { db } = await import('../src/db.ts');
 const { loadCatalog, addOfficials, catalog, search } = await import('../src/catalog.ts');
 const { DEFAULT_PREFS } = await import('../src/fanout.ts');
 const { PLAYER_DETECTORS } = await import('../src/detectors.ts');
-const { liveDeps, GameTracker } = await import('../src/live.ts');
+const { liveDeps, GameTracker, engine } = await import('../src/live.ts');
 const { urls, officialKey } = await import('../src/leagues.ts');
 const { EVENT_TYPES } = await import('../src/event-types.ts');
 const { HATE_WATCH_TYPES } = await import('../src/hate-watches.ts');
@@ -235,4 +235,53 @@ test('an ABS challenge that ESPN leaves confirmed is no umpire alert', async () 
   await tracker.poll(); await wait(); await tracker.poll();
   done();
   for (const d of DEVICES) assert.deepEqual(feed(d, ...UMP), [], d);
+});
+
+test('officials join the catalog before a game starts: each untracked game on the board is read once, four a scan, and a game with no crew yet is asked again later', async () => {
+  const crews: Record<string, string[]> = { 1: ['Zz Alpha'], 2: ['Zz Bravo', 'Zz Charlie'], 3: [], 4: ['Zz Delta'], 5: ['Zz Echo'], 6: ['Zz Foxtrot'] };
+  const side = (ha: string, id: string) => ({ homeAway: ha, id, team: { id, displayName: id === '13' ? 'Los Angeles Lakers' : 'Boston Celtics', abbreviation: id === '13' ? 'LAL' : 'BOS' } });
+  const events = Object.keys(crews).map((id) => ({
+    id, date: new Date(Date.now() + 5 * 3600_000).toISOString(), shortName: 'BOS @ LAL', season: { type: 2 },
+    status: { type: { state: 'pre', completed: false } }, competitions: [{ competitors: [side('home', '13'), side('away', '2')] }],
+  }));
+  let reads: string[] = [];
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = (async (url: string, ...rest: any[]) => {
+    if (url.startsWith(urls.scoreboard('nba').split('?')[0])) return { events };
+    for (const id of Object.keys(crews)) {
+      if (url === urls.summary('nba', id)) { reads.push(id); return { gameInfo: { officials: crews[id].map((fullName) => ({ fullName, position: { displayName: 'Referee' } })) } }; }
+    }
+    return (prev as any)(url, ...rest);
+  }) as any;
+  const found = (name: string) => search(name, { kind: 'player', officials: true }).some((r: any) => r.key === officialKey('nba', name));
+  const scan = async () => { reads = []; await (engine as any).scanScoreboard('nba'); await new Promise((r) => setTimeout(r, 20)); return reads.slice().sort(); }; // the sweep runs in the background
+  try {
+    assert.deepEqual(await scan(), ['1', '2', '3', '4'], 'four summaries on the first scan');
+    assert.ok(found('Zz Charlie'), 'a crew is searchable before the game starts');
+    assert.deepEqual(await scan(), ['5', '6'], 'the rest next scan; games with a crew and game 3 (waiting to retry) are not read again');
+    crews[3] = ['Zz Golf'];
+    (engine as any).crewsSwept.set('nba:3', 0); // its 3 h retry has come
+    assert.deepEqual(await scan(), ['3']);
+    assert.ok(found('Zz Golf'));
+    assert.deepEqual(await scan(), [], 'every crew found: nothing left to read');
+  } finally { liveDeps.getJson = prev; }
+});
+
+test('an odd summary never breaks the scan: garbage officials are skipped', async () => {
+  const side = (ha: string, id: string) => ({ homeAway: ha, id, team: { id, displayName: 'Boston Celtics', abbreviation: 'BOS' } });
+  const events = [{
+    id: '9', date: new Date(Date.now() + 5 * 3600_000).toISOString(), shortName: 'BOS @ LAL', season: { type: 2 },
+    status: { type: { state: 'pre', completed: false } }, competitions: [{ competitors: [side('home', '13'), side('away', '2')] }],
+  }];
+  const prev = liveDeps.getJson;
+  liveDeps.getJson = (async (url: string, ...rest: any[]) => {
+    if (url.startsWith(urls.scoreboard('nba').split('?')[0])) return { events };
+    if (url === urls.summary('nba', '9')) return { gameInfo: { officials: [null, { fullName: 'Zz Odd', position: null }, 7, { position: {} }] } };
+    return (prev as any)(url, ...rest);
+  }) as any;
+  try {
+    await assert.doesNotReject((engine as any).sweepOfficials('nba', events));
+    const kept = search('Zz Odd', { kind: 'player', officials: true }).some((r: any) => r.key === officialKey('nba', 'Zz Odd'));
+    assert.equal(kept, true, 'a named official is kept; entries with no name are skipped');
+  } finally { liveDeps.getJson = prev; }
 });

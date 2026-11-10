@@ -62,7 +62,7 @@ How to read the diagram, checked against `server/src/live.ts` and `fanout.ts`:
 - **Motion** ([docs/motion.md](docs/motion.md)): the little animation where something just happened (an alert drops in, the counter and scores roll up, the heart and X pop, a live dot pulses, the first cards wave in, a loss glints), all React Native `Animated` on the native driver, so it ships over the air and respects reduce motion.
 - **Video ads** ([docs/video-ads.md](docs/video-ads.md)): three vertical ads, a video of the startup guide and the animated App Store header and search result videos, React components rendered to MP4 with Remotion in `marketing/video-ads/`; the sources are in git, the renders are not.
 - **Officials** ([docs/officials.md](docs/officials.md)): referees and umpires can be tracked from Search (under Athletes, below the players); five overturned-call alerts (ABS, replay, coach's challenge, review, reversal) and a game-start alert, feed only by default, worded for the crew.
-- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026.
+- **Tests** ([docs/tests.md](docs/tests.md)): `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 694 tests in 89 files, offline, in about 9 seconds, all passing on November 8, 2026.
 - **The post game recording report** ([docs/post-game-recording-report.md](docs/post-game-recording-report.md)): every recorded game gets one report when it ends, in every sport: a private claude.ai Artifact with a card per finding that the user approves, changes or skips.
 - **SEO plan for hatewatch.dev** ([docs/seo-plan.md](docs/seo-plan.md)): the site is an empty single-page shell to search engines; a phased, ask-first plan to make it findable.
 - **Known limits** ([docs/known-limits.md](docs/known-limits.md)): Everything rests on ESPN's unofficial, undocumented API, so its delay is our floor and a change to its fields can break a league until the code catches up; the replays are the early warning.
@@ -190,7 +190,7 @@ The full detail: [docs/favorites.md](docs/favorites.md).
 
 ## Officials
 
-**In short:** referees and umpires (NBA, MLB, NFL) can be tracked from Search like a player or team: they show under the Athletes filter, below the players. They have no team of their own, only a heading ("MLB Umpires"), which cannot be tracked. The names come from ESPN's game summaries, so an official is searchable once the server has seen a started game of theirs. Six alerts, on and feed only by default: a ball/strike call overturned by an ABS challenge, a replay overturning a call (MLB), a coach's challenge won and a call overturned on review (NBA), a call reversed on replay (NFL), and the game they work starting (first pitch, tip-off, kickoff). Only the ABS one names a person (the home plate umpire); the rest say "<name>'s crew".
+**In short:** referees and umpires (NBA, MLB, NFL) can be tracked from Search like a player or team: they show under the Athletes filter, below the players. They have no team of their own, only a heading ("MLB Umpires"), which cannot be tracked. The names come from ESPN's game summaries, so an official is searchable once the server has read a summary naming their crew: today's games are read before they start, a later day's once it is on the board. Six alerts, on and feed only by default: a ball/strike call overturned by an ABS challenge, a replay overturning a call (MLB), a coach's challenge won and a call overturned on review (NBA), a call reversed on replay (NFL), and the game they work starting (first pitch, tip-off, kickoff). Only the ABS one names a person (the home plate umpire); the rest say "<name>'s crew".
 
 The full detail: [docs/officials.md](docs/officials.md).
 
@@ -214,7 +214,7 @@ The full detail: [docs/video-ads.md](docs/video-ads.md).
 
 ## Tests
 
-**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 692 tests in 89 files, offline, in about 9 seconds, all passing on November 7, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
+**In short:** `npm test` in `server/` runs every `test/*.test.ts` file with Node's own test runner: 694 tests in 89 files, offline, in about 9 seconds, all passing on November 8, 2026. Next to them are scripts that read live ESPN (replays of finished games, the two-feed check, an F1 replay, a catalog audit) and an end-to-end smoke test against a running server. On the Mac, recordings of live games under `server/data/recordings/` (not in git) are replayed through the real game tracker and checked against what production sent.
 
 The full detail: [docs/tests.md](docs/tests.md).
 

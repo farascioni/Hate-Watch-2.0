@@ -77,6 +77,8 @@ const INJURIES_SOON_MS = 3 * 3600_000;     // "soon": a game starting within thi
 const NEWS_IDLE_MS = 20 * 60_000;
 const STANDINGS_IDLE_MS = 30 * 60_000;
 const STANDINGS_HOT_MS = 15 * 60_000;      // after a game ends: the usual 60 s, for as long as ESPN's table can take to move
+const OFFICIALS_RETRY_MS = 3 * 3600_000;  // a game on the board whose summary names no officials yet: asked again this much later
+const OFFICIALS_PER_SCAN = 4;             // summaries the officials sweep reads per scoreboard read, so a boot's whole board takes a few scans
 const SUMMARY_EVERY_MS = 10_000;           // summary-on-demand: a live game's summary at most this often (its plays are still read every poll)
 const SUMMARY_LEAGUES = new Set<League>(['mlb', 'nba', 'wnba', 'nhl']);
 const BREAK_POLL_MS = 6000;                // slow-breaks: halftime, between periods, a delay
@@ -1402,15 +1404,8 @@ export class GameTracker {
   /** The summary's gameInfo.officials (docs/officials.md): new names enter the catalog, and `ctx.crew` is this game's list (empty until a started game's summary names them, and again after a restart until the next summary read), in ESPN's order. ESPN gives names and a position only, no id. A summary without them leaves the last crew alone. */
   private readOfficials(s: any) {
     const league = this.ctx.league;
-    const list = (Array.isArray(s.gameInfo?.officials) ? s.gameInfo.officials : [])
-      .map((o: any) => ({
-        name: String(o?.fullName ?? o?.displayName ?? '').replace(/\s+/g, ' ').trim(),
-        position: String(o?.position?.displayName ?? o?.position?.name ?? '').trim(),
-      }))
-      .filter((o: { name: string }) => o.name);
-    if (!list.length) return;
-    for (const o of addOfficials(league, list.map((x: { name: string }) => x.name))) log(`[${league} ${this.ctx.gameId}] new official in the catalog: ${o.name}`);
-    this.ctx.crew = list.map((o: { name: string; position: string }) => ({ key: officialKey(league, o.name), name: o.name, position: o.position }));
+    const list = crewOf(league, s, this.ctx.gameId);
+    if (list.length) this.ctx.crew = list;
   }
 
   /** Basketball: players the box score lists that the catalog lacks are added once each (addBoxPlayers), so their alerts name them and they can be followed. */
@@ -1576,6 +1571,8 @@ class LiveEngine {
   /** After any game of the league ends (its tracker's final, or a new final on the scoreboard), until when standings are read every 60 s. */
   private standingsHotUntil: Partial<Record<League, number>> = {};
   private finalsSeen = new Set<string>();
+  /** Games of the officials leagues whose crew the sweep has read (Infinity) or will ask again for (the time), by `league:gameId`. */
+  private crewsSwept = new Map<string, number>();
   private gameSoon(lg: League) {
     const g = this.gameDay[lg];
     return !g || g.live || g.nextStart - Date.now() < INJURIES_SOON_MS || [...this.trackers.values()].some((t) => t.ctx.league === lg && !t.finished);
@@ -1666,8 +1663,48 @@ class LiveEngine {
       }
     }
     for (const [k, t] of this.trackers) if (t.finished && !(sb.events ?? []).some((e: any) => `${lg}:${e.id}` === k) && k.startsWith(lg)) this.trackers.delete(k);
+    if (OFFICIAL_LEAGUES.has(lg)) void this.sweepOfficials(lg, sb.events ?? []).catch((e) => log(`[${lg}] officials sweep failed: ${(e as Error).message}`)); // not awaited: a slow or odd summary never holds up the scan
     this.scanned.add(lg); // games attached from now on are new follows: 90 s of history (BOOT_BACKFILL_MS)
   }
+
+  /**
+   * Officials enter the catalog before a game starts (docs/officials.md "Pre-game indexing"): each game on the board that no
+   * tracker reads has its summary read once for its crew, at most OFFICIALS_PER_SCAN a scoreboard read. A game whose summary
+   * names none yet is asked again after OFFICIALS_RETRY_MS. A tracked game's own summary reads do this.
+   */
+  private async sweepOfficials(lg: League, evs: any[]) {
+    if (this.crewsSwept.size > 5000) this.crewsSwept.clear();
+    const now = Date.now();
+    const due = evs.filter((ev) => {
+      const key = `${lg}:${ev.id}`;
+      return !this.trackers.has(key) && now >= (this.crewsSwept.get(key) ?? 0);
+    }).slice(0, OFFICIALS_PER_SCAN);
+    await Promise.all(due.map(async (ev) => {
+      const key = `${lg}:${ev.id}`;
+      this.crewsSwept.set(key, now + OFFICIALS_RETRY_MS); // also after a failed read: it is asked again then
+      try {
+        const s = await liveDeps.getJson(urls.summary(lg, ev.id), { bust: true, timeoutMs: 6000 }).catch(() => null);
+        if (s && crewOf(lg, s, ev.id).length) this.crewsSwept.set(key, Infinity);
+      } catch (e) {
+        log(`[${lg}] officials sweep of ${ev.id} failed: ${(e as Error).message}`);
+      }
+    }));
+  }
+}
+
+/**
+ * A summary's gameInfo.officials as a crew in ESPN's order (docs/officials.md); new names enter the catalog here, once each.
+ * Empty when ESPN names none yet.
+ */
+function crewOf(league: League, s: any, gameId: string): { key: string; name: string; position: string }[] {
+  const list = (Array.isArray(s?.gameInfo?.officials) ? s.gameInfo.officials : [])
+    .map((o: any) => ({
+      name: String(o?.fullName ?? o?.displayName ?? '').replace(/\s+/g, ' ').trim(),
+      position: String(o?.position?.displayName ?? o?.position?.name ?? '').trim(),
+    }))
+    .filter((o: { name: string }) => o.name);
+  for (const o of addOfficials(league, list.map((x: { name: string }) => x.name))) log(`[${league} ${gameId}] new official in the catalog: ${o.name}`);
+  return list.map((o: { name: string; position: string }) => ({ key: officialKey(league, o.name), name: o.name, position: o.position }));
 }
 
 export const engine = new LiveEngine();
