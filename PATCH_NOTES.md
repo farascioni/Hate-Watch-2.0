@@ -20,7 +20,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Search and Tracking reload on open, so image switches show.
 - Settings: "Move to a new install" makes a recovery code on the old install and restores it on the new one: tracking, favorites, counts and the feed come across. (Update)
 - Server: cards carry the event, series and each game's result.
-- Badges (when logos and photos are off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code. (Update)
+- Badges (logos and photos off): a team is a circle with a darker sash and its code; a player is a plate with the jersey number over the team code; its cutout fits. (Update)
 - Server: new installs push only for losses, bad news and starts (25 alerts); the rest are Feed only. Installs already out keep their pushes and get the starts on.
 - Server: bad requests get a 400 or 413, new devices are rate limited, share links use our address.
 - Server: saving alert settings rejects a malformed body; one failing device no longer stops the others' alerts.

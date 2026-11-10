@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Avatar, readableOn, tintOf } from './Avatar';
+import { Avatar, cutoutRadius, readableOn, tintOf } from './Avatar';
 import { useStore } from '../lib/store';
 import { GOLD, colors, radius, space } from '../theme';
 import { usePlus } from '../lib/plus';
@@ -170,7 +170,7 @@ export function TargetCard({ target, division, note, actions }: { target: Target
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardHead}>
-          <View style={styles.cardAvatar}><Avatar target={target} size={44} /></View>
+          <View style={[styles.cardAvatar, { borderRadius: cutoutRadius(target, 44) }]}><Avatar target={target} size={44} /></View>
           <View style={styles.cardText}>
             <Text style={styles.cardTitle}>{target.name}</Text>
             <Text style={styles.rowSub}>{[note, subtitle(target), division].filter(Boolean).join(' · ')}</Text>
