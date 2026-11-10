@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useStore } from '../lib/store';
-import { Avatar, readableOn, tintOf } from './Avatar';
+import { Avatar, cutoutRadius, readableOn, tintOf } from './Avatar';
 import { targetHref } from '../lib/alerts';
 import { HaterCount, LeagueTag, TargetCard, subtitle } from './ui';
 import { streakOf, type GameInfo } from '../lib/trackingInfo';
@@ -75,7 +75,7 @@ export function TrackingCard({ target, layout, info, actions }: { target: Target
           <HaterCount target={target} tint={ink} size={11} />
         </View>
         <View style={styles.bannerBody}>
-          <View style={styles.bannerAvatar}><Avatar target={target} size={48} /></View>
+          <View style={[styles.bannerAvatar, { borderRadius: cutoutRadius(target, 48) }]}><Avatar target={target} size={48} /></View>
           <View style={{ flex: 1, gap: 1 }}>
             <Text style={styles.name}>{target.name}</Text>
             <Text style={styles.sub} numberOfLines={1}>{sub(target, info)}</Text>

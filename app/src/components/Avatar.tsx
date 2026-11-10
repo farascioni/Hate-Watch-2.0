@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { sizedImage } from '../lib/images';
-import { colors } from '../theme';
+import { colors, radius } from '../theme';
 import { leagueColor } from '../lib/leagueUi';
 import type { Target } from '../lib/types';
 
@@ -49,7 +49,7 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
       const big = jersey ?? (code === '?' ? target.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() : code);
       const bigSize = Math.round(size * (big.length > 2 ? 0.34 : jersey ? 0.46 : 0.34));
       return (
-        <View style={[styles.wrap, { width: size, height: size, borderRadius: Math.round(size * 0.28), borderColor: fill, backgroundColor: fill }]} accessibilityLabel={target.name}>
+        <View style={[styles.wrap, { width: size, height: size, borderRadius: plateRadius(size), borderColor: fill, backgroundColor: fill }]} accessibilityLabel={target.name}>
           <Text style={{ color: ink, fontSize: bigSize, fontWeight: '900', lineHeight: Math.round(bigSize * 1.05) }} numberOfLines={1}>{big}</Text>
           {jersey && size >= 30 ? <Text style={{ color: ink, opacity: 0.8, fontSize: Math.round(size * 0.18), fontWeight: '800', letterSpacing: 0.5 }} numberOfLines={1}>{code}</Text> : null}
         </View>
@@ -86,6 +86,13 @@ export function Avatar({ target, size = 48 }: { target: Target; size?: number })
 
 /** The colour a target's card, avatar ring and banner take: a team's, a player's team's, an official's league's. */
 export const tintOf = (t: Target) => (t.kind === 'official' ? leagueColor(t.league) : t.kind === 'team' ? t.color : t.teamColor) ?? colors.border;
+
+/** A player drawn as a jersey plate (no photo) is a rounded square; everything else is a circle. */
+const plateRadius = (size: number) => Math.round(size * 0.28);
+const isPlate = (t: Target) => t.kind === 'player' && t.image.startsWith('badge://');
+
+/** The corner radius of the surface-coloured cutout behind an avatar that overlaps a card's colour band: the avatar's own shape plus its padding, so a plate's corners sit inside it instead of poking out. */
+export const cutoutRadius = (t: Target, size: number, pad = 3) => (isPlate(t) ? plateRadius(size) + pad : radius.pill);
 
 /** Black or white text, whichever reads better on a hex background (Alpine yellow, Williams white…). */
 export function readableOn(hex: string) {
