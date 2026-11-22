@@ -84,6 +84,8 @@ export interface GameCtx {
   foulPlays?: Map<string, Set<string>>;
   /** NBA, WNBA: where each counted foul was (who, period, clock): ESPN's second entry for the same stop (a personal foul, then its shooting foul or offensive foul turnover) is the same foul (foulOf). */
   foulSpots?: { actor: string; period?: number; clock: number; key: string }[];
+  /** NBA, WNBA: the poll's plays in order (live.ts sets it before judging them), so a missed shot's numbers are counted from the plays as ESPN has them now (missedShotBody). */
+  plays?: NPlay[];
   /** NBA, WNBA: points scored in a row against each side, for "on a 14-0 run" (teamScoreEvents). */
   run?: { home: number; away: number };
   /** NHL: each goalie's shots faced and goals allowed so far (observePlay), and the ones pulled. */
@@ -1851,6 +1853,48 @@ function lateAndClose(g: GameCtx, p: NPlay, points: number): string {
   return `${mine + points === theirs ? ' to tie it' : ' for the lead'} with ${secs} left`;
 }
 
+/** Streaks shown on a missed shot from this many: a player's misses in a row, and his team's (shortcut: fixed numbers, tune them from replays). */
+const PLAYER_STREAK = 3, TEAM_STREAK = 5;
+const isFieldGoal = (q: NPlay) => q.shooting && !/free throw/i.test(`${q.text} ${q.type}`);
+const isThree = (q: NPlay) => q.shot ? q.shot.points === 3 : /three point/i.test(q.text);
+const shooterOf = (q: NPlay) => role(q, 'shooter')[0] ?? q.participants[0]?.id;
+/** "Jalen Brunson" -> "J. Brunson". */
+const shortName = (n: string) => n === 'Your tracked player' ? n : n.replace(/^(\S)\S*\s+(?=\S)/, '$1. ');
+/** Misses in a row, counting back from the latest of these attempts until a make. */
+const missRun = (shots: NPlay[]) => { let n = 0; for (let i = shots.length - 1; i >= 0 && !shots[i].scoring; i--) n++; return n; };
+
+/**
+ * A missed shot's body: ESPN's words and the score as every play alert has them, then one fact a line: "11/22 FG" (his field goals so far, this one in), the rebounder
+ * when ESPN has posted the rebound ("D. Clingan · 13 reb"), the streaks ("📉 4-straight missed FG", "🧊 3-straight
+ * missed threes", the team's "😱 9-straight missed team FG", "❄️ 7-straight missed team threes") and "🔄 Offensive rebound".
+ * Counted from the poll's plays as ESPN has them now (`g.plays`), never a running count, since ESPN
+ * edits and removes basketball plays. A block is a missed attempt; free throws don't count; a made field goal ends a streak.
+ */
+function missedShotBody(g: GameCtx, p: NPlay, shooter: string): string {
+  const three = isThree(p);
+  const plays = g.plays ?? [];
+  const at = plays.findIndex((q) => q.id === p.id);
+  const upto = at >= 0 ? plays.slice(0, at + 1) : [...plays, p];
+  const fg = upto.filter(isFieldGoal);
+  const mine = fg.filter((q) => shooterOf(q) === shooter), team = fg.filter((q) => q.teamId === p.teamId);
+  const lines = [`${goalWords(g.league, p)} — ${scoreLine(g, p)}`, `${mine.filter((q) => q.scoring).length}/${mine.length} FG`];
+  // The rebound, when ESPN has it: the first rebound after the miss, before the next shot.
+  let reb: NPlay | undefined;
+  if (at >= 0) for (const q of plays.slice(at + 1)) { if (/rebound/i.test(q.type)) { reb = q; break; } if (q.shooting) break; }
+  const rebounder = reb && role(reb, 'rebounder')[0];
+  if (reb && rebounder && catalog.playerByEspn(g.league, rebounder)) { // a rebounder we can't name gets no line
+    const n = plays.slice(0, plays.indexOf(reb) + 1).filter((q) => /rebound/i.test(q.type) && role(q, 'rebounder')[0] === rebounder).length;
+    lines.push(`${shortName(nameOf(g.league, rebounder))} · ${n} reb`);
+  }
+  const streak = (n: number, min: number, line: string) => { if (n >= min) lines.push(line.replace('#', String(n))); };
+  streak(missRun(mine), PLAYER_STREAK, '📉 #-straight missed FG');
+  if (three) streak(missRun(mine.filter(isThree)), PLAYER_STREAK, '🧊 #-straight missed threes');
+  streak(missRun(team), TEAM_STREAK, '😱 #-straight missed team FG');
+  if (three) streak(missRun(team.filter(isThree)), TEAM_STREAK, '❄️ #-straight missed team threes');
+  if (reb && /offensive/i.test(reb.type)) lines.push('🔄 Offensive rebound');
+  return lines.join('\n');
+}
+
 /**
  * Seconds played when a play happened. Basketball: quarters of 12 minutes, the WNBA's 10, overtimes 5, from the clock left. Hockey: ESPN's
  * clock counts up (a goal at "11:31" of the 1st is 11:31 in), periods of 20 minutes; an overtime has no late-score check.
@@ -1901,7 +1945,7 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
       out.push(mk(g, p, `${lg}.missed_free_throw`, actor!, `${nameOf(lg, actor!)} missed a free throw`));
     } else if (/miss/i.test(t)) {
       const title = missedShot(g, p, nameOf(lg, actor!));
-      if (title) out.push(mk(g, p, `${lg}.missed_shot`, actor!, title));
+      if (title) out.push(mk(g, p, `${lg}.missed_shot`, actor!, title, { body: missedShotBody(g, p, actor!) }));
     }
   } else if (/turnover/i.test(`${p.type} ${t}`) && actor && p.participants.length) { // a traveling turnover is typed just "Traveling"
     out.push(mk(g, p, `${lg}.turnover`, actor, `${nameOf(lg, actor)} turned it over`, say === t.replace(/\s+/g, ' ').trim() ? {} : { body: `${say} — ${scoreLine(g, p)}` }));
@@ -1927,7 +1971,8 @@ function nba(g: GameCtx, p: NPlay): Detected[] {
   }
   // A play ESPN posted late alerts with the game's score now, not the old score of its moment.
   const late = lateScore(g, p);
-  if (late) for (const e of out) e.body = `${say} — ${scoreLine(g, late)}`;
+  // A missed shot keeps its stat lines under the first.
+  if (late) for (const e of out) e.body = `${say} — ${scoreLine(g, late)}${e.type.endsWith('.missed_shot') ? e.body.replace(/^[^\n]*/, '') : ''}`;
   // An offensive foul is two plays at one moment ("Offensive Foul", "Offensive Foul Turnover"; a charge likewise): one alert
   // per device, whichever play came first, the other a line on it (GS vs LAL, October 13 2026).
   // Every foul play takes the foul's moment, so ESPN's second entry for the stop (DET at MIN: a personal foul, then 20 seconds on its offensive foul turnover) is a line on the first alert.

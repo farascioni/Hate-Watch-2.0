@@ -173,6 +173,24 @@ test('MLB: chased early, and when "no quality start" came first, a line on it wi
 const nbaCtx = (): any => ({ league: 'nba', gameId: 'B', homeId: '2', awayId: '18', goalies: new Map() });
 const foul = (i: number) => ({ id: `f${i}`, type: 'Personal Foul', typeSlug: '', text: 'Jayson Tatum personal foul', teamId: '2', participants: [{ id: '4065648' }], scoring: false, scoreValue: 0, home: 0, away: 0, at: 0, shooting: false });
 
+test('NBA: a missed shot\'s numbers: under the usual title and first line, his field goals, the rebounder, streaks and an offensive rebound (counted from the plays ESPN has now)', () => {
+  const T = '4065648', other = '9999999'; // Jayson Tatum, Celtics (2), at home to the Knicks (18); a teammate the catalog can't name
+  const shot = (id: string, made: boolean, three: boolean, who = T, team = '2'): any => ({ id, type: 'Jump Shot', typeSlug: '', text: `x ${made ? 'makes' : 'misses'} ${three ? '26-foot three point jumper' : '12-foot jumper'}`, teamId: team,
+    participants: [{ id: who, role: 'shooter' }], scoring: made, scoreValue: made ? (three ? 3 : 2) : 0, home: 50, away: 50, at: 0, shooting: true, periodNum: 2, clockSec: 300, shot: { x: 25, y: three ? 27 : 13, points: three ? 3 : 2 } });
+  const reb = (id: string, who: string, offensive: boolean, team = '2'): any => ({ id, type: `${offensive ? 'Offensive' : 'Defensive'} Rebound`, typeSlug: '', text: 'x rebound', teamId: team, participants: [{ id: who, role: 'rebounder' }], scoring: false, scoreValue: 0, home: 50, away: 50, at: 0, shooting: false });
+  const ft: any = { ...shot('ft', false, false), type: 'Free Throw - 1 of 2', text: 'Jayson Tatum misses free throw 1 of 2' };
+  const plays = [shot('a', true, false), shot('b', false, true), reb('r0', other, true), ft, shot('c', false, true), shot('d', false, false, other), shot('e', false, true), reb('r1', T, true), shot('f', true, true, '1', '18')];
+  const [e] = PLAYER_DETECTORS.nba({ ...nbaCtx(), plays }, plays[6]);
+  assert.equal(e.title, 'Jayson Tatum missed a 26-foot three', 'the title is as before');
+  assert.equal(e.body, ['x misses 26-foot three point jumper — NY 50, BOS 50', '1/4 FG', 'J. Tatum · 1 reb', '📉 3-straight missed FG', '🧊 3-straight missed threes', '🔄 Offensive rebound'].join('\n'),
+    'a free throw is not a field goal; the team (4 misses in a row) is under 5, so no team line; his own rebound, his 1st (the unnamed teammate\'s earlier one is not his)');
+  // No rebound posted yet: no rebounder line, no offensive rebound line.
+  assert.deepEqual(PLAYER_DETECTORS.nba({ ...nbaCtx(), plays: plays.slice(0, 7) }, plays[6])[0].body.split('\n').slice(1), ['1/4 FG', '📉 3-straight missed FG', '🧊 3-straight missed threes']);
+  // A team's streak from 5, and the threes lines only on a three.
+  const brick = Array.from({ length: 5 }, (_, i) => shot(`m${i}`, false, false, i % 2 ? T : other));
+  assert.deepEqual(PLAYER_DETECTORS.nba({ ...nbaCtx(), plays: brick }, brick[4])[0].body.split('\n').slice(1), ['0/3 FG', '📉 3-straight missed FG', '😱 5-straight missed team FG']);
+});
+
 test('NBA: a missed shot says what it was and from how far (ESPN plays from October 2026 preseason games); a heave is no alert', () => {
   const ctx = (homeId: string, awayId: string): any => ({ league: 'nba', gameId: 'B', homeId, awayId, goalies: new Map() });
   const espn = (id: string, type: string, text: string, team: string, away: number, home: number, period: number, clock: string, x: number, y: number, pointsAttempted: number) =>

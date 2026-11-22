@@ -998,6 +998,7 @@ export class GameTracker {
     const led = { home: 0, away: 0 }; // each side's biggest lead before this play ("blew a big lead")
     let held = false; // MLB: a result ahead of this play is settling
     let goalHeld = false; // hockey, basketball: a goal or basket ahead of this play (or this one) has no scorer yet: no score is announced past it
+    if (BASKETBALL.has(league)) this.ctx.plays = plays; // a missed shot's field goals, streaks and rebound are counted from these (missedShotBody)
     for (const p of plays) {
       bump(led, score);
       const prev = score;

@@ -7,14 +7,15 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 
 ## Next build
 
+- NBA and WNBA missed shots add the shooter's FG (11/22), the rebounder, missed-in-a-row streaks and offensive rebounds.
 - Server: long push titles are not cut off.
 - Injury alerts: tracking a player and their team no longer shows one injury twice, and a player reinstated or activated from the injured list no longer alerts.
 - Scores: switching league keeps the My / Playoffs / All highlight right. (Update)
 - Plus: a failed subscription shows the store's error code. (Update)
 - Hate Watch Plus: star an alert to save it; the Feed's Saved chip lists them. A lapse hides the list; resubscribing restores it. (Update)
-- Hate Watch Plus: tracking profiles (like Playoff teams) narrow the Feed and Tracking tab. Alert presets (save, edit, build) set a target's alerts in one tap. Hidden, not deleted, on a lapse. (Update)
+- Hate Watch Plus: tracking profiles narrow the Feed and Tracking tab; presets set a target's alerts in one tap. Hidden, not deleted, on lapse. (Update)
 - Tabs: quick swaps no longer leave a blank screen or freeze the Feed; swipe to switch tabs. (Update)
-- Lock screen scoreboard: an unstarted game shows its start time in your time zone; clock and quarter sit between the teams. One-game Hero adds a live dot, bigger score, leader and venue (after server update). Tap for the box score. (Update)
+- Lock screen scoreboard: an unstarted game shows its local start time; clock and quarter sit between the teams. One-game Hero adds a live dot, bigger score, leader, venue. (Update, after server update)
 - Guide: drawings move on each page, the web guide is dark, and the Feed page says losses, bad news and starts push by default. (Update)
 - Motion: alerts drop in, counts roll, hearts pop, live dots pulse, a loss glints gold, the F1 order slides, and more. Off under Reduce Motion. (Update)
 - Search and Tracking reload on open, so image switches show.
@@ -29,7 +30,7 @@ TestFlight, that heading becomes its build number and a new "Next build" starts 
 - Scores: a "Special Events" view between My and All lists postseason games with teams, scores, the series line and each winner.
 - Scores: "Coming up" lists playoff series starting within 7 days with "Who do you want to lose?". Vote and change it until game 1.
 - Scores: under your vote, an "Alert me about (team) losses" switch, off by default. A series ends it once won.
-- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events, so a doubleheader no longer shows twice. The strip shows the series line, a cell per game (tap for its box score) and the next game's time. (Update; needs the server update.)
+- Scores: a playoff series is one ledger card (with the vote) in My, All and Special Events; a doubleheader no longer shows twice. The strip shows the series, each game (tap for its box score) and the next start. (Update, after server update)
 - Officials: track a referee or umpire from Search (crews show at game time); alerts for overturned calls and game starts, feed only. (Update, after the server deploy)
 - Server: the MLB "Opponent has runners in scoring position" alert sends a second alert in the same half-inning when a runner steals third after the first went out.
 - Tracking: hold a bell to snooze a player or team for 1 day, 3 days or a week. (Update, after the server deploy.)
